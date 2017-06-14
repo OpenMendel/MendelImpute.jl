@@ -11,6 +11,9 @@ X = rand(0:2, n, p)
 n, d = size(X, 1), size(H, 1)
 M = A_mul_Bt(H, H)
 M .*= 2
+for i in 1:d
+    M[i, i] /= 2
+end
 N = A_mul_Bt(X, H)
 N .*= 2
 happair  = zeros(Int, n, 2)

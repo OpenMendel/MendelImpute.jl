@@ -1,5 +1,8 @@
 module MendelImpute
 
-# package code goes here
+export haplopair!, haplopair, haploimpute!
+
+# utilities for haplotyping
+include("haplotyping.jl")
 
 end # module
