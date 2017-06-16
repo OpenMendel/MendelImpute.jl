@@ -161,8 +161,8 @@ function fillgeno!(
     happair::Tuple{AbstractVector, AbstractVector}
     )
 
-    for I in eachindex(X)
-        X[I] = H[happair[I[1], 1], I[2]] + H[happair[I[1], 2], I[2]]
+    @inbounds for j in 1:size(X, 2), i in 1:size(X, 1)
+        X[i, j] = H[happair[1][i], j] + H[happair[2][i], j]
     end
     return nothing
 
@@ -216,28 +216,35 @@ function haploimpute!(
     )
 
     people, snps = size(X)
-    d = size(H, 1)
+    haplotypes = size(H, 1)
     # no need for sliding window
     if nsnps < 3width
         # TODO
     end
 
     # allocate working arrays
-    Xwork = X[:, 1:3width]
-    X1 = view(Xwork, :, 1:width)
-    X2 = view(Xwork, :, ( width + 1):2width)
-    X3 = view(Xwork, :, (2width + 1):3width)
+    Xwork = X[:, 1:3width] # NullableMatrix
+    Xw1    = view(Xwork.values, :, 1:width)
+    Xw23   = view(Xwork.values, :, (width + 1):3width)
+    X23    = view(X.values, :, (width + 1):3width)
     Hwork = H[:, 1:3width]
-    H1 = view(Hwork, :, 1:width)
-    H2 = view(Hwork, :, ( width + 1):2width)
-    H3 = view(Hwork, :, (2width + 1):3width)
-    M        = zeros(eltype(H), d, d)
-    N        = zeros(promote_type(eltype(H), eltype(X.values)), size(Xwork))
-    happair  = zeros(Int, size(Xwork, 1), 2)
-    hapscore = zeros(eltype(N), size(Xwork, 1))
+    H1    = view(H, :, 1:width)
+    M        = zeros(eltype(H), haplotypes, haplotypes)
+    N        = zeros(promote_type(eltype(H), eltype(X.values)), people, haplotypes)
+    happair  = zeros(Int, people), zeros(Int, people)
+    hapscore = zeros(eltype(N), people
 
     # phase and impute window 1
+    if verbose; println("Imputing SNPs 1:$width"); end
     haploimpute!(Xwork, Hwork, M, N, happair, hapscore, maxiters, tolfun)
-    fillgeno!(X1, H1, happair)
+    fillgeno!(Xw1, H1, happair)
+    copy!(Xw23, X23)
+
+    # phase and impute window 2
+    if verbose; println("Imputing SNPs $width+1:2$width"); end
+    haploimpute!(Xwork, Hwork, M, N, happair, hapscore, maxiters, tolfun)
+    fillgeno!(Xw1, H1, happair)
+    copy!(Xw23, X23)
+
 
 end
