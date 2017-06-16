@@ -1,3 +1,5 @@
+using NullableArrays
+
 """
     haplopair!(happair, hapscore, M, N)
 
@@ -5,20 +7,16 @@ Calculate the best pair of haplotypes in `H` for each individual in `X` using
 sufficient statistics `M` and `N`.
 
 # Input
-* `happair`: `n * 2` storage for haplotype index for each individual.
+* `happair`: storage haplotype pair for each individual.
 * `hapmin`: minimum offered by the optimal haplotype pair.
-* `M`: `d x d` matrix with entries `M[i, j] = dot(H[i, :], H[j, :]) +
+* `M`: `d x d` matrix with entries `M[i, j] = 2dot(H[i, :], H[j, :]) +
     sumabs2(H[i, :]) + sumabs2(H[j, :])`, where `H` is the haplotype matrix
     with haplotypes in rows. Only the upper triangular part of `M` is used.
 * `N`: `n x d` matrix `2XH'`, where `X` is the genotype matrix with individuals
     in rows.
-
-# Output
-* `happair`
-* `hapmin`
 """
 function haplopair!(
-    happair::AbstractMatrix,
+    happair::Tuple{AbstractVector, AbstractVector},
     hapmin::Vector,
     M::AbstractMatrix,
     N::AbstractMatrix
@@ -33,12 +31,12 @@ function haplopair!(
             score = mij - N[k, i] - N[k, j]
             if score < hapmin[k]
                 hapmin[k]     = score
-                happair[k, 1] = i
-                happair[k, 2] = j
+                happair[1][k] = i
+                happair[2][k] = j
             end
         end
     end
-    return happair, hapmin
+    return nothing
 
 end
 
@@ -52,7 +50,7 @@ Calculate the best pair of haplotypes in `H` for each individual in `X`.
 * `H`: `d x p` haplotype matrix. Each row is a haplotype.
 
 # Output
-* `happair`: haplotype pair. `X[k, :] ≈ H[happair[k, 1], :] + H[happair[k, 2], :]`
+* `happair`: haplotype pair. `X[k, :] ≈ H[happair[1][k], :] + H[happair[2][k], :]`
 * `hapscore`: haplotyping score. 0 means best. Larger means worse.
 """
 function haplopair(
@@ -64,9 +62,10 @@ function haplopair(
     d        = size(H, 1)
     M        = zeros(eltype(H), d, d)
     N        = zeros(promote_type(eltype(H), eltype(X)), n, d)
-    happair  = zeros(Int, n, 2)
+    happair  = zeros(Int, n), zeros(Int, n)
     hapscore = zeros(eltype(N), n)
     haplopair!(X, H, M, N, happair, hapscore)
+    return happair, hapscore
 
 end
 
@@ -84,17 +83,13 @@ by objective value from optimal haplotype pair.
 * `N`: overwritten by `n x d` matrix `2XH'`.
 * `happair`: haplotype pair. `X[k, :] ≈ H[happair[k, 1], :] + H[happair[k, 2], :]`
 * `hapscore`: haplotyping score. 0 means best. Larger means worse.
-
-# Output
-* `happair`
-* `hapscore`
 """
 function haplopair!(
     X::AbstractMatrix,
     H::AbstractMatrix,
     M::AbstractMatrix,
     N::AbstractMatrix,
-    happair::AbstractMatrix,
+    happair::Tuple{AbstractVector, AbstractVector},
     hapscore::AbstractVector
     )
 
@@ -110,14 +105,16 @@ function haplopair!(
         M[j, j] *= 4
     end
     A_mul_Bt!(N, X, H)
-    N .*= 2
+    for I in eachindex(N)
+        N[I] *= 2
+    end
     haplopair!(happair, hapscore, M, N)
     @inbounds for j in 1:p
         @simd for i in 1:n
-            hapscore[i] += X[i, j] * X[i, j]
+            hapscore[i] += abs2(X[i, j])
         end
     end
-    return happair, hapscore
+    return nothing
 
 end
 
@@ -129,27 +126,24 @@ Fill missing genotypes in `X` according to haplotypes.
 # Input
 * `X`: `n x p` genotype matrix. Each row is an individual.
 * `H`: `d x p` haplotype matrix. Each row is a haplotype.
-* `happair`: pair of haplotypes. `X[k, :] = H[happair[k, 1], :] + H[happair[k, 2], :]`.
-* `missingidx`: `X[missingidx[1][i], missingidx[2][i]]` are missing.
+* `happair`: pair of haplotypes. `X[k, :] = H[happair[1][k], :] + H[happair[2][k], :]`.
 
 # Output
-* `X`: completed genotype matrix.
+* `discrepancy`: sum of squared errors between current values in missing genotypes
+    and the imputed genotypes.
 """
 function fillmissing!(
     X::NullableMatrix,
     H::AbstractMatrix,
-    happair::AbstractMatrix,
+    happair::Tuple{AbstractVector, AbstractVector}
     )
 
-    n, p = size(X)
-    discrepancy = zero(eltype(X))
-    for j in 1:size(X, 2)
-        for i in 1:size(X, 1)
-            if X.isnull[i, j]
-                tmp = H[happair[i, 1], j] + H[happair[i, 2], j]
-                discrepancy += (X.values[i, j] - tmp)^2
-                X.values[i, j] = tmp
-            end
+    discrepancy = zero(eltype(X.values))
+    for j in 1:size(X, 2), i in 1:size(X, 1)
+        if X.isnull[i, j]
+            tmp = H[happair[1][i], j] + H[happair[2][i], j]
+            discrepancy += abs2(X.values[i, j] - tmp)
+            X.values[i, j] = tmp
         end
     end
     return discrepancy
@@ -157,14 +151,36 @@ function fillmissing!(
 end
 
 """
+    fillgeno!(X, H, happair)
+
+Fill in genotypes according to haplotypes.
+"""
+function fillgeno!(
+    X::AbstractMatrix,
+    H::AbstractMatrix,
+    happair::Tuple{AbstractVector, AbstractVector}
+    )
+
+    for I in eachindex(X)
+        X[I] = H[happair[I[1], 1], I[2]] + H[happair[I[1], 2], I[2]]
+    end
+    return nothing
+
+end
+
+
+"""
     haploimpute!(X, H, M, N, happair, hapscore, maxiters=5, tolfun=1e-3)
+
+Haplotying of genotype matrix `X` from the pool of haplotypes `H` and impute
+missing genotypes in `X` according to haplotypes.
 """
 function haploimpute!(
     X::NullableMatrix,
     H::AbstractMatrix,
     M::AbstractMatrix,
     N::AbstractMatrix,
-    happair::AbstractMatrix,
+    happair::Tuple{AbstractVector, AbstractVector},
     hapscore::AbstractVector,
     maxiters::Int  = 1,
     tolfun::Number = 1e-3
@@ -185,5 +201,43 @@ function haploimpute!(
             break
         end
     end
+    return nothing
+
+end
+
+
+function haploimpute!(
+    X::NullableMatrix,
+    H::AbstractMatrix,
+    width::Number = 500,
+    maxiters::Int  = 1,
+    tolfun::Number = 1e-3,
+    verbose::Bool = true
+    )
+
+    people, snps = size(X)
+    d = size(H, 1)
+    # no need for sliding window
+    if nsnps < 3width
+        # TODO
+    end
+
+    # allocate working arrays
+    Xwork = X[:, 1:3width]
+    X1 = view(Xwork, :, 1:width)
+    X2 = view(Xwork, :, ( width + 1):2width)
+    X3 = view(Xwork, :, (2width + 1):3width)
+    Hwork = H[:, 1:3width]
+    H1 = view(Hwork, :, 1:width)
+    H2 = view(Hwork, :, ( width + 1):2width)
+    H3 = view(Hwork, :, (2width + 1):3width)
+    M        = zeros(eltype(H), d, d)
+    N        = zeros(promote_type(eltype(H), eltype(X.values)), size(Xwork))
+    happair  = zeros(Int, size(Xwork, 1), 2)
+    hapscore = zeros(eltype(N), size(Xwork, 1))
+
+    # phase and impute window 1
+    haploimpute!(Xwork, Hwork, M, N, happair, hapscore, maxiters, tolfun)
+    fillgeno!(X1, H1, happair)
 
 end
