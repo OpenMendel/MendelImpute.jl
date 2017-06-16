@@ -7,7 +7,7 @@ Calculate the best pair of haplotypes in `H` for each individual in `X` using
 sufficient statistics `M` and `N`.
 
 # Input
-* `happair`: storage haplotype pair for each individual.
+* `happair`: optimal haplotype pair for each individual.
 * `hapmin`: minimum offered by the optimal haplotype pair.
 * `M`: `d x d` matrix with entries `M[i, j] = 2dot(H[i, :], H[j, :]) +
     sumabs2(H[i, :]) + sumabs2(H[j, :])`, where `H` is the haplotype matrix
@@ -24,10 +24,11 @@ function haplopair!(
 
     n, d = size(N)
     fill!(hapmin, typemax(eltype(hapmin)))
+    # TODO: parallel computing
     @inbounds for j in 1:d, i in 1:j
         mij = M[i, j]
         # loop over individuals
-        @simd for k in 1:n
+        for k in 1:n
             score = mij - N[k, i] - N[k, j]
             if score < hapmin[k]
                 hapmin[k]     = score
@@ -73,15 +74,17 @@ end
     haplopair!(X, H, M, N, happair, hapscore)
 
 Calculate the best pair of haplotypes in `H` for each individual in `X`. Overwite
-`M` by `2HH'`, `N` by `2XH'`, `happair` by optimal haplotype pair, and `hapscore`
-by objective value from optimal haplotype pair.
+`M` by `M[i, j] = 2dot(H[i, :], H[j, :]) + sumabs2(H[i, :]) + sumabs2(H[j, :])`,
+`N` by `2XH'`, `happair` by optimal haplotype pair, and `hapscore` by
+objective value from the optimal haplotype pair.
 
 # Input
 * `X`: `n x p` genotype matrix. Each row is an individual.
 * `H`: `d x p` haplotype matrix. Each row is a haplotype.
-* `M`: overwritten by `d x d` matrix `2HH'` with diagonal `sumabs2(H[i, :])`.
+* `M`: overwritten by `M[i, j] = 2dot(H[i, :], H[j, :]) + sumabs2(H[i, :]) +
+    sumabs2(H[j, :])`.
 * `N`: overwritten by `n x d` matrix `2XH'`.
-* `happair`: haplotype pair. `X[k, :] ≈ H[happair[k, 1], :] + H[happair[k, 2], :]`
+* `happair`: optimal haplotype pair. `X[k, :] ≈ H[happair[k, 1], :] + H[happair[k, 2], :]`
 * `hapscore`: haplotyping score. 0 means best. Larger means worse.
 """
 function haplopair!(
@@ -121,7 +124,8 @@ end
 """
     fillmissing!(X, H, haplopair)
 
-Fill missing genotypes in `X` according to haplotypes.
+Fill in missing genotypes in `X` according to haplotypes. Non-missing gentypes
+remain same.
 
 # Input
 * `X`: `n x p` genotype matrix. Each row is an individual.
@@ -138,8 +142,8 @@ function fillmissing!(
     happair::Tuple{AbstractVector, AbstractVector}
     )
 
-    discrepancy = zero(eltype(X.values))
-    for j in 1:size(X, 2), i in 1:size(X, 1)
+    discrepancy = zero(promote_type(eltype(X.values), eltype(H)))
+    @inbounds for j in 1:size(X, 2), i in 1:size(X, 1)
         if X.isnull[i, j]
             tmp = H[happair[1][i], j] + H[happair[2][i], j]
             discrepancy += abs2(X.values[i, j] - tmp)
@@ -153,7 +157,13 @@ end
 """
     fillgeno!(X, H, happair)
 
-Fill in genotypes according to haplotypes.
+Fill in genotypes according to haplotypes. Both missing and non-missing
+genotypes may be changed.
+
+# Input
+* `X`: `n x p` genotype matrix. Each row is an individual.
+* `H`: `d x p` haplotype matrix. Each row is a haplotype.
+* `happair`: pair of haplotypes. `X[k, :] = H[happair[1][k], :] + H[happair[2][k], :]`.
 """
 function fillgeno!(
     X::AbstractMatrix,
@@ -168,12 +178,51 @@ function fillgeno!(
 
 end
 
+"""
+    initmissing(X)
+
+Initialize the missing values in a nullable matrix `X` by `2 x` allele frequency.
+"""
+function initmissing!(X::NullableMatrix)
+    T = eltype(X.values)
+    for j in 1:size(X, 2)
+        # allele frequency
+        cnnz = 0
+        csum = zero(T)
+        for i in 1:size(X, 1)
+            if ~X.isnull[i, j]
+                cnnz += 1
+                csum += X.values[i, j]
+            end
+        end
+        # set missing values to 2freq
+        imp = csum / cnnz
+        for i in 1:size(X, 1)
+            if X.isnull[i, j]
+                X.values[i, j] = imp
+            end
+        end
+    end
+    return nothing
+end
+
 
 """
-    haploimpute!(X, H, M, N, happair, hapscore, maxiters=5, tolfun=1e-3)
+    haploimpute!(X, H, M, N, happair, hapscore, maxiters=1, tolfun=1e-3)
 
 Haplotying of genotype matrix `X` from the pool of haplotypes `H` and impute
 missing genotypes in `X` according to haplotypes.
+
+# Input
+* `X`: `n x p` nullable matrix. Each row is genotypes of an individual.
+* `H`: `d x p` haplotype matrix. Each row is a haplotype.
+* `M`: overwritten by `M[i, j] = 2dot(H[i, :], H[j, :]) + sumabs2(H[i, :]) +
+    sumabs2(H[j, :])`.
+* `N`: overwritten by `n x d` matrix `2XH'`.
+* `happair`: optimal haplotype pair. `X[k, :] ≈ H[happair[k, 1], :] + H[happair[k, 2], :]`
+* `hapscore`: haplotyping score. 0 means best. Larger means worse.
+* `maxiters`: number of MM iterations. Defaultis 1.
+* `tolfun`: convergence tolerance of MM iterations. Default is 1e-3.
 """
 function haploimpute!(
     X::NullableMatrix,
@@ -206,34 +255,49 @@ function haploimpute!(
 
 end
 
+"""
+    haploimpute!(X, H, width=500, maxiters=5, tolfun=1e-3)
 
+Haplotying of genotype matrix `X` from a pool of haplotypes `H` and impute
+missing genotypes in `X` according to haplotypes.
+
+# Input
+* `X`: `n x p` nullable matrix. Each row is genotypes of an individual.
+* `H`: `d x p` haplotype matrix. Each row is a haplotype.
+* `width`: width of the sliding window.
+* `maxiters`: number of MM iterations. Defaultis 1.
+* `tolfun`: convergence tolerance of MM iterations. Default is 1e-3.
+"""
 function haploimpute!(
     X::NullableMatrix,
     H::AbstractMatrix,
-    width::Number = 500,
+    width::Number  = 500,
     maxiters::Int  = 1,
     tolfun::Number = 1e-3,
-    verbose::Bool = true
+    verbose::Bool  = true
     )
 
-    people, snps = size(X)
-    haplotypes = size(H, 1)
-    # no need for sliding window
-    if snps < 3width
-        # TODO
-    end
-
+    people, snps, haplotypes = size(X, 1), size(X, 2), size(H, 1)
     # allocate working arrays
-    Xwork    = X[:, 1:3width] # NullableMatrix
-    Xw1      = view(Xwork.values, :, 1:width)
-    Xw23     = view(Xwork.values, :, (width + 1):3width)
-    Xwb1     = view(Xwork.isnull, :, 1:width)
-    Xwb23    = view(Xwork.isnull, :, (width + 1):3width)
-    Hwork    = view(H, :, 1:3width)
     M        = zeros(eltype(H), haplotypes, haplotypes)
     N        = zeros(promote_type(eltype(H), eltype(X.values)), people, haplotypes)
     happair  = zeros(Int, people), zeros(Int, people)
     hapscore = zeros(eltype(N), people)
+
+    # no need for sliding window
+    if snps ≤ 3width
+        haploimpute!(X, H, M, N, happair, hapscore, maxiters, tolfun)
+        fillgeno!(X.values, H, happair)
+        return nothing
+    end
+
+    # allocate working arrays
+    Xwork = X[:, 1:3width] # NullableMatrix
+    Xw1   = view(Xwork.values, :, 1:width)
+    Xwb1  = view(Xwork.isnull, :, 1:width)
+    Xw23  = view(Xwork.values, :, (width + 1):3width)
+    Xwb23 = view(Xwork.isnull, :, (width + 1):3width)
+    Hwork = view(H, :, 1:3width)
 
     # number of windows
     windows = floor(Int, snps / width)
@@ -243,9 +307,9 @@ function haploimpute!(
     haploimpute!(Xwork, Hwork, M, N, happair, hapscore, maxiters, tolfun)
     fill!(Xwb1, false)
 
-    # first 1/3: ((w - 2) * width + 1):((w - 1) * width)
+    # first  1/3: ((w - 2) * width + 1):((w - 1) * width)
     # middle 1/3: ((w - 1) * width + 1):(w * width)
-    # last 1/3: (w * width + 1):((w + 1) * width)
+    # last   1/3:       (w * width + 1):((w + 1) * width)
     for w in 2:(windows - 1)
         if verbose
             println("Imputing SNPs $((w - 1) * width + 1):$(w * width)")
@@ -275,43 +339,15 @@ function haploimpute!(
     X1    = view(X.values, :, ((windows - 2) * width + 1):((windows - 1) * width))
     fillgeno!(X1, H1, happair)
     copy!(Xw1, X1)
-    X23   = view(X.values,     :, ((windows - 1) * width + 1):snps)
     H23   = view(H,            :, ((windows - 1) * width + 1):snps)
+    X23   = view(X.values,     :, ((windows - 1) * width + 1):snps)
     Xw23  = view(Xwork.values, :, (width + 1):size(Xwork, 2))
-    copy!(Xw23, X23)
     Xb23  = view(X.isnull,     :, ((windows - 1) * width + 1):snps)
+    copy!(Xw23, X23)
     copy!(Xwb23, Xb23)
     haploimpute!(Xwork, Hwork, M, N, happair, hapscore, maxiters, tolfun)
     fillgeno!(X23, H23, happair)
 
     return nothing
 
-end
-
-"""
-    initmissing(X)
-
-Initialize the missing values in a nullable matrix `X` by `2 x` allele frequency.
-"""
-function initmissing!(X::NullableMatrix)
-    T = eltype(X.values)
-    for j in 1:size(X, 2)
-        # allele frequency
-        cnnz = 0
-        csum = zero(T)
-        for i in 1:size(X, 1)
-            if ~X.isnull[i, j]
-                cnnz += 1
-                csum += X.values[i, j]
-            end
-        end
-        # set missing values to 2freq
-        imp = csum / cnnz
-        for i in 1:size(X, 1)
-            if X.isnull[i, j]
-                X.values[i, j] = imp
-            end
-        end
-    end
-    return nothing
 end
