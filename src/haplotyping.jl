@@ -271,7 +271,7 @@ missing genotypes in `X` according to haplotypes.
 function haploimpute!(
     X::NullableMatrix,
     H::AbstractMatrix,
-    width::Number  = 500,
+    width::Int     = 500,
     maxiters::Int  = 1,
     tolfun::Number = 1e-3,
     verbose::Bool  = true
@@ -347,6 +347,64 @@ function haploimpute!(
     copy!(Xwb23, Xb23)
     haploimpute!(Xwork, Hwork, M, N, happair, hapscore, maxiters, tolfun)
     fillgeno!(X23, H23, happair)
+
+    return nothing
+
+end
+
+"""
+The version not using information from flanking windows.
+"""
+function haploimpute2!(
+    X::NullableMatrix,
+    H::AbstractMatrix,
+    width::Int  = 500,
+    maxiters::Int  = 1,
+    tolfun::Number = 1e-3,
+    verbose::Bool  = true
+    )
+
+    people, snps, haplotypes = size(X, 1), size(X, 2), size(H, 1)
+    # allocate working arrays
+    M        = zeros(eltype(H), haplotypes, haplotypes)
+    N        = zeros(promote_type(eltype(H), eltype(X.values)), people, haplotypes)
+    happair  = zeros(Int, people), zeros(Int, people)
+    hapscore = zeros(eltype(N), people)
+
+    # no need for sliding window
+    if snps ≤ width
+        haploimpute!(X, H, M, N, happair, hapscore, maxiters, tolfun)
+        fillgeno!(X.values, H, happair)
+        return nothing
+    end
+
+    # sliding window
+    windows = floor(Int, snps / width)
+    Xwork   = X[:, 1:width]
+    for w in 1:(windows - 1)
+        if verbose
+            println("Imputing SNPs $((w - 1) * width + 1):$(w * width)")
+        end
+        Hwork = view(H,        :, ((w - 1) * width + 1):(w * width))
+        Xdata = view(X.values, :, ((w - 1) * width + 1):(w * width))
+        Xbool = view(X.isnull, :, ((w - 1) * width + 1):(w * width))
+        #Xwork = NullableMatrix(Xdata, Xbool)
+        #Xwork = view(X, :, ((w - 1) * width + 1):(w * width))
+        copy!(Xwork.values, Xdata)
+        copy!(Xwork.isnull, Xbool)
+        haploimpute!(Xwork, Hwork, M, N, happair, hapscore, maxiters, tolfun)
+        fillgeno!(Xdata, Hwork, happair)
+    end
+
+    # last window
+    if verbose
+        println("Imputing SNPs $((windows - 1) * width + 1):$snps")
+    end
+    Hwork = view(H, :, ((windows - 1) * width + 1):snps)
+    Xwork = X[:, ((windows - 1) * width + 1):snps]
+    Xdata = view(X.values, :, ((windows - 1) * width + 1):snps)
+    haploimpute!(Xwork, Hwork, M, N, happair, hapscore, maxiters, tolfun)
+    fillgeno!(Xdata, Hwork, happair)
 
     return nothing
 
