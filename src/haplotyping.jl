@@ -1,4 +1,5 @@
 using NullableArrays
+import Base.Order: Lexicographic
 
 """
     haplopair!(happair, hapscore, M, N)
@@ -99,10 +100,8 @@ function haplopair!(
     n, p = size(X)
     d    = size(H, 1)
     A_mul_Bt!(M, H, H)
-    for j in 1:d
-        for i in 1:(j - 1)
-            M[i, j] = 2M[i, j] + M[i, i] + M[j, j]
-        end
+    for j in 1:d, i in 1:(j - 1)
+        M[i, j] = 2M[i, j] + M[i, i] + M[j, j]
     end
     for j in 1:d
         M[j, j] *= 4
@@ -408,4 +407,35 @@ function haploimpute2!(
 
     return nothing
 
+end
+
+"""
+    isuniquerows!(isuniq, p, A)
+
+Find unique rows of matrix `A` and indicate them in the vector `isuniq`.
+`isuniq[i] == false` indicates `A[i, :]` is a unique row. `p` is overwritten by
+the permutation vector such that `A[p, :]` has rows sorted in Lexicographic order.
+"""
+function isuniquerows!(
+    isuniq::AbstractVector,
+    p::AbstractVector{<:Integer},
+    A::AbstractMatrix
+    )
+    inds = indices(A,1)
+    T = Base.Sort.slicetypeof(A, inds, :)
+    rows = similar(Vector{T}, indices(A, 1))
+    for i in inds
+        rows[i] = view(A, i, :)
+    end
+    sortperm!(p, rows; order=Lexicographic)
+    fill!(isuniq, false)
+    isuniq[p[1]] = true
+    lastuniq = p[1]
+    for i in 2:length(p)
+        if !isequal(rows[p[i]], rows[lastuniq])
+            isuniq[p[i]] = true
+            lastuniq = p[i]
+        end
+    end
+    return nothing
 end
