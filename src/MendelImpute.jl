@@ -1,6 +1,6 @@
 module MendelImpute
 
-export haplopair!, haplopair, haploimpute!, haploimpute2!, isuniquerows!
+export haplopair!, haplopair, haploimpute!, haploimpute2!, finduniquerows!
 
 # utilities for haplotyping
 include("haplotyping.jl")

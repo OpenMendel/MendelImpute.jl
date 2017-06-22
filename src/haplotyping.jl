@@ -64,9 +64,11 @@ function haplopair(
     d        = size(H, 1)
     M        = zeros(eltype(H), d, d)
     N        = zeros(promote_type(eltype(H), eltype(X)), n, d)
+    uniqhap  = zeros(Bool, d)
+    permhap  = zeros(Int, d)
     happair  = zeros(Int, n), zeros(Int, n)
     hapscore = zeros(eltype(N), n)
-    haplopair!(X, H, M, N, happair, hapscore)
+    haplopair!(X, H, M, N, uniqhap, permhap, happair, hapscore)
     return happair, hapscore
 
 end
@@ -93,6 +95,8 @@ function haplopair!(
     H::AbstractMatrix,
     M::AbstractMatrix,
     N::AbstractMatrix,
+    uniqhap::AbstractVector{Bool},
+    permhap::AbstractVector{<:Integer},
     happair::Tuple{AbstractVector, AbstractVector},
     hapscore::AbstractVector
     )
@@ -110,7 +114,18 @@ function haplopair!(
     for I in eachindex(N)
         N[I] *= 2
     end
-    haplopair!(happair, hapscore, M, N)
+    # find unique rows of H
+    finduniquerows!(uniqhap, permhap, H)
+    Muniq = view(M, uniqhap, uniqhap)
+    Nuniq = view(N,       :, uniqhap)
+    haplopair!(happair, hapscore, Muniq, Nuniq)
+    # translate index into Muniq back to index into M
+    pi, = parentindexes(Muniq)
+    for i in 1:n
+        happair[1][i] = pi[happair[1][i]]
+        happair[2][i] = pi[happair[2][i]]
+    end
+    # adding constant sumabs2(X[i, :]) to the objective value
     @inbounds for j in 1:p
         @simd for i in 1:n
             hapscore[i] += abs2(X[i, j])
@@ -157,7 +172,7 @@ end
     fillgeno!(X, H, happair)
 
 Fill in genotypes according to haplotypes. Both missing and non-missing
-genotypes may be changed.
+genotypes can be changed.
 
 # Input
 * `X`: `n x p` genotype matrix. Each row is an individual.
@@ -228,6 +243,8 @@ function haploimpute!(
     H::AbstractMatrix,
     M::AbstractMatrix,
     N::AbstractMatrix,
+    uniqhap::AbstractVector{Bool},
+    permhap::AbstractVector{<:Integer},
     happair::Tuple{AbstractVector, AbstractVector},
     hapscore::AbstractVector,
     maxiters::Int  = 1,
@@ -238,7 +255,7 @@ function haploimpute!(
     initmissing!(X)
     for iter in 1:maxiters
         # haplotyping
-        haplopair!(X.values, H, M, N, happair, hapscore)
+        haplopair!(X.values, H, M, N, uniqhap, permhap, happair, hapscore)
         # impute missing entries according to current haplotypes
         discrepancy = fillmissing!(X, H, happair)
         #println("discrepancy = $discrepancy")
@@ -280,12 +297,14 @@ function haploimpute!(
     # allocate working arrays
     M        = zeros(eltype(H), haplotypes, haplotypes)
     N        = zeros(promote_type(eltype(H), eltype(X.values)), people, haplotypes)
+    uniqhap  = zeros(Bool, haplotypes)
+    permhap  = collect(1:haplotypes)
     happair  = zeros(Int, people), zeros(Int, people)
     hapscore = zeros(eltype(N), people)
 
     # no need for sliding window
     if snps ≤ 3width
-        haploimpute!(X, H, M, N, happair, hapscore, maxiters, tolfun)
+        haploimpute!(X, H, M, N, uniqhap, permhap, happair, hapscore, maxiters, tolfun)
         fillgeno!(X.values, H, happair)
         return nothing
     end
@@ -296,14 +315,14 @@ function haploimpute!(
     Xwb1  = view(Xwork.isnull, :, 1:width)
     Xw23  = view(Xwork.values, :, (width + 1):3width)
     Xwb23 = view(Xwork.isnull, :, (width + 1):3width)
-    Hwork = view(H, :, 1:3width)
+    Hwork = view(H,            :, 1:3width)
 
     # number of windows
     windows = floor(Int, snps / width)
 
     # phase and impute window 1
     if verbose; println("Imputing SNPs 1:$width"); end
-    haploimpute!(Xwork, Hwork, M, N, happair, hapscore, maxiters, tolfun)
+    haploimpute!(Xwork, Hwork, M, N, uniqhap, permhap, happair, hapscore, maxiters, tolfun)
     fill!(Xwb1, false)
 
     # first  1/3: ((w - 2) * width + 1):((w - 1) * width)
@@ -325,7 +344,7 @@ function haploimpute!(
         copy!(Xwb23, Xb23)
         # phase + impute
         Hwork = view(H, :, ((w - 2) * width + 1):((w + 1) * width))
-        haploimpute!(Xwork, Hwork, M, N, happair, hapscore, maxiters, tolfun)
+        haploimpute!(Xwork, Hwork, M, N, uniqhap, permhap, happair, hapscore, maxiters, tolfun)
     end
 
     # last window
@@ -344,7 +363,7 @@ function haploimpute!(
     Xb23  = view(X.isnull,     :, ((windows - 1) * width + 1):snps)
     copy!(Xw23, X23)
     copy!(Xwb23, Xb23)
-    haploimpute!(Xwork, Hwork, M, N, happair, hapscore, maxiters, tolfun)
+    haploimpute!(Xwork, Hwork, M, N, uniqhap, permhap, happair, hapscore, maxiters, tolfun)
     fillgeno!(X23, H23, happair)
 
     return nothing
@@ -410,19 +429,20 @@ function haploimpute2!(
 end
 
 """
-    isuniquerows!(isuniq, p, A)
+    finduniquerows!(isuniq, p, A)
 
-Find unique rows of matrix `A` and indicate them in the vector `isuniq`.
-`isuniq[i] == false` indicates `A[i, :]` is a unique row. `p` is overwritten by
-the permutation vector such that `A[p, :]` has rows sorted in Lexicographic order.
+Find unique rows of matrix `A`. The function returns `ctrow`, the number of
+unique rows. `uniqrow[1:ctrow]` are the row indices of the unique rows.
+Remaining entries of `uniqrow[ctrow+1:end]` are set to 0. `p` is the permutation
+vector such that `A[p, :]` has rows sorted in Lexicographic order.
 """
-function isuniquerows!(
-    isuniq::AbstractVector,
+function finduniquerows!(
+    isuniq::AbstractVector{Bool},
     p::AbstractVector{<:Integer},
     A::AbstractMatrix
     )
-    inds = indices(A,1)
-    T = Base.Sort.slicetypeof(A, inds, :)
+    inds = indices(A, 1)
+    T = typeof(view(A, 1, :))
     rows = similar(Vector{T}, indices(A, 1))
     for i in inds
         rows[i] = view(A, i, :)
@@ -433,8 +453,8 @@ function isuniquerows!(
     lastuniq = p[1]
     for i in 2:length(p)
         if !isequal(rows[p[i]], rows[lastuniq])
-            isuniq[p[i]] = true
             lastuniq = p[i]
+            isuniq[lastuniq] = true
         end
     end
     return nothing
