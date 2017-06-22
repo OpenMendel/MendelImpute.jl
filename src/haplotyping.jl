@@ -1,5 +1,4 @@
 using NullableArrays
-import Base.Order: Lexicographic
 
 """
     haplopair!(happair, hapscore, M, N)
