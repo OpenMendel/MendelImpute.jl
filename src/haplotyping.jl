@@ -408,34 +408,3 @@ function haploimpute2!(
     return nothing
 
 end
-
-"""
-    isuniquerows!(isuniq, p, A)
-
-Find unique rows of matrix `A` and indicate them in the vector `isuniq`.
-`isuniq[i] == false` indicates `A[i, :]` is a unique row. `p` is overwritten by
-the permutation vector such that `A[p, :]` has rows sorted in Lexicographic order.
-"""
-function isuniquerows!(
-    isuniq::AbstractVector,
-    p::AbstractVector{<:Integer},
-    A::AbstractMatrix
-    )
-    inds = indices(A,1)
-    T = Base.Sort.slicetypeof(A, inds, :)
-    rows = similar(Vector{T}, indices(A, 1))
-    for i in inds
-        rows[i] = view(A, i, :)
-    end
-    sortperm!(p, rows; order=Lexicographic)
-    fill!(isuniq, false)
-    isuniq[p[1]] = true
-    lastuniq = p[1]
-    for i in 2:length(p)
-        if !isequal(rows[p[i]], rows[lastuniq])
-            isuniq[p[i]] = true
-            lastuniq = p[i]
-        end
-    end
-    return nothing
-end
