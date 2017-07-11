@@ -257,7 +257,7 @@ function haploimpute!(
 end
 
 """
-    haploimpute!(X, H, width=500, maxiters=5, tolfun=1e-3)
+    haploimpute!(X, H, width=400)
 
 Haplotying of genotype matrix `X` from a pool of haplotypes `H` and impute
 missing genotypes in `X` according to haplotypes.
@@ -266,15 +266,11 @@ missing genotypes in `X` according to haplotypes.
 * `X`: `n x p` nullable matrix. Each row is genotypes of an individual.
 * `H`: `d x p` haplotype matrix. Each row is a haplotype.
 * `width`: width of the sliding window.
-* `maxiters`: number of MM iterations. Defaultis 1.
-* `tolfun`: convergence tolerance of MM iterations. Default is 1e-3.
 """
 function haploimpute!(
     X::NullableMatrix,
     H::AbstractMatrix,
     width::Int     = 500,
-    maxiters::Int  = 1,
-    tolfun::Number = 1e-3,
     verbose::Bool  = true
     )
 
@@ -286,68 +282,68 @@ function haploimpute!(
     hapscore = zeros(eltype(N), people)
 
     # no need for sliding window
-    if snps ≤ 3width
-        haploimpute!(X, H, M, N, happair, hapscore, maxiters, tolfun)
+    if snps ≤ 2width
+        haploimpute!(X, H, M, N, happair, hapscore)
         fillgeno!(X.values, H, happair)
         return nothing
     end
 
     # allocate working arrays
-    Xwork = X[:, 1:3width] # NullableMatrix
+    Xwork = X[:, 1:2width] # NullableMatrix
     Xw1   = view(Xwork.values, :, 1:width)
     Xwb1  = view(Xwork.isnull, :, 1:width)
-    Xw23  = view(Xwork.values, :, (width + 1):3width)
-    Xwb23 = view(Xwork.isnull, :, (width + 1):3width)
-    Hwork = view(H, :, 1:3width)
+    Xw2   = view(Xwork.values, :, (width + 1):2width)
+    Xwb2  = view(Xwork.isnull, :, (width + 1):2width)
+    Hwork = view(H, :, 1:2width)
 
     # number of windows
     windows = floor(Int, snps / width)
 
     # phase and impute window 1
     if verbose; println("Imputing SNPs 1:$width"); end
-    haploimpute!(Xwork, Hwork, M, N, happair, hapscore, maxiters, tolfun)
+    haploimpute!(Xwork, Hwork, M, N, happair, hapscore)
     fill!(Xwb1, false)
 
-    # first  1/3: ((w - 2) * width + 1):((w - 1) * width)
-    # middle 1/3: ((w - 1) * width + 1):(w * width)
-    # last   1/3:       (w * width + 1):((w + 1) * width)
-    for w in 2:(windows - 1)
+    # first  1/2: ((w - 2) * width + 1):((w - 1) * width)
+    # second 1/2: ((w - 1) * width + 1):(w * width)
+    for w in 2:windows
         if verbose
             println("Imputing SNPs $((w - 1) * width + 1):$(w * width)")
         end
-        # overwrite first 1/3 by phased haplotypes
+        # overwrite first 1/2 by phased haplotypes
         H1    = view(H,        :, ((w - 2) * width + 1):((w - 1) * width))
         X1    = view(X.values, :, ((w - 2) * width + 1):((w - 1) * width))
         fillgeno!(X1, H1, happair)
         copy!(Xw1, X1)
-        # refresh second and third 1/3 to original data
-        X23   = view(X.values, :, ((w - 1) * width + 1):((w + 1) * width))
-        Xb23  = view(X.isnull, :, ((w - 1) * width + 1):((w + 1) * width))
-        copy!(Xw23, X23)
-        copy!(Xwb23, Xb23)
+        # refresh second 1/2 to original data
+        X2    = view(X.values, :, ((w - 1) * width + 1):(w * width))
+        Xb2   = view(X.isnull, :, ((w - 1) * width + 1):(w * width))
+        copy!(Xw2, X2)
+        copy!(Xwb2, Xb2)
         # phase + impute
-        Hwork = view(H, :, ((w - 2) * width + 1):((w + 1) * width))
-        haploimpute!(Xwork, Hwork, M, N, happair, hapscore, maxiters, tolfun)
+        Hwork = view(H, :, ((w - 2) * width + 1):(w * width))
+        haploimpute!(Xwork, Hwork, M, N, happair, hapscore)
     end
 
     # last window
     if verbose
         println("Imputing SNPs $((windows - 1) * width + 1):$snps")
     end
-    Xwork = X[:, ((windows - 2) * width + 1):snps]
-    Hwork = view(H,        :, ((windows - 2) * width + 1):snps)
-    H1    = view(H,        :, ((windows - 2) * width + 1):((windows - 1) * width))
-    X1    = view(X.values, :, ((windows - 2) * width + 1):((windows - 1) * width))
+    Xwork = X[:, ((windows - 1) * width + 1):snps]
+    Hwork = view(H,        :, ((windows - 1) * width + 1):snps)
+    H1    = view(H,        :, ((windows - 1) * width + 1):(windows * width))
+    X1    = view(X.values, :, ((windows - 1) * width + 1):(windows * width))
     fillgeno!(X1, H1, happair)
     copy!(Xw1, X1)
-    H23   = view(H,            :, ((windows - 1) * width + 1):snps)
-    X23   = view(X.values,     :, ((windows - 1) * width + 1):snps)
-    Xw23  = view(Xwork.values, :, (width + 1):size(Xwork, 2))
-    Xb23  = view(X.isnull,     :, ((windows - 1) * width + 1):snps)
-    copy!(Xw23, X23)
-    copy!(Xwb23, Xb23)
-    haploimpute!(Xwork, Hwork, M, N, happair, hapscore, maxiters, tolfun)
-    fillgeno!(X23, H23, happair)
+    H2    = view(H,            :, (windows * width + 1):snps)
+    X2    = view(X.values,     :, (windows * width + 1):snps)
+    Xw2   = view(Xwork.values, :, (width + 1):size(Xwork, 2))
+    Xwb2  = view(Xwork.isnull, :, (width + 1):size(Xwork, 2))
+    Xb2   = view(X.isnull,     :, (windows * width + 1):snps)
+    copy!(Xw2, X2)
+    copy!(Xwb2, Xb2)
+    haploimpute!(Xwork, Hwork, M, N, happair, hapscore)
+    fillgeno!(X2, H2, happair)
 
     return nothing
 
