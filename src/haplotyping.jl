@@ -273,8 +273,6 @@ function haploimpute!(
     X::NullableMatrix,
     H::AbstractMatrix,
     width::Int     = 500,
-    maxiters::Int  = 1,
-    tolfun::Number = 1e-3,
     verbose::Bool  = true
     )
 
@@ -287,7 +285,7 @@ function haploimpute!(
 
     # no need for sliding window
     if snps ≤ 3width
-        haploimpute!(X, H, M, N, happair, hapscore, maxiters, tolfun)
+        haploimpute!(X, H, M, N, happair, hapscore)
         fillgeno!(X.values, H, happair)
         return nothing
     end
@@ -305,7 +303,7 @@ function haploimpute!(
 
     # phase and impute window 1
     if verbose; println("Imputing SNPs 1:$width"); end
-    haploimpute!(Xwork, Hwork, M, N, happair, hapscore, maxiters, tolfun)
+    haploimpute!(Xwork, Hwork, M, N, happair, hapscore)
     fill!(Xwb1, false)
 
     # first  1/3: ((w - 2) * width + 1):((w - 1) * width)
@@ -327,7 +325,7 @@ function haploimpute!(
         copy!(Xwb23, Xb23)
         # phase + impute
         Hwork = view(H, :, ((w - 2) * width + 1):((w + 1) * width))
-        haploimpute!(Xwork, Hwork, M, N, happair, hapscore, maxiters, tolfun)
+        haploimpute!(Xwork, Hwork, M, N, happair, hapscore)
     end
 
     # last window
@@ -344,9 +342,10 @@ function haploimpute!(
     X23   = view(X.values,     :, ((windows - 1) * width + 1):snps)
     Xw23  = view(Xwork.values, :, (width + 1):size(Xwork, 2))
     Xb23  = view(X.isnull,     :, ((windows - 1) * width + 1):snps)
+    Xwb23 = view(Xwork.isnull, :, (width + 1):size(Xwork, 2))
     copy!(Xw23, X23)
     copy!(Xwb23, Xb23)
-    haploimpute!(Xwork, Hwork, M, N, happair, hapscore, maxiters, tolfun)
+    haploimpute!(Xwork, Hwork, M, N, happair, hapscore)
     fillgeno!(X23, H23, happair)
 
     return nothing
