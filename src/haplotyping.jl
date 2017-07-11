@@ -98,17 +98,20 @@ function haplopair!(
 
     n, p = size(X)
     d    = size(H, 1)
+    # assemble M
     A_mul_Bt!(M, H, H)
-    for j in 1:d, i in 1:(j - 1)
+    for j in 1:d, i in 1:(j - 1) # off-diagonal
         M[i, j] = 2M[i, j] + M[i, i] + M[j, j]
     end
-    for j in 1:d
+    for j in 1:d # diagonal
         M[j, j] *= 4
     end
+    # assemble N
     A_mul_Bt!(N, X, H)
     for I in eachindex(N)
         N[I] *= 2
     end
+    # computational routine
     haplopair!(happair, hapscore, M, N)
     @inbounds for j in 1:p
         @simd for i in 1:n
