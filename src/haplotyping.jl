@@ -16,24 +16,25 @@ sufficient statistics `M` and `N`.
     in rows.
 """
 function haplopair!(
-    happair::Tuple{AbstractVector, AbstractVector},
+    happair::Tuple{Vector, Vector},
     hapmin::Vector,
     M::AbstractMatrix,
     N::AbstractMatrix
     )
 
     n, d = size(N)
+#    for i in 1:n
+#        j, k = happair[1][i], happair[2][i]
+#        hapmin[i] = M[j, k] - N[i, j] - N[i, k]
+#    end
     fill!(hapmin, typemax(eltype(hapmin)))
     # TODO: parallel computing
-    @inbounds for j in 1:d, i in 1:j
-        mij = M[i, j]
+    @inbounds for k in 1:d, j in 1:k
         # loop over individuals
-        for k in 1:n
-            score = mij - N[k, i] - N[k, j]
-            if score < hapmin[k]
-                hapmin[k]     = score
-                happair[1][k] = i
-                happair[2][k] = j
+        @simd for i in 1:n
+            score = M[j, k] - N[i, j] - N[i, k]
+            if score < hapmin[i]
+                hapmin[i], happair[1][i], happair[2][i] = score, j, k
             end
         end
     end
@@ -63,7 +64,7 @@ function haplopair(
     d        = size(H, 1)
     M        = zeros(eltype(H), d, d)
     N        = zeros(promote_type(eltype(H), eltype(X)), n, d)
-    happair  = zeros(Int, n), zeros(Int, n)
+    happair  = ones(Int, n), ones(Int, n)
     hapscore = zeros(eltype(N), n)
     haplopair!(X, H, M, N, happair, hapscore)
     return happair, hapscore
@@ -113,6 +114,7 @@ function haplopair!(
     end
     # computational routine
     haplopair!(happair, hapscore, M, N)
+    # supplement the constant terms in objective
     @inbounds for j in 1:p
         @simd for i in 1:n
             hapscore[i] += abs2(X[i, j])
@@ -280,7 +282,7 @@ function haploimpute!(
     # allocate working arrays
     M        = zeros(eltype(H), haplotypes, haplotypes)
     N        = zeros(promote_type(eltype(H), eltype(X.values)), people, haplotypes)
-    happair  = zeros(Int, people), zeros(Int, people)
+    happair  = ones(Int, people), ones(Int, people)
     hapscore = zeros(eltype(N), people)
 
     # no need for sliding window
@@ -307,11 +309,12 @@ function haploimpute!(
     fill!(Xwb1, false)
 
     # first  1/3: ((w - 2) * width + 1):((w - 1) * width)
-    # middle 1/3: ((w - 1) * width + 1):(w * width)
-    # last   1/3:       (w * width + 1):((w + 1) * width)
+    # middle 1/3: ((w - 1) * width + 1):(      w * width)
+    # last   1/3: (      w * width + 1):((w + 1) * width)
     for w in 2:(windows - 1)
         if verbose
             println("Imputing SNPs $((w - 1) * width + 1):$(w * width)")
+            println([happair[1][5], happair[2][5]])
         end
         # overwrite first 1/3 by phased haplotypes
         H1    = view(H,        :, ((w - 2) * width + 1):((w - 1) * width))
@@ -335,19 +338,175 @@ function haploimpute!(
     Xwork = X[:, ((windows - 2) * width + 1):snps]
     Hwork = view(H,        :, ((windows - 2) * width + 1):snps)
     H1    = view(H,        :, ((windows - 2) * width + 1):((windows - 1) * width))
+    H23   = view(H,        :, ((windows - 1) * width + 1):snps)
     X1    = view(X.values, :, ((windows - 2) * width + 1):((windows - 1) * width))
+    X23   = view(X.values, :, ((windows - 1) * width + 1):snps)
+    Xw1   = view(Xwork.values, :, 1:width)
     fillgeno!(X1, H1, happair)
     copy!(Xw1, X1)
-    H23   = view(H,            :, ((windows - 1) * width + 1):snps)
-    X23   = view(X.values,     :, ((windows - 1) * width + 1):snps)
-    Xw23  = view(Xwork.values, :, (width + 1):size(Xwork, 2))
-    Xb23  = view(X.isnull,     :, ((windows - 1) * width + 1):snps)
-    Xwb23 = view(Xwork.isnull, :, (width + 1):size(Xwork, 2))
-    copy!(Xw23, X23)
-    copy!(Xwb23, Xb23)
     haploimpute!(Xwork, Hwork, M, N, happair, hapscore)
     fillgeno!(X23, H23, happair)
 
     return nothing
+
+end
+
+"""
+    continue_haplotype(X, H, happair_prev, happair_next, breakpt)
+
+Find the optimal concatenated haplotypes from unordered haplotype pairs in two
+consecutive windows.
+
+# Input
+* `X`: an `n` vector of genotypes with {0, 1, 2} entries
+* `H`: an `n x d` reference panel of haplotypes with {0, 1} entries
+* `happair_prev`: unordered haplotypes `(i, j)` in the first window
+* `happair_next`: unordered haplotypes `(k, l)` in the next window
+* `breakpt`: break points in the ordered haplotypes
+
+# Output
+`happair_next` and `breakpt` are updated with the optimal configuration.
+"""
+function continue_haplotype(
+    X::AbstractVector,
+    H::AbstractMatrix,
+    happair_prev::Tuple{Int, Int},
+    happair_next::Tuple{Int, Int}
+    )
+
+    i, j = happair_prev
+    k, l = happair_next
+
+    # both strands match
+    if i == k && j == l
+        return (k, l), (-1, -1)
+    end
+
+    if i == l && j == k
+        return (l, k), (-1, -1)
+    end
+
+    # only one strand matches
+    if i == k && j ≠ l
+        breakpt, errors = search_breakpoint(X, H, i, (j, l))
+        return (k, l), (-1, breakpt)
+    elseif i == l && j ≠ k
+        breakpt, errors = search_breakpoint(X, H, i, (j, k))
+        return (l, k), (-1, breakpt)
+    elseif j == k && i ≠ l
+        breakpt, errors = search_breakpoint(X, H, j, (i, l))
+        return (l, k), (breakpt, -1)
+    elseif j == l && i ≠ k
+        breakpt, errors = search_breakpoint(X, H, j, (i, k))
+        return (k, l), (breakpt, -1)
+    end
+
+    # no strand matches
+    # i | j
+    # k | l
+    bkpts1, errors1 = search_breakpoint(X, H, (i, k), (j, l))
+    # i | j
+    # l | k
+    bkpts2, errors2 = search_breakpoint(X, H, (i, l), (j, k))
+    # choose the best one
+    if errors1 < errors2
+        return (k, l), bkpts1
+    else
+        return (l, k), bkpts2
+    end
+
+end
+
+"""
+    search_breakpoint(X, H, s1, s2)
+
+Find the optimal break point between s2[1] and s2[2] in configuration
+s1 | s2[1]
+s1 | s2[2]
+"""
+function search_breakpoint(
+    X::AbstractVector,
+    H::AbstractMatrix,
+    s1::Int,
+    s2::Tuple{Int, Int}
+    )
+
+    # count number of errors if second haplotype is all from H[:, s2[2]]
+    errors = 0
+    for pos in 1:length(X)
+        if !isnull(X[pos])
+            errors += X[pos] ≠ H[pos, s1] + H[pos, s2[2]]
+        end
+    end
+    err_optim  = errors
+    bkpt_optim = 0
+    # extend haplotype H[:, s2[1]] position by position
+    for bkpt in 1:length(X)
+        if !isnull(X[bkpt])
+            errors -= X[bkpt] ≠ H[bkpt, s1] + H[bkpt, s2[2]]
+            errors += X[bkpt] ≠ H[bkpt, s1] + H[bkpt, s2[1]]
+            if errors < err_optim
+                err_optim = errors
+                bkpt_optim = bkpt
+            end
+        end
+    end
+    return bkpt_optim, err_optim
+
+end
+
+"""
+    search_breakpoint(X, H, s1, s2)
+
+Find the optimal break point between s2[1] and s2[2] in configuration
+s1[1] | s2[1]
+s1[2] | s2[2]
+"""
+function search_breakpoint(
+    X::AbstractVector,
+    H::AbstractMatrix,
+    s1::Tuple{Int, Int},
+    s2::Tuple{Int, Int}
+    )
+
+    err_optim   = typemax(Int)
+    bkpts_optim = (0, 0)
+    # search over all combintations of break points in two strands
+    for bkpt1 in 0:length(X)
+        # count number of errors if second haplotype is all from H[:, s2[2]]
+        errors = 0
+        for pos in 1:bkpt1
+            isnull(X[pos]) || (errors += (X[pos] ≠ H[pos, s1[1]] + H[pos, s2[2]]))
+        end
+        for pos in (bkpt1 + 1):length(X)
+            isnull(X[pos]) || (errors += (X[pos] ≠ H[pos, s1[2]] + H[pos, s2[2]]))
+        end
+        if errors < err_optim
+            err_optim = errors
+            bkpts_optim = (bkpt1, 0)
+        end
+        # extend haplotype H[:, s2[1]] position by position
+        for bkpt2 in 1:bkpt1
+            if !isnull(X[bkpt2])
+                errors -= X[bkpt2] ≠ H[bkpt2, s1[1]] + H[bkpt2, s2[2]]
+                errors += X[bkpt2] ≠ H[bkpt2, s1[1]] + H[bkpt2, s2[1]]
+                if errors < err_optim
+                    err_optim = errors
+                    bkpts_optim = (bkpt1, bkpt2)
+                end
+            end
+        end
+        for bkpt2 in (bkpt1 + 1):length(X)
+            if !isnull(X[bkpt2])
+                errors -= X[bkpt2] ≠ H[bkpt2, s1[2]] + H[bkpt2, s2[2]]
+                errors += X[bkpt2] ≠ H[bkpt2, s1[2]] + H[bkpt2, s2[1]]
+                if errors < err_optim
+                    err_optim = errors
+                    bkpts_optim = (bkpt1, bkpt2)
+                end
+            end
+        end
+    end
+    return bkpts_optim, err_optim
 
 end

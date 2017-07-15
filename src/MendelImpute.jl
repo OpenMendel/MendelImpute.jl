@@ -1,6 +1,8 @@
 module MendelImpute
 
-export haplopair!, haplopair, haploimpute!
+export continue_haplotype,
+    haplopair!, haplopair, haploimpute!,
+    search_breakpoint
 
 # utilities for haplotyping
 include("haplotyping.jl")
