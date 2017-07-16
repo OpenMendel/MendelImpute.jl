@@ -260,10 +260,10 @@ function haploimpute!(
 end
 
 """
-    haploimpute!(X, H, width=400, verbose=true)
+    phase(X, H, width=400, verbose=true)
 
-Haplotying of genotype matrix `X` from a pool of haplotypes `H` and impute
-missing genotypes in `X` by sliding windows.
+Phasing (haplotying) of genotype matrix `X` from a pool of haplotypes `H`
+by sliding windows.
 
 # Input
 * `X`: `p x n` nullable matrix. Each column is genotypes of an individual.
@@ -271,28 +271,35 @@ missing genotypes in `X` by sliding windows.
 * `width`: width of the sliding window.
 * `verbose`: display algorithmic information.
 """
-function haploimpute!(
-    X::NullableMatrix,
-    H::AbstractMatrix,
+function phase(
+    X::NullableMatrix{T},
+    H::AbstractMatrix{T},
     width::Int    = 400,
     verbose::Bool = true
-    )
+    ) where T <: Real
 
     people, snps, haplotypes = size(X, 2), size(X, 1), size(H, 2)
     # allocate working arrays
-    M        = zeros(eltype(H), haplotypes, haplotypes)
-    N        = zeros(promote_type(eltype(H), eltype(X.values)), people, haplotypes)
+    M        = zeros(T, haplotypes, haplotypes)
+    N        = zeros(T,     people, haplotypes)
     happair  = ones(Int, people), ones(Int, people)
-    hapscore = zeros(eltype(N), people)
+    hapscore = zeros(T, people)
+    phase    = [HaplotypeMosaicPair(snps) for i in 1:people]
 
     # no need for sliding window
     if snps ≤ 3width
         haploimpute!(X, H, M, N, happair, hapscore)
-        fillgeno!(X.values, H, happair)
-        return nothing
+        for i in 1:people
+            push!(phase[i].strand1.start, 1)
+            push!(phase[i].strand1.haplotypelabel, happair[1][i])
+            push!(phase[i].strand2.start, 1)
+            push!(phase[i].strand2.haplotypelabel, happair[2][i])
+        end
+        return phase
     end
 
     # allocate working arrays
+    happair_prev = deepcopy(happair)
     Xwork = X[1:3width, :] # NullableMatrix
     Xw1   = view(Xwork.values,           1:width , :)
     Xw23  = view(Xwork.values, (width + 1):3width, :)
@@ -306,7 +313,13 @@ function haploimpute!(
     # phase and impute window 1
     if verbose; println("Imputing SNPs 1:$width"); end
     haploimpute!(Xwork, Hwork, M, N, happair, hapscore)
-    fill!(Xwb1, false)
+    #fill!(Xwb1, false)
+    for i in 1:people
+        push!(phase[i].strand1.start, 1)
+        push!(phase[i].strand1.haplotypelabel, happair[1][i])
+        push!(phase[i].strand2.start, 1)
+        push!(phase[i].strand2.haplotypelabel, happair[2][i])
+    end
 
     # first  1/3: ((w - 2) * width + 1):((w - 1) * width)
     # middle 1/3: ((w - 1) * width + 1):(      w * width)
@@ -314,40 +327,75 @@ function haploimpute!(
     for w in 2:(windows - 1)
         if verbose
             println("Imputing SNPs $((w - 1) * width + 1):$(w * width)")
-            println([happair[1][1], happair[2][1]])
         end
-        # overwrite first 1/3 by phased haplotypes
-        H1    = view(       H, ((w - 2) * width + 1):((w - 1) * width), :)
-        X1    = view(X.values, ((w - 2) * width + 1):((w - 1) * width), :)
-        fillgeno!(X1, H1, happair)
-        copy!(Xw1, X1)
-        # refresh second and third 1/3 to original data
-        X23   = view(X.values, ((w - 1) * width + 1):((w + 1) * width), :)
-        Xb23  = view(X.isnull, ((w - 1) * width + 1):((w + 1) * width), :)
-        copy!(Xw23, X23)
-        copy!(Xwb23, Xb23)
-        # phase + impute
+        # sync Xwork and Hwork with original data
         Hwork = view(H, ((w - 2) * width + 1):((w + 1) * width), :)
+        copy!(Xwork, view(X.values, ((w - 2) * width + 1):((w + 1) * width), :))
+        # overwrite first 1/3 according to phased haplotypes
+        Hw1   = view(Hwork, 1:width, :)
+        fillgeno!(Xw1, Hw1, happair)
+        #fill!(Xwb1, false) # TODO DO THIS OR NOT
+        # phase current window
+        copy!(happair_prev[1], happair[1])
+        copy!(happair_prev[2], happair[2])
         haploimpute!(Xwork, Hwork, M, N, happair, hapscore)
+        # find optimal break points and record info into phase
+        Hw12 = view(Hwork, 1:2width, :)
+        for i in 1:people
+            Xi = view(X, ((w - 2) * width + 1):(w * width), i)
+            (happair[1][i], happair[2][i]), bkpts =
+                continue_haplotype(Xi, Hw12,
+                (happair_prev[1][i], happair_prev[2][i]),
+                (     happair[1][i],      happair[2][i]))
+            # strand 1
+            if bkpts[1] > -1 && bkpts[1] < 2width
+                push!(phase[i].strand1.start, (w - 2) * width + 1 + bkpts[1])
+                push!(phase[i].strand1.haplotypelabel, happair[1][i])
+            end
+            # strand 2
+            if bkpts[2] > -1 && bkpts[2] < 2width
+                push!(phase[i].strand2.start, (w - 2) * width + 1 + bkpts[2])
+                push!(phase[i].strand2.haplotypelabel, happair[2][i])
+            end
+            # for debug
+            if i == 1
+                println("happair = ($(happair[1][i]), $(happair[2][i]))")
+                println("bkpts = $bkpts")
+            end
+        end
     end
 
-    # last window
+    # phase last window
     if verbose
         println("Imputing SNPs $((windows - 1) * width + 1):$snps")
     end
     Xwork = X[((windows - 2) * width + 1):snps, :]
     Hwork = view(H,        ((windows - 2) * width + 1):snps, :)
-    H1    = view(H,        ((windows - 2) * width + 1):((windows - 1) * width), :)
-    H23   = view(H,        ((windows - 1) * width + 1):snps, :)
-    X1    = view(X.values, ((windows - 2) * width + 1):((windows - 1) * width), :)
-    X23   = view(X.values, ((windows - 1) * width + 1):snps, :)
+    Hw1   = view(Hwork, 1:width, :)
     Xw1   = view(Xwork.values, 1:width, :)
-    fillgeno!(X1, H1, happair)
-    copy!(Xw1, X1)
+    fillgeno!(Xw1, Hw1, happair)
+    copy!(happair_prev[1], happair[1])
+    copy!(happair_prev[2], happair[2])
     haploimpute!(Xwork, Hwork, M, N, happair, hapscore)
-    fillgeno!(X23, H23, happair)
+    # find optimal break points and record info to phase
+    for i in 1:people
+        (happair[1][i], happair[2][i]), bkpts =
+        continue_haplotype(Xwork[:, i], Hwork,
+            (happair_prev[1][i], happair_prev[2][i]),
+            (happair[1][i], happair[2][i]))
+        # strand 1
+        if bkpts[1] > -1 && bkpts[1] < 2width
+            push!(phase[i].strand1.start, (windows - 2) * width + 1 + bkpts[1])
+            push!(phase[i].strand1.haplotypelabel, happair[1][i])
+        end
+        # strand 2
+        if bkpts[2] > -1 && bkpts[2] < 2width
+            push!(phase[i].strand2.start, (windows - 2) * width + 1 + bkpts[2])
+            push!(phase[i].strand2.haplotypelabel, happair[2][i])
+        end
+    end
 
-    return nothing
+    return phase
 
 end
 
@@ -404,15 +452,15 @@ function continue_haplotype(
     # no strand matches
     # i | j
     # k | l
-    bkpts1, errors1 = search_breakpoint(X, H, (i, k), (j, l))
+    breakpts1, errors1 = search_breakpoint(X, H, (i, k), (j, l))
     # i | j
     # l | k
-    bkpts2, errors2 = search_breakpoint(X, H, (i, l), (j, k))
+    breakpts2, errors2 = search_breakpoint(X, H, (i, l), (j, k))
     # choose the best one
     if errors1 < errors2
-        return (k, l), bkpts1
+        return (k, l), breakpts2
     else
-        return (l, k), bkpts2
+        return (l, k), breakpts2
     end
 
 end
@@ -431,23 +479,26 @@ function search_breakpoint(
     s2::Tuple{Int, Int}
     )
 
+    n = length(X)
     # count number of errors if second haplotype is all from H[:, s2[2]]
     errors = 0
-    for pos in 1:length(X)
+    for pos in 1:n
         if !isnull(X[pos])
-            errors += X[pos] ≠ H[pos, s1] + H[pos, s2[2]]
+            errors += unsafe_get(X[pos]) ≠ H[pos, s1] + H[pos, s2[2]]
         end
     end
-    err_optim  = errors
-    bkpt_optim = 0
+    bkpt_optim, err_optim = 0, errors
+    # quick return if perfect match
+    err_optim == 0 && return 0, 0
     # extend haplotype H[:, s2[1]] position by position
-    for bkpt in 1:length(X)
+    for bkpt in 1:n
         if !isnull(X[bkpt])
-            errors -= X[bkpt] ≠ H[bkpt, s1] + H[bkpt, s2[2]]
-            errors += X[bkpt] ≠ H[bkpt, s1] + H[bkpt, s2[1]]
+            errors -= unsafe_get(X[bkpt]) ≠ H[bkpt, s1] + H[bkpt, s2[2]]
+            errors += unsafe_get(X[bkpt]) ≠ H[bkpt, s1] + H[bkpt, s2[1]]
             if errors < err_optim
-                err_optim = errors
-                bkpt_optim = bkpt
+                bkpt_optim, err_optim = bkpt, errors
+                # quick return if perfect match
+                err_optim == 0 && return bkpt_optim, err_optim
             end
         end
     end
@@ -476,10 +527,10 @@ function search_breakpoint(
         # count number of errors if second haplotype is all from H[:, s2[2]]
         errors = 0
         for pos in 1:bkpt1
-            isnull(X[pos]) || (errors += (X[pos] ≠ H[pos, s1[1]] + H[pos, s2[2]]))
+            isnull(X[pos]) || (errors += (unsafe_get(X[pos]) ≠ H[pos, s1[1]] + H[pos, s2[2]]))
         end
         for pos in (bkpt1 + 1):length(X)
-            isnull(X[pos]) || (errors += (X[pos] ≠ H[pos, s1[2]] + H[pos, s2[2]]))
+            isnull(X[pos]) || (errors += (unsafe_get(X[pos]) ≠ H[pos, s1[2]] + H[pos, s2[2]]))
         end
         if errors < err_optim
             err_optim = errors
@@ -487,9 +538,9 @@ function search_breakpoint(
         end
         # extend haplotype H[:, s2[1]] position by position
         for bkpt2 in 1:bkpt1
-            if !isnull(X[bkpt2])
-                errors -= X[bkpt2] ≠ H[bkpt2, s1[1]] + H[bkpt2, s2[2]]
-                errors += X[bkpt2] ≠ H[bkpt2, s1[1]] + H[bkpt2, s2[1]]
+            if !isnull(X[bkpt2]) && (H[bkpt2, s2[1]] ≠ H[bkpt2, s2[2]])
+                errors -= unsafe_get(X[bkpt2]) ≠ H[bkpt2, s1[1]] + H[bkpt2, s2[2]]
+                errors += unsafe_get(X[bkpt2]) ≠ H[bkpt2, s1[1]] + H[bkpt2, s2[1]]
                 if errors < err_optim
                     err_optim = errors
                     bkpts_optim = (bkpt1, bkpt2)
@@ -497,9 +548,9 @@ function search_breakpoint(
             end
         end
         for bkpt2 in (bkpt1 + 1):length(X)
-            if !isnull(X[bkpt2])
-                errors -= X[bkpt2] ≠ H[bkpt2, s1[2]] + H[bkpt2, s2[2]]
-                errors += X[bkpt2] ≠ H[bkpt2, s1[2]] + H[bkpt2, s2[1]]
+            if !isnull(X[bkpt2]) && (H[bkpt2, s2[1]] ≠ H[bkpt2, s2[2]])
+                errors -= unsafe_get(X[bkpt2]) ≠ H[bkpt2, s1[2]] + H[bkpt2, s2[2]]
+                errors += unsafe_get(X[bkpt2]) ≠ H[bkpt2, s1[2]] + H[bkpt2, s2[1]]
                 if errors < err_optim
                     err_optim = errors
                     bkpts_optim = (bkpt1, bkpt2)
@@ -509,4 +560,28 @@ function search_breakpoint(
     end
     return bkpts_optim, err_optim
 
+end
+
+function impute!(
+    X::AbstractMatrix,
+    H::AbstractMatrix,
+    phase::Vector{HaplotypeMosaicPair}
+    )
+
+    fill!(X, 0)
+    # loop over individuals
+    for i in 1:size(X, 2)
+        for s in 1:(length(phase[i].strand1.start) - 1)
+            idx = phase[i].strand1.start[s]:(phase[i].strand1.start[s + 1] - 1)
+            X[idx, i] = H[idx, phase[i].strand1.haplotypelabel[s]]
+        end
+        idx = phase[i].strand1.start[end]:phase[i].strand1.length
+        X[idx, i] = H[idx, phase[i].strand1.haplotypelabel[end]]
+        for s in 1:(length(phase[i].strand2.start) - 1)
+            idx = phase[i].strand2.start[s]:(phase[i].strand2.start[s + 1] - 1)
+            X[idx, i] += H[idx, phase[i].strand2.haplotypelabel[s]]
+        end
+        idx = phase[i].strand2.start[end]:phase[i].strand2.length
+        X[idx, i] += H[idx, phase[i].strand2.haplotypelabel[end]]
+    end
 end
