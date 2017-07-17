@@ -492,7 +492,7 @@ function search_breakpoint(
     err_optim == 0 && return 0, 0
     # extend haplotype H[:, s2[1]] position by position
     for bkpt in 1:n
-        if !isnull(X[bkpt])
+        if !isnull(X[bkpt]) && H[bkpt, s2[1]] ≠ H[bkpt, s2[2]]
             errors -= unsafe_get(X[bkpt]) ≠ H[bkpt, s1] + H[bkpt, s2[2]]
             errors += unsafe_get(X[bkpt]) ≠ H[bkpt, s1] + H[bkpt, s2[1]]
             if errors < err_optim
@@ -527,18 +527,24 @@ function search_breakpoint(
         # count number of errors if second haplotype is all from H[:, s2[2]]
         errors = 0
         for pos in 1:bkpt1
-            isnull(X[pos]) || (errors += (unsafe_get(X[pos]) ≠ H[pos, s1[1]] + H[pos, s2[2]]))
+            if !isnull(X[pos])
+                errors += unsafe_get(X[pos]) ≠ H[pos, s1[1]] + H[pos, s2[2]]
+            end
         end
         for pos in (bkpt1 + 1):length(X)
-            isnull(X[pos]) || (errors += (unsafe_get(X[pos]) ≠ H[pos, s1[2]] + H[pos, s2[2]]))
+            if !isnull(X[pos])
+                errors += unsafe_get(X[pos]) ≠ H[pos, s1[2]] + H[pos, s2[2]]
+            end
         end
         if errors < err_optim
             err_optim = errors
             bkpts_optim = (bkpt1, 0)
+            # quick return if perfect match
+            err_optim == 0 && return bkpts_optim, err_optim
         end
         # extend haplotype H[:, s2[1]] position by position
         for bkpt2 in 1:bkpt1
-            if !isnull(X[bkpt2]) && (H[bkpt2, s2[1]] ≠ H[bkpt2, s2[2]])
+            if !isnull(X[bkpt2])
                 errors -= unsafe_get(X[bkpt2]) ≠ H[bkpt2, s1[1]] + H[bkpt2, s2[2]]
                 errors += unsafe_get(X[bkpt2]) ≠ H[bkpt2, s1[1]] + H[bkpt2, s2[1]]
                 if errors < err_optim
@@ -548,12 +554,14 @@ function search_breakpoint(
             end
         end
         for bkpt2 in (bkpt1 + 1):length(X)
-            if !isnull(X[bkpt2]) && (H[bkpt2, s2[1]] ≠ H[bkpt2, s2[2]])
+            if !isnull(X[bkpt2])
                 errors -= unsafe_get(X[bkpt2]) ≠ H[bkpt2, s1[2]] + H[bkpt2, s2[2]]
                 errors += unsafe_get(X[bkpt2]) ≠ H[bkpt2, s1[2]] + H[bkpt2, s2[1]]
                 if errors < err_optim
                     err_optim = errors
                     bkpts_optim = (bkpt1, bkpt2)
+                    # quick return if perfect match
+                    err_optim == 0 && return bkpts_optim, err_optim
                 end
             end
         end
