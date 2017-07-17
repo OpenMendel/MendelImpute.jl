@@ -450,18 +450,19 @@ function continue_haplotype(
     end
 
     # no strand matches
-    # i | j
-    # k | l
-    breakpts1, errors1 = search_breakpoint(X, H, (i, k), (j, l))
-    # i | j
-    # l | k
-    breakpts2, errors2 = search_breakpoint(X, H, (i, l), (j, k))
-    # choose the best one
-    if errors1 < errors2
-        return (k, l), breakpts2
-    else
-        return (l, k), breakpts2
-    end
+    # # i | j
+    # # k | l
+    # breakpts1, errors1 = search_breakpoint(X, H, (i, k), (j, l))
+    # # i | j
+    # # l | k
+    # breakpts2, errors2 = search_breakpoint(X, H, (i, l), (j, k))
+    # # choose the best one
+    # if errors1 < errors2
+    #     return (k, l), breakpts2
+    # else
+    #     return (l, k), breakpts2
+    # end
+    return (k, l), (0, 0)
 
 end
 
