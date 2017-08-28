@@ -2,6 +2,3 @@
 *.jl.*.cov
 *.jl.mem
 .DS_Store
-.ipynb_checkpoints
-AFRped_geno.txt
-GBR_data.csv

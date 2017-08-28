@@ -300,8 +300,6 @@ function phase(
 
     # allocate working arrays
     Xwork = X[1:3width, :] # NullableMatrix
-    #Xw1   = view(Xwork, 1:width, :)
-    #Xwb1  = view(Xwork.isnull, 1:width, :)
     Hwork = view(H, 1:3width, :)
     happair_prev = deepcopy(happair)
 
