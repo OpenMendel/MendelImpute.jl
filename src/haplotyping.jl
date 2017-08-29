@@ -421,44 +421,100 @@ function continue_haplotype(
     k, l = happair_next
 
     # both strands match
+    # i | j
+    # k | l
     if i == k && j == l
-        return (k, l), (-1, -1)
+        return (i, j), (-1, -1)
     end
-
+    # i | j
+    # l | k
     if i == l && j == k
-        return (l, k), (-1, -1)
+        return (i, j), (-1, -1)
     end
 
+    tol = 5
     # only one strand matches
+    # i | j
+    # k | l
     if i == k && j ≠ l
-        breakpt, errors = search_breakpoint(X, H, i, (j, l))
-        return (k, l), (-1, breakpt)
+        if columndiff(H, j, l) < tol
+            return (i, j), (-1, -1)
+        else
+            breakpt, errors = search_breakpoint(X, H, i, (j, l))
+            return (k, l), (-1, breakpt)
+        end
+    # i | j
+    # l | k
     elseif i == l && j ≠ k
-        breakpt, errors = search_breakpoint(X, H, i, (j, k))
-        return (l, k), (-1, breakpt)
+        if columndiff(H, j, k) < tol
+            return (i, j), (-1, -1)
+        else
+            breakpt, errors = search_breakpoint(X, H, i, (j, k))
+            return (i, k), (-1, breakpt)
+        end
+    # i | j
+    # l | k
     elseif j == k && i ≠ l
-        breakpt, errors = search_breakpoint(X, H, j, (i, l))
-        return (l, k), (breakpt, -1)
+        if columndiff(H, i, l) < tol
+            return (i, j), (-1, -1)
+        else
+            breakpt, errors = search_breakpoint(X, H, j, (i, l))
+            return (l, j), (breakpt, -1)
+        end
+    # i | j
+    # k | l
     elseif j == l && i ≠ k
-        breakpt, errors = search_breakpoint(X, H, j, (i, k))
-        return (k, l), (breakpt, -1)
+        if columndiff(H, i, k) < tol
+            return (i, j), (-1, -1)
+        else
+            breakpt, errors = search_breakpoint(X, H, j, (i, k))
+            return (k, j), (breakpt, -1)
+        end
     end
 
     # no strand matches
-    # # i | j
-    # # k | l
-    # breakpts1, errors1 = search_breakpoint(X, H, (i, k), (j, l))
-    # # i | j
-    # # l | k
-    # breakpts2, errors2 = search_breakpoint(X, H, (i, l), (j, k))
+    # i | j
+    # k | l
+    if columndiff(H, i, k) < tol # i == k
+        if columndiff(H, j, l) < tol # j == l
+            return (i, j), (-1, -1)
+        else # j ≠ l
+            breakpt, errors = search_breakpoint(X, H, i, (j, l))
+            return (i, l), (-1, breakpt)
+        end
+    else # i ≠ k
+        if columndiff(H, j, l) < tol # j == l
+            breakpt, errors = search_breakpoint(X, H, j, (i, k))
+            return (k, j), (breakpt, -1)
+        else # j ≠ l
+            # breakpts1, errors1 = search_breakpoint(X, H, (i, k), (j, l))
+            return (k, l), (0, 0)
+        end
+    end
+    # i | j
+    # l | k
+    if columndiff(H, i, l) < tol # i == l
+        if columndiff(H, j, k) < tol # j == k
+            return (i, j), (-1, -1)
+        else # j ≠ k
+            breakpt, errors = search_breakpoint(X, H, i, (j, k))
+            return (i, k), (-1, breakpt)
+        end
+    else # i ≠ l
+        if columndiff(H, j, k) < tol # j == k
+            breakpt, errors = search_breakpoint(X, H, j, (i, l))
+            return (l, -1), (breakpt, -1)
+        else # j ≠ k
+            # breakpts2, errors2 = search_breakpoint(X, H, (i, l), (j, k))
+            return (l, k), (0, 0)
+        end
+    end
     # # choose the best one
     # if errors1 < errors2
     #     return (k, l), breakpts2
     # else
     #     return (l, k), breakpts2
     # end
-    return (k, l), (0, 0)
-
 end
 
 """
@@ -588,4 +644,17 @@ function impute!(
         idx = phase[i].strand2.start[end]:phase[i].strand2.length
         X[idx, i] += H[idx, phase[i].strand2.haplotypelabel[end]]
     end
+end
+
+"""
+    columndiff(M, j, k, [p=2])
+
+L1 norm of the difference between the `j`-th and `k`-th columns of a matrix `M`.
+"""
+function columndiff(M::AbstractMatrix, j::Integer, k::Integer)
+    d = zero(eltype(M))
+    @inbounds @simd for i in 1:size(M, 1)
+        d += abs(M[i, j] - M[i, k])
+    end
+    d
 end
