@@ -8,6 +8,7 @@ X2 = Matrix{Union{Missing, eltype(X1)}}(X1);
 X3 = ifelse.(rand(eltype(X1), n, p) .< 0.9, X2, missing);
 
 @benchmark initmissing!(X3) setup=(X3=ifelse.(rand(n, p) .< 0.9, X2, missing))
+@benchmark X4 = convert(Matrix{eltype(X1)}, X2)
 
 using Revise
 using BenchmarkTools

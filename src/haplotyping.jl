@@ -234,7 +234,9 @@ function haploimpute!(
     )
 
     obj = typemax(eltype(hapscore))
-    initmissing!(X) # impute by mean
+    initmissing!(X)
+    X = convert(Matrix{eltype(H)}, X) # quick and dirty fix for speed but wastes memory
+    
     for iter in 1:maxiters
 
         # haplotyping
