@@ -1,5 +1,7 @@
 module MendelImpute
 
+using LinearAlgebra
+
 export continue_haplotype,
     haplopair!, haplopair, haploimpute!,
     impute!, phase,

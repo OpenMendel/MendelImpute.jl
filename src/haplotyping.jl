@@ -1,4 +1,88 @@
-using NullableArrays
+"""
+    haplopair(X, H)
+
+Calculate the best pair of haplotypes in `H` for each individual in `X`. Assumes `X` 
+does not have missing data. 
+
+# Input
+* `X`: `p x n` genotype matrix. Each column is an individual.
+* `H`: `p * d` haplotype matrix. Each column is a haplotype.
+
+# Output
+* `happair`: optimal haplotype pairs. `X[:, k] ≈ H[:, happair[1][k]] + H[:, happair[2][k]]`.
+* `hapscore`: haplotyping score. 0 means best. Larger means worse.
+"""
+function haplopair(
+    X::AbstractMatrix,
+    H::AbstractMatrix
+    )
+
+    p, n     = size(X)
+    d        = size(H, 2)
+    M        = zeros(eltype(H), d, d)
+    N        = zeros(promote_type(eltype(H), eltype(X)), n, d)
+    happair  = ones(Int, n), ones(Int, n)
+    hapscore = zeros(eltype(N), n)
+    haplopair!(X, H, M, N, happair, hapscore)
+
+    return happair, hapscore
+end
+
+"""
+    haplopair!(X, H, M, N, happair, hapscore)
+
+Calculate the best pair of haplotypes in `H` for each individual in `X`. Overwite
+`M` by `M[i, j] = 2dot(H[:, i], H[:, j]) + sumabs2(H[:, i]) + sumabs2(H[:, j])`,
+`N` by `2X'H`, `happair` by optimal haplotype pair, and `hapscore` by
+objective value from the optimal haplotype pair.
+
+# Input
+* `X`: `p x n` genotype matrix. Each row is an individual.
+* `H`: `p x d` haplotype matrix. Each row is a haplotype.
+* `M`: overwritten by `M[i, j] = 2dot(H[:, i], H[:, j]) + sumabs2(H[:, i]) +
+    sumabs2(H[:, j])`.
+* `N`: overwritten by `n x d` matrix `2X'H`.
+* `happair`: optimal haplotype pair. `X[:, k] ≈ H[:, happair[k, 1]] + H[:, happair[k, 2]]`.
+* `hapscore`: haplotyping score. 0 means best. Larger means worse.
+"""
+function haplopair!(
+    X::AbstractMatrix,
+    H::AbstractMatrix,
+    M::AbstractMatrix,
+    N::AbstractMatrix,
+    happair::Tuple{AbstractVector, AbstractVector},
+    hapscore::AbstractVector
+    )
+
+    p, n, d = size(X, 1), size(X, 2), size(H, 2)
+
+    # assemble M
+    mul!(M, Transpose(H), H)
+    for j in 1:d, i in 1:(j - 1) # off-diagonal
+        M[i, j] = 2M[i, j] + M[i, i] + M[j, j]
+    end
+    for j in 1:d # diagonal
+        M[j, j] *= 4
+    end
+
+    # assemble N
+    mul!(N, Transpose(X), H)
+    @simd for I in eachindex(N)
+        N[I] *= 2
+    end
+
+    # computational routine
+    haplopair!(happair, hapscore, M, N)
+
+    # supplement the constant terms in objective
+    @inbounds for j in 1:n
+        @simd for i in 1:p
+            hapscore[j] += abs2(X[i, j])
+        end
+    end
+
+    return nothing
+end
 
 """
     haplopair!(happair, hapscore, M, N)
@@ -38,89 +122,8 @@ function haplopair!(
             end
         end
     end
+
     return nothing
-
-end
-
-"""
-    haplopair(X, H)
-
-Calculate the best pair of haplotypes in `H` for each individual in `X`.
-
-# Input
-* `X`: `p x n` genotype matrix. Each column is an individual.
-* `H`: `p * d` haplotype matrix. Each column is a haplotype.
-
-# Output
-* `happair`: optimal haplotype pairs. `X[:, k] ≈ H[:, happair[1][k]] + H[:, happair[2][k]]`.
-* `hapscore`: haplotyping score. 0 means best. Larger means worse.
-"""
-function haplopair(
-    X::AbstractMatrix,
-    H::AbstractMatrix
-    )
-
-    n, p     = size(X)
-    d        = size(H, 1)
-    M        = zeros(eltype(H), d, d)
-    N        = zeros(promote_type(eltype(H), eltype(X)), n, d)
-    happair  = ones(Int, n), ones(Int, n)
-    hapscore = zeros(eltype(N), n)
-    haplopair!(X, H, M, N, happair, hapscore)
-    return happair, hapscore
-
-end
-
-"""
-    haplopair!(X, H, M, N, happair, hapscore)
-
-Calculate the best pair of haplotypes in `H` for each individual in `X`. Overwite
-`M` by `M[i, j] = 2dot(H[:, i], H[:, j]) + sumabs2(H[:, i]) + sumabs2(H[:, j])`,
-`N` by `2X'H`, `happair` by optimal haplotype pair, and `hapscore` by
-objective value from the optimal haplotype pair.
-
-# Input
-* `X`: `p x n` genotype matrix. Each row is an individual.
-* `H`: `p x d` haplotype matrix. Each row is a haplotype.
-* `M`: overwritten by `M[i, j] = 2dot(H[:, i], H[:, j]) + sumabs2(H[:, i]) +
-    sumabs2(H[:, j])`.
-* `N`: overwritten by `n x d` matrix `2X'H`.
-* `happair`: optimal haplotype pair. `X[:, k] ≈ H[:, happair[k, 1]] + H[:, happair[k, 2]]`.
-* `hapscore`: haplotyping score. 0 means best. Larger means worse.
-"""
-function haplopair!(
-    X::AbstractMatrix,
-    H::AbstractMatrix,
-    M::AbstractMatrix,
-    N::AbstractMatrix,
-    happair::Tuple{AbstractVector, AbstractVector},
-    hapscore::AbstractVector
-    )
-
-    p, n, d = size(X, 1), size(X, 2), size(H, 2)
-    # assemble M
-    At_mul_B!(M, H, H)
-    for j in 1:d, i in 1:(j - 1) # off-diagonal
-        M[i, j] = 2M[i, j] + M[i, i] + M[j, j]
-    end
-    for j in 1:d # diagonal
-        M[j, j] *= 4
-    end
-    # assemble N
-    At_mul_B!(N, X, H)
-    @simd for I in eachindex(N)
-        N[I] *= 2
-    end
-    # computational routine
-    haplopair!(happair, hapscore, M, N)
-    # supplement the constant terms in objective
-    @inbounds for j in 1:n
-        @simd for i in 1:p
-            hapscore[j] += abs2(X[i, j])
-        end
-    end
-    return nothing
-
 end
 
 """
@@ -133,27 +136,19 @@ remain same.
 * `X`: `p x n` genotype matrix. Each column is an individual.
 * `H`: `p x d` haplotype matrix. Each column is a haplotype.
 * `happair`: pair of haplotypes. `X[:, k] = H[:, happair[1][k]] + H[:, happair[2][k]]`.
-
-# Output
-* `discrepancy`: sum of squared errors between current values in missing genotypes
-    and the imputed genotypes.
 """
 function fillmissing!(
-    X::NullableMatrix,
+    X::AbstractMatrix,
     H::AbstractMatrix,
     happair::Tuple{AbstractVector, AbstractVector}
     )
 
-    discrepancy = zero(promote_type(eltype(X.values), eltype(H)))
     @inbounds for j in 1:size(X, 2), i in 1:size(X, 1)
-        if X.isnull[i, j]
-            tmp = H[i, happair[1][j]] + H[i, happair[2][j]]
-            discrepancy   += abs2(X.values[i, j] - tmp)
-            X.values[i, j] = tmp
+        if ismissing(X[i, j])
+            X[i, j] = H[i, happair[1][j]] + H[i, happair[2][j]]
         end
     end
-    return discrepancy
-
+    return nothing
 end
 
 """
@@ -186,30 +181,29 @@ end
 Initialize the missing values in a nullable matrix `X` by `2 x` allele frequency.
 `X` is a `p x n` genotype matrix. Each column is an individual.
 """
-function initmissing!(X::NullableMatrix)
-    T = eltype(X.values)
+function initmissing!(X::AbstractMatrix)
+    T = eltype(X)
     p, n = size(X)
+
     for i in 1:p
         # allele frequency
         cnnz = 0
         csum = zero(T)
         for j in 1:n
-            if !X.isnull[i, j]
+            if !ismissing(X[i, j])
                 cnnz += 1
-                csum += X.values[i, j]
+                csum += X[i, j]
             end
         end
         # set missing values to 2freq
         imp = csum / cnnz
         for j in 1:n
-            if X.isnull[i, j]
-                X.values[i, j] = imp
-            end
+            ismissing(X[i, j]) && (X[i, j] = imp)
         end
     end
+
     return nothing
 end
-
 
 """
     haploimpute!(X, H, M, N, happair, hapscore, maxiters=1, tolfun=1e-3)
@@ -218,18 +212,18 @@ Haplotying of genotype matrix `X` from the pool of haplotypes `H` and impute
 missing genotypes in `X` according to haplotypes.
 
 # Input
-* `X`: `p x n` nullable matrix. Each column is genotypes of an individual.
+* `X`: `p x n` matrix with missing values. Each column is genotypes of an individual.
 * `H`: `p x d` haplotype matrix. Each column is a haplotype.
 * `M`: overwritten by `M[i, j] = 2dot(H[:, i], H[:, j]) + sumabs2(H[:, i]) +
     sumabs2(H[:, j])`.
 * `N`: overwritten by `n x d` matrix `2X'H`.
 * `happair`: optimal haplotype pair. `X[:, k] ≈ H[:, happair[k, 1]] + H[:, happair[k, 2]]`.
 * `hapscore`: haplotyping score. 0 means best. Larger means worse.
-* `maxiters`: number of MM iterations. Defaultis 1.
+* `maxiters`: number of MM iterations. Default is 1.
 * `tolfun`: convergence tolerance of MM iterations. Default is 1e-3.
 """
 function haploimpute!(
-    X::NullableMatrix,
+    X::AbstractMatrix,
     H::AbstractMatrix,
     M::AbstractMatrix,
     N::AbstractMatrix,
@@ -240,23 +234,27 @@ function haploimpute!(
     )
 
     obj = typemax(eltype(hapscore))
-    initmissing!(X)
+    initmissing!(X) # impute by mean
     for iter in 1:maxiters
-        # haplotyping
-        haplopair!(X.values, H, M, N, happair, hapscore)
-        # impute missing entries according to current haplotypes
-        discrepancy = fillmissing!(X, H, happair)
-        #println("discrepancy = $discrepancy")
-        # convergence criterion
-        objold = obj
-        obj = sum(hapscore) - discrepancy
-        #println("iter = $iter, obj = $obj")
-        if abs(obj - objold) < tolfun * (objold + 1)
-            break
-        end
-    end
-    return nothing
 
+        # haplotyping
+        haplopair!(X, H, M, N, happair, hapscore)
+
+        # impute missing entries according to current haplotypes
+        fillmissing!(X, H, happair)
+
+        # CURRENTLY NOT COMPARING ERROR WITH IMPUTATION BY MEAN
+        # println("discrepancy = $discrepancy")
+        # convergence criterion
+        # objold = obj
+        # obj = sum(hapscore) - discrepancy
+        # println("iter = $iter, obj = $obj")
+        # if abs(obj - objold) < tolfun * (objold + 1)
+        #     break
+        # end
+    end
+
+    return nothing
 end
 
 """
@@ -266,13 +264,13 @@ Phasing (haplotying) of genotype matrix `X` from a pool of haplotypes `H`
 by sliding windows.
 
 # Input
-* `X`: `p x n` nullable matrix. Each column is genotypes of an individual.
+* `X`: `p x n` matrix with missing values. Each column is genotypes of an individual.
 * `H`: `p x d` haplotype matrix. Each column is a haplotype.
 * `width`: width of the sliding window.
 * `verbose`: display algorithmic information.
 """
 function phase(
-    X::NullableMatrix{T},
+    X::AbstractMatrix{Union{Missing, T}},
     H::AbstractMatrix{T},
     width::Int    = 400,
     verbose::Bool = true
@@ -299,7 +297,7 @@ function phase(
     end
 
     # allocate working arrays
-    Xwork = X[1:3width, :] # NullableMatrix
+    Xwork = X[1:3width, :]
     #Xw1   = view(Xwork, 1:width, :)
     #Xwb1  = view(Xwork.isnull, 1:width, :)
     Hwork = view(H, 1:3width, :)
@@ -309,7 +307,7 @@ function phase(
     windows = floor(Int, snps / width)
 
     # phase and impute window 1
-    if verbose; println("Imputing SNPs 1:$width"); end
+    verbose && println("Imputing SNPs 1:$width")
     haploimpute!(Xwork, Hwork, M, N, happair, hapscore)
     for i in 1:people
         push!(phase[i].strand1.start, 1)
@@ -327,15 +325,17 @@ function phase(
         end
         # sync Xwork and Hwork with original data
         Hwork = view(H, ((w - 2) * width + 1):((w + 1) * width), :)
-        copy!(Xwork, view(X, ((w - 2) * width + 1):((w + 1) * width), :))
+        copyto!(Xwork, view(X, ((w - 2) * width + 1):((w + 1) * width), :))
         # overwrite first 1/3 according to phased haplotypes
         #Hw1 = view(Hwork, 1:width, :)
         #fillgeno!(Xw1, Hw1, happair)
         #fill!(Xwb1, false) # TODO DO THIS OR NOT
+
         # phase current window
-        copy!(happair_prev[1], happair[1])
-        copy!(happair_prev[2], happair[2])
+        copyto!(happair_prev[1], happair[1])
+        copyto!(happair_prev[2], happair[2])
         haploimpute!(Xwork, Hwork, M, N, happair, hapscore)
+
         # find optimal break points and record info into phase
         Hw12 = view(Hwork, 1:2width, :)
         for i in 1:people
@@ -371,8 +371,8 @@ function phase(
     #Hw1   = view(Hwork, 1:width, :)
     #Xw1   = view(Xwork.values, 1:width, :)
     #fillgeno!(Xw1, Hw1, happair)
-    copy!(happair_prev[1], happair[1])
-    copy!(happair_prev[2], happair[2])
+    copyto!(happair_prev[1], happair[1])
+    copyto!(happair_prev[2], happair[2])
     haploimpute!(Xwork, Hwork, M, N, happair, hapscore)
     # find optimal break points and record info to phase
     for i in 1:people
@@ -393,7 +393,6 @@ function phase(
     end
 
     return phase
-
 end
 
 """
@@ -481,18 +480,20 @@ function search_breakpoint(
     # count number of errors if second haplotype is all from H[:, s2[2]]
     errors = 0
     for pos in 1:n
-        if !isnull(X[pos])
-            errors += unsafe_get(X[pos]) ≠ H[pos, s1] + H[pos, s2[2]]
+        if !ismissing(X[pos])
+            errors += X[pos] ≠ H[pos, s1] + H[pos, s2[2]]
         end
     end
     bkpt_optim, err_optim = 0, errors
+
     # quick return if perfect match
     err_optim == 0 && return 0, 0
+
     # extend haplotype H[:, s2[1]] position by position
     @inbounds for bkpt in 1:n
-        if !isnull(X[bkpt]) && H[bkpt, s2[1]] ≠ H[bkpt, s2[2]]
-            errors -= unsafe_get(X[bkpt]) ≠ H[bkpt, s1] + H[bkpt, s2[2]]
-            errors += unsafe_get(X[bkpt]) ≠ H[bkpt, s1] + H[bkpt, s2[1]]
+        if !ismissing(X[bkpt]) && H[bkpt, s2[1]] ≠ H[bkpt, s2[2]]
+            errors -= X[bkpt] ≠ H[bkpt, s1] + H[bkpt, s2[2]]
+            errors += X[bkpt] ≠ H[bkpt, s1] + H[bkpt, s2[1]]
             if errors < err_optim
                 bkpt_optim, err_optim = bkpt, errors
                 # quick return if perfect match
@@ -500,8 +501,8 @@ function search_breakpoint(
             end
         end
     end
-    return bkpt_optim, err_optim
 
+    return bkpt_optim, err_optim
 end
 
 """
@@ -520,31 +521,35 @@ function search_breakpoint(
 
     err_optim   = typemax(Int)
     bkpts_optim = (0, 0)
+
     # search over all combintations of break points in two strands
     @inbounds for bkpt1 in 0:length(X)
+
         # count number of errors if second haplotype is all from H[:, s2[2]]
         errors = 0
         for pos in 1:bkpt1
-            if !isnull(X[pos])
-                errors += unsafe_get(X[pos]) ≠ H[pos, s1[1]] + H[pos, s2[2]]
+            if !ismissing(X[pos])
+                errors += X[pos] ≠ H[pos, s1[1]] + H[pos, s2[2]]
             end
         end
         for pos in (bkpt1 + 1):length(X)
-            if !isnull(X[pos])
-                errors += unsafe_get(X[pos]) ≠ H[pos, s1[2]] + H[pos, s2[2]]
+            if !ismissing(X[pos])
+                errors += X[pos] ≠ H[pos, s1[2]] + H[pos, s2[2]]
             end
         end
         if errors < err_optim
             err_optim = errors
             bkpts_optim = (bkpt1, 0)
+
             # quick return if perfect match
             err_optim == 0 && return bkpts_optim, err_optim
         end
+
         # extend haplotype H[:, s2[1]] position by position
         for bkpt2 in 1:bkpt1
-            if !isnull(X[bkpt2])
-                errors -= unsafe_get(X[bkpt2]) ≠ H[bkpt2, s1[1]] + H[bkpt2, s2[2]]
-                errors += unsafe_get(X[bkpt2]) ≠ H[bkpt2, s1[1]] + H[bkpt2, s2[1]]
+            if !ismissing(X[bkpt2])
+                errors -= X[bkpt2] ≠ H[bkpt2, s1[1]] + H[bkpt2, s2[2]]
+                errors += X[bkpt2] ≠ H[bkpt2, s1[1]] + H[bkpt2, s2[1]]
                 if errors < err_optim
                     err_optim = errors
                     bkpts_optim = (bkpt1, bkpt2)
@@ -552,9 +557,9 @@ function search_breakpoint(
             end
         end
         for bkpt2 in (bkpt1 + 1):length(X)
-            if !isnull(X[bkpt2])
-                errors -= unsafe_get(X[bkpt2]) ≠ H[bkpt2, s1[2]] + H[bkpt2, s2[2]]
-                errors += unsafe_get(X[bkpt2]) ≠ H[bkpt2, s1[2]] + H[bkpt2, s2[1]]
+            if !ismissing(X[bkpt2])
+                errors -= X[bkpt2] ≠ H[bkpt2, s1[2]] + H[bkpt2, s2[2]]
+                errors += X[bkpt2] ≠ H[bkpt2, s1[2]] + H[bkpt2, s2[1]]
                 if errors < err_optim
                     err_optim = errors
                     bkpts_optim = (bkpt1, bkpt2)
@@ -564,8 +569,8 @@ function search_breakpoint(
             end
         end
     end
-    return bkpts_optim, err_optim
 
+    return bkpts_optim, err_optim
 end
 
 function impute!(
