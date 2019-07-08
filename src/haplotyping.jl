@@ -598,3 +598,64 @@ function impute!(
         X[idx, i] += H[idx, phase[i].strand2.haplotypelabel[end]]
     end
 end
+
+"""
+    filter_redundant_haplotypes(H)
+
+MUCH SLOWER THAN `unique(H, dims=1)`. Filters out repeating columns. 
+
+# Input
+* `H`: an `n x d` reference panel of haplotypes within a genomic window. 
+
+# Output
+* `uH`: reference panel of haplotypes with repeating columns removed
+"""
+function filter_redundant_haplotypes(H::AbstractMatrix)
+    p, d = size(H)
+
+    #compute integer representation of each column in H
+    ints = zeros(BigInt, d)
+    for j in 1:d
+        # concat = join(Int.(@view(H[:, j])))
+        concat  = concats(Int.(@view(H[:, j])))
+        ints[j] = parse(BigInt, concat, base=2)
+    end
+
+    #find all redundant index
+    # sort!(ints)
+    # uints = redundant_index(ints)
+
+    # return H[:, uints]
+end
+
+"""
+
+"""
+function redundant_index(v::AbstractVector)
+    seen = Set{eltype(v)}()
+    lv   = length(v)
+    unique_index = trues(lv)
+
+    @inbounds for i in 1:lv
+        if in(v[i], seen)
+            unique_index[i] = false
+        else
+            push!(seen, v[i])
+        end
+    end
+
+    return unique_index
+end
+
+"""
+    concats(vector) 
+
+Takes a vector, returns a string where all entries are concatenated. 
+"""
+function concats(vector) 
+    io = IOBuffer() 
+    for v in vector 
+        print(io, v) 
+    end 
+    return String(take!(io))
+end

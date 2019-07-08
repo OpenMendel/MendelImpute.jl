@@ -1,3 +1,5 @@
+__precompile__()
+
 module MendelImpute
 
 using LinearAlgebra
@@ -5,7 +7,8 @@ using LinearAlgebra
 export continue_haplotype,
     haplopair!, haplopair, haploimpute!,
     impute!, phase,
-    search_breakpoint
+    search_breakpoint,
+    filter_redundant_haplotypes, concats, redundant_index
 
 """
 Data structure for recording haplotype mosaic of one strand:
