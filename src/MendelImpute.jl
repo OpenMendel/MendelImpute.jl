@@ -3,13 +3,14 @@ __precompile__()
 module MendelImpute
 
 using LinearAlgebra
+using StatsBase
 
 export continue_haplotype,
     haplopair!, haplopair, haploimpute!,
     impute!, phase,
     search_breakpoint,
-    filter_redundant_haplotypes, concats, redundant_index
-
+    unique_haplotypes
+    
 """
 Data structure for recording haplotype mosaic of one strand:
 `start[i]` to `start[i+1]` has haplotype `haplotypelabel[i]`

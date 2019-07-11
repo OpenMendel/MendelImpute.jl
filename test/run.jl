@@ -154,8 +154,8 @@ H = convert(Matrix{Float32}, rand(0:1, p, d))
 p = 512   # number of SNPs within a window
 d = 1_000_000 # number of reference haplotypes
 H = convert(Matrix{Float32}, rand(0:1, p, d))
-@benchmark unique(H, dims=1)               #
-@benchmark filter_redundant_haplotypes(H)  #
+@benchmark unique(H, dims=1)               #7.756 s, 1.91 GiB
+@benchmark filter_redundant_haplotypes(H)  #didn't finish in a few minutes
 
 
 
@@ -184,4 +184,49 @@ end
 
 
 
+
+using Revise
+using MendelImpute
+using Random
+using LinearAlgebra
+using Profile
+using StatsBase
+using Random
+using BenchmarkTools
+
+Random.seed!(123)
+
+function julia_unique(H)
+	uH = unique(H, dims=1)
+	return convert(Matrix{Float32}, uH)  
+end
+
+p = 8     # number of SNPs within a window
+d = 10000 # number of reference haplotypes
+H = bitrand(p, d)
+@benchmark unique_haplotypes(H) #2.603 ms, 194.97 KiB
+@benchmark julia_unique(H)      #2.196 ms, 323.75 KiB
+
+p = 64   # number of SNPs within a window
+d = 10000 # number of reference haplotypes
+H = bitrand(p, d)
+@benchmark unique_haplotypes(H) #9.545 ms, 3.77 MiB
+@benchmark julia_unique(H)      #16.125 ms, 2.53 MiB
+
+p = 128   # number of SNPs within a window
+d = 10000 # number of reference haplotypes
+H = bitrand(p, d)
+@benchmark unique_haplotypes(H) #16.982 ms, 6.70 MiB
+@benchmark julia_unique(H)      #34.475 ms, 5.05 MiB
+
+
+
+
+
+
+
+
+
+
+H = bitrand(8, 10000)
 

@@ -600,62 +600,50 @@ function impute!(
 end
 
 """
-    filter_redundant_haplotypes(H)
+    unique_haplotypes(H::BitArray{2})
 
-MUCH SLOWER THAN `unique(H, dims=1)`. Filters out repeating columns. 
+Finds the unique haplotypes determined by the reference haplotypes stored 
+in the columns of H. 
 
 # Input
-* `H`: an `n x d` reference panel of haplotypes within a genomic window. 
+* `H`: an `p x d` reference panel of haplotypes within a genomic window. 
 
 # Output
-* `uH`: reference panel of haplotypes with repeating columns removed
+* `Hunique`: matrix of unique haplotypes with entries in 32 bit floating point 0's and 1's
+* `Hrank[i]`: the unique haplotype corresponding to reference haplotype i.
 """
-function filter_redundant_haplotypes(H::AbstractMatrix)
-    p, d = size(H)
+function unique_haplotypes(H::BitArray{2})
+    p, d = size(H) 
 
-    #compute integer representation of each column in H
-    ints = zeros(BigInt, d)
-    for j in 1:d
-        # concat = join(Int.(@view(H[:, j])))
-        concat  = concats(Int.(@view(H[:, j])))
-        ints[j] = parse(BigInt, concat, base=2)
+    # reinterpret each haplotype as an integer
+    if p == 8 
+        HR = reinterpret(UInt8, H.chunks) 
+    elseif p == 16
+        HR = reinterpret(UInt16, H.chunks)
+    elseif p == 32
+        HR = reinterpret(UInt32, H.chunks)
+    elseif p == 64
+        HR = reinterpret(UInt64, H.chunks)
+    elseif p == 128
+        HR = reinterpret(UInt128, H.chunks)
+    else
+        return convert(Matrix{Float32}, unique(H, dims=1))
     end
+    
+    Hrank = denserank(HR) # map integers to unique integers with no gap
+    HU    = unique(HR)    # find unique integers
+    n     = length(HU)
+    Hrep  = zeros(Int, n) # representative haplotype for integer 
 
-    #find all redundant index
-    # sort!(ints)
-    # uints = redundant_index(ints)
-
-    # return H[:, uints]
-end
-
-"""
-
-"""
-function redundant_index(v::AbstractVector)
-    seen = Set{eltype(v)}()
-    lv   = length(v)
-    unique_index = trues(lv)
-
-    @inbounds for i in 1:lv
-        if in(v[i], seen)
-            unique_index[i] = false
-        else
-            push!(seen, v[i])
+    m = 0
+    for j = 1:d
+        if Hrep[Hrank[j]] == 0
+            Hrep[Hrank[j]] = j
+            m += 1
+            m == n && break
         end
     end
 
-    return unique_index
-end
-
-"""
-    concats(vector) 
-
-Takes a vector, returns a string where all entries are concatenated. 
-"""
-function concats(vector) 
-    io = IOBuffer() 
-    for v in vector 
-        print(io, v) 
-    end 
-    return String(take!(io))
+    Hunique = convert(Matrix{Float32}, H[:, Hrep])
+    return (Hunique, Hrank)
 end
