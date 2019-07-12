@@ -630,7 +630,7 @@ function unique_haplotypes(H::BitArray{2})
         return convert(Matrix{Float32}, unique(H, dims=1))
     end
     
-    Hrank = denserank(HR) # map integers to unique integers with no gap
+    Hrank = denserank(HR) # map to unique integers with no gap
     HU    = unique(HR)    # find unique integers
     n     = length(HU)
     Hrep  = zeros(Int, n) # representative haplotype for integer 
@@ -646,4 +646,52 @@ function unique_haplotypes(H::BitArray{2})
 
     Hunique = convert(Matrix{Float32}, H[:, Hrep])
     return (Hunique, Hrank)
+end
+
+"""
+    unique_haplotype_idx(H::BitArray{2})
+
+Returns the columns of `H` that are unique. 
+
+# Input
+* `H`: an `p x d` reference panel of haplotypes within a genomic window. 
+
+# Output
+* Vector containing the unique column index of H.
+"""
+function unique_haplotype_idx(H::BitArray{2})
+    p, d = size(H) 
+
+    # reinterpret each haplotype as an integer
+    if p == 8 
+        HR = reinterpret(UInt8, H.chunks) 
+    elseif p == 16
+        HR = reinterpret(UInt16, H.chunks)
+    elseif p == 32
+        HR = reinterpret(UInt32, H.chunks)
+    elseif p == 64
+        HR = reinterpret(UInt64, H.chunks)
+    elseif p == 128
+        HR = reinterpret(UInt128, H.chunks)
+    else
+        throw(ArgumentError("Currently, number of rows should be in {8, 16, 32, 64, 128} but was $p"))
+    end
+
+    return unique_index(HR)
+end
+
+function unique_index(v::AbstractVector)
+    seen = Set{eltype(v)}()
+    lv   = length(v)
+    unique_index = trues(lv)
+
+    @inbounds for i in 1:lv
+        if in(v[i], seen)
+            unique_index[i] = false
+        else
+            push!(seen, v[i])
+        end
+    end
+
+    return unique_index
 end

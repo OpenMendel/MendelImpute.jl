@@ -9,8 +9,8 @@ export continue_haplotype,
     haplopair!, haplopair, haploimpute!,
     impute!, phase,
     search_breakpoint,
-    unique_haplotypes
-    
+    unique_haplotypes, unique_haplotype_idx
+
 """
 Data structure for recording haplotype mosaic of one strand:
 `start[i]` to `start[i+1]` has haplotype `haplotypelabel[i]`

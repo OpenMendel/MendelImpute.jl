@@ -204,29 +204,26 @@ end
 p = 8     # number of SNPs within a window
 d = 10000 # number of reference haplotypes
 H = bitrand(p, d)
-@benchmark unique_haplotypes(H) #2.603 ms, 194.97 KiB
-@benchmark julia_unique(H)      #2.196 ms, 323.75 KiB
+@benchmark unique_haplotypes(H)   #2.603 ms, 194.97 KiB
+@benchmark julia_unique(H)        #2.196 ms, 323.75 KiB
+@benchmark unique_haplotype_idx(H)#155.454 μs, 5.38 KiB
 
 p = 64   # number of SNPs within a window
 d = 10000 # number of reference haplotypes
 H = bitrand(p, d)
-@benchmark unique_haplotypes(H) #9.545 ms, 3.77 MiB
-@benchmark julia_unique(H)      #16.125 ms, 2.53 MiB
+@benchmark unique_haplotypes(H)   #9.545 ms, 3.77 MiB
+@benchmark julia_unique(H)        #16.125 ms, 2.53 MiB
+@benchmark unique_haplotype_idx(H)#445.094 μs, 195.28 KiB
 
 p = 128   # number of SNPs within a window
 d = 10000 # number of reference haplotypes
 H = bitrand(p, d)
-@benchmark unique_haplotypes(H) #16.982 ms, 6.70 MiB
-@benchmark julia_unique(H)      #34.475 ms, 5.05 MiB
+@benchmark unique_haplotypes(H)   #16.982 ms, 6.70 MiB
+@benchmark julia_unique(H)        #34.475 ms, 5.05 MiB
+@benchmark unique_haplotype_idx(H)#1.281 ms, 366.00 KiB
 
 
 
 
 
-
-
-
-
-
-H = bitrand(8, 10000)
 
