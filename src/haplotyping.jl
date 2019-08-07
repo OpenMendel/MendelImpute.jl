@@ -178,14 +178,17 @@ remain same.
 function fillmissing!(
     X::AbstractMatrix,
     H::AbstractMatrix,
-    happair::Tuple{AbstractVector, AbstractVector}
+    happair::Tuple{AbstractVector, AbstractVector},
     )
 
-    @inbounds for j in 1:size(X, 2), i in 1:size(X, 1)
+    p, n = size(X)
+
+    @inbounds for j in 1:n, i in 1:p
         if ismissing(X[i, j])
             X[i, j] = H[i, happair[1][j]] + H[i, happair[2][j]]
         end
     end
+
     return nothing
 end
 
@@ -214,12 +217,19 @@ function fillgeno!(
 end
 
 """
-    initmissing(X)
+    initmissing(X, Xwork)
 
-Initialize the missing values in a nullable matrix `X` by `2 x` allele frequency.
-`X` is a `p x n` genotype matrix. Each column is an individual.
+Initializes the matrix `Xwork` where missing values of matrix `X` by `2 x` allele frequency.
+
+# Input
+* `X` is a `p x n` genotype matrix. Each column is an individual.
+* `Xwork` is the `p x n` matrix of X where missing values are filled by 2x allele frequency. 
 """
-function initmissing!(X::AbstractMatrix)
+function initmissing!(
+    X::AbstractMatrix;
+    Xfloat::AbstractMatrix = zeros(Float32, size(X))
+    )
+    
     T = eltype(X)
     p, n = size(X)
 
@@ -236,7 +246,11 @@ function initmissing!(X::AbstractMatrix)
         # set missing values to 2freq
         imp = csum / cnnz
         for j in 1:n
-            ismissing(X[i, j]) && (X[i, j] = imp)
+            if ismissing(X[i, j]) 
+                Xfloat[i, j] = imp
+            else
+                Xfloat[i, j] = X[i, j]
+            end
         end
     end
 
@@ -257,6 +271,7 @@ missing genotypes in `X` according to haplotypes.
 * `N`: overwritten by `n x d` matrix `2X'H`.
 * `happair`: optimal haplotype pair. `X[:, k] ≈ H[:, happair[k, 1]] + H[:, happair[k, 2]]`.
 * `hapscore`: haplotyping score. 0 means best. Larger means worse.
+* `Xwork`: copy of `X` where missing values are filled with mean. This engages in linear algebra for computing `N`
 * `maxiters`: number of MM iterations. Default is 1.
 * `tolfun`: convergence tolerance of MM iterations. Default is 1e-3.
 """
@@ -266,19 +281,19 @@ function haploimpute!(
     M::AbstractMatrix,
     N::AbstractMatrix,
     happair::Tuple{AbstractVector, AbstractVector},
-    hapscore::AbstractVector,
+    hapscore::AbstractVector;
+    Xfloat::AbstractMatrix = zeros(Float32, size(X)),
     maxiters::Int  = 1,
     tolfun::Number = 1e-3
     )
 
     obj = typemax(eltype(hapscore))
-    initmissing!(X)
-    X = convert(Matrix{eltype(H)}, X) # quick and dirty fix for speed but wastes memory
-    
+    initmissing!(X, Xfloat=Xfloat) #Xfloat[i, j] = X[i, j] on observed entries
+
     for iter in 1:maxiters
 
         # haplotyping
-        haplopair!(X, H, M, N, happair, hapscore)
+        haplopair!(Xfloat, H, M, N, happair, hapscore)
 
         # impute missing entries according to current haplotypes
         fillmissing!(X, H, happair)

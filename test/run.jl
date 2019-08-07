@@ -282,3 +282,35 @@ function run()
 		x .= U \ (L \ b)
 	end
 end
+
+
+
+
+
+using Revise
+using BenchmarkTools
+using MendelImpute
+using Random
+using LinearAlgebra
+using Profile
+
+Random.seed!(123)
+n, p, d = 5000, 500, 500
+H = convert(Matrix{Float32}, rand(0:1, p, d))
+X = convert(Matrix{Float32}, rand(0:2, p, n))
+M = zeros(eltype(H), d, d)
+N = zeros(promote_type(eltype(H), eltype(X)), n, d)
+happair  = zeros(Int, n), zeros(Int, n)
+hapscore = zeros(eltype(N), n)
+missingprop = 0.1
+
+X2 = Matrix{Union{Missing, eltype(X)}}(X)
+X3 = ifelse.(rand(eltype(X), p, n) .< missingprop, missing, X2)
+X3_original = deepcopy(X3)
+
+missing_location = BitArray(undef, size(X))
+findmissing!(X3, missing_location)
+
+@benchmark findmissing!(X3, missing_location) setup=(missing_location = BitArray(undef, size(X3)))
+
+
