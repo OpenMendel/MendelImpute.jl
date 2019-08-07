@@ -227,3 +227,58 @@ H = bitrand(p, d)
 
 
 
+
+### search min in Matrix
+
+using Revise
+using BenchmarkTools
+using MendelImpute
+using Random
+using LinearAlgebra
+using Profile
+
+Random.seed!(123)
+n = 5000 # number of individuals
+p = 500  # number of SNPs
+d = 500  # number of reference haplotypes
+H = convert(Matrix{Float32}, rand(0:1, p, d))
+X = convert(Matrix{Float32}, rand(0:2, p, n))
+M = Transpose(H) * H
+for j in 1:d, i in 1:(j - 1) # off-diagonal
+    M[i, j] = 2M[i, j] + M[i, i] + M[j, j]
+end
+for j in 1:d # diagonal
+    M[j, j] *= 4
+end
+N = Transpose(X) * H
+for I in eachindex(N)
+    N[I] *= 2
+end
+
+happair  = zeros(Int, n), zeros(Int, n)
+hapscore = zeros(eltype(N), n)
+haplopair!(happair, hapscore, M, N)
+
+
+M_col_min = zeros(eltype(N), d)
+M_min_pos = zeros(Int, d)
+happair2  = zeros(Int, n), zeros(Int, n)
+hapscore2 = zeros(eltype(N), n)
+haplopair2!(happair2, hapscore2, M, N, M_col_min=M_col_min, M_min_pos=M_min_pos)
+
+all(happair .== happair2)
+all(hapscore .== hapscore2)
+[happair[1] happair[2] happair2[1] happair2[2]]
+[hapscore hapscore2]
+
+@benchmark haplopair!(happair, hapscore, M, N) #432.302 ms, 0 bytes
+@benchmark haplopair2!(happair2, hapscore2, M, N, M_col_min=M_col_min, M_min_pos=M_min_pos) #542.754 ms, 64 bytes
+
+
+
+function run()
+	b = ones(100)
+	for i in 1:100
+		x .= U \ (L \ b)
+	end
+end
