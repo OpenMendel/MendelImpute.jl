@@ -115,7 +115,7 @@ function haplopair!(
     # TODO: parallel computing
     @inbounds for k in 1:d, j in 1:k
         # loop over individuals
-        @simd for i in 1:n
+        for i in 1:n
             score = M[j, k] - N[i, j] - N[i, k]
             if score < hapmin[i]
                 hapmin[i], happair[1][i], happair[2][i] = score, j, k
@@ -219,11 +219,11 @@ end
 """
     initmissing(X, Xwork)
 
-Initializes the matrix `Xwork` where missing values of matrix `X` by `2 x` allele frequency.
+Initializes the matrix `Xfloat` where missing values of matrix `X` by `2 x` allele frequency.
 
 # Input
 * `X` is a `p x n` genotype matrix. Each column is an individual.
-* `Xwork` is the `p x n` matrix of X where missing values are filled by 2x allele frequency. 
+* `Xfloat` is the `p x n` matrix of X where missing values are filled by 2x allele frequency. 
 """
 function initmissing!(
     X::AbstractMatrix;
@@ -271,7 +271,7 @@ missing genotypes in `X` according to haplotypes.
 * `N`: overwritten by `n x d` matrix `2X'H`.
 * `happair`: optimal haplotype pair. `X[:, k] ≈ H[:, happair[k, 1]] + H[:, happair[k, 2]]`.
 * `hapscore`: haplotyping score. 0 means best. Larger means worse.
-* `Xwork`: copy of `X` where missing values are filled with mean. This engages in linear algebra for computing `N`
+* `Xfloat`: copy of `X` where missing values are filled with mean. This engages in linear algebra for computing `N`
 * `maxiters`: number of MM iterations. Default is 1.
 * `tolfun`: convergence tolerance of MM iterations. Default is 1e-3.
 """
@@ -353,9 +353,13 @@ function phase(
 
     # allocate working arrays
     Xwork = X[1:3width, :]
-    #Xw1   = view(Xwork, 1:width, :)
-    #Xwb1  = view(Xwork.isnull, 1:width, :)
-    Hwork = view(H, 1:3width, :)
+    Xwork_float = zeros(T, size(Xwork))
+    if eltype(H) == Bool
+        unique_hap_idx = unique_haplotype_idx(view(H, 1:3width, :))
+        Hwork = view(H, 1:3width, unique_hap_idx)
+    else
+        Hwork = view(H, 1:3width, :)
+    end
     happair_prev = deepcopy(happair)
 
     # number of windows
@@ -363,7 +367,7 @@ function phase(
 
     # phase and impute window 1
     verbose && println("Imputing SNPs 1:$width")
-    haploimpute!(Xwork, Hwork, M, N, happair, hapscore)
+    haploimpute!(Xwork, Hwork, M, N, happair, hapscore, Xfloat=Xwork_float)
     for i in 1:people
         push!(phase[i].strand1.start, 1)
         push!(phase[i].strand1.haplotypelabel, happair[1][i])
@@ -379,17 +383,18 @@ function phase(
             println("Imputing SNPs $((w - 1) * width + 1):$(w * width)")
         end
         # sync Xwork and Hwork with original data
-        Hwork = view(H, ((w - 2) * width + 1):((w + 1) * width), :)
+        if eltype(H) == Bool
+            unique_hap_idx = unique_haplotype_idx(view(H, ((w - 2) * width + 1):((w + 1) * width), :))
+            Hwork = view(H, ((w - 2) * width + 1):((w + 1) * width), unique_hap_idx)
+        else
+            Hwork = view(H, ((w - 2) * width + 1):((w + 1) * width), :)
+        end
         copyto!(Xwork, view(X, ((w - 2) * width + 1):((w + 1) * width), :))
-        # overwrite first 1/3 according to phased haplotypes
-        #Hw1 = view(Hwork, 1:width, :)
-        #fillgeno!(Xw1, Hw1, happair)
-        #fill!(Xwb1, false) # TODO DO THIS OR NOT
 
         # phase current window
         copyto!(happair_prev[1], happair[1])
         copyto!(happair_prev[2], happair[2])
-        haploimpute!(Xwork, Hwork, M, N, happair, hapscore)
+        haploimpute!(Xwork, Hwork, M, N, happair, hapscore, Xfloat=Xwork_float)
 
         # find optimal break points and record info into phase
         Hw12 = view(Hwork, 1:2width, :)
@@ -422,13 +427,16 @@ function phase(
         println("Imputing SNPs $((windows - 1) * width + 1):$snps")
     end
     Xwork = X[((windows - 2) * width + 1):snps, :]
-    Hwork = view(H, ((windows - 2) * width + 1):snps, :)
-    #Hw1   = view(Hwork, 1:width, :)
-    #Xw1   = view(Xwork.values, 1:width, :)
-    #fillgeno!(Xw1, Hw1, happair)
+    if eltype(H) == Bool
+        unique_hap_idx = unique_haplotype_idx(view(H, ((windows - 2) * width + 1):snps, :))
+        Hwork = view(H, ((windows - 2) * width + 1):snps, unique_hap_idx)
+    else
+        Hwork = view(H, ((windows - 2) * width + 1):snps, :)
+    end
     copyto!(happair_prev[1], happair[1])
     copyto!(happair_prev[2], happair[2])
     haploimpute!(Xwork, Hwork, M, N, happair, hapscore)
+
     # find optimal break points and record info to phase
     for i in 1:people
         (happair[1][i], happair[2][i]), bkpts =
@@ -500,19 +508,6 @@ function continue_haplotype(
         return (k, l), (breakpt, -1)
     end
 
-    # no strand matches
-    # # i | j
-    # # k | l
-    # breakpts1, errors1 = search_breakpoint(X, H, (i, k), (j, l))
-    # # i | j
-    # # l | k
-    # breakpts2, errors2 = search_breakpoint(X, H, (i, l), (j, k))
-    # # choose the best one
-    # if errors1 < errors2
-    #     return (k, l), breakpts2
-    # else
-    #     return (l, k), breakpts2
-    # end
     return (k, l), (0, 0)
 
 end
