@@ -324,3 +324,25 @@ findmissing!(X3, missing_location)
 @benchmark findmissing!(X3, missing_location) setup=(missing_location = BitArray(undef, size(X3)))
 
 
+
+
+
+
+using Revise
+using BenchmarkTools
+using MendelImpute
+using Random
+using LinearAlgebra
+using Profile
+
+H = rand(1000, 1000)
+H[:, 1] .= H[:, 2]
+groupslices(H, 1)
+
+@benchmark groupslices(H, 1)
+
+@benchmark unique(H, dims=1)
+
+
+
+

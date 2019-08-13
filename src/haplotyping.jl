@@ -660,6 +660,127 @@ in the columns of H.
 * `Hunique`: matrix of unique haplotypes with entries in 32 bit floating point 0's and 1's
 * `Hrank[i]`: the unique haplotype corresponding to reference haplotype i.
 """
+function unique_haplotypes(H::AbstractMatrix, windows, width)
+
+    if eltype(H) == Bool
+        hap_index = unique_haplotype_idx(H)
+        return view(H, 1:3width, hap_index)
+    end
+
+    p, d = size(H) 
+    
+
+
+    # first  1/3: ((w - 2) * width + 1):((w - 1) * width)
+    # middle 1/3: ((w - 1) * width + 1):(      w * width)
+    # last   1/3: (      w * width + 1):((w + 1) * width)
+end
+
+"""
+    groupslices(A, dim)
+
+Returns a vector of integers where each integer element of the returned vector
+is a group number corresponding to the unique slices along dimension `dim` as
+returned from `unique(A, dim)`, where `A` can be a multidimensional array.
+
+# Example usage:
+If `C = unique(A, dim)`, `ic = groupslices(A, dim)`, and
+`ndims(A) == ndims(C) == 3`, then:
+```
+if dim == 1
+   all(A .== C[ic,:,:])
+elseif dim == 2
+   all(A .== C[:,ic,:])
+elseif dim == 3
+   all(A .== C[:,:,ic])
+end
+```
+
+Function from: https://github.com/mcabbott/GroupSlices.jl/blob/master/src/GroupSlices.jl
+Wait until this gets resolved: https://github.com/JuliaLang/julia/issues/1845 
+
+"""
+@generated function groupslices(A::AbstractArray{T,N}, dim::Int) where {T,N}
+    quote
+        if !(1 <= dim <= $N)
+            ArgumentError("Input argument dim must be 1 <= dim <= $N, but is currently $dim")
+        end
+        hashes = zeros(UInt, size(A, dim))
+
+        # Compute hash for each row
+        k = 0
+        @nloops $N i A d->(if d == dim; k = i_d; end) begin
+            @inbounds hashes[k] = hash(hashes[k], hash((@nref $N A i)))
+        end
+
+        # Collect index of first row for each hash
+        uniquerow = Vector{Int}(undef, size(A, dim))
+        firstrow = Dict{Prehashed,Int}()
+        for k = 1:size(A, dim)
+            uniquerow[k] = get!(firstrow, Prehashed(hashes[k]), k)
+        end
+        uniquerows = collect(values(firstrow))
+
+        # Check for collisions
+        collided = falses(size(A, dim))
+        @inbounds begin
+            @nloops $N i A d->(if d == dim
+                k = i_d
+                j_d = uniquerow[k]
+            else
+                j_d = i_d
+            end) begin
+                if (@nref $N A j) != (@nref $N A i)
+                    collided[k] = true
+                end
+            end
+        end
+
+        if any(collided)
+            nowcollided = BitArray(size(A, dim))
+            while any(collided)
+                # Collect index of first row for each collided hash
+                empty!(firstrow)
+                for j = 1:size(A, dim)
+                    collided[j] || continue
+                    uniquerow[j] = get!(firstrow, Prehashed(hashes[j]), j)
+                end
+                for v in values(firstrow)
+                    push!(uniquerows, v)
+                end
+
+                # Check for collisions
+                fill!(nowcollided, false)
+                @nloops $N i A d->begin
+                    if d == dim
+                        k = i_d
+                        j_d = uniquerow[k]
+                        (!collided[k] || j_d == k) && continue
+                    else
+                        j_d = i_d
+                    end
+                end begin
+                    if (@nref $N A j) != (@nref $N A i)
+                        nowcollided[k] = true
+                    end
+                end
+                (collided, nowcollided) = (nowcollided, collided)
+            end
+        end
+        ie = unique(uniquerow)
+        ic_dict = Dict{Int,Int}()
+        for k = 1:length(ie)
+            ic_dict[ie[k]] = k
+        end
+
+        ic = similar(uniquerow)
+        for k = 1:length(ic)
+            ic[k] = ie[ic_dict[uniquerow[k]]]
+        end
+        return ic
+    end
+end
+
 function unique_haplotypes(H::BitArray{2})
     p, d = size(H) 
 
@@ -707,7 +828,7 @@ Returns the columns of `H` that are unique.
 # Output
 * Vector containing the unique column index of H.
 """
-function unique_haplotype_idx(H::BitArray{2})
+function unique_haplotype_idx(H::AbstractMatrix)
     p, d = size(H) 
 
     # reinterpret each haplotype as an integer
