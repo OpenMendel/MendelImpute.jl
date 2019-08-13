@@ -107,18 +107,16 @@ function haplopair!(
     )
 
     n, d = size(N)
-#    for i in 1:n
-#        j, k = happair[1][i], happair[2][i]
-#        hapmin[i] = M[j, k] - N[i, j] - N[i, k]
-#    end
     fill!(hapmin, typemax(eltype(hapmin)))
-    # TODO: parallel computing
-    @inbounds for k in 1:d, j in 1:k
-        # loop over individuals
-        for i in 1:n
-            score = M[j, k] - N[i, j] - N[i, k]
-            if score < hapmin[i]
-                hapmin[i], happair[1][i], happair[2][i] = score, j, k
+
+    Threads.@threads for k in 1:d
+        @inbounds for j in 1:k
+            # loop over individuals
+            for i in 1:n
+                score = M[j, k] - N[i, j] - N[i, k]
+                if score < hapmin[i]
+                    hapmin[i], happair[1][i], happair[2][i] = score, j, k
+                end
             end
         end
     end
@@ -331,6 +329,9 @@ function phase(
     verbose::Bool = true
     ) where T <: Real
 
+    #set BLAS threads to 1 if more than 1 Julia threads
+    Threads.nthreads() > 1 && BLAS.set_num_threads(1)
+
     people, snps, haplotypes = size(X, 2), size(X, 1), size(H, 2)
     # allocate working arrays
     M        = zeros(T, haplotypes, haplotypes)
@@ -354,12 +355,8 @@ function phase(
     # allocate working arrays
     Xwork = X[1:3width, :]
     Xwork_float = zeros(T, size(Xwork))
-    if eltype(H) == Bool
-        unique_hap_idx = unique_haplotype_idx(view(H, 1:3width, :))
-        Hwork = view(H, 1:3width, unique_hap_idx)
-    else
-        Hwork = view(H, 1:3width, :)
-    end
+    # Hwork = view(H, 1:3width, :)
+    Hwork = unique_haplotypes(H, 1:3width)
     happair_prev = deepcopy(happair)
 
     # number of windows
@@ -383,12 +380,8 @@ function phase(
             println("Imputing SNPs $((w - 1) * width + 1):$(w * width)")
         end
         # sync Xwork and Hwork with original data
-        if eltype(H) == Bool
-            unique_hap_idx = unique_haplotype_idx(view(H, ((w - 2) * width + 1):((w + 1) * width), :))
-            Hwork = view(H, ((w - 2) * width + 1):((w + 1) * width), unique_hap_idx)
-        else
-            Hwork = view(H, ((w - 2) * width + 1):((w + 1) * width), :)
-        end
+        # Hwork = view(H, ((w - 2) * width + 1):((w + 1) * width), :)
+        Hwork = unique_haplotypes(H, ((w - 2) * width + 1):((w + 1) * width))
         copyto!(Xwork, view(X, ((w - 2) * width + 1):((w + 1) * width), :))
 
         # phase current window
@@ -427,15 +420,11 @@ function phase(
         println("Imputing SNPs $((windows - 1) * width + 1):$snps")
     end
     Xwork = X[((windows - 2) * width + 1):snps, :]
-    if eltype(H) == Bool
-        unique_hap_idx = unique_haplotype_idx(view(H, ((windows - 2) * width + 1):snps, :))
-        Hwork = view(H, ((windows - 2) * width + 1):snps, unique_hap_idx)
-    else
-        Hwork = view(H, ((windows - 2) * width + 1):snps, :)
-    end
+    # Hwork = view(H, ((windows - 2) * width + 1):snps, :)
+    Hwork = unique_haplotypes(H, ((windows - 2) * width + 1):snps)
     copyto!(happair_prev[1], happair[1])
     copyto!(happair_prev[2], happair[2])
-    haploimpute!(Xwork, Hwork, M, N, happair, hapscore)
+    haploimpute!(Xwork, Hwork, M, N, happair, hapscore, Xfloat=Xwork_float)
 
     # find optimal break points and record info to phase
     for i in 1:people
@@ -648,33 +637,72 @@ function impute!(
 end
 
 """
-    unique_haplotypes(H::BitArray{2})
+    unique_haplotypes(H, window)
 
 Finds the unique haplotypes determined by the reference haplotypes stored 
 in the columns of H. 
 
 # Input
 * `H`: an `p x d` reference panel of haplotypes within a genomic window. 
+* `window`: a small window of `H` that is currently undergoing haplotyping.
 
 # Output
-* `Hunique`: matrix of unique haplotypes with entries in 32 bit floating point 0's and 1's
-* `Hrank[i]`: the unique haplotype corresponding to reference haplotype i.
+* A `view` of `H` at the appropriate window with all redundant haplotypes eliminated
 """
-function unique_haplotypes(H::AbstractMatrix, windows, width)
+function unique_haplotypes(
+    H::AbstractMatrix, 
+    window::UnitRange{Int}
+    )
 
-    if eltype(H) == Bool
-        hap_index = unique_haplotype_idx(H)
-        return view(H, 1:3width, hap_index)
-    end
+    lw = length(window)
+    cur_chunk = view(H, window, :)
 
-    p, d = size(H) 
-    
+    # if eltype(H) == Bool && lw in Set([8, 16, 32, 64, 128])
+    #     unique_hap_index = unique_haplotype_idx(cur_chunk)
+    # else
+    #     unique_hap_index = unique(groupslices(cur_chunk))
+    # end
 
-
-    # first  1/3: ((w - 2) * width + 1):((w - 1) * width)
-    # middle 1/3: ((w - 1) * width + 1):(      w * width)
-    # last   1/3: (      w * width + 1):((w + 1) * width)
+    unique_hap_index = unique(groupslices(cur_chunk, 2))
+    return view(H, window, unique_hap_index)
 end
+
+#ken's code for making a copy of the unique haplotype matrix
+# function unique_haplotypes(H::BitArray{2})
+#     p, d = size(H) 
+
+#     # reinterpret each haplotype as an integer
+#     if p == 8 
+#         HR = reinterpret(UInt8, H.chunks) 
+#     elseif p == 16
+#         HR = reinterpret(UInt16, H.chunks)
+#     elseif p == 32
+#         HR = reinterpret(UInt32, H.chunks)
+#     elseif p == 64
+#         HR = reinterpret(UInt64, H.chunks)
+#     elseif p == 128
+#         HR = reinterpret(UInt128, H.chunks)
+#     else
+#         return convert(Matrix{Float32}, unique(H, dims=1))
+#     end
+    
+#     Hrank = denserank(HR) # map to unique integers with no gap
+#     HU    = unique(HR)    # find unique integers
+#     n     = length(HU)
+#     Hrep  = zeros(Int, n) # representative haplotype for integer 
+
+#     m = 0
+#     for j = 1:d
+#         if Hrep[Hrank[j]] == 0
+#             Hrep[Hrank[j]] = j
+#             m += 1
+#             m == n && break
+#         end
+#     end
+
+#     Hunique = convert(Matrix{Float32}, H[:, Hrep])
+#     return (Hunique, Hrank)
+# end
 
 """
     groupslices(A, dim)
@@ -697,8 +725,7 @@ end
 ```
 
 Function from: https://github.com/mcabbott/GroupSlices.jl/blob/master/src/GroupSlices.jl
-Wait until this gets resolved: https://github.com/JuliaLang/julia/issues/1845 
-
+Can delete this function when this issue gets resolved: https://github.com/JuliaLang/julia/issues/1845 
 """
 @generated function groupslices(A::AbstractArray{T,N}, dim::Int) where {T,N}
     quote
@@ -781,55 +808,19 @@ Wait until this gets resolved: https://github.com/JuliaLang/julia/issues/1845
     end
 end
 
-function unique_haplotypes(H::BitArray{2})
-    p, d = size(H) 
-
-    # reinterpret each haplotype as an integer
-    if p == 8 
-        HR = reinterpret(UInt8, H.chunks) 
-    elseif p == 16
-        HR = reinterpret(UInt16, H.chunks)
-    elseif p == 32
-        HR = reinterpret(UInt32, H.chunks)
-    elseif p == 64
-        HR = reinterpret(UInt64, H.chunks)
-    elseif p == 128
-        HR = reinterpret(UInt128, H.chunks)
-    else
-        return convert(Matrix{Float32}, unique(H, dims=1))
-    end
-    
-    Hrank = denserank(HR) # map to unique integers with no gap
-    HU    = unique(HR)    # find unique integers
-    n     = length(HU)
-    Hrep  = zeros(Int, n) # representative haplotype for integer 
-
-    m = 0
-    for j = 1:d
-        if Hrep[Hrank[j]] == 0
-            Hrep[Hrank[j]] = j
-            m += 1
-            m == n && break
-        end
-    end
-
-    Hunique = convert(Matrix{Float32}, H[:, Hrep])
-    return (Hunique, Hrank)
-end
-
 """
-    unique_haplotype_idx(H::BitArray{2})
+    unique_haplotype_idx(H)
 
 Returns the columns of `H` that are unique. 
 
 # Input
-* `H`: an `p x d` reference panel of haplotypes within a genomic window. 
+* `H`: an abstract bitarray of haplotypes within a genomic window.
 
 # Output
 * Vector containing the unique column index of H.
 """
 function unique_haplotype_idx(H::AbstractMatrix)
-    p, d = size(H) 
+    p = size(H, 1) 
 
     # reinterpret each haplotype as an integer
     if p == 8 
@@ -842,8 +833,6 @@ function unique_haplotype_idx(H::AbstractMatrix)
         HR = reinterpret(UInt64, H.chunks)
     elseif p == 128
         HR = reinterpret(UInt128, H.chunks)
-    else
-        throw(ArgumentError("Currently, number of rows should be in {8, 16, 32, 64, 128} but was $p"))
     end
 
     return unique_index(HR)

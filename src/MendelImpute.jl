@@ -2,6 +2,7 @@ __precompile__()
 
 module MendelImpute
 
+#needed for groupslices function
 import Base.hash
 import Base.Cartesian, Base.Cartesian.@nloops, Base.Cartesian.@nref
 
@@ -34,6 +35,7 @@ struct HaplotypeMosaicPair
 end
 HaplotypeMosaicPair(len) = HaplotypeMosaicPair(HaplotypeMosaic(len), HaplotypeMosaic(len))
 
+#needed for groupslices function
 struct Prehashed
     hash::UInt
 end

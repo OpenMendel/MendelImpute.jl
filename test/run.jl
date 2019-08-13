@@ -335,13 +335,23 @@ using Random
 using LinearAlgebra
 using Profile
 
-H = rand(1000, 1000)
-H[:, 1] .= H[:, 2]
-groupslices(H, 1)
+Random.seed!(123)
+H = bitrand(128, 1000)
+Hwork = unique_haplotypes(H, 1:128)
 
-@benchmark groupslices(H, 1)
+for i in 1:500
+	H[:, 2i] .= H[:, 2i - 1]
+end
 
-@benchmark unique(H, dims=1)
+# groupslices(H, 1)
+# unique(groupslices(H, 2)) 
+# unique_haplotype_idx(H)
+
+@benchmark unique_haplotypes(H, 1:128)
+
+@benchmark unique(groupslices(H, 2)) # 1.273 ms, 348.78 KiB
+@benchmark unique(H, dims=2)         # 1.408 ms, 132.25 KiB
+@benchmark unique_haplotype_idx(H)   # 88.825 μs, 92.58 KiB
 
 
 
