@@ -126,44 +126,6 @@ function haplopair!(
     return nothing
 end
 
-#saves some subtraction compared to haplopair!, but this is slower presumable 
-#because data not accessed in column major
-# function haplopair2!(
-#     happair::Tuple{AbstractVector, AbstractVector},
-#     hapmin::Vector,
-#     M::AbstractMatrix,
-#     N::AbstractMatrix;
-#     M_col_min::AbstractVector = zeros(eltype(N), size(N, 2)),
-#     M_min_pos::AbstractVector = zeros(Int, size(N, 2))
-#     )
-
-#     n, d = size(N)
-
-#     for i in 1:n
-#         fill!(M_col_min, Inf)
-
-#         #first find minimum entry in each columns
-#         for k in 1:d
-#             for j in 1:k
-#                 new_score = M[j, k] - N[i, j]
-#                 if new_score < M_col_min[k]
-#                     M_col_min[k] = new_score 
-#                     M_min_pos[k] = j #keep track which row the min occurred on
-#                 end
-#             end
-#             M_col_min[k] -= N[i, k]
-#         end
-
-#         #store the results in correct place
-#         score, col    = findmin(M_col_min)
-#         hapmin[i]     = score
-#         happair[1][i] = M_min_pos[col]
-#         happair[2][i] = col
-#     end
-
-#     return nothing
-# end
-
 """
     fillmissing!(X, H, haplopair)
 
@@ -381,7 +343,7 @@ function phase(
         if verbose
             println("Imputing SNPs $((w - 1) * width + 1):$(w * width)")
         end
-        
+
         # sync Xwork and Hwork with original data
         Hwork = view(H, ((w - 2) * width + 1):((w + 1) * width), :)
         # Hwork, (pp, dd) = unique_haplotypes(H, ((w - 2) * width + 1):((w + 1) * width))
