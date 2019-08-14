@@ -57,6 +57,8 @@ function haplopair!(
     p, n, d = size(X, 1), size(X, 2), size(H, 2)
 
     # assemble M (upper triangular only)
+    println(size(M))
+    println(size(H))
     mul!(M, Transpose(H), H)
     for j in 1:d, i in 1:(j - 1) # off-diagonal
         M[i, j] = 2M[i, j] + M[i, i] + M[j, j]
@@ -356,7 +358,7 @@ function phase(
     Xwork = X[1:3width, :]
     Xwork_float = zeros(T, size(Xwork))
     Hwork = view(H, 1:3width, :)
-    # Hwork = unique_haplotypes(H, 1:3width)
+    # Hwork, (pp, dd) = unique_haplotypes(H, ((windows - 2) * width + 1):snps)
     happair_prev = deepcopy(happair)
 
     # number of windows
@@ -379,15 +381,17 @@ function phase(
         if verbose
             println("Imputing SNPs $((w - 1) * width + 1):$(w * width)")
         end
+        
         # sync Xwork and Hwork with original data
         Hwork = view(H, ((w - 2) * width + 1):((w + 1) * width), :)
-        # Hwork = unique_haplotypes(H, ((w - 2) * width + 1):((w + 1) * width))
+        # Hwork, (pp, dd) = unique_haplotypes(H, ((w - 2) * width + 1):((w + 1) * width))
         copyto!(Xwork, view(X, ((w - 2) * width + 1):((w + 1) * width), :))
 
         # phase current window
         copyto!(happair_prev[1], happair[1])
         copyto!(happair_prev[2], happair[2])
         haploimpute!(Xwork, Hwork, M, N, happair, hapscore, Xfloat=Xwork_float)
+        # haploimpute!(Xwork, Hwork, view(M, 1:dd, 1:dd), view(N, :, 1:dd), happair, hapscore, Xfloat=Xwork_float)
 
         # find optimal break points and record info into phase
         Hw12 = view(Hwork, 1:2width, :)
@@ -421,9 +425,10 @@ function phase(
     end
     Xwork = X[((windows - 2) * width + 1):snps, :]
     Hwork = view(H, ((windows - 2) * width + 1):snps, :)
-    # Hwork = unique_haplotypes(H, ((windows - 2) * width + 1):snps)
+    # Hwork, (pp, dd) = unique_haplotypes(H, ((windows - 2) * width + 1):snps)
     copyto!(happair_prev[1], happair[1])
     copyto!(happair_prev[2], happair[2])
+    # haploimpute!(Xwork, Hwork, view(M, 1:dd, 1:dd), view(N, :, dd), happair, hapscore)
     haploimpute!(Xwork, Hwork, M, N, happair, hapscore)
 
     # find optimal break points and record info to phase
@@ -529,7 +534,8 @@ function search_breakpoint(
     err_optim == 0 && return 0, 0
 
     # extend haplotype H[:, s2[1]] position by position
-    @inbounds for bkpt in 1:n
+    # @inbounds for bkpt in 1:n
+    for bkpt in 1:n
         if !ismissing(X[bkpt]) && H[bkpt, s2[1]] ≠ H[bkpt, s2[2]]
             errors -= X[bkpt] ≠ H[bkpt, s1] + H[bkpt, s2[2]]
             errors += X[bkpt] ≠ H[bkpt, s1] + H[bkpt, s2[1]]
@@ -664,7 +670,8 @@ function unique_haplotypes(
     # end
 
     unique_hap_index = unique(groupslices(cur_chunk, 2))
-    return view(H, window, unique_hap_index)
+    unique_hap = view(H, window, unique_hap_index)
+    return unique_hap, size(unique_hap)
 end
 
 function unique_haplotypes(

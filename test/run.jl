@@ -353,3 +353,36 @@ Hunique = unique_haplotypes(H, 128)
 
 
 
+#AFRped data
+
+using Revise
+using DelimitedFiles
+using LinearAlgebra
+using BenchmarkTools
+using MendelImpute
+using Random
+using Profile
+
+rawdata = readdlm("AFRped_geno.txt", ',', Float32);
+people = 664;
+X = copy(Transpose(rawdata[1:people, 1:(end - 1)]));
+function create_hap(x)
+    n, p = size(x)
+    h = one(eltype(x))
+    for j in 1:p, i in 1:n
+        if x[i, j] != 0
+            x[i, j] -= h
+        end
+    end
+    return copy(Transpose(x))
+end
+H = create_hap(rawdata[(people + 1):end, 1:(end - 1)]);
+
+Random.seed!(123)
+missingprop = 0.1
+p, n = size(X)
+X2 = Matrix{Union{Missing, eltype(X)}}(X)
+Xm = ifelse.(rand(eltype(X), p, n) .< missingprop, missing, X2)
+Xm_original = copy(Xm)
+
+ph = phase(Xm, H, 400)
