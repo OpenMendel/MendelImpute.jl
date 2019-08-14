@@ -280,7 +280,7 @@ function haploimpute!(
     N::AbstractMatrix,
     happair::Tuple{AbstractVector, AbstractVector},
     hapscore::AbstractVector;
-    Xfloat::AbstractMatrix = zeros(Float32, size(X)),
+    Xfloat::AbstractMatrix = zeros(eltype(M), size(X)),
     maxiters::Int  = 1,
     tolfun::Number = 1e-3
     )
@@ -355,8 +355,8 @@ function phase(
     # allocate working arrays
     Xwork = X[1:3width, :]
     Xwork_float = zeros(T, size(Xwork))
-    # Hwork = view(H, 1:3width, :)
-    Hwork = unique_haplotypes(H, 1:3width)
+    Hwork = view(H, 1:3width, :)
+    # Hwork = unique_haplotypes(H, 1:3width)
     happair_prev = deepcopy(happair)
 
     # number of windows
@@ -380,8 +380,8 @@ function phase(
             println("Imputing SNPs $((w - 1) * width + 1):$(w * width)")
         end
         # sync Xwork and Hwork with original data
-        # Hwork = view(H, ((w - 2) * width + 1):((w + 1) * width), :)
-        Hwork = unique_haplotypes(H, ((w - 2) * width + 1):((w + 1) * width))
+        Hwork = view(H, ((w - 2) * width + 1):((w + 1) * width), :)
+        # Hwork = unique_haplotypes(H, ((w - 2) * width + 1):((w + 1) * width))
         copyto!(Xwork, view(X, ((w - 2) * width + 1):((w + 1) * width), :))
 
         # phase current window
@@ -420,11 +420,11 @@ function phase(
         println("Imputing SNPs $((windows - 1) * width + 1):$snps")
     end
     Xwork = X[((windows - 2) * width + 1):snps, :]
-    # Hwork = view(H, ((windows - 2) * width + 1):snps, :)
-    Hwork = unique_haplotypes(H, ((windows - 2) * width + 1):snps)
+    Hwork = view(H, ((windows - 2) * width + 1):snps, :)
+    # Hwork = unique_haplotypes(H, ((windows - 2) * width + 1):snps)
     copyto!(happair_prev[1], happair[1])
     copyto!(happair_prev[2], happair[2])
-    haploimpute!(Xwork, Hwork, M, N, happair, hapscore, Xfloat=Xwork_float)
+    haploimpute!(Xwork, Hwork, M, N, happair, hapscore)
 
     # find optimal break points and record info to phase
     for i in 1:people
@@ -667,6 +667,23 @@ function unique_haplotypes(
     return view(H, window, unique_hap_index)
 end
 
+function unique_haplotypes(
+    H::AbstractMatrix,
+    width::Int,
+    # trans::char='N'
+    )
+
+    p, d = size(H)
+    windows = ceil(Int, p / width) # number of windows
+    unique_hap = zeros(Int, d, windows) #each column j stores unique haplotype mappings for window j
+
+    for i in 1:windows
+        groupslices!(@view(unique_hap[:, i]), H, 2)
+    end
+
+    return unique_hap
+end
+
 #ken's code for making a copy of the unique haplotype matrix
 # function unique_haplotypes(H::BitArray{2})
 #     p, d = size(H) 
@@ -805,6 +822,85 @@ Can delete this function when this issue gets resolved: https://github.com/Julia
             ic[k] = ie[ic_dict[uniquerow[k]]]
         end
         return ic
+    end
+end
+
+@generated function groupslices!(ic::AbstractArray, A::AbstractArray{T,N}, dim::Int) where {T,N}
+    quote
+        if !(1 <= dim <= $N)
+            ArgumentError("Input argument dim must be 1 <= dim <= $N, but is currently $dim")
+        end
+        hashes = zeros(UInt, size(A, dim))
+
+        # Compute hash for each row
+        k = 0
+        @nloops $N i A d->(if d == dim; k = i_d; end) begin
+            @inbounds hashes[k] = hash(hashes[k], hash((@nref $N A i)))
+        end
+
+        # Collect index of first row for each hash
+        uniquerow = Vector{Int}(undef, size(A, dim))
+        firstrow = Dict{Prehashed,Int}()
+        for k = 1:size(A, dim)
+            uniquerow[k] = get!(firstrow, Prehashed(hashes[k]), k)
+        end
+        uniquerows = collect(values(firstrow))
+
+        # Check for collisions
+        collided = falses(size(A, dim))
+        @inbounds begin
+            @nloops $N i A d->(if d == dim
+                k = i_d
+                j_d = uniquerow[k]
+            else
+                j_d = i_d
+            end) begin
+                if (@nref $N A j) != (@nref $N A i)
+                    collided[k] = true
+                end
+            end
+        end
+
+        if any(collided)
+            nowcollided = BitArray(size(A, dim))
+            while any(collided)
+                # Collect index of first row for each collided hash
+                empty!(firstrow)
+                for j = 1:size(A, dim)
+                    collided[j] || continue
+                    uniquerow[j] = get!(firstrow, Prehashed(hashes[j]), j)
+                end
+                for v in values(firstrow)
+                    push!(uniquerows, v)
+                end
+
+                # Check for collisions
+                fill!(nowcollided, false)
+                @nloops $N i A d->begin
+                    if d == dim
+                        k = i_d
+                        j_d = uniquerow[k]
+                        (!collided[k] || j_d == k) && continue
+                    else
+                        j_d = i_d
+                    end
+                end begin
+                    if (@nref $N A j) != (@nref $N A i)
+                        nowcollided[k] = true
+                    end
+                end
+                (collided, nowcollided) = (nowcollided, collided)
+            end
+        end
+        ie = unique(uniquerow)
+        ic_dict = Dict{Int,Int}()
+        for k = 1:length(ie)
+            ic_dict[ie[k]] = k
+        end
+
+        for k = 1:length(ic)
+            ic[k] = ie[ic_dict[uniquerow[k]]]
+        end
     end
 end
 

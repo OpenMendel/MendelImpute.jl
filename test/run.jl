@@ -274,16 +274,8 @@ all(hapscore .== hapscore2)
 @benchmark haplopair!(happair, hapscore, M, N) #432.302 ms, 64 bytes
 @benchmark haplopair2!(happair2, hapscore2, M, N, M_col_min=M_col_min, M_min_pos=M_min_pos) #542.754 ms, 64 bytes
 
-#16 Julia Threads, 8 BLAS threads
-@benchmark haplopair!(happair, hapscore, M, N) #113.325 ms, 64 bytes 
 
-#16 Julia Threads, 4 BLAS threads
-@benchmark haplopair!(happair, hapscore, M, N) #115.909 ms, 64 bytes 
 
-#16 Julia Threads, 1 BLAS threads
-@benchmark haplopair!(happair, hapscore, M, N) #119.756 ms, 64 bytes 
-
-#8 Julia Threads, 8 BLAS threads
 
 
 function run()
@@ -336,12 +328,17 @@ using LinearAlgebra
 using Profile
 
 Random.seed!(123)
-H = bitrand(128, 1000)
-Hwork = unique_haplotypes(H, 1:128)
+H = bitrand(1280, 1000)
+# Hwork = unique_haplotypes(H, 1:128)
+Hunique = unique_haplotypes(H, 128)
 
 for i in 1:500
 	H[:, 2i] .= H[:, 2i - 1]
 end
+
+# Hwork = unique_haplotypes(H, 1:128)
+Hunique = unique_haplotypes(H, 128)
+
 
 # groupslices(H, 1)
 # unique(groupslices(H, 2)) 
