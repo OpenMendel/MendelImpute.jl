@@ -57,8 +57,6 @@ function haplopair!(
     p, n, d = size(X, 1), size(X, 2), size(H, 2)
 
     # assemble M (upper triangular only)
-    println(size(M))
-    println(size(H))
     mul!(M, Transpose(H), H)
     for j in 1:d, i in 1:(j - 1) # off-diagonal
         M[i, j] = 2M[i, j] + M[i, i] + M[j, j]
@@ -425,7 +423,7 @@ function phase2(
     Threads.nthreads() > 1 && BLAS.set_num_threads(1)
 
     # problem dimensions
-    people, snps, haplotypes = size(X, 2), size(X, 1), size(H, 2)
+    snps, people = size(X)
 
     # number of windows
     windows = ceil(Int, snps / width)
@@ -448,6 +446,8 @@ function phase2(
     # phase and impute window 1
     verbose && println("Imputing SNPs 1:$width")
     haploimpute!(Xwork, Hwork, M, N, happair, hapscore, Xfloat=Xwork_float)
+
+    # record info into phase
     for i in 1:people
         push!(phase[i].strand1.start, 1)
         push!(phase[i].strand1.haplotypelabel, happair[1][i])
@@ -455,46 +455,69 @@ function phase2(
         push!(phase[i].strand2.haplotypelabel, happair[2][i])
     end
 
-    for w in 2:windows
+    for w in 2:(windows-1)
         verbose && println("Imputing SNPs $((w - 1) * width + 1):$(w * width)")
 
         # sync Xwork and Hwork with original data
-        resize_and_sync!(X, H, M, N, Xwork, Hwork, Hunique[w], width, w)
-
-        println("hi")
-        f
+        cur_range = ((w - 1) * width + 1):(w * width)
+        M = resize_and_sync!(X, H, M, N, Xwork, Hwork, Hunique[w], cur_range)
 
         # phase current window
         copyto!(happair_prev[1], happair[1])
         copyto!(happair_prev[2], happair[2])
         haploimpute!(Xwork, Hwork, M, N, happair, hapscore, Xfloat=Xwork_float)
-        # haploimpute!(Xwork, Hwork, view(M, 1:dd, 1:dd), view(N, :, 1:dd), happair, hapscore, Xfloat=Xwork_float)
+
+        # record info into phase
+        for i in 1:people
+            push!(phase[i].strand1.start, (w - 2) * width + 1)
+            push!(phase[i].strand1.haplotypelabel, happair[1][i])
+            push!(phase[i].strand2.start, (w - 2) * width + 1)
+            push!(phase[i].strand2.haplotypelabel, happair[2][i])
+        end
 
         # find optimal break points and record info into phase
-        Hw12 = view(Hwork, 1:2width, :)
-        for i in 1:people
-            Xi = view(Xwork, 1:2width, i)
-            (happair[1][i], happair[2][i]), bkpts =
-                continue_haplotype(Xi, Hw12,
-                (happair_prev[1][i], happair_prev[2][i]),
-                (     happair[1][i],      happair[2][i]))
-            # strand 1
-            if bkpts[1] > -1 && bkpts[1] < 2width
-                push!(phase[i].strand1.start, (w - 2) * width + 1 + bkpts[1])
-                push!(phase[i].strand1.haplotypelabel, happair[1][i])
-            end
-            # strand 2
-            if bkpts[2] > -1 && bkpts[2] < 2width
-                push!(phase[i].strand2.start, (w - 2) * width + 1 + bkpts[2])
-                push!(phase[i].strand2.haplotypelabel, happair[2][i])
-            end
-            # # for debug
-            if verbose == true && i == 1
-                println("happair = ($(happair[1][i]), $(happair[2][i]))")
-                println("bkpts = $bkpts")
-            end
-        end
+        # Hw12 = view(Hwork, 1:2width, :)
+        # for i in 1:people
+        #     Xi = view(Xwork, 1:2width, i)
+        #     (happair[1][i], happair[2][i]), bkpts =
+        #         continue_haplotype(Xi, Hw12,
+        #         (happair_prev[1][i], happair_prev[2][i]),
+        #         (     happair[1][i],      happair[2][i]))
+        #     # strand 1
+        #     if bkpts[1] > -1 && bkpts[1] < 2width
+        #         push!(phase[i].strand1.start, (w - 2) * width + 1 + bkpts[1])
+        #         push!(phase[i].strand1.haplotypelabel, happair[1][i])
+        #     end
+        #     # strand 2
+        #     if bkpts[2] > -1 && bkpts[2] < 2width
+        #         push!(phase[i].strand2.start, (w - 2) * width + 1 + bkpts[2])
+        #         push!(phase[i].strand2.haplotypelabel, happair[2][i])
+        #     end
+        #     # # for debug
+        #     if verbose == true && i == 1
+        #         println("happair = ($(happair[1][i]), $(happair[2][i]))")
+        #         println("bkpts = $bkpts")
+        #     end
+        # end
     end
+
+    # phase last window
+    last_range = ((windows - 1) * width + 1):snps
+    verbose && println("Imputing SNPs $last_range")
+    M = resize_and_sync!(X, H, M, N, Xwork, Hwork, Hunique[end], last_range)
+    copyto!(happair_prev[1], happair[1])
+    copyto!(happair_prev[2], happair[2])
+    haploimpute!(Xwork, Hwork, M, N, happair, hapscore)
+
+    # record last window info into phase
+    for i in 1:people
+        push!(phase[i].strand1.start, (windows - 2) * width + 1)
+        push!(phase[i].strand1.haplotypelabel, happair[1][i])
+        push!(phase[i].strand2.start, (windows - 2) * width + 1)
+        push!(phase[i].strand2.haplotypelabel, happair[2][i])
+    end
+
+    return phase
 end
 
 function resize_and_sync!(
@@ -505,8 +528,7 @@ function resize_and_sync!(
     Xwork::AbstractMatrix,
     Hwork::ElasticArray,
     Hnext::Vector{Int},
-    width::Int,
-    window::Int
+    window::UnitRange{Int}
     )
 
     pp, dd = size(Hwork)
@@ -515,22 +537,19 @@ function resize_and_sync!(
 
     # quick return
     if dd == next_d
-        return nothing
+        return M
     end
 
-    # resize working arrays
+    # resize working arrays. Resizing M is not amortized when resizing upwards. 
     resize!(Hwork, pp, next_d)
     resize!(N, size(N, 1), next_d)
-    if next_d < dd
-        Mvec = vec(M)
-        M = Base.ReshapedArray(Mvec, (next_d, next_d), ())
-    else
-        M = zeros(T, next_d, next_d) #ideally we can resize upwards like amortized vectors
-    end
+    Mnew = (next_d < dd ? Base.ReshapedArray(vec(M), (next_d, next_d), ()) : zeros(T, next_d, next_d))
 
     # sync Xwork and Hwork with original data
-    copyto!(Xwork, view(X, ((window - 1) * width + 1):(window * width), :))
-    copyto!(Hwork, view(H, ((window - 1) * width + 1):(window * width), Hnext))
+    copyto!(Xwork, view(X, window, :))
+    copyto!(Hwork, view(H, window, Hnext))
+
+    return Mnew::AbstractMatrix
 end
 
 """
