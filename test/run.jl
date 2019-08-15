@@ -385,4 +385,10 @@ X2 = Matrix{Union{Missing, eltype(X)}}(X)
 Xm = ifelse.(rand(eltype(X), p, n) .< missingprop, missing, X2)
 Xm_original = copy(Xm)
 
-ph = phase(Xm, H, 400)
+# ph = phase(Xm, H, 400)
+ph2 = phase2(Xm, H, 128, 'T')
+
+
+
+
+

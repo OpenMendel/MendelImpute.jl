@@ -14,7 +14,8 @@ export continue_haplotype,
     impute!, phase,
     search_breakpoint,
     unique_haplotypes, unique_haplotype_idx,
-    groupslices, groupinds
+    groupslices,
+    phase2
 
 """
 Data structure for recording haplotype mosaic of one strand:

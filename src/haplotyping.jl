@@ -414,6 +414,75 @@ function phase(
     return phase
 end
 
+function phase2(
+    X::AbstractMatrix{Union{Missing, T}},
+    H::AbstractMatrix{T},
+    width::Int    = 128,
+    verbose::Bool = true
+    ) where T <: Real
+
+    # set BLAS threads to 1 if more than 1 Julia threads
+    Threads.nthreads() > 1 && BLAS.set_num_threads(1)
+
+    # problem dimennsion
+    people, snps, haplotypes = size(X, 2), size(X, 1), size(H, 2)
+
+    # number of windows
+    windows = ceil(Int, snps / width)
+
+    # allocate working arrays
+    happair  = ones(Int, people), ones(Int, people)
+    hapscore = zeros(T, people)
+    phase    = [HaplotypeMosaicPair(snps) for i in 1:people]
+
+    #get unique haplotypes within each window
+    Hunique = unique_haplotypes(H, width, 'T')
+
+    return Hunique
+
+    for w in 1:windows
+        verbose && println("Imputing SNPs $((w - 1) * width + 1):$(w * width)")
+
+        # sync Xwork and Hwork with original data
+        Hwork = view(H, ((w - 2) * width + 1):((w + 1) * width), :)
+        # Hwork, (pp, dd) = unique_haplotypes(H, ((w - 2) * width + 1):((w + 1) * width))
+        copyto!(Xwork, view(X, ((w - 2) * width + 1):((w + 1) * width), :))
+
+        # phase current window
+        copyto!(happair_prev[1], happair[1])
+        copyto!(happair_prev[2], happair[2])
+        haploimpute!(Xwork, Hwork, M, N, happair, hapscore, Xfloat=Xwork_float)
+        # haploimpute!(Xwork, Hwork, view(M, 1:dd, 1:dd), view(N, :, 1:dd), happair, hapscore, Xfloat=Xwork_float)
+
+        # find optimal break points and record info into phase
+        Hw12 = view(Hwork, 1:2width, :)
+        for i in 1:people
+            Xi = view(Xwork, 1:2width, i)
+            (happair[1][i], happair[2][i]), bkpts =
+                continue_haplotype(Xi, Hw12,
+                (happair_prev[1][i], happair_prev[2][i]),
+                (     happair[1][i],      happair[2][i]))
+            # strand 1
+            if bkpts[1] > -1 && bkpts[1] < 2width
+                push!(phase[i].strand1.start, (w - 2) * width + 1 + bkpts[1])
+                push!(phase[i].strand1.haplotypelabel, happair[1][i])
+            end
+            # strand 2
+            if bkpts[2] > -1 && bkpts[2] < 2width
+                push!(phase[i].strand2.start, (w - 2) * width + 1 + bkpts[2])
+                push!(phase[i].strand2.haplotypelabel, happair[2][i])
+            end
+            # # for debug
+            if verbose == true && i == 1
+                println("happair = ($(happair[1][i]), $(happair[2][i]))")
+                println("bkpts = $bkpts")
+            end
+        end
+    end
+
+
+end
+
 """
     continue_haplotype(X, H, happair_prev, happair_next)
 
@@ -605,7 +674,7 @@ function impute!(
 end
 
 """
-    unique_haplotypes(H, window)
+    unique_haplotypes(H, window::UnitRange{Int})
 
 Finds the unique haplotypes determined by the reference haplotypes stored 
 in the columns of H. 
@@ -636,59 +705,86 @@ function unique_haplotypes(
     return unique_hap, size(unique_hap)
 end
 
+"""
+    unique_haplotypes(H, width::Int)
+
+For each window, finds unique haplotypes stored in the columns of H and saves the unique
+columns of H in each window.
+
+# Input
+* `H`: an `p x d` reference panel of haplotypes within a genomic window. 
+* `width`: the window width 
+* `trans`: orientation of `H`. 'T' means columns of `H` are a haplotype vectors. 'N' means rows of `H` are. 
+
+# Output
+* `unique_hap`: a vector of integer vectors denoting the unique columns of each window. 
+"""
 function unique_haplotypes(
     H::AbstractMatrix,
     width::Int,
-    # trans::char='N'
+    trans::Char='N'
     )
 
     p, d = size(H)
-    windows = ceil(Int, p / width) # number of windows
-    unique_hap = zeros(Int, d, windows) #each column j stores unique haplotype mappings for window j
+    windows = ceil(Int, p / width)
+    unique_hap = Vector{Vector{Int}}(undef, windows)
 
-    for i in 1:windows
-        groupslices!(@view(unique_hap[:, i]), H, 2)
+    if trans == 'N'
+        dim = 1
+    elseif trans == 'T'
+        dim = 2
+    else
+        error("trans can only be 'N' or 'T' but was $dim" )
     end
+
+    # find unique haplotypes in all but last window
+    for w in 1:(windows-1)
+        H_cur_window = view(H, ((w - 1) * width + 1):(w * width), :)
+        unique_hap[w] = unique(groupslices(H_cur_window, dim))
+    end
+
+    # find unique haplotype in last window
+    H_last_window = view(H, ((windows - 2) * width + 1):p, :)
+    unique_hap[end] = unique(groupslices(H_last_window, dim))
 
     return unique_hap
 end
 
-#ken's code for making a copy of the unique haplotype matrix
-# function unique_haplotypes(H::BitArray{2})
-#     p, d = size(H) 
+function unique_haplotypes(H::BitArray{2})
+    p, d = size(H) 
 
-#     # reinterpret each haplotype as an integer
-#     if p == 8 
-#         HR = reinterpret(UInt8, H.chunks) 
-#     elseif p == 16
-#         HR = reinterpret(UInt16, H.chunks)
-#     elseif p == 32
-#         HR = reinterpret(UInt32, H.chunks)
-#     elseif p == 64
-#         HR = reinterpret(UInt64, H.chunks)
-#     elseif p == 128
-#         HR = reinterpret(UInt128, H.chunks)
-#     else
-#         return convert(Matrix{Float32}, unique(H, dims=1))
-#     end
+    # reinterpret each haplotype as an integer
+    if p == 8 
+        HR = reinterpret(UInt8, H.chunks) 
+    elseif p == 16
+        HR = reinterpret(UInt16, H.chunks)
+    elseif p == 32
+        HR = reinterpret(UInt32, H.chunks)
+    elseif p == 64
+        HR = reinterpret(UInt64, H.chunks)
+    elseif p == 128
+        HR = reinterpret(UInt128, H.chunks)
+    else
+        return convert(Matrix{Float32}, unique(H, dims=1))
+    end
     
-#     Hrank = denserank(HR) # map to unique integers with no gap
-#     HU    = unique(HR)    # find unique integers
-#     n     = length(HU)
-#     Hrep  = zeros(Int, n) # representative haplotype for integer 
+    Hrank = denserank(HR) # map to unique integers with no gap
+    HU    = unique(HR)    # find unique integers
+    n     = length(HU)
+    Hrep  = zeros(Int, n) # representative haplotype for integer 
 
-#     m = 0
-#     for j = 1:d
-#         if Hrep[Hrank[j]] == 0
-#             Hrep[Hrank[j]] = j
-#             m += 1
-#             m == n && break
-#         end
-#     end
+    m = 0
+    for j = 1:d
+        if Hrep[Hrank[j]] == 0
+            Hrep[Hrank[j]] = j
+            m += 1
+            m == n && break
+        end
+    end
 
-#     Hunique = convert(Matrix{Float32}, H[:, Hrep])
-#     return (Hunique, Hrank)
-# end
+    Hunique = convert(Matrix{Float32}, H[:, Hrep])
+    return (Hunique, Hrank)
+end
 
 """
     groupslices(A, dim)
