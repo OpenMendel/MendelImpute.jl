@@ -8,6 +8,7 @@ import Base.Cartesian, Base.Cartesian.@nloops, Base.Cartesian.@nref
 
 using LinearAlgebra
 using StatsBase
+using ElasticArrays
 
 export continue_haplotype,
     haplopair!, haplopair, haploimpute!,

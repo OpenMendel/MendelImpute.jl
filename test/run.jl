@@ -362,6 +362,8 @@ using BenchmarkTools
 using MendelImpute
 using Random
 using Profile
+using ElasticArrays
+
 
 rawdata = readdlm("AFRped_geno.txt", ',', Float32);
 people = 664;
@@ -385,8 +387,88 @@ X2 = Matrix{Union{Missing, eltype(X)}}(X)
 Xm = ifelse.(rand(eltype(X), p, n) .< missingprop, missing, X2)
 Xm_original = copy(Xm)
 
-# ph = phase(Xm, H, 400)
-ph2 = phase2(Xm, H, 128, 'T')
+ph2 = phase2(Xm, H, width=32)
+
+
+
+
+
+#resize matrix efficiently
+
+using BenchmarkTools
+using LinearAlgebra
+using ElasticArrays
+
+H = rand(1000, 1000)
+Hwork = ElasticArray{Float64}(H[1:100, 1:100])
+resize!(Hwork, 100, 1000)
+
+
+
+
+
+A = rand(1000, 1000)
+H = zeros(1000, 1000)
+Htest = ElasticArray{Float64}(undef, 1000, 1000)
+@benchmark copyto!(H, A)
+@benchmark copyto!(Htest, A)
+
+M = rand(10000, 10000)
+Mvec = vec(M)
+M = Base.ReshapedArray(Mvec, (1000, 1000), ())
+
+C = zeros(1000, 1000)
+A = rand(1000, 1000)
+B = rand(1000, 1000)
+@benchmark mul!(C, A, B) #9.462 ms
+@benchmark mul!(C, M, B) #10.058 ms
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
