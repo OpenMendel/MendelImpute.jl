@@ -520,6 +520,14 @@ function phase2(
     return phase
 end
 
+"""
+    resize_and_sync!(X, H, M, N, Xwork, Hwork, Hnext, window)
+
+Potentially changes the dimension of `Hwork`, `M`, and `N`. Downsizing does not 
+allocate extra memory, upsizing is amortized like vectors. 
+
+
+"""
 function resize_and_sync!(
     X::AbstractMatrix,
     H::AbstractMatrix,
@@ -540,16 +548,18 @@ function resize_and_sync!(
         return M
     end
 
-    # resize working arrays. Resizing M is not amortized when resizing upwards. 
+    # resize working arrays
     resize!(Hwork, pp, next_d)
     resize!(N, size(N, 1), next_d)
-    Mnew = (next_d < dd ? Base.ReshapedArray(vec(M), (next_d, next_d), ()) : zeros(T, next_d, next_d))
+    Mvec = vec(M)
+    resize!(Mvec, next_d^2)
+    Mnew = Base.ReshapedArray(Mvec, (next_d, next_d), ())
 
     # sync Xwork and Hwork with original data
     copyto!(Xwork, view(X, window, :))
     copyto!(Hwork, view(H, window, Hnext))
 
-    return Mnew::AbstractMatrix
+    return Mnew
 end
 
 """

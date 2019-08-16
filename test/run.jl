@@ -389,9 +389,9 @@ Xm_original = copy(Xm)
 
 ph2 = phase2(Xm, H, width=32)
 
-
-
-
+@time ph2 = phase2(Xm, H, width=32, verbose=false); # downsizing M is amortized: 176.924 MiB
+@time ph2 = phase2(Xm, H, width=32, verbose=false); # always reallocate new M:   177.917 MiB
+@time ph2 = phase2(Xm, H, width=32, verbose=false); # always amortized:          173.688 MiB
 
 #resize matrix efficiently
 
@@ -413,8 +413,9 @@ Htest = ElasticArray{Float64}(undef, 1000, 1000)
 @benchmark copyto!(H, A)
 @benchmark copyto!(Htest, A)
 
-M = rand(10000, 10000)
+M = rand(100, 100)
 Mvec = vec(M)
+resize!(Mvec, 1000000)
 M = Base.ReshapedArray(Mvec, (1000, 1000), ())
 
 C = zeros(1000, 1000)
