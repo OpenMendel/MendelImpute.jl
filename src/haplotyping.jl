@@ -469,9 +469,9 @@ function phase2(
 
         # record info into phase
         for i in 1:people
-            push!(phase[i].strand1.start, (w - 2) * width + 1)
+            push!(phase[i].strand1.start, (w - 1) * width + 1)
             push!(phase[i].strand1.haplotypelabel, happair[1][i])
-            push!(phase[i].strand2.start, (w - 2) * width + 1)
+            push!(phase[i].strand2.start, (w - 1) * width + 1)
             push!(phase[i].strand2.haplotypelabel, happair[2][i])
         end
 
@@ -511,9 +511,9 @@ function phase2(
 
     # record last window info into phase
     for i in 1:people
-        push!(phase[i].strand1.start, (windows - 2) * width + 1)
+        push!(phase[i].strand1.start, (windows - 1) * width + 1)
         push!(phase[i].strand1.haplotypelabel, happair[1][i])
-        push!(phase[i].strand2.start, (windows - 2) * width + 1)
+        push!(phase[i].strand2.start, (windows - 1) * width + 1)
         push!(phase[i].strand2.haplotypelabel, happair[2][i])
     end
 
