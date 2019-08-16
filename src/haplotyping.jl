@@ -548,19 +548,20 @@ function resize_and_sync!(
 
     pp, dd = size(Hwork)
     next_d = length(Hnext)
-    T      = eltype(M)
-
-    # quick return
-    if dd == next_d
-        return M
-    end
 
     # resize working arrays
-    resize!(Hwork, pp, next_d)
-    resize!(N, size(N, 1), next_d)
-    Mvec = vec(M)
-    resize!(Mvec, next_d^2)
-    Mnew = Base.ReshapedArray(Mvec, (next_d, next_d), ())
+    if dd != next_d
+        resize!(Hwork, pp        , next_d)
+        resize!(N    , size(N, 1), next_d)
+        # Mvec = vec(M)
+        # resize!(Mvec, next_d^2) 
+        # Mnew = Base.ReshapedArray(Mvec, (next_d, next_d), ()) # actually resize! makes a copy internally! 
+        # Mnew = zeros(eltype(M), next_d, next_d)               # always reallocate entire M
+        Mnew = (next_d < dd ? Base.ReshapedArray(vec(M), (next_d, next_d), ()) : 
+                              zeros(eltype(M), next_d, next_d))
+    else
+        Mnew = M
+    end
 
     # sync Xwork and Hwork with original data
     copyto!(Xwork, view(X, window, :))

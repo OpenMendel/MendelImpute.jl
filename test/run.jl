@@ -391,7 +391,12 @@ ph2 = phase2(Xm, H, width=32)
 
 @time ph2 = phase2(Xm, H, width=32, verbose=false); # downsizing M is amortized: 176.924 MiB
 @time ph2 = phase2(Xm, H, width=32, verbose=false); # always reallocate new M:   177.917 MiB
-@time ph2 = phase2(Xm, H, width=32, verbose=false); # always amortized:          173.688 MiB
+@time ph2 = phase2(Xm, H, width=32, verbose=false); # calls resize! on Mvec:     173.688 MiB
+
+@time ph2 = phase2(Xm, H, width=128, verbose=false); # downsizing M is amortized:   2.944723 seconds (794.36 k allocations: 77.325 MiB, 0.65% gc time)
+@time ph2 = phase2(Xm, H, width=128, verbose=false); # always reallocate new M:     2.933874 seconds (794.28 k allocations: 85.624 MiB, 0.21% gc time)
+@time ph2 = phase2(Xm, H, width=128, verbose=false); # calls resize! on Mvec:       2.937120 seconds (795.12 k allocations: 134.948 MiB, 0.35% gc time)
+
 
 #resize matrix efficiently
 
