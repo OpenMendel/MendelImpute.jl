@@ -460,7 +460,7 @@ function phase2(
 
         # sync Xwork and Hwork with original data
         cur_range = ((w - 1) * width + 1):(w * width)
-        M = resize_and_sync!(X, H, M, N, Xwork, Hwork, Hunique[w], cur_range)
+        M = resize_and_sync!(Xwork, Hwork, Hunique[w], cur_range, X, H, M, N)
 
         # phase current window
         copyto!(happair_prev[1], happair[1])
@@ -504,7 +504,7 @@ function phase2(
     # phase last window
     last_range = ((windows - 1) * width + 1):snps
     verbose && println("Imputing SNPs $last_range")
-    M = resize_and_sync!(X, H, M, N, Xwork, Hwork, Hunique[end], last_range)
+    M = resize_and_sync!(Xwork, Hwork, Hunique[end], last_range, X, H, M, N)
     copyto!(happair_prev[1], happair[1])
     copyto!(happair_prev[2], happair[2])
     haploimpute!(Xwork, Hwork, M, N, happair, hapscore)
@@ -523,20 +523,27 @@ end
 """
     resize_and_sync!(X, H, M, N, Xwork, Hwork, Hnext, window)
 
-Potentially changes the dimension of `Hwork`, `M`, and `N`. Downsizing does not 
-allocate extra memory, upsizing is amortized like vectors. 
+Up/downsizes the dimension of `Hwork`, `M`, and `N` and copies relevant information into `Xwork` and `Hwork`. 
 
-
+# Inputs
+* `Xwork`: Worker matrix storing X[window, :]. 
+* `Hwork`: Haplotype matrix in the current window containing only unique haplotypes. Must add/subtract columns. 
+* `Hnext`: The unique haplotype indices of the current haplotype window. 
+* `window`: Indices of current window. 
+* `X`: Full genotype matrix. Each column is a person's haplotype
+* `H`: Full haplotype reference panel. Each column is a haplotype
+* `M`: Square matrix used in the computational routine. Must be resized in both dimension. 
+* `N`: Matrix used in the computational routine. Must add/subtract columns. 
 """
 function resize_and_sync!(
+    Xwork::AbstractMatrix,
+    Hwork::ElasticArray,
+    Hnext::Vector{Int},
+    window::UnitRange{Int},
     X::AbstractMatrix,
     H::AbstractMatrix,
     M::AbstractMatrix,
     N::ElasticArray,
-    Xwork::AbstractMatrix,
-    Hwork::ElasticArray,
-    Hnext::Vector{Int},
-    window::UnitRange{Int}
     )
 
     pp, dd = size(Hwork)
