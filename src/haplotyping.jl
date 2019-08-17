@@ -804,17 +804,14 @@ columns of H in each window.
 * `trans`: orientation of `H`. 'T' means columns of `H` are a haplotype vectors. 'N' means rows of `H` are. 
 
 # Output
-* `unique_hap`: a vector of integer vectors denoting the unique columns of each window. 
+* `unique_hap`: Vector of integer vectors denoting the unique columns of each window. No repeats.
+* `hap_match` : Vector of integer vectors where hap_match[w][i] finds the matching unique haplotype in `unique_hap`. 
 """
 function unique_haplotypes(
     H::AbstractMatrix,
     width::Int,
     trans::Char='N'
     )
-
-    p, d = size(H)
-    windows = ceil(Int, p / width)
-    unique_hap = Vector{Vector{Int}}(undef, windows)
 
     if trans == 'N'
         dim = 1
@@ -824,17 +821,25 @@ function unique_haplotypes(
         error("trans can only be 'N' or 'T' but was $dim" )
     end
 
-    # find unique haplotypes in all but last window
+    p, d    = size(H)
+    storage = zeros(Int, d)
+    windows = ceil(Int, p / width)
+    unique_hap = Vector{Vector{Int}}(undef, windows)
+    hap_match  = [zeros(Int, d) for i in 1:windows]
+
+    # find unique haplotypes
     for w in 1:(windows-1)
         H_cur_window = view(H, ((w - 1) * width + 1):(w * width), :)
-        unique_hap[w] = unique(groupslices(H_cur_window, dim))
+        groupslices!(hap_match[w], H_cur_window, dim)
+        unique_hap[w] = unique(hap_match[w])
     end
 
     # find unique haplotype in last window
-    H_last_window = view(H, ((windows - 2) * width + 1):p, :)
-    unique_hap[end] = unique(groupslices(H_last_window, dim))
+    H_last_window = view(H, ((windows - 1) * width + 1):p, :)
+    groupslices!(hap_match[end], H_last_window, dim)
+    unique_hap[end] = unique(hap_match[end])
 
-    return unique_hap
+    return unique_hap, hap_match
 end
 
 # function unique_haplotypes(H::BitArray{2})

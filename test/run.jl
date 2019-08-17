@@ -330,17 +330,18 @@ using Profile
 Random.seed!(123)
 H = bitrand(1280, 1000)
 # Hwork = unique_haplotypes(H, 1:128)
-Hunique = unique_haplotypes(H, 128)
+# Hunique = unique_haplotypes(H, 128)
 
 for i in 1:500
 	H[:, 2i] .= H[:, 2i - 1]
 end
 
-# Hwork = unique_haplotypes(H, 1:128)
-Hunique = unique_haplotypes(H, 128)
+# Hwork = unique_haplotypes(H, 1:128, 'T')
+Hunique = unique_haplotypes(H, 128, 'T')
 
-
-# groupslices(H, 1)
+storage = zeros(Int, 1000)
+hi = groupslices(H, 2)
+groupslices!(storage, H, 2)
 # unique(groupslices(H, 2)) 
 # unique_haplotype_idx(H)
 

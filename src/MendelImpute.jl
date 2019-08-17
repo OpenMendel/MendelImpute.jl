@@ -15,7 +15,7 @@ export continue_haplotype,
     impute!, phase,
     search_breakpoint,
     unique_haplotypes, unique_haplotype_idx,
-    groupslices,
+    groupslices, groupslices!, 
     phase2
 
 """
@@ -37,7 +37,7 @@ struct HaplotypeMosaicPair
 end
 HaplotypeMosaicPair(len) = HaplotypeMosaicPair(HaplotypeMosaic(len), HaplotypeMosaic(len))
 
-#needed for groupslices function
+# needed for groupslices function
 struct Prehashed
     hash::UInt
 end
