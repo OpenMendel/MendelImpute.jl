@@ -43,6 +43,19 @@ struct Prehashed
 end
 hash(x::Prehashed) = x.hash
 
+"""
+Data structure for keeping track of unique haplotypes in each window. 
+There are a total of `length` windows. In each window, `uniqH[i]`
+is an integer vector denoting the unique columns of window `i` (without
+repeats). `hapmap[i]` is an integer vector where `hap_match[w][i]` 
+finds the matching unique haplotype in `uniqH`. 
+"""
+struct UniqueHapSet
+    uniqH::Vector{Vector{Int}}
+    hapmap::Vector{Vector{Int}}
+end
+UniqueHapSet(windows, haps) = UniqueHapSet(Vector{Vector{Int}}(undef, windows), [zeros(Int, haps) for i in 1:windows])
+
 # utilities for haplotyping
 include("haplotyping.jl")
 

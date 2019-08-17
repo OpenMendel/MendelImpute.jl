@@ -822,24 +822,22 @@ function unique_haplotypes(
     end
 
     p, d    = size(H)
-    storage = zeros(Int, d)
     windows = ceil(Int, p / width)
-    unique_hap = Vector{Vector{Int}}(undef, windows)
-    hap_match  = [zeros(Int, d) for i in 1:windows]
+    hapset  = UniqueHapSet(windows, d)
 
-    # find unique haplotypes
+    # record unique haplotypes and mappings window by window
     for w in 1:(windows-1)
         H_cur_window = view(H, ((w - 1) * width + 1):(w * width), :)
-        groupslices!(hap_match[w], H_cur_window, dim)
-        unique_hap[w] = unique(hap_match[w])
+        groupslices!(hapset.hapmap[w], H_cur_window, dim)
+        hapset.uniqH[w] = unique(hapset.hapmap[w])
     end
 
     # find unique haplotype in last window
     H_last_window = view(H, ((windows - 1) * width + 1):p, :)
-    groupslices!(hap_match[end], H_last_window, dim)
-    unique_hap[end] = unique(hap_match[end])
+    groupslices!(hapset.hapmap[end], H_last_window, dim)
+    hapset.uniqH[end] = unique(hapset.hapmap[end])
 
-    return unique_hap, hap_match
+    return hapset
 end
 
 # function unique_haplotypes(H::BitArray{2})
