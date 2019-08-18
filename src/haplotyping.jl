@@ -823,7 +823,7 @@ function unique_haplotypes(
 
     p, d    = size(H)
     windows = ceil(Int, p / width)
-    hapset  = UniqueHapSet(windows, d)
+    hapset  = UniqueHaplotypeMaps(windows, d)
 
     # record unique haplotypes and mappings window by window
     for w in 1:(windows-1)

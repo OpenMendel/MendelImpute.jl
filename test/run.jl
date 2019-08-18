@@ -340,7 +340,7 @@ end
 Hunique = unique_haplotypes(H, 128, 'T')
 
 storage = zeros(Int, 1000)
-hi = groupslices(H, 2)
+hii = groupslices(H, 2)
 groupslices!(storage, H, 2)
 # unique(groupslices(H, 2)) 
 # unique_haplotype_idx(H)
@@ -350,6 +350,22 @@ groupslices!(storage, H, 2)
 @benchmark unique(groupslices(H, 2)) # 1.273 ms, 348.78 KiB
 @benchmark unique(H, dims=2)         # 1.408 ms, 132.25 KiB
 @benchmark unique_haplotype_idx(H)   # 88.825 μs, 92.58 KiB
+
+
+
+
+H = zeros(1, 9)
+H[1] = 1
+H[2] = 2
+H[3] = 2
+H[4] = 3
+H[5] = 2
+H[6] = 4
+H[7] = 1
+H[8] = 4
+H[9] = 1
+
+result = unique_haplotypes(H, 128, 'T')
 
 
 
@@ -387,6 +403,12 @@ p, n = size(X)
 X2 = Matrix{Union{Missing, eltype(X)}}(X)
 Xm = ifelse.(rand(eltype(X), p, n) .< missingprop, missing, X2)
 Xm_original = copy(Xm)
+
+Hunique = unique_haplotypes(H, 128, 'T')
+@benchmark unique_haplotypes(H, 128, 'T') #247.271 ms, 16.24 MiB
+@benchmark unique_haplotypes(H, 64, 'T')  #240.313 ms, 20.95 MiB
+@benchmark unique_haplotypes(H, 32, 'T')  #275.781 ms, 29.25 MiB
+@benchmark unique_haplotypes(H, 16, 'T')  #287.333 ms, 48.92 MiB
 
 ph2 = phase2(Xm, H, width=32)
 
