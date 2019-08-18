@@ -10,11 +10,11 @@ module MendelImpute
 	using StatsBase
 	using ElasticArrays
 
-	export continue_haplotype, haplopair!, haplopair, haploimpute!,
-	export impute!, phase, search_breakpoint, unique_haplotypes, 
+	export continue_haplotype, haplopair!, haplopair, haploimpute!
+	export impute!, phase, search_breakpoint, unique_haplotypes
 	export unique_haplotype_idx, groupslices, groupslices!, phase2
 
-	include("haplotyping.jl")
 	include("data_structures.jl")
+	include("haplotyping.jl")
 
 end # module

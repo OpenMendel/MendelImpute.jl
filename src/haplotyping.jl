@@ -429,19 +429,19 @@ function phase2(
     windows = ceil(Int, snps / width)
 
     #get unique haplotype indices in each window
-    Hunique = unique_haplotypes(H, width, 'T')
-    num_unq = length(Hunique[1])
+    Hunique  = unique_haplotypes(H, width, 'T')
+    num_uniq = length(Hunique.uniqH[1])
 
     # allocate working arrays
     happair      = ones(Int, people), ones(Int, people)
     happair_prev = deepcopy(happair)
     hapscore     = zeros(T, people)
     phase        = [HaplotypeMosaicPair(snps) for i in 1:people]
-    Hwork        = ElasticArray{T}(H[1:width, Hunique[1]])
+    Hwork        = ElasticArray{T}(H[1:width, Hunique.uniqH[1]])
     Xwork        = X[1:width, :]
     Xwork_float  = zeros(T, size(Xwork))
-    M            = zeros(T, num_unq, num_unq)
-    N            = ElasticArray{T}(undef, people, num_unq)
+    M            = zeros(T, num_uniq, num_uniq)
+    N            = ElasticArray{T}(undef, people, num_uniq)
 
     # phase and impute window 1
     verbose && println("Imputing SNPs 1:$width")
@@ -460,7 +460,7 @@ function phase2(
 
         # sync Xwork and Hwork with original data
         cur_range = ((w - 1) * width + 1):(w * width)
-        M = resize_and_sync!(Xwork, Hwork, Hunique[w], cur_range, X, H, M, N)
+        M = resize_and_sync!(Xwork, Hwork, Hunique.uniqH[w], cur_range, X, H, M, N)
 
         # phase current window
         copyto!(happair_prev[1], happair[1])
@@ -504,7 +504,7 @@ function phase2(
     # phase last window
     last_range = ((windows - 1) * width + 1):snps
     verbose && println("Imputing SNPs $last_range")
-    M = resize_and_sync!(Xwork, Hwork, Hunique[end], last_range, X, H, M, N)
+    M = resize_and_sync!(Xwork, Hwork, Hunique.uniqH[end], last_range, X, H, M, N)
     copyto!(happair_prev[1], happair[1])
     copyto!(happair_prev[2], happair[2])
     haploimpute!(Xwork, Hwork, M, N, happair, hapscore)
