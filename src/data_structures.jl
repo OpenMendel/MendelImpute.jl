@@ -62,6 +62,5 @@ function PeoplesRedundantHaplotypeSet(windows::Int, people::Int)
     return x
 end
 Base.getindex(h::PeoplesRedundantHaplotypeSet, i::Int, j::Int) = h.p[i, j]
-
-
-
+Base.size(h::PeoplesRedundantHaplotypeSet) = size(h.p)
+Base.size(h::PeoplesRedundantHaplotypeSet, k::Int) = size(h.p, k)

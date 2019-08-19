@@ -37,8 +37,8 @@ Calculate the best pair of haplotypes in `H` for each individual in `X`. Overwit
 objective value from the optimal haplotype pair.
 
 # Input
-* `X`: `p x n` genotype matrix. Each row is an individual.
-* `H`: `p x d` haplotype matrix. Each row is a haplotype.
+* `X`: `p x n` genotype matrix. Each column is an individual.
+* `H`: `p x d` haplotype matrix. Each column is a haplotype.
 * `M`: overwritten by `M[i, j] = 2dot(H[:, i], H[:, j]) + sumabs2(H[:, i]) +
     sumabs2(H[:, j])`.
 * `N`: overwritten by `n x d` matrix `2X'H`.
@@ -250,24 +250,11 @@ function haploimpute!(
     obj = typemax(eltype(hapscore))
     initmissing!(X, Xfloat=Xfloat) #Xfloat[i, j] = X[i, j] on observed entries
 
-    for iter in 1:maxiters
+    # haplotyping
+    haplopair!(Xfloat, H, M, N, happair, hapscore)
 
-        # haplotyping
-        haplopair!(Xfloat, H, M, N, happair, hapscore)
-
-        # impute missing entries according to current haplotypes
-        fillmissing!(X, H, happair)
-
-        # CURRENTLY NOT COMPARING ERROR WITH IMPUTATION BY MEAN
-        # println("discrepancy = $discrepancy")
-        # convergence criterion
-        # objold = obj
-        # obj = sum(hapscore) - discrepancy
-        # println("iter = $iter, obj = $obj")
-        # if abs(obj - objold) < tolfun * (objold + 1)
-        #     break
-        # end
-    end
+    # impute missing entries according to current haplotypes
+    # fillmissing!(X, H, happair)
 
     return nothing
 end
@@ -428,96 +415,84 @@ function phase2(
     # number of windows
     windows = ceil(Int, snps / width)
 
-    #get unique haplotype indices in each window
+    # get unique haplotype indices and maps for each window
     Hunique  = unique_haplotypes(H, width, 'T')
-    num_uniq = length(Hunique.uniqH[1])
+    num_uniq = length(Hunique.uniqueindex[1])
 
     # allocate working arrays
-    happair      = ones(Int, people), ones(Int, people)
-    happair_prev = deepcopy(happair)
-    hapscore     = zeros(T, people)
-    phase        = [HaplotypeMosaicPair(snps) for i in 1:people]
-    Hwork        = ElasticArray{T}(H[1:width, Hunique.uniqH[1]])
-    Xwork        = X[1:width, :]
-    Xwork_float  = zeros(T, size(Xwork))
-    M            = zeros(T, num_uniq, num_uniq)
-    N            = ElasticArray{T}(undef, people, num_uniq)
+    happair     = ones(Int, people), ones(Int, people)
+    hapscore    = zeros(T, people)
+    phase       = [HaplotypeMosaicPair(snps) for i in 1:people]
+    Hwork       = ElasticArray{T}(H[1:width, Hunique.uniqueindex[1]])
+    Xwork       = X[1:width, :]
+    Xwork_float = zeros(T, size(Xwork))
+    M           = zeros(T, num_uniq, num_uniq)
+    N           = ElasticArray{T}(undef, people, num_uniq)
+
+    # Matrix storing redundant haplotypes. 
+    # Each column is a person. Rows are sets storing redundant haplotypes for each window 
+    redund_haps = PeoplesRedundantHaplotypeSet(windows, people) 
 
     # phase and impute window 1
     verbose && println("Imputing SNPs 1:$width")
     haploimpute!(Xwork, Hwork, M, N, happair, hapscore, Xfloat=Xwork_float)
 
-    # record info into phase
-    for i in 1:people
-        push!(phase[i].strand1.start, 1)
-        push!(phase[i].strand1.haplotypelabel, happair[1][i])
-        push!(phase[i].strand2.start, 1)
-        push!(phase[i].strand2.haplotypelabel, happair[2][i])
-    end
+    # record redundant haplotype information
+    compute_redundant_haplotypes!(redund_haps, Hunique, happair, H, 1)
 
     for w in 2:(windows-1)
         verbose && println("Imputing SNPs $((w - 1) * width + 1):$(w * width)")
 
         # sync Xwork and Hwork with original data
         cur_range = ((w - 1) * width + 1):(w * width)
-        M = resize_and_sync!(Xwork, Hwork, Hunique.uniqH[w], cur_range, X, H, M, N)
+        M = resize_and_sync!(Xwork, Hwork, Hunique.uniqueindex[w], cur_range, X, H, M, N)
 
         # phase current window
-        copyto!(happair_prev[1], happair[1])
-        copyto!(happair_prev[2], happair[2])
         haploimpute!(Xwork, Hwork, M, N, happair, hapscore, Xfloat=Xwork_float)
 
-        # record info into phase
-        for i in 1:people
-            push!(phase[i].strand1.start, (w - 1) * width + 1)
-            push!(phase[i].strand1.haplotypelabel, happair[1][i])
-            push!(phase[i].strand2.start, (w - 1) * width + 1)
-            push!(phase[i].strand2.haplotypelabel, happair[2][i])
-        end
-
-        # find optimal break points and record info into phase
-        # Hw12 = view(Hwork, 1:2width, :)
-        # for i in 1:people
-        #     Xi = view(Xwork, 1:2width, i)
-        #     (happair[1][i], happair[2][i]), bkpts =
-        #         continue_haplotype(Xi, Hw12,
-        #         (happair_prev[1][i], happair_prev[2][i]),
-        #         (     happair[1][i],      happair[2][i]))
-        #     # strand 1
-        #     if bkpts[1] > -1 && bkpts[1] < 2width
-        #         push!(phase[i].strand1.start, (w - 2) * width + 1 + bkpts[1])
-        #         push!(phase[i].strand1.haplotypelabel, happair[1][i])
-        #     end
-        #     # strand 2
-        #     if bkpts[2] > -1 && bkpts[2] < 2width
-        #         push!(phase[i].strand2.start, (w - 2) * width + 1 + bkpts[2])
-        #         push!(phase[i].strand2.haplotypelabel, happair[2][i])
-        #     end
-        #     # # for debug
-        #     if verbose == true && i == 1
-        #         println("happair = ($(happair[1][i]), $(happair[2][i]))")
-        #         println("bkpts = $bkpts")
-        #     end
-        # end
+        # record redundant haplotype information
+        compute_redundant_haplotypes!(redund_haps, Hunique, happair, H, w)
     end
 
     # phase last window
     last_range = ((windows - 1) * width + 1):snps
     verbose && println("Imputing SNPs $last_range")
-    M = resize_and_sync!(Xwork, Hwork, Hunique.uniqH[end], last_range, X, H, M, N)
-    copyto!(happair_prev[1], happair[1])
-    copyto!(happair_prev[2], happair[2])
+    M = resize_and_sync!(Xwork, Hwork, Hunique.uniqueindex[end], last_range, X, H, M, N)
     haploimpute!(Xwork, Hwork, M, N, happair, hapscore)
-
-    # record last window info into phase
-    for i in 1:people
-        push!(phase[i].strand1.start, (windows - 1) * width + 1)
-        push!(phase[i].strand1.haplotypelabel, happair[1][i])
-        push!(phase[i].strand2.start, (windows - 1) * width + 1)
-        push!(phase[i].strand2.haplotypelabel, happair[2][i])
-    end
+    compute_redundant_haplotypes!(redund_haps, Hunique, happair, H, windows)
 
     return phase
+end
+
+function compute_redundant_haplotypes!(
+    redund_haps::PeoplesRedundantHaplotypeSet, 
+    Hunique::UniqueHaplotypeMaps, 
+    happair::Tuple{AbstractVector, AbstractVector}, 
+    H::AbstractMatrix,
+    window::Int,
+    )
+
+    people = size(redund_haps, 2)
+
+    # loop through all people
+    @inbounds for p in 1:people
+        (Hwork_i, Hwork_j) = (happair[1][p], happair[2][p])
+        # println("person $p's optimal haplotype pairs are: $((Hwork_i, Hwork_j))")
+
+        (H_i, H_j) = (Hunique.uniqueindex[window][Hwork_i], Hunique.uniqueindex[window][Hwork_j])
+        # println("person $p's optimal haplotype pairs are located at columns $H_i and $H_j in H")
+
+        # loop through windows and find redundant haplotypes that match either of the optimal haplotypes 
+        for jj in 1:size(H, 2)
+            Hunique.hapmap[window][jj] === H_i && push!(redund_haps[window, p], jj)
+            Hunique.hapmap[window][jj] === H_j && push!(redund_haps[window, p], jj)
+        end
+
+        # println("person $p's redundant haplotypes are: ")
+        # println(redund_haps[1, p])
+    end
+
+    return nothing
 end
 
 """
@@ -553,12 +528,12 @@ function resize_and_sync!(
     if dd != next_d
         resize!(Hwork, pp        , next_d)
         resize!(N    , size(N, 1), next_d)
-        # Mvec = vec(M)
-        # resize!(Mvec, next_d^2) 
-        # Mnew = Base.ReshapedArray(Mvec, (next_d, next_d), ()) # actually resize! makes a copy internally! 
+        Mvec = vec(M)
+        resize!(Mvec, next_d^2)
+        Mnew = Base.ReshapedArray(Mvec, (next_d, next_d), ()) # actually resize! makes a copy internally! 
         # Mnew = zeros(eltype(M), next_d, next_d)               # always reallocate entire M
-        Mnew = (next_d < dd ? Base.ReshapedArray(vec(M), (next_d, next_d), ()) : 
-                              zeros(eltype(M), next_d, next_d))
+        # Mnew = (next_d < dd ? Base.ReshapedArray(vec(M), (next_d, next_d), ()) : 
+        #                       zeros(eltype(M), next_d, next_d))
     else
         Mnew = M
     end
@@ -793,19 +768,19 @@ function unique_haplotypes(
 end
 
 """
-    unique_haplotypes(H, width::Int)
+    unique_haplotypes(H, width, trans)
 
-For each window, finds unique haplotypes stored in the columns of H and saves the unique
-columns of H in each window.
+For each window, finds unique haplotype indices stored in the columns of H and 
+saves a mapping vector of unique columns of H. See `UniqueHaplotypeMaps` data 
+structure for examples. 
 
 # Input
-* `H`: an `p x d` reference panel of haplotypes within a genomic window. 
-* `width`: the window width 
-* `trans`: orientation of `H`. 'T' means columns of `H` are a haplotype vectors. 'N' means rows of `H` are. 
+* `H`: An `p x d` reference panel of haplotypes within a genomic window. 
+* `width`: The window width 
+* `trans`: Orientation of `H`. 'T' means columns of `H` are a haplotype vectors. 'N' means rows of `H` are. 
 
 # Output
-* `unique_hap`: Vector of integer vectors denoting the unique columns of each window. No repeats.
-* `hap_match` : Vector of integer vectors where hap_match[w][i] finds the matching unique haplotype in `unique_hap`. 
+* `hapset`: Data structure for keeping track of unique haplotypes in each window. 
 """
 function unique_haplotypes(
     H::AbstractMatrix,
@@ -829,13 +804,13 @@ function unique_haplotypes(
     for w in 1:(windows-1)
         H_cur_window = view(H, ((w - 1) * width + 1):(w * width), :)
         groupslices!(hapset.hapmap[w], H_cur_window, dim)
-        hapset.uniqH[w] = unique(hapset.hapmap[w])
+        hapset.uniqueindex[w] = unique(hapset.hapmap[w])
     end
 
     # find unique haplotype in last window
     H_last_window = view(H, ((windows - 1) * width + 1):p, :)
     groupslices!(hapset.hapmap[end], H_last_window, dim)
-    hapset.uniqH[end] = unique(hapset.hapmap[end])
+    hapset.uniqueindex[end] = unique(hapset.hapmap[end])
 
     return hapset
 end

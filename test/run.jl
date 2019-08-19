@@ -404,11 +404,11 @@ X2 = Matrix{Union{Missing, eltype(X)}}(X)
 Xm = ifelse.(rand(eltype(X), p, n) .< missingprop, missing, X2)
 Xm_original = copy(Xm)
 
-Hunique = unique_haplotypes(H, 128, 'T')
-@benchmark unique_haplotypes(H, 128, 'T') #247.271 ms, 16.24 MiB
-@benchmark unique_haplotypes(H, 64, 'T')  #240.313 ms, 20.95 MiB
-@benchmark unique_haplotypes(H, 32, 'T')  #275.781 ms, 29.25 MiB
-@benchmark unique_haplotypes(H, 16, 'T')  #287.333 ms, 48.92 MiB
+# Hunique = unique_haplotypes(H, 128, 'T')
+# @benchmark unique_haplotypes(H, 128, 'T') #247.271 ms, 16.24 MiB
+# @benchmark unique_haplotypes(H, 64, 'T')  #240.313 ms, 20.95 MiB
+# @benchmark unique_haplotypes(H, 32, 'T')  #275.781 ms, 29.25 MiB
+# @benchmark unique_haplotypes(H, 16, 'T')  #287.333 ms, 48.92 MiB
 
 ph2 = phase2(Xm, H, width=32)
 
@@ -456,12 +456,61 @@ B = rand(1000, 1000)
 
 
 
+### Benchmark compute_redundant_haplotypes!
 
+using Revise
+using DelimitedFiles
+using LinearAlgebra
+using BenchmarkTools
+using MendelImpute
+using Random
+using Profile
+using ElasticArrays
 
+rawdata = readdlm("AFRped_geno.txt", ',', Float32);
+people = 664;
+X = copy(Transpose(rawdata[1:people, 1:(end - 1)]));
+function create_hap(x)
+    n, p = size(x)
+    h = one(eltype(x))
+    for j in 1:p, i in 1:n
+        if x[i, j] != 0
+            x[i, j] -= h
+        end
+    end
+    return copy(Transpose(x))
+end
+H = create_hap(rawdata[(people + 1):end, 1:(end - 1)]);
 
+Random.seed!(123)
+missingprop = 0.1
+p, n = size(X)
+X2 = Matrix{Union{Missing, eltype(X)}}(X)
+Xm = ifelse.(rand(eltype(X), p, n) .< missingprop, missing, X2)
+Xm_original = copy(Xm)
 
+@time ph2 = phase2(Xm, H, width=128, verbose=false);
 
+width = 128
+snps, people = size(X)
+windows = ceil(Int, snps / width)
+Hunique  = unique_haplotypes(H, width, 'T')
+num_uniq = length(Hunique.uniqueindex[1])
+T = eltype(H)
 
+# allocate working arrays
+happair     = ones(Int, people), ones(Int, people)
+hapscore    = zeros(T, people)
+phase       = [HaplotypeMosaicPair(snps) for i in 1:people]
+Hwork       = ElasticArray{T}(H[1:width, Hunique.uniqueindex[1]])
+Xwork       = X[1:width, :]
+Xwork_float = zeros(T, size(Xwork))
+M           = zeros(T, num_uniq, num_uniq)
+N           = ElasticArray{T}(undef, people, num_uniq)
+
+redund_haps = PeoplesRedundantHaplotypeSet(windows, people) 
+
+@benchmark compute_redundant_haplotypes!(redund_haps, Hunique, happair, H, 1)
 
 
 
