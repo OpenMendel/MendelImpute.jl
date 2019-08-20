@@ -56,11 +56,8 @@ UniqueHaplotypeMaps(windows::Int, haps::Int) = UniqueHaplotypeMaps(Vector{Vector
 struct PeoplesRedundantHaplotypeSet
     p::Matrix{Set{Int}}
 end
-function PeoplesRedundantHaplotypeSet(windows::Int, people::Int) 
-    x = PeoplesRedundantHaplotypeSet(Matrix{Set{Int}}(undef, windows, people))
-    fill!(x.p, Set{Int}())
-    return x
-end
+PeoplesRedundantHaplotypeSet(windows::Int, people::Int) = PeoplesRedundantHaplotypeSet([Set{Int}() for i in 1:windows, j in 1:people])
+
 Base.getindex(h::PeoplesRedundantHaplotypeSet, i::Int, j::Int) = h.p[i, j]
 Base.size(h::PeoplesRedundantHaplotypeSet) = size(h.p)
 Base.size(h::PeoplesRedundantHaplotypeSet, k::Int) = size(h.p, k)

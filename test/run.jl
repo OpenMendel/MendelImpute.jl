@@ -489,7 +489,15 @@ X2 = Matrix{Union{Missing, eltype(X)}}(X)
 Xm = ifelse.(rand(eltype(X), p, n) .< missingprop, missing, X2)
 Xm_original = copy(Xm)
 
-@time ph2 = phase2(Xm, H, width=128, verbose=false);
+@time result = redundant_haplotypes(Xm, H, width=128, verbose=false); # 3.549484 seconds (26.48 k allocations: 26.286 MiB, 0.13% gc time)
+
+person1 = copy(result[1, 1])
+intersect!(person1, result[2, 1])
+
+for i in 1:size(result, 1)
+	intersect!(person1, result[2, 1])
+end
+
 
 width = 128
 snps, people = size(X)
@@ -515,8 +523,8 @@ redund_haps = PeoplesRedundantHaplotypeSet(windows, people)
 
 
 
-
-
+x = Vector{Set{Int}}(undef, 10)
+fill!(x, Set{Int}())
 
 
 
