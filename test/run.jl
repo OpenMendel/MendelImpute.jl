@@ -489,15 +489,22 @@ X2 = Matrix{Union{Missing, eltype(X)}}(X)
 Xm = ifelse.(rand(eltype(X), p, n) .< missingprop, missing, X2)
 Xm_original = copy(Xm)
 
-@time result = redundant_haplotypes(Xm, H, width=128, verbose=false); #   2.902272 seconds (1.89 M allocations: 946.188 MiB)  -> using Set{Int}()
-@time result = redundant_haplotypes(Xm, H, width=128, verbose=false); #   2.003341 seconds (924.64 k allocations: 89.575 MiB) -> using BitSet()
+@time result = redundant_haplotypes(Xm, H, width=128); #   2.902272 seconds (1.89 M allocations: 946.188 MiB)  -> using Set{Int}()
+@time result = redundant_haplotypes(Xm, H, width=128); #   2.003341 seconds (924.64 k allocations: 89.575 MiB) -> using BitSet()
+@time result = redundant_haplotypes(Xm, H, width=1200); #  1.822300 seconds (75.33 k allocations: 32.212 MiB)  -> using BitSet()
 
-# person1 = copy(result[1, 1])
-# intersect!(person1, result[2, 1])
+#check breakpoints in first person
+hapset, bkpts = phase2(Xm, H, width=1200) # median 30 breakpoints, total 31 windows
+hapset, bkpts = phase2(Xm, H, width=400)  # median 76 breakpoints, total 31 windows
+hapset, bkpts = phase2(Xm, H, width=128)  # median 135 breakpoints, total 286 windows
+hapset, bkpts = phase2(Xm, H, width=64)   # median 150 breakpoints, total 571 windows
+hapset, bkpts = phase2(Xm, H, width=32)   # median 185 breakpoints, total 1141 windows
+hapset, bkpts = phase2(Xm, H, width=16)   # median 176 breakpoints, total 2282 windows
 
-# for i in 1:size(result, 1)
-# 	intersect!(person1, result[2, 1])
-# end
+
+
+
+
 
 
 width = 128

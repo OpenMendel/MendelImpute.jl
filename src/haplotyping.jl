@@ -399,7 +399,7 @@ function phase(
     return phase
 end
 
-function redundant_haplotypes(
+function phase2(
     X::AbstractMatrix{Union{Missing, T}},
     H::AbstractMatrix{T};
     width::Int    = 128,
@@ -408,6 +408,38 @@ function redundant_haplotypes(
 
     # set BLAS threads to 1 if more than 1 Julia threads
     Threads.nthreads() > 1 && BLAS.set_num_threads(1)
+
+    # problem dimensions
+    snps, people = size(X)
+
+    # number of windows
+    windows = ceil(Int, snps / width)
+
+    # get redundant haplotype sets. Each column is a person and each row are redundant haplotypes in a window
+    hapset = redundant_haplotypes(X, H, width=width, verbose=verbose)
+
+    # allocate working arrays
+    phase = [HaplotypeMosaicPair(snps) for i in 1:people]
+    store = [copy(hapset.p[1, i]) for i in 1:people] # redundant haplotype sets in first window for each person
+    bkpts = zeros(Int, people)
+
+    @inbounds for k in 1:people, i in 2:windows
+        intersect!(store[k], hapset.p[i, 1])
+        if isempty(store[k])
+            store[k] = copy(hapset.p[i, k])
+            bkpts[k] += 1
+        end
+    end
+
+    return hapset, bkpts
+end
+
+function redundant_haplotypes(
+    X::AbstractMatrix{Union{Missing, T}},
+    H::AbstractMatrix{T};
+    width::Int    = 128,
+    verbose::Bool = true
+    ) where T <: Real
 
     # problem dimensions
     snps, people = size(X)
@@ -425,37 +457,33 @@ function redundant_haplotypes(
     # allocate working arrays
     happair     = ones(Int, people), ones(Int, people)
     hapscore    = zeros(T, people)
-    phase       = [HaplotypeMosaicPair(snps) for i in 1:people]
     Hwork       = ElasticArray{T}(H[1:width, Hunique.uniqueindex[1]])
     Xwork       = X[1:width, :]
     Xwork_float = zeros(T, size(Xwork))
     M           = zeros(T, num_uniq, num_uniq)
     N           = ElasticArray{T}(undef, people, num_uniq)
 
-    # phase and impute window 1
-    verbose && println("Imputing SNPs 1:$width")
+    # impute window 1
     haploimpute!(Xwork, Hwork, M, N, happair, hapscore, Xfloat=Xwork_float)
 
     # record redundant haplotype information
     compute_redundant_haplotypes!(redund_haps, Hunique, happair, H, 1)
 
     for w in 2:(windows-1)
-        verbose && println("Imputing SNPs $((w - 1) * width + 1):$(w * width)")
 
         # sync Xwork and Hwork with original data
         cur_range = ((w - 1) * width + 1):(w * width)
         M = resize_and_sync!(Xwork, Hwork, Hunique.uniqueindex[w], cur_range, X, H, M, N)
 
-        # phase current window
+        # impute current window
         haploimpute!(Xwork, Hwork, M, N, happair, hapscore, Xfloat=Xwork_float)
 
         # record redundant haplotype information
         compute_redundant_haplotypes!(redund_haps, Hunique, happair, H, w)
     end
 
-    # phase last window
+    # impute last window
     last_range = ((windows - 1) * width + 1):snps
-    verbose && println("Imputing SNPs $last_range")
     M = resize_and_sync!(Xwork, Hwork, Hunique.uniqueindex[end], last_range, X, H, M, N)
     haploimpute!(Xwork, Hwork, M, N, happair, hapscore)
     compute_redundant_haplotypes!(redund_haps, Hunique, happair, H, windows)
