@@ -489,14 +489,15 @@ X2 = Matrix{Union{Missing, eltype(X)}}(X)
 Xm = ifelse.(rand(eltype(X), p, n) .< missingprop, missing, X2)
 Xm_original = copy(Xm)
 
-@time result = redundant_haplotypes(Xm, H, width=128, verbose=false); # 3.549484 seconds (26.48 k allocations: 26.286 MiB, 0.13% gc time)
+@time result = redundant_haplotypes(Xm, H, width=128, verbose=false); #   2.902272 seconds (1.89 M allocations: 946.188 MiB)  -> using Set{Int}()
+@time result = redundant_haplotypes(Xm, H, width=128, verbose=false); #   2.003341 seconds (924.64 k allocations: 89.575 MiB) -> using BitSet()
 
-person1 = copy(result[1, 1])
-intersect!(person1, result[2, 1])
+# person1 = copy(result[1, 1])
+# intersect!(person1, result[2, 1])
 
-for i in 1:size(result, 1)
-	intersect!(person1, result[2, 1])
-end
+# for i in 1:size(result, 1)
+# 	intersect!(person1, result[2, 1])
+# end
 
 
 width = 128
@@ -522,9 +523,6 @@ redund_haps = PeoplesRedundantHaplotypeSet(windows, people)
 
 
 
-
-x = Vector{Set{Int}}(undef, 10)
-fill!(x, Set{Int}())
 
 
 
