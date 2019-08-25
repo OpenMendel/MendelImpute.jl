@@ -491,11 +491,29 @@ X2 = Matrix{Union{Missing, eltype(X)}}(X)
 Xm = ifelse.(rand(eltype(X), p, n) .< missingprop, missing, X2)
 Xm_original = copy(Xm)
 
-@time result = redundant_haplotypes(Xm, H, width=128);  #  3.427234 seconds (1.66 M allocations: 136.764 MiB, 2.87% gc time)
-@time result = redundant_haplotypes(Xm, H, width=1200); #  3.624770 seconds (129.18 k allocations: 34.883 MiB, 0.34% gc time)
+# code in function phase2
+width = 64
+snps, people = size(X)
+windows = ceil(Int, snps / width)
+hapset = redundant_haplotypes(Xm, H, width=width)
+phase = [HaplotypeMosaicPair(snps) for i in 1:people]
+bkpts = (zeros(Int, people), zeros(Int, people))
+store = ([copy(hapset.strand1[1, i]) for i in 1:people], [copy(hapset.strand2[1, i]) for i in 1:people])
+window_span = (zeros(Int, people), zeros(Int, people))
 
-hapset, bkpts1, bkpts2 = phase2(Xm, H, width=64)   
-[bkpts1 bkpts2]
+#run phase2
+phase, hapset, bkpts = phase2(Xm, H, width=width)   
+[bkpts[1] bkpts[2]]
+
+#examine person 1
+phase[1].strand2.start
+phase[1].strand2.haplotypelabel
+
+@time phase2(Xm, H, width=width)
+
+# @time result = redundant_haplotypes(Xm, H, width=128);  #  3.427234 seconds (1.66 M allocations: 136.764 MiB, 2.87% gc time)
+# @time result = redundant_haplotypes(Xm, H, width=1200); #  3.624770 seconds (129.18 k allocations: 34.883 MiB, 0.34% gc time)
+
 
 #check breakpoints in first person
 # hapset, bkpts = phase2(Xm, H, width=1200) # median 30 breakpoints, total 31 windows
@@ -539,8 +557,10 @@ redund_haps = PeoplesRedundantHaplotypeSet(windows, people)
 
 
 
-
-
+#### set intersections
+a = BitSet(rand(1:100000, 100000))
+b = BitSet(rand(1:100000, 100000))
+c = intersect(a, b)
 
 
 

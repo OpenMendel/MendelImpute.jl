@@ -397,6 +397,7 @@ function phase(
     return phase
 end
 
+# TODO: why does benchmark on this function crash the REPL
 function phase2(
     X::AbstractMatrix{Union{Missing, T}},
     H::AbstractMatrix{T};
@@ -417,30 +418,53 @@ function phase2(
     hapset = redundant_haplotypes(X, H, width=width, verbose=verbose)
 
     # allocate working arrays
-    phase  = [HaplotypeMosaicPair(snps)  for i in 1:people]
-    store1 = [copy(hapset.strand1[1, i]) for i in 1:people] # strand 1's redundant haplotype sets in first window for each person
-    store2 = [copy(hapset.strand2[1, i]) for i in 1:people] # strand 2's redundant haplotype sets in first window for each person
-    bkpts1  = zeros(Int, people)
-    bkpts2  = zeros(Int, people)
+    phase = [HaplotypeMosaicPair(snps) for i in 1:people]
+    bkpts = (zeros(Int, people), zeros(Int, people))
+    store = ([copy(hapset.strand1[1, i]) for i in 1:people], [copy(hapset.strand2[1, i]) for i in 1:people])
+    window_span = (ones(Int, people), ones(Int, people))
+    # store_prev = deepcopy(store)
 
-    # intersect each window
-    @inbounds for k in 1:people, i in 2:windows
+    # TODO: search for breakpoints. 
+    # TODO: parallel computing
+    # TODO: replace `intersect` and `intersect!` with fast set intersection using bisection/seesaw search
+    @inbounds for i in 1:people, w in 2:windows
+    
         # strand 1
-        intersect!(store1[k], hapset.strand1[i, k])
-        if isempty(store1[k])
-            store1[k] = copy(hapset.strand1[i, k])
-            bkpts1[k] += 1
+        a = intersect(store[1][i], hapset.strand1[w, i])
+        if isempty(a)
+            # designate a haplotype in the current set as the optimal haplotype 
+            hap1 = first(store[1][i]) 
+            push!(phase[i].strand1.start, (w - window_span[1][i] - 1) * width + 1)
+            push!(phase[i].strand1.haplotypelabel, hap1)
+
+            # update counters and storage
+            store[1][i] = copy(hapset.strand1[w, i])
+            bkpts[1][i] += 1
+            window_span[1][i] = 0
+        else
+            intersect!(store[1][i], hapset.strand1[w, i])
+            window_span[1][i] += 1
         end
 
         # strand 2
-        intersect!(store2[k], hapset.strand2[i, k])
-        if isempty(store2[k])
-            store2[k] = copy(hapset.strand2[i, k])
-            bkpts2[k] += 1
+        b = intersect(store[2][i], hapset.strand2[w, i])
+        if isempty(b)
+            # designate a haplotype in the current set as the optimal haplotype 
+            hap2 = first(store[2][i]) 
+            push!(phase[i].strand2.start, (w - window_span[2][i] - 1) * width + 1)
+            push!(phase[i].strand2.haplotypelabel, hap2)
+
+            # update counters and storage
+            store[2][i] = copy(hapset.strand2[w, i])
+            bkpts[2][i] += 1
+            window_span[2][i] = 0
+        else
+            intersect!(store[2][i], hapset.strand2[w, i])
+            window_span[2][i] += 1
         end
     end
 
-    return hapset, bkpts1, bkpts2
+    return phase, hapset, bkpts
 end
 
 function redundant_haplotypes(
@@ -821,6 +845,8 @@ structure for examples.
 
 # Output
 * `hapset`: Data structure for keeping track of unique haplotypes in each window. 
+
+TODO: replace `groupslices!` with fast haplotype elimination strategy when width is a small multiple of 2
 """
 function unique_haplotypes(
     H::AbstractMatrix,
