@@ -415,23 +415,34 @@ function phase2(
     # number of windows
     windows = ceil(Int, snps / width)
 
-    # get redundant haplotype sets. Each column is a person and each row are redundant haplotypes in a window
+    # get redundant haplotype sets. 
     hapset = redundant_haplotypes(X, H, width=width, verbose=verbose)
 
     # allocate working arrays
-    phase = [HaplotypeMosaicPair(snps) for i in 1:people]
-    store = [copy(hapset.p[1, i]) for i in 1:people] # redundant haplotype sets in first window for each person
-    bkpts = zeros(Int, people)
+    phase  = [HaplotypeMosaicPair(snps)  for i in 1:people]
+    store1 = [copy(hapset.strand1[1, i]) for i in 1:people] # strand 1's redundant haplotype sets in first window for each person
+    store2 = [copy(hapset.strand2[1, i]) for i in 1:people] # strand 2's redundant haplotype sets in first window for each person
+    bkpts1  = zeros(Int, people)
+    bkpts2  = zeros(Int, people)
 
+    # intersect each window
     @inbounds for k in 1:people, i in 2:windows
-        intersect!(store[k], hapset.p[i, 1])
-        if isempty(store[k])
-            store[k] = copy(hapset.p[i, k])
-            bkpts[k] += 1
+        # strand 1
+        intersect!(store1[k], hapset.strand1[i, k])
+        if isempty(store1[k])
+            store1[k] = copy(hapset.strand1[i, k])
+            bkpts1[k] += 1
+        end
+
+        # strand 2
+        intersect!(store2[k], hapset.strand2[i, k])
+        if isempty(store2[k])
+            store2[k] = copy(hapset.strand2[i, k])
+            bkpts2[k] += 1
         end
     end
 
-    return hapset, bkpts
+    return hapset, bkpts1, bkpts2
 end
 
 function redundant_haplotypes(
@@ -466,9 +477,10 @@ function redundant_haplotypes(
     # impute window 1
     haploimpute!(Xwork, Hwork, M, N, happair, hapscore, Xfloat=Xwork_float)
 
-    # record redundant haplotype information
+    # record redundant haplotype information for window 1
     compute_redundant_haplotypes!(redund_haps, Hunique, happair, H, 1)
 
+    #TODO: make this loop multithreaded 
     for w in 2:(windows-1)
 
         # sync Xwork and Hwork with original data
@@ -491,6 +503,7 @@ function redundant_haplotypes(
     return redund_haps
 end
 
+# computational routine for recording redundant haplotypes for each window
 function compute_redundant_haplotypes!(
     redund_haps::PeoplesRedundantHaplotypeSet, 
     Hunique::UniqueHaplotypeMaps, 
@@ -511,8 +524,8 @@ function compute_redundant_haplotypes!(
 
         # loop through all haplotypes and find ones that match either of the optimal haplotypes 
         for jj in 1:size(H, 2)
-            Hunique.hapmap[window][jj] == H_i && push!(redund_haps.p[window, k], jj)
-            Hunique.hapmap[window][jj] == H_j && push!(redund_haps.p[window, k], jj)
+            Hunique.hapmap[window][jj] == H_i && push!(redund_haps.strand1[window, k], jj)
+            Hunique.hapmap[window][jj] == H_j && push!(redund_haps.strand2[window, k], jj)
         end
 
         # println("person $k's redundant haplotypes are: ")
@@ -536,6 +549,8 @@ Up/downsizes the dimension of `Hwork`, `M`, and `N` and copies relevant informat
 * `H`: Full haplotype reference panel. Each column is a haplotype
 * `M`: Square matrix used in the computational routine. Must be resized in both dimension. 
 * `N`: Matrix used in the computational routine. Must add/subtract columns. 
+
+TODO: check how ReshapedArray cause type instability and if it is significant overhead
 """
 function resize_and_sync!(
     Xwork::AbstractMatrix,
@@ -557,7 +572,7 @@ function resize_and_sync!(
         resize!(N    , size(N, 1), next_d)
         Mvec = vec(M)
         resize!(Mvec, next_d^2)
-        Mnew = Base.ReshapedArray(Mvec, (next_d, next_d), ()) # actually resize! makes a copy internally! 
+        Mnew = Base.ReshapedArray(Mvec, (next_d, next_d), ()) # actually resize! makes a copy internally!
         # Mnew = zeros(eltype(M), next_d, next_d)               # always reallocate entire M
         # Mnew = (next_d < dd ? Base.ReshapedArray(vec(M), (next_d, next_d), ()) : 
         #                       zeros(eltype(M), next_d, next_d))

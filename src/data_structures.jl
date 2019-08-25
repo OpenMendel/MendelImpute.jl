@@ -27,7 +27,7 @@ hash(x::Prehashed) = x.hash
 Data structure for keeping track of unique haplotypes in each window. 
 
 Let `w` be the current window, then `uniqueindex[w]` is the unique haplotype indices
-of window `w`. `hapmap[w]` maps every haplotype to its unique haplotype. Once 
+of window `w`. `hapmap1[w]` maps every haplotype to its unique haplotype. Once 
 the best haplotype pair (h1, h2) is identified, one can use `hapmap` to 
 generate a set of redundant haplotypes in window `w`. 
 
@@ -52,16 +52,25 @@ struct UniqueHaplotypeMaps
 end
 UniqueHaplotypeMaps(windows::Int, haps::Int) = UniqueHaplotypeMaps(Vector{Vector{Int}}(undef, windows), [zeros(Int, haps) for i in 1:windows])
 
-# Each column is a person. Rows are sets storing redundant haplotypes for each window 
-struct PeoplesRedundantHaplotypeSet
-    # p::Matrix{Vector{Int}}
-    # p::Matrix{Set{Int}}
+"""
+Data structure for storing the redundant haplotypes matching the optimal haplotype in each window. 
+
+Each column is a person. Rows are sets storing redundant haplotypes for each window 
+"""
+struct RedundantHaplotypeSet
     p::Matrix{BitSet}
 end
-# PeoplesRedundantHaplotypeSet(windows::Int, people::Int) = PeoplesRedundantHaplotypeSet([Int[] for i in 1:windows, j in 1:people])
-# PeoplesRedundantHaplotypeSet(windows::Int, people::Int) = PeoplesRedundantHaplotypeSet([Set{Int}() for i in 1:windows, j in 1:people])
-PeoplesRedundantHaplotypeSet(windows::Int, people::Int) = PeoplesRedundantHaplotypeSet([BitSet() for i in 1:windows, j in 1:people])
+RedundantHaplotypeSet(windows, people) = RedundantHaplotypeSet([BitSet() for i in 1:windows, j in 1:people])
 
-Base.getindex(h::PeoplesRedundantHaplotypeSet, i::Int, j::Int) = h.p[i, j]
-Base.size(h::PeoplesRedundantHaplotypeSet) = size(h.p)
-Base.size(h::PeoplesRedundantHaplotypeSet, k::Int) = size(h.p, k)
+Base.getindex(h::RedundantHaplotypeSet, i::Int, j::Int) = h.p[i, j]
+Base.size(h::RedundantHaplotypeSet) = size(h.p)
+Base.size(h::RedundantHaplotypeSet, k::Int) = size(h.p, k)
+
+struct PeoplesRedundantHaplotypeSet
+    strand1::RedundantHaplotypeSet
+    strand2::RedundantHaplotypeSet
+end
+PeoplesRedundantHaplotypeSet(windows::Int, people::Int) = PeoplesRedundantHaplotypeSet(RedundantHaplotypeSet(windows, people), RedundantHaplotypeSet(windows, people))
+
+Base.size(h::PeoplesRedundantHaplotypeSet) = size(h.strand1)
+Base.size(h::PeoplesRedundantHaplotypeSet, k::Int) = size(h.strand1, k)

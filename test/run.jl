@@ -467,6 +467,8 @@ using Random
 using Profile
 using ElasticArrays
 
+cd("/Users/biona001/.julia/dev/MendelImpute/test")
+
 rawdata = readdlm("AFRped_geno.txt", ',', Float32);
 people = 664;
 X = copy(Transpose(rawdata[1:people, 1:(end - 1)]));
@@ -489,17 +491,19 @@ X2 = Matrix{Union{Missing, eltype(X)}}(X)
 Xm = ifelse.(rand(eltype(X), p, n) .< missingprop, missing, X2)
 Xm_original = copy(Xm)
 
-@time result = redundant_haplotypes(Xm, H, width=128); #   2.902272 seconds (1.89 M allocations: 946.188 MiB)  -> using Set{Int}()
-@time result = redundant_haplotypes(Xm, H, width=128); #   2.003341 seconds (924.64 k allocations: 89.575 MiB) -> using BitSet()
-@time result = redundant_haplotypes(Xm, H, width=1200); #  1.822300 seconds (75.33 k allocations: 32.212 MiB)  -> using BitSet()
+@time result = redundant_haplotypes(Xm, H, width=128);  #  3.427234 seconds (1.66 M allocations: 136.764 MiB, 2.87% gc time)
+@time result = redundant_haplotypes(Xm, H, width=1200); #  3.624770 seconds (129.18 k allocations: 34.883 MiB, 0.34% gc time)
+
+hapset, bkpts1, bkpts2 = phase2(Xm, H, width=64)   
+[bkpts1 bkpts2]
 
 #check breakpoints in first person
-hapset, bkpts = phase2(Xm, H, width=1200) # median 30 breakpoints, total 31 windows
-hapset, bkpts = phase2(Xm, H, width=400)  # median 76 breakpoints, total 31 windows
-hapset, bkpts = phase2(Xm, H, width=128)  # median 135 breakpoints, total 286 windows
-hapset, bkpts = phase2(Xm, H, width=64)   # median 150 breakpoints, total 571 windows
-hapset, bkpts = phase2(Xm, H, width=32)   # median 185 breakpoints, total 1141 windows
-hapset, bkpts = phase2(Xm, H, width=16)   # median 176 breakpoints, total 2282 windows
+# hapset, bkpts = phase2(Xm, H, width=1200) # median 30 breakpoints, total 31 windows
+# hapset, bkpts = phase2(Xm, H, width=400)  # median 76 breakpoints, total 31 windows
+# hapset, bkpts = phase2(Xm, H, width=128)  # median 135 breakpoints, total 286 windows
+# hapset, bkpts = phase2(Xm, H, width=64)   # median 150 breakpoints, total 571 windows
+# hapset, bkpts = phase2(Xm, H, width=32)   # median 185 breakpoints, total 1141 windows
+# hapset, bkpts = phase2(Xm, H, width=16)   # median 176 breakpoints, total 2282 windows
 
 
 
