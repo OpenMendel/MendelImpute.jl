@@ -109,14 +109,12 @@ function haplopair!(
     n, d = size(N)
     fill!(hapmin, typemax(eltype(hapmin)))
 
-    Threads.@threads for k in 1:d
-        @inbounds for j in 1:k
-            # loop over individuals
-            for i in 1:n
-                score = M[j, k] - N[i, j] - N[i, k]
-                if score < hapmin[i]
-                    hapmin[i], happair[1][i], happair[2][i] = score, j, k
-                end
+    @inbounds for k in 1:d, j in 1:k
+        # loop over individuals
+        for i in 1:n
+            score = M[j, k] - N[i, j] - N[i, k]
+            if score < hapmin[i]
+                hapmin[i], happair[1][i], happair[2][i] = score, j, k
             end
         end
     end

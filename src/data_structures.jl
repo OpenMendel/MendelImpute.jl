@@ -55,7 +55,7 @@ UniqueHaplotypeMaps(windows::Int, haps::Int) = UniqueHaplotypeMaps(Vector{Vector
 """
 Data structure for storing the redundant haplotypes matching the optimal haplotype in each window. 
 
-Each column is a person. Rows are sets storing redundant haplotypes for each window 
+Each column is a person. Rows are `BitSet`s storing redundant haplotypes for each window 
 """
 struct RedundantHaplotypeSet
     p::Matrix{BitSet}
