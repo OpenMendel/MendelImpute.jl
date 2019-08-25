@@ -150,30 +150,6 @@ function fillmissing!(
     return nothing
 end
 
-function fillmissing!(
-    X::AbstractMatrix,
-    H::AbstractMatrix,
-    phase::Vector{HaplotypeMosaicPair}
-    )
-
-    p, n = size(X)
-
-    # @inbounds for person in 1:n, snp in 1:p
-    for person in 1:n, snp in 1:p
-        if ismissing(X[snp, person])
-            hap1_position = searchsortedlast(phase[person].strand1.start, snp)
-            hap2_position = searchsortedlast(phase[person].strand2.start, snp)
-            hap1 = phase[person].strand1.haplotypelabel[hap1_position]
-            hap2 = phase[person].strand2.haplotypelabel[hap2_position]
-
-            # imputation step 
-            X[snp, person] = H[snp, hap1] + H[snp, hap2]
-        end
-    end
-
-    return nothing
-end
-
 """
     fillgeno!(X, H, happair)
 
@@ -489,7 +465,7 @@ function phase2(
     end
 
     # finally, fill in missing entries of X
-    fillmissing!(X, H, phase)
+    impute2!(X, H, phase)
 
     return phase, hapset, bkpts
 end
@@ -824,6 +800,29 @@ function impute!(
         idx = phase[i].strand2.start[end]:phase[i].strand2.length
         X[idx, i] += H[idx, phase[i].strand2.haplotypelabel[end]]
     end
+end
+
+function impute2!(
+    X::AbstractMatrix,
+    H::AbstractMatrix,
+    phase::Vector{HaplotypeMosaicPair}
+    )
+
+    p, n = size(X)
+
+    @inbounds for person in 1:n, snp in 1:p
+        if ismissing(X[snp, person])
+            hap1_position = searchsortedlast(phase[person].strand1.start, snp)
+            hap2_position = searchsortedlast(phase[person].strand2.start, snp)
+            hap1 = phase[person].strand1.haplotypelabel[hap1_position]
+            hap2 = phase[person].strand2.haplotypelabel[hap2_position]
+
+            # imputation step 
+            X[snp, person] = H[snp, hap1] + H[snp, hap2]
+        end
+    end
+
+    return nothing
 end
 
 """

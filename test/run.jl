@@ -509,7 +509,8 @@ phase, hapset, bkpts = phase2(Xm, H, width=width)
 phase[1].strand2.start
 phase[1].strand2.haplotypelabel
 
-@time phase2(Xm, H, width=width)
+@time phase2(Xm, H, width=64);  #3.966141 seconds (7.19 M allocations: 498.949 MiB, 19.78% gc time)
+@time phase2(Xm, H, width=128); #3.715701 seconds (3.56 M allocations: 250.528 MiB, 7.05% gc time)
 
 # @time result = redundant_haplotypes(Xm, H, width=128);  #  3.427234 seconds (1.66 M allocations: 136.764 MiB, 2.87% gc time)
 # @time result = redundant_haplotypes(Xm, H, width=1200); #  3.624770 seconds (129.18 k allocations: 34.883 MiB, 0.34% gc time)
