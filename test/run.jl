@@ -493,16 +493,16 @@ Xm_original = copy(Xm)
 
 # code in function phase2
 width = 64
-snps, people = size(X)
-windows = ceil(Int, snps / width)
-hapset = redundant_haplotypes(Xm, H, width=width)
-phase = [HaplotypeMosaicPair(snps) for i in 1:people]
-bkpts = (zeros(Int, people), zeros(Int, people))
-store = ([copy(hapset.strand1[1, i]) for i in 1:people], [copy(hapset.strand2[1, i]) for i in 1:people])
-window_span = (zeros(Int, people), zeros(Int, people))
+# snps, people = size(X)
+# windows = ceil(Int, snps / width)
+# hapset = redundant_haplotypes(Xm, H, width=width)
+# phase = [HaplotypeMosaicPair(snps) for i in 1:people]
+# bkpts = (zeros(Int, people), zeros(Int, people))
+# store = ([copy(hapset.strand1[1, i]) for i in 1:people], [copy(hapset.strand2[1, i]) for i in 1:people])
+# window_span = (zeros(Int, people), zeros(Int, people))
 
 #run phase2
-phase, hapset, bkpts = phase2(Xm, H, width=width)   
+phase, hapset, bkpts = phase2(Xm, H, width=width)
 [bkpts[1] bkpts[2]]
 
 #examine person 1
