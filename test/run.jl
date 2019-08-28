@@ -494,7 +494,7 @@ Xm_original = copy(Xm)
 # code in function phase2
 width = 64
 windows = ceil(Int, p / width)
-hapset, bkpts = phase2(Xm, H, width=width)
+phase = phase2(Xm, H, width=width)
 
 
 # look at the beautiful haplotype intersections

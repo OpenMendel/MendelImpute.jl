@@ -427,20 +427,17 @@ function phase2(
     # TODO: search for breakpoints. 
     # TODO: parallel computing
     # TODO: replace `intersect` and `intersect!` with fast set intersection using bisection/seesaw search
+    # TODO: last few windows may not be hitting the isempty() command
     @inbounds for i in 1:people, w in 2:windows
 
         # strand 1
         a = intersect(store[1][i], hapset.strand1[w, i])
         if isempty(a)
-            # designate a haplotype in the current set and delete all redundant elements in previous windows
-            # hap1 = first(store[1][i]) 
+            # designate a haplotype in the current set and delete all nonmatching haplotypes in previous windows
             for ww in (w - window_span[1][i]):(w - 1)
                 intersect!(hapset.strand1[ww, i], store[1][i]) 
                 # intersect!(hapset.strand1[ww, i], hap1) 
             end
-
-            # push!(phase[i].strand1.start, (w - window_span[1][i] - 1) * width + 1)
-            # push!(phase[i].strand1.haplotypelabel, hap1)
 
             # update counters and storage
             store[1][i] = copy(hapset.strand1[w, i])
@@ -454,14 +451,11 @@ function phase2(
         # strand 2
         b = intersect(store[2][i], hapset.strand2[w, i])
         if isempty(b)
-            # designate a haplotype in the current set and delete all redundant elements in previous windows
-            # hap2 = first(store[2][i]) 
+            # designate a haplotype in the current set and delete all nonmatching haplotypes in previous windows
             for ww in (w - window_span[2][i]):(w - 1)
                 intersect!(hapset.strand2[ww, i], store[2][i]) 
                 # intersect!(hapset.strand2[ww, i], hap2) 
             end
-            # push!(phase[i].strand2.start, (w - window_span[2][i] - 1) * width + 1)
-            # push!(phase[i].strand2.haplotypelabel, hap2)
 
             # update counters and storage
             store[2][i] = copy(hapset.strand2[w, i])
@@ -473,10 +467,35 @@ function phase2(
         end
     end
 
-    return hapset, bkpts
+    # phase window 1
+    # TODO: make this consistent with second window
+    for i in 1:people
+        push!(phase[i].strand1.start, 1)
+        push!(phase[i].strand1.haplotypelabel, first(hapset.strand1[1, i]))
+        push!(phase[i].strand2.start, 1)
+        push!(phase[i].strand2.haplotypelabel, first(hapset.strand2[1, i]))
+    end
 
-    # search breakpoints
+    # TODO: record phase info in last window too
+    # find optimal break points and record info to phase
+    for i in 1:people, w in 2:(windows-1)
+        Xi = view(X, ((w - 2) * width + 1):(w * width), i)
+        Hi = view(H, ((w - 2) * width + 1):(w * width), :)
+        (hap1, hap2), bkpts = continue_haplotype(Xi, Hi,
+            (hapset.strand1[w - 1, i], hapset.strand2[w - 1, i]),
+            (hapset.strand1[w    , i], hapset.strand2[w    , i]))
 
+        # strand 1
+        if bkpts[1] > -1 && bkpts[1] < 2width
+            push!(phase[i].strand1.start, (w - 2) * width + 1 + bkpts[1])
+            push!(phase[i].strand1.haplotypelabel, hap1)
+        end
+        # strand 2
+        if bkpts[2] > -1 && bkpts[2] < 2width
+            push!(phase[i].strand2.start, (w - 2) * width + 1 + bkpts[2])
+            push!(phase[i].strand2.haplotypelabel, hap2)
+        end
+    end
 
     # finally, fill in missing entries of X
     impute2!(X, H, phase)
@@ -680,6 +699,49 @@ function continue_haplotype(
 
 end
 
+function continue_haplotype(
+    X::AbstractVector,
+    H::AbstractMatrix,
+    happair_prev::Tuple{BitSet, BitSet},
+    happair_next::Tuple{BitSet, BitSet}
+    )
+
+    i, j = happair_prev
+    k, l = happair_next
+
+    a = intersect(i, k)
+    b = intersect(j, l)
+    c = intersect(i, l)
+    d = intersect(j, k)
+
+    # both strands match
+    if !isempty(a) && !isempty(b)
+        return (first(a), first(b)), (-1, -1)
+    end
+
+    if !isempty(c) && !isempty(d)
+        return (first(c), first(d)), (-1, -1)
+    end
+
+    # only one strand matches
+    # TODO: make sure returning first(k or l) is correct behavior
+    if !isempty(a) && isempty(b)
+        breakpt, errors = search_breakpoint(X, H, i, (j, l))
+        return (first(k), first(l)), (-1, breakpt)
+    elseif !isempty(c) && isempty(d)
+        breakpt, errors = search_breakpoint(X, H, i, (j, k))
+        return (first(l), first(k)), (-1, breakpt)
+    elseif !isempty(d) && isempty(c)
+        breakpt, errors = search_breakpoint(X, H, j, (i, l))
+        return (first(l), first(k)), (breakpt, -1)
+    elseif !isempty(b) && isempty(a)
+        breakpt, errors = search_breakpoint(X, H, j, (i, k))
+        return (first(k), first(l)), (breakpt, -1)
+    end
+
+    return (first(k), first(l)), (0, 0)
+end
+
 """
     search_breakpoint(X, H, s1, s2)
 
@@ -713,6 +775,49 @@ function search_breakpoint(
         if !ismissing(X[bkpt]) && H[bkpt, s2[1]] ≠ H[bkpt, s2[2]]
             errors -= X[bkpt] ≠ H[bkpt, s1] + H[bkpt, s2[2]]
             errors += X[bkpt] ≠ H[bkpt, s1] + H[bkpt, s2[1]]
+            if errors < err_optim
+                bkpt_optim, err_optim = bkpt, errors
+                # quick return if perfect match
+                err_optim == 0 && return bkpt_optim, err_optim
+            end
+        end
+    end
+
+    return bkpt_optim, err_optim
+end
+
+function search_breakpoint(
+    X::AbstractVector,
+    H::AbstractMatrix,
+    strand1::BitSet,
+    strand2::Tuple{BitSet, BitSet}
+    )
+
+    n = length(X)
+
+    # all haplotypes in BitSet are equivalent in current window, so get one as representative
+    s1  = first(strand1)
+    s21 = first(strand2[1])
+    s22 = first(strand2[2])
+
+    # count number of errors if second haplotype is all from H[:, s2[2]]
+    errors = 0
+    for pos in 1:n
+        if !ismissing(X[pos])
+            errors += X[pos] ≠ H[pos, s1] + H[pos, s22]
+        end
+    end
+    bkpt_optim, err_optim = 0, errors
+
+    # quick return if perfect match
+    err_optim == 0 && return 0, 0
+
+    # extend haplotype H[:, s2[1]] position by position
+    # @inbounds for bkpt in 1:n
+    for bkpt in 1:n
+        if !ismissing(X[bkpt]) && H[bkpt, s21] ≠ H[bkpt, s22]
+            errors -= X[bkpt] ≠ H[bkpt, s1] + H[bkpt, s22]
+            errors += X[bkpt] ≠ H[bkpt, s1] + H[bkpt, s21]
             if errors < err_optim
                 bkpt_optim, err_optim = bkpt, errors
                 # quick return if perfect match
@@ -825,6 +930,7 @@ function impute2!(
     p, n = size(X)
 
     @inbounds for person in 1:n, snp in 1:p
+    # for person in 1:n, snp in 1:p
         if ismissing(X[snp, person])
             hap1_position = searchsortedlast(phase[person].strand1.start, snp)
             hap2_position = searchsortedlast(phase[person].strand2.start, snp)
