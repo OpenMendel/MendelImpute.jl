@@ -433,9 +433,10 @@ function phase2(
         a = intersect(store[1][i], hapset.strand1[w, i])
         if isempty(a)
             # designate a haplotype in the current set and delete all redundant elements in previous windows
-            hap1 = first(store[1][i]) 
+            # hap1 = first(store[1][i]) 
             for ww in (w - window_span[1][i]):(w - 1)
-                intersect!(hapset.strand1[ww, i], hap1) 
+                intersect!(hapset.strand1[ww, i], store[1][i]) 
+                # intersect!(hapset.strand1[ww, i], hap1) 
             end
 
             # push!(phase[i].strand1.start, (w - window_span[1][i] - 1) * width + 1)
@@ -454,9 +455,10 @@ function phase2(
         b = intersect(store[2][i], hapset.strand2[w, i])
         if isempty(b)
             # designate a haplotype in the current set and delete all redundant elements in previous windows
-            hap2 = first(store[2][i]) 
+            # hap2 = first(store[2][i]) 
             for ww in (w - window_span[2][i]):(w - 1)
-                intersect!(hapset.strand2[ww, i], hap2) 
+                intersect!(hapset.strand2[ww, i], store[2][i]) 
+                # intersect!(hapset.strand2[ww, i], hap2) 
             end
             # push!(phase[i].strand2.start, (w - window_span[2][i] - 1) * width + 1)
             # push!(phase[i].strand2.haplotypelabel, hap2)
@@ -471,7 +473,7 @@ function phase2(
         end
     end
 
-    return hapset
+    return hapset, bkpts
 
     # search breakpoints
 

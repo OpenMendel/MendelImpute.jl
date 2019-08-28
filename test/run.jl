@@ -493,8 +493,14 @@ Xm_original = copy(Xm)
 
 # code in function phase2
 width = 64
-# snps, people = size(X)
-# windows = ceil(Int, snps / width)
+windows = ceil(Int, p / width)
+hapset, bkpts = phase2(Xm, H, width=width)
+
+
+# look at the beautiful haplotype intersections
+hapset.strand1.p[1:20, 1]
+
+
 # hapset = redundant_haplotypes(Xm, H, width=width)
 # phase = [HaplotypeMosaicPair(snps) for i in 1:people]
 # bkpts = (zeros(Int, people), zeros(Int, people))
