@@ -432,15 +432,19 @@ function phase2(
         # strand 1
         a = intersect(store[1][i], hapset.strand1[w, i])
         if isempty(a)
-            # designate a haplotype in the current set as the optimal haplotype 
+            # designate a haplotype in the current set and delete all redundant elements in previous windows
             hap1 = first(store[1][i]) 
-            push!(phase[i].strand1.start, (w - window_span[1][i] - 1) * width + 1)
-            push!(phase[i].strand1.haplotypelabel, hap1)
+            for ww in (w - window_span[1][i]):(w - 1)
+                intersect!(hapset.strand1[ww, i], hap1) 
+            end
+
+            # push!(phase[i].strand1.start, (w - window_span[1][i] - 1) * width + 1)
+            # push!(phase[i].strand1.haplotypelabel, hap1)
 
             # update counters and storage
             store[1][i] = copy(hapset.strand1[w, i])
             bkpts[1][i] += 1
-            window_span[1][i] = 0
+            window_span[1][i] = 1
         else
             intersect!(store[1][i], hapset.strand1[w, i])
             window_span[1][i] += 1
@@ -449,20 +453,28 @@ function phase2(
         # strand 2
         b = intersect(store[2][i], hapset.strand2[w, i])
         if isempty(b)
-            # designate a haplotype in the current set as the optimal haplotype 
+            # designate a haplotype in the current set and delete all redundant elements in previous windows
             hap2 = first(store[2][i]) 
-            push!(phase[i].strand2.start, (w - window_span[2][i] - 1) * width + 1)
-            push!(phase[i].strand2.haplotypelabel, hap2)
+            for ww in (w - window_span[2][i]):(w - 1)
+                intersect!(hapset.strand2[ww, i], hap2) 
+            end
+            # push!(phase[i].strand2.start, (w - window_span[2][i] - 1) * width + 1)
+            # push!(phase[i].strand2.haplotypelabel, hap2)
 
             # update counters and storage
             store[2][i] = copy(hapset.strand2[w, i])
             bkpts[2][i] += 1
-            window_span[2][i] = 0
+            window_span[2][i] = 1
         else
             intersect!(store[2][i], hapset.strand2[w, i])
             window_span[2][i] += 1
         end
     end
+
+    return hapset
+
+    # search breakpoints
+
 
     # finally, fill in missing entries of X
     impute2!(X, H, phase)
@@ -499,10 +511,10 @@ function redundant_haplotypes(
     M           = zeros(T, num_uniq, num_uniq)
     N           = ElasticArray{T}(undef, people, num_uniq)
 
-    # impute window 1
+    # In first window, calculate optimal haplotype pair among unique haplotypes
     haploimpute!(Xwork, Hwork, M, N, happair, hapscore, Xfloat=Xwork_float)
 
-    # record redundant haplotype information for window 1
+    # find all haplotypes matching the optimal haplotype pairs
     compute_redundant_haplotypes!(redund_haps, Hunique, happair, H, 1)
 
     #TODO: make this loop multithreaded 
@@ -512,14 +524,14 @@ function redundant_haplotypes(
         cur_range = ((w - 1) * width + 1):(w * width)
         M = resize_and_sync!(Xwork, Hwork, Hunique.uniqueindex[w], cur_range, X, H, M, N)
 
-        # impute current window
+        # Calculate optimal haplotype pair among unique haplotypes
         haploimpute!(Xwork, Hwork, M, N, happair, hapscore, Xfloat=Xwork_float)
 
-        # record redundant haplotype information
+        # find all haplotypes matching the optimal haplotype pairs
         compute_redundant_haplotypes!(redund_haps, Hunique, happair, H, w)
     end
 
-    # impute last window
+    # last window
     last_range = ((windows - 1) * width + 1):snps
     M = resize_and_sync!(Xwork, Hwork, Hunique.uniqueindex[end], last_range, X, H, M, N)
     haploimpute!(Xwork, Hwork, M, N, happair, hapscore)
