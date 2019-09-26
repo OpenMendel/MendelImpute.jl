@@ -11,7 +11,7 @@ module MendelImpute
 	using ElasticArrays
 
 	export continue_haplotype, haplopair!, haplopair, haploimpute!
-	export impute!, phase, search_breakpoint, unique_haplotypes
+	export impute!, impute2!, phase, search_breakpoint, unique_haplotypes
 	export unique_haplotype_idx, groupslices, groupslices!
 	export compute_redundant_haplotypes!, redundant_haplotypes
 	export HaplotypeMosaicPair, HaplotypeMosaic, UniqueHaplotypeMaps

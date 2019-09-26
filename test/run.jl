@@ -456,8 +456,6 @@ B = rand(1000, 1000)
 
 
 
-### Benchmark compute_redundant_haplotypes!
-
 using Revise
 using DelimitedFiles
 using LinearAlgebra
@@ -490,33 +488,41 @@ p, n = size(X)
 X2 = Matrix{Union{Missing, eltype(X)}}(X)
 Xm = ifelse.(rand(eltype(X), p, n) .< missingprop, missing, X2)
 Xm_original = copy(Xm)
-
-# code in function phase2
 width = 64
-windows = ceil(Int, p / width)
-phase = phase2(Xm, H, width=width)
+windows = floor(Int, p / width)
+
+#Hua's code without search breakpoints has error = 0.014663744250977082
+#Hua's code with    search breakpoints has error = 0.013899062884015356
+hapset = phase(Xm, H, width)
+impute2!(Xm, H, hapset) 
+
+#current code without search breakpoints has error = 0.0264620975683957
+#current code with    search breakpoints has error = 0.0382987880109504
+hapset2 = phase2(Xm, H, width=width)
 
 
 # look at the beautiful haplotype intersections
-hapset.strand1.p[1:20, 1]
+hapset2.strand1.p[1:5, 5]
+hapset2.strand2.p[1:5, 5]
 
 
-# hapset = redundant_haplotypes(Xm, H, width=width)
-# phase = [HaplotypeMosaicPair(snps) for i in 1:people]
-# bkpts = (zeros(Int, people), zeros(Int, people))
-# store = ([copy(hapset.strand1[1, i]) for i in 1:people], [copy(hapset.strand2[1, i]) for i in 1:people])
-# window_span = (zeros(Int, people), zeros(Int, people))
-
-#run phase2
-phase, hapset, bkpts = phase2(Xm, H, width=width)
-[bkpts[1] bkpts[2]]
-
-# error rate
+# calculate error rate
 missing_idx    = ismissing.(Xm_original)
 total_missing  = sum(missing_idx)
 missing_true   = round.(Int, X[missing_idx])  #true values of missing entries
 missing_impute = round.(Int, Xm[missing_idx]) #imputed values of missing entries
 error = sum(missing_true .!= missing_impute) / total_missing
+
+
+
+function naive_impute!(X)
+	n, p = size(X)
+	for j in 1:p, i in 1:n
+		ismissing(X[i, j]) && (X[i, j] = 0.0)
+	end
+end
+naive_impute!(Xm) #error rate = 0.09844272948788609
+
 
 #examine person 1
 phase[1].strand2.start
@@ -526,8 +532,9 @@ phase[1].strand2.haplotypelabel
 @time phase2(Xm, H, width=128); #3.715701 seconds (3.56 M allocations: 250.528 MiB, 7.05% gc time)
 
 
-# @time result = redundant_haplotypes(Xm, H, width=128);  #  3.427234 seconds (1.66 M allocations: 136.764 MiB, 2.87% gc time)
-# @time result = redundant_haplotypes(Xm, H, width=1200); #  3.624770 seconds (129.18 k allocations: 34.883 MiB, 0.34% gc time)
+result = redundant_haplotypes(Xm, H, width=128);  #  3.427234 seconds (1.66 M allocations: 136.764 MiB, 2.87% gc time)
+size(result.strand1.p)
+@time result = redundant_haplotypes(Xm, H, width=1200); #  3.624770 seconds (129.18 k allocations: 34.883 MiB, 0.34% gc time)
 
 
 #check breakpoints in first person
@@ -581,9 +588,59 @@ c = intersect(a, b)
 
 
 
+using Revise
+using DelimitedFiles
+using LinearAlgebra
+using BenchmarkTools
+using MendelImpute
+using Random
+using Profile
+using ElasticArrays
 
+cd("/Users/biona001/.julia/dev/MendelImpute/test")
+rawdata = readdlm("AFRped_geno.txt", ',', Float32);
+people = 664;
+X = copy(Transpose(rawdata[1:people, 1:(end - 1)]));
+function create_hap(x)
+    n, p = size(x)
+    h = one(eltype(x))
+    for j in 1:p, i in 1:n
+        if x[i, j] != 0
+            x[i, j] -= h
+        end
+    end
+    return copy(Transpose(x))
+end
+H = create_hap(rawdata[(people + 1):end, 1:(end - 1)]);
 
+Random.seed!(123)
+missingprop = 0.1
+p, n = size(X)
+X2 = Matrix{Union{Missing, eltype(X)}}(X)
+Xm = ifelse.(rand(eltype(X), p, n) .< missingprop, missing, X2)
+Xm_original = copy(Xm)
 
+function test(pos)
+    width = 64
+    windows = ceil(Int, p / width)
+    hapset = phase2(Xm, H, width=width, pos=pos)
+
+    # calculate error rate
+    missing_idx    = ismissing.(Xm_original)
+    total_missing  = sum(missing_idx)
+    missing_true   = round.(Int, X[missing_idx])  #true values of missing entries
+    missing_impute = round.(Int, Xm[missing_idx]) #imputed values of missing entries
+    myerror = sum(missing_true .!= missing_impute) / total_missing
+
+    return myerror
+end
+
+# mypos = collect(3:500:30000)
+mypos = collect(3)
+myerrors = zeros(length(mypos))
+for i in 1:length(mypos)
+    myerrors[i] = test(mypos[i])
+end
 
 
 
