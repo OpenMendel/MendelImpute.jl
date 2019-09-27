@@ -491,160 +491,47 @@ Xm_original = copy(Xm)
 width = 64
 windows = floor(Int, p / width)
 
+copyto!(Xm, Xm_original)
+
 #Hua's code without search breakpoints has error = 0.014663744250977082
 #Hua's code with    search breakpoints has error = 0.013899062884015356
 hapset = phase(Xm, H, width)
 impute2!(Xm, H, hapset) 
 
-#current code without search breakpoints has error = 0.0264620975683957
-#current code with    search breakpoints has error = 0.0382987880109504
-hapset2 = phase2(Xm, H, width=width)
+#current code without search breakpoints has error = 0.024447543476567152 
+#current code without search breakpoints has error = 0.013954713549535482 (3*width)
+#current code with    search breakpoints has error = 
+hapset = phase2(Xm, H, width=width)
+hapset = phase2(Xm, H, width=3*width)
+
+#non-redundant haplotypes without search breakpoints has error = 0.08077261261736622
+hapset = phase3(Xm, H, width=width)
 
 
-# look at the beautiful haplotype intersections
-hapset2.strand1.p[1:5, 5]
-hapset2.strand2.p[1:5, 5]
+# look at the haplotype intersections
+hapset.strand1.p[1:10, 1]
+hapset.strand2.p[1:10, 1]
 
 
 # calculate error rate
 missing_idx    = ismissing.(Xm_original)
 total_missing  = sum(missing_idx)
-missing_true   = round.(Int, X[missing_idx])  #true values of missing entries
-missing_impute = round.(Int, Xm[missing_idx]) #imputed values of missing entries
-error = sum(missing_true .!= missing_impute) / total_missing
+actual_missing_values  = convert(Vector{Int64}, X[missing_idx])  #true values of missing entries
+imputed_missing_values = convert(Vector{Int64}, Xm[missing_idx]) #imputed values of missing entries
+error_rate = sum(actual_missing_values .!= imputed_missing_values) / total_missing
 
 
 
 function naive_impute!(X)
 	n, p = size(X)
+    fillval = convert(eltype(X), 1.0)
 	for j in 1:p, i in 1:n
-		ismissing(X[i, j]) && (X[i, j] = 0.0)
+		ismissing(X[i, j]) && (X[i, j] = fillval)
 	end
 end
-naive_impute!(Xm) #error rate = 0.09844272948788609
-
-
-#examine person 1
-phase[1].strand2.start
-phase[1].strand2.haplotypelabel
-
-@time phase2(Xm, H, width=64);  #3.966141 seconds (7.19 M allocations: 498.949 MiB, 19.78% gc time)
-@time phase2(Xm, H, width=128); #3.715701 seconds (3.56 M allocations: 250.528 MiB, 7.05% gc time)
-
-
-result = redundant_haplotypes(Xm, H, width=128);  #  3.427234 seconds (1.66 M allocations: 136.764 MiB, 2.87% gc time)
-size(result.strand1.p)
-@time result = redundant_haplotypes(Xm, H, width=1200); #  3.624770 seconds (129.18 k allocations: 34.883 MiB, 0.34% gc time)
-
-
-#check breakpoints in first person
-# hapset, bkpts = phase2(Xm, H, width=1200) # median 30 breakpoints, total 31 windows
-# hapset, bkpts = phase2(Xm, H, width=400)  # median 76 breakpoints, total 31 windows
-# hapset, bkpts = phase2(Xm, H, width=128)  # median 135 breakpoints, total 286 windows
-# hapset, bkpts = phase2(Xm, H, width=64)   # median 150 breakpoints, total 571 windows
-# hapset, bkpts = phase2(Xm, H, width=32)   # median 185 breakpoints, total 1141 windows
-# hapset, bkpts = phase2(Xm, H, width=16)   # median 176 breakpoints, total 2282 windows
-
-
-
-
-
-
-
-width = 128
-snps, people = size(X)
-windows = ceil(Int, snps / width)
-Hunique  = unique_haplotypes(H, width, 'T')
-num_uniq = length(Hunique.uniqueindex[1])
-T = eltype(H)
-
-# allocate working arrays
-happair     = ones(Int, people), ones(Int, people)
-hapscore    = zeros(T, people)
-phase       = [HaplotypeMosaicPair(snps) for i in 1:people]
-Hwork       = ElasticArray{T}(H[1:width, Hunique.uniqueindex[1]])
-Xwork       = X[1:width, :]
-Xwork_float = zeros(T, size(Xwork))
-M           = zeros(T, num_uniq, num_uniq)
-N           = ElasticArray{T}(undef, people, num_uniq)
-
-redund_haps = PeoplesRedundantHaplotypeSet(windows, people) 
-
-@benchmark compute_redundant_haplotypes!(redund_haps, Hunique, happair, H, 1)
-
-
-
-
-
-
-
-
-#### set intersections
-a = BitSet(rand(1:100000, 100000))
-b = BitSet(rand(1:100000, 100000))
-c = intersect(a, b)
-
-
-
-
-
-using Revise
-using DelimitedFiles
-using LinearAlgebra
-using BenchmarkTools
-using MendelImpute
-using Random
-using Profile
-using ElasticArrays
-
-cd("/Users/biona001/.julia/dev/MendelImpute/test")
-rawdata = readdlm("AFRped_geno.txt", ',', Float32);
-people = 664;
-X = copy(Transpose(rawdata[1:people, 1:(end - 1)]));
-function create_hap(x)
-    n, p = size(x)
-    h = one(eltype(x))
-    for j in 1:p, i in 1:n
-        if x[i, j] != 0
-            x[i, j] -= h
-        end
-    end
-    return copy(Transpose(x))
-end
-H = create_hap(rawdata[(people + 1):end, 1:(end - 1)]);
-
-Random.seed!(123)
-missingprop = 0.1
-p, n = size(X)
-X2 = Matrix{Union{Missing, eltype(X)}}(X)
-Xm = ifelse.(rand(eltype(X), p, n) .< missingprop, missing, X2)
-Xm_original = copy(Xm)
-
-function test(pos)
-    width = 64
-    windows = ceil(Int, p / width)
-    hapset = phase2(Xm, H, width=width, pos=pos)
-
-    # calculate error rate
-    missing_idx    = ismissing.(Xm_original)
-    total_missing  = sum(missing_idx)
-    missing_true   = round.(Int, X[missing_idx])  #true values of missing entries
-    missing_impute = round.(Int, Xm[missing_idx]) #imputed values of missing entries
-    myerror = sum(missing_true .!= missing_impute) / total_missing
-
-    return myerror
-end
-
-# mypos = collect(3:500:30000)
-mypos = collect(3)
-myerrors = zeros(length(mypos))
-for i in 1:length(mypos)
-    myerrors[i] = test(mypos[i])
-end
-
-
-
-
+naive_impute!(Xm) #fill with 0 gives error rate = 0.09844272948788609
+naive_impute!(Xm) #fill with 1 gives error rate = 0.9343025343313078
+naive_impute!(Xm) #fill with 2 gives error rate = 0.9672547361808062
 
 
 
