@@ -12,10 +12,10 @@ module MendelImpute
 
 	export continue_haplotype, haplopair!, haplopair, haploimpute!
 	export impute!, impute2!, phase, search_breakpoint, unique_haplotypes
-	export unique_haplotype_idx, groupslices, groupslices!
+	export unique_haplotype_idx, groupslices, groupslices!, phase3
 	export compute_redundant_haplotypes!, redundant_haplotypes
 	export HaplotypeMosaicPair, HaplotypeMosaic, UniqueHaplotypeMaps
-	export PeoplesRedundantHaplotypeSet, phase2
+	export PeoplesRedundantHaplotypeSet, phase2, non_redundant_haplotypes
 
 	include("data_structures.jl")
 	include("haplotyping.jl")

@@ -420,6 +420,61 @@ function phase(
     return phase
 end
 
+"""
+Test function that phases by using only the optimal haplotype pairs.
+"""
+function phase3(
+    X::AbstractMatrix{Union{Missing, T}},
+    H::AbstractMatrix{T};
+    width::Int    = 128,
+    verbose::Bool = true
+    ) where T <: Real
+    
+    # problem dimensions
+    snps, people = size(X)
+
+    # number of windows
+    windows = floor(Int, snps / width)
+
+    # get non-redundant haplotype sets
+    hapset = non_redundant_haplotypes(X, H, width=width, verbose=verbose)
+
+    # allocate working arrays
+    phase = [HaplotypeMosaicPair(snps) for i in 1:people]
+
+    # begin phasing
+    for i in 1:people, w in 2:windows
+        hap1 = first(hapset.strand1[w, i])
+        hap2 = first(hapset.strand2[w, i])
+
+        # strand 1
+        push!(phase[i].strand1.start, (w - 1) * width + 1)
+        push!(phase[i].strand1.haplotypelabel, hap1)
+
+        # strand 2
+        push!(phase[i].strand2.start, (w - 1) * width + 1)
+        push!(phase[i].strand2.haplotypelabel, hap2)
+    end
+
+    # phase last window
+    for i in 1:people
+        hap1 = first(hapset.strand1.p[end, i])
+        hap2 = first(hapset.strand2.p[end, i])
+
+        # strand 1
+        push!(phase[i].strand1.start, (windows - 1) * width + 1)
+        push!(phase[i].strand1.haplotypelabel, hap1)
+        
+        # strand 2
+        push!(phase[i].strand2.start, (windows - 1) * width + 1)
+        push!(phase[i].strand2.haplotypelabel, hap2)
+    end
+
+    impute!(X, H, phase) #impute2! seg faults right now...
+
+    return hapset
+end
+
 # TODO: why does benchmark on this function crash the REPL
 function phase2(
     X::AbstractMatrix{Union{Missing, T}},
@@ -448,12 +503,24 @@ function phase2(
     # TODO: last few windows may not be hitting the isempty() command
     @inbounds for i in 1:people, w in 2:windows
 
+        # decide how to concatenate next 2 windows to previous windows based on the larger intersection
+        A = intersect(store[1][i], hapset.strand1[w, i])
+        B = intersect(store[1][i], hapset.strand2[w, i])
+        if length(A) >= length(B)
+            # no need to cross over
+            a = A 
+        else
+            # cross over
+            a = B
+            hapset.strand1.p[w, i], hapset.strand2.p[w, i] = hapset.strand2.p[w, i], hapset.strand1.p[w, i]
+        end
+        b = intersect(store[2][i], hapset.strand2[w, i])
+
         # strand 1
-        a = intersect(store[1][i], hapset.strand1[w, i])
         if isempty(a)
             # delete all nonmatching haplotypes in previous windows
             for ww in (w - window_span[1][i]):(w - 1)
-                intersect!(hapset.strand1[ww, i], store[1][i]) 
+                hapset.strand1.p[ww, i] = copy(store[1][i]) 
             end
 
             # update counters and storage
@@ -465,11 +532,10 @@ function phase2(
         end
 
         # strand 2
-        b = intersect(store[2][i], hapset.strand2[w, i])
         if isempty(b)
             # designate a haplotype in the current set and delete all nonmatching haplotypes in previous windows
             for ww in (w - window_span[2][i]):(w - 1)
-                intersect!(hapset.strand2[ww, i], store[2][i]) 
+                hapset.strand2.p[ww, i] = copy(store[2][i]) 
             end
 
             # update counters and storage
@@ -491,19 +557,16 @@ function phase2(
     end
 
     #phase window by window without checking breakpoints
-    # impute!  error = 0.026761 
-    # impute2! error = 0.026761 
-
     for i in 1:people, w in 2:windows
         hap1 = first(hapset.strand1[w, i])
         hap2 = first(hapset.strand2[w, i])
 
         # strand 1
-        push!(phase[i].strand1.start, (w - 2) * width + 1)
+        push!(phase[i].strand1.start, (w - 1) * width + 1)
         push!(phase[i].strand1.haplotypelabel, hap1)
 
         # strand 2
-        push!(phase[i].strand2.start, (w - 2) * width + 1)
+        push!(phase[i].strand2.start, (w - 1) * width + 1)
         push!(phase[i].strand2.haplotypelabel, hap2)
     end
 
@@ -564,24 +627,24 @@ function phase2(
     # end
 
     # phase last window
-    for i in 1:people
-        Xi = view(X, ((windows - 2) * width + 1):snps, i)
-        Hi = view(H, ((windows - 2) * width + 1):snps, :)
-        (hap1, hap2), bks = continue_haplotype(Xi, Hi,
-            (hapset.strand1[windows - 1, i], hapset.strand2[windows - 1, i]),
-            (hapset.strand1[windows    , i], hapset.strand2[windows    , i]))
+    # for i in 1:people
+    #     Xi = view(X, ((windows - 2) * width + 1):snps, i)
+    #     Hi = view(H, ((windows - 2) * width + 1):snps, :)
+    #     (hap1, hap2), bks = continue_haplotype(Xi, Hi,
+    #         (hapset.strand1[windows - 1, i], hapset.strand2[windows - 1, i]),
+    #         (hapset.strand1[windows    , i], hapset.strand2[windows    , i]))
 
-        # strand 1
-        if bks[1] > -1 && bks[1] < 2width
-            push!(phase[i].strand1.start, (windows - 2) * width + 1 + bks[1])
-            push!(phase[i].strand1.haplotypelabel, hap1)
-        end
-        # strand 2
-        if bks[2] > -1 && bks[2] < 2width
-            push!(phase[i].strand2.start, (windows - 2) * width + 1 + bks[2])
-            push!(phase[i].strand2.haplotypelabel, hap2)
-        end
-    end
+    #     # strand 1
+    #     if bks[1] > -1 && bks[1] < 2width
+    #         push!(phase[i].strand1.start, (windows - 2) * width + 1 + bks[1])
+    #         push!(phase[i].strand1.haplotypelabel, hap1)
+    #     end
+    #     # strand 2
+    #     if bks[2] > -1 && bks[2] < 2width
+    #         push!(phase[i].strand2.start, (windows - 2) * width + 1 + bks[2])
+    #         push!(phase[i].strand2.haplotypelabel, hap2)
+    #     end
+    # end
 
     # finally, fill in missing entries of X
     # impute!(X, H, phase)
@@ -589,6 +652,75 @@ function phase2(
 
     return hapset
     # return phase, hapset, bkpts
+end
+
+"""
+Test function that computes the optimal haplotype pairs and stores 
+the result in `non_redund_haps`. 
+
+Each row is a window and each column is a person. 
+"""
+function non_redundant_haplotypes(
+    X::AbstractMatrix{Union{Missing, T}},
+    H::AbstractMatrix{T};
+    width::Int    = 128,
+    verbose::Bool = true
+    ) where T <: Real
+    
+    # problem dimensions
+    snps, people = size(X)
+
+    # number of windows
+    windows = ceil(Int, snps / width)
+
+    # get unique haplotype indices and maps for each window
+    Hunique  = unique_haplotypes(H, width, 'T')
+    num_uniq = length(Hunique.uniqueindex[1])
+
+    # Matrix storing haplotypes. Each column is a person. Rows are optimal haplotypes for each window 
+    non_redund_haps = PeoplesRedundantHaplotypeSet(windows, people) 
+
+    # allocate working arrays
+    happair     = ones(Int, people), ones(Int, people)
+    hapscore    = zeros(T, people)
+    Hwork       = ElasticArray{T}(H[1:width, Hunique.uniqueindex[1]])
+    Xwork       = X[1:width, :]
+    Xwork_float = zeros(T, size(Xwork))
+    M           = zeros(T, num_uniq, num_uniq)
+    N           = ElasticArray{T}(undef, people, num_uniq)
+
+    # In first window, calculate optimal haplotype pair among unique haplotypes
+    haploimpute!(Xwork, Hwork, M, N, happair, hapscore, Xfloat=Xwork_float)
+    for k in 1:people
+        non_redund_haps.strand1.p[1, k] = BitSet(happair[1][k])
+        non_redund_haps.strand2.p[1, k] = BitSet(happair[2][k])
+    end
+
+    #TODO: make this loop multithreaded 
+    for w in 2:(windows-1)
+
+        # sync Xwork and Hwork with original data
+        cur_range = ((w - 1) * width + 1):(w * width)
+        M = resize_and_sync!(Xwork, Hwork, Hunique.uniqueindex[w], cur_range, X, H, M, N)
+
+        # Store optimal haplotype pair in non_redund_haps
+        haploimpute!(Xwork, Hwork, M, N, happair, hapscore, Xfloat=Xwork_float)
+        for k in 1:people
+            non_redund_haps.strand1.p[w, k] = BitSet(happair[1][k])
+            non_redund_haps.strand2.p[w, k] = BitSet(happair[2][k])
+        end
+    end
+
+    # last window
+    last_range = ((windows - 1) * width + 1):snps
+    M = resize_and_sync!(Xwork, Hwork, Hunique.uniqueindex[end], last_range, X, H, M, N)
+    haploimpute!(Xwork, Hwork, M, N, happair, hapscore)
+    for k in 1:people
+        non_redund_haps.strand1.p[end, k] = BitSet(happair[1][end])
+        non_redund_haps.strand2.p[end, k] = BitSet(happair[2][end])
+    end
+
+    return non_redund_haps
 end
 
 function redundant_haplotypes(
