@@ -491,19 +491,26 @@ Xm_original = copy(Xm)
 width = 64
 windows = floor(Int, p / width)
 
+copyto!(Xm, Xm_original)
+
 #Hua's code without search breakpoints has error = 0.014663744250977082
 #Hua's code with    search breakpoints has error = 0.013899062884015356
 hapset = phase(Xm, H, width)
 impute2!(Xm, H, hapset) 
 
-#current code without search breakpoints has error = 0.0264620975683957
-#current code with    search breakpoints has error = 0.0382987880109504
-# hapset2 = phase2(Xm, H, width=width)
+#current code without search breakpoints has error = 0.024447543476567152 
+#current code without search breakpoints has error = 0.013954713549535482 (3*width)
+#current code with    search breakpoints has error = 
+hapset = phase2(Xm, H, width=width)
+hapset = phase2(Xm, H, width=3*width)
+
+#non-redundant haplotypes without search breakpoints has error = 0.08077261261736622
 hapset = phase3(Xm, H, width=width)
 
-# look at the beautiful haplotype intersections
-hapset2.strand1.p[1:5, 5]
-hapset2.strand2.p[1:5, 5]
+
+# look at the haplotype intersections
+hapset.strand1.p[1:10, 1]
+hapset.strand2.p[1:10, 1]
 
 
 # calculate error rate

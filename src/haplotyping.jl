@@ -421,7 +421,7 @@ function phase(
 end
 
 """
-Test function that phases by using only only the optimal haplotype pairs.
+Test function that phases by using only the optimal haplotype pairs.
 """
 function phase3(
     X::AbstractMatrix{Union{Missing, T}},
@@ -448,11 +448,11 @@ function phase3(
         hap2 = first(hapset.strand2[w, i])
 
         # strand 1
-        push!(phase[i].strand1.start, (w - 2) * width + 1)
+        push!(phase[i].strand1.start, (w - 1) * width + 1)
         push!(phase[i].strand1.haplotypelabel, hap1)
 
         # strand 2
-        push!(phase[i].strand2.start, (w - 2) * width + 1)
+        push!(phase[i].strand2.start, (w - 1) * width + 1)
         push!(phase[i].strand2.haplotypelabel, hap2)
     end
 
@@ -462,15 +462,15 @@ function phase3(
         hap2 = first(hapset.strand2.p[end, i])
 
         # strand 1
-        push!(phase[i].strand1.start, (windows - 2) * width + 1)
+        push!(phase[i].strand1.start, (windows - 1) * width + 1)
         push!(phase[i].strand1.haplotypelabel, hap1)
         
         # strand 2
-        push!(phase[i].strand2.start, (windows - 2) * width + 1)
+        push!(phase[i].strand2.start, (windows - 1) * width + 1)
         push!(phase[i].strand2.haplotypelabel, hap2)
     end
 
-    impute!(X, H, phase)
+    impute!(X, H, phase) #impute2! seg faults right now...
 
     return hapset
 end
@@ -503,12 +503,24 @@ function phase2(
     # TODO: last few windows may not be hitting the isempty() command
     @inbounds for i in 1:people, w in 2:windows
 
+        # decide how to concatenate next 2 windows to previous windows based on the larger intersection
+        A = intersect(store[1][i], hapset.strand1[w, i])
+        B = intersect(store[1][i], hapset.strand2[w, i])
+        if length(A) >= length(B)
+            # no need to cross over
+            a = A 
+        else
+            # cross over
+            a = B
+            hapset.strand1.p[w, i], hapset.strand2.p[w, i] = hapset.strand2.p[w, i], hapset.strand1.p[w, i]
+        end
+        b = intersect(store[2][i], hapset.strand2[w, i])
+
         # strand 1
-        a = intersect(store[1][i], hapset.strand1[w, i])
         if isempty(a)
             # delete all nonmatching haplotypes in previous windows
             for ww in (w - window_span[1][i]):(w - 1)
-                intersect!(hapset.strand1[ww, i], store[1][i]) 
+                hapset.strand1.p[ww, i] = copy(store[1][i]) 
             end
 
             # update counters and storage
@@ -520,11 +532,10 @@ function phase2(
         end
 
         # strand 2
-        b = intersect(store[2][i], hapset.strand2[w, i])
         if isempty(b)
             # designate a haplotype in the current set and delete all nonmatching haplotypes in previous windows
             for ww in (w - window_span[2][i]):(w - 1)
-                intersect!(hapset.strand2[ww, i], store[2][i]) 
+                hapset.strand2.p[ww, i] = copy(store[2][i]) 
             end
 
             # update counters and storage
@@ -546,19 +557,16 @@ function phase2(
     end
 
     #phase window by window without checking breakpoints
-    # impute!  error = 0.026761 
-    # impute2! error = 0.026761 
-
     for i in 1:people, w in 2:windows
         hap1 = first(hapset.strand1[w, i])
         hap2 = first(hapset.strand2[w, i])
 
         # strand 1
-        push!(phase[i].strand1.start, (w - 2) * width + 1)
+        push!(phase[i].strand1.start, (w - 1) * width + 1)
         push!(phase[i].strand1.haplotypelabel, hap1)
 
         # strand 2
-        push!(phase[i].strand2.start, (w - 2) * width + 1)
+        push!(phase[i].strand2.start, (w - 1) * width + 1)
         push!(phase[i].strand2.haplotypelabel, hap2)
     end
 
@@ -619,24 +627,24 @@ function phase2(
     # end
 
     # phase last window
-    for i in 1:people
-        Xi = view(X, ((windows - 2) * width + 1):snps, i)
-        Hi = view(H, ((windows - 2) * width + 1):snps, :)
-        (hap1, hap2), bks = continue_haplotype(Xi, Hi,
-            (hapset.strand1[windows - 1, i], hapset.strand2[windows - 1, i]),
-            (hapset.strand1[windows    , i], hapset.strand2[windows    , i]))
+    # for i in 1:people
+    #     Xi = view(X, ((windows - 2) * width + 1):snps, i)
+    #     Hi = view(H, ((windows - 2) * width + 1):snps, :)
+    #     (hap1, hap2), bks = continue_haplotype(Xi, Hi,
+    #         (hapset.strand1[windows - 1, i], hapset.strand2[windows - 1, i]),
+    #         (hapset.strand1[windows    , i], hapset.strand2[windows    , i]))
 
-        # strand 1
-        if bks[1] > -1 && bks[1] < 2width
-            push!(phase[i].strand1.start, (windows - 2) * width + 1 + bks[1])
-            push!(phase[i].strand1.haplotypelabel, hap1)
-        end
-        # strand 2
-        if bks[2] > -1 && bks[2] < 2width
-            push!(phase[i].strand2.start, (windows - 2) * width + 1 + bks[2])
-            push!(phase[i].strand2.haplotypelabel, hap2)
-        end
-    end
+    #     # strand 1
+    #     if bks[1] > -1 && bks[1] < 2width
+    #         push!(phase[i].strand1.start, (windows - 2) * width + 1 + bks[1])
+    #         push!(phase[i].strand1.haplotypelabel, hap1)
+    #     end
+    #     # strand 2
+    #     if bks[2] > -1 && bks[2] < 2width
+    #         push!(phase[i].strand2.start, (windows - 2) * width + 1 + bks[2])
+    #         push!(phase[i].strand2.haplotypelabel, hap2)
+    #     end
+    # end
 
     # finally, fill in missing entries of X
     # impute!(X, H, phase)
@@ -663,7 +671,7 @@ function non_redundant_haplotypes(
     snps, people = size(X)
 
     # number of windows
-    windows = floor(Int, snps / width)
+    windows = ceil(Int, snps / width)
 
     # get unique haplotype indices and maps for each window
     Hunique  = unique_haplotypes(H, width, 'T')
