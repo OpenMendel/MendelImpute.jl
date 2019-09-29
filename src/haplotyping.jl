@@ -699,6 +699,7 @@ function redundant_haplotypes(
     end
 
     # last window
+    # TODO: there is problem with calling resize_and_sync! on the last window since the range is different
     last_range = ((windows - 1) * width + 1):snps
     M = resize_and_sync!(Xwork, Hwork, Hunique.uniqueindex[end], last_range, X, H, M, N)
     haploimpute!(Xwork, Hwork, M, N, happair, hapscore)
