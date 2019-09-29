@@ -498,10 +498,8 @@ copyto!(Xm, Xm_original)
 hapset = phase(Xm, H, width)
 impute2!(Xm, H, hapset) 
 
-#current code without search breakpoints has error = 0.03018986770394011
-#current code without search breakpoints has error = 0.013954713549535482 (3*width)
-#current code with    search breakpoints has error = 0.019693327732540428
-#current code without search breakpoints has error = 0.009360029713333115 (3*width)
+#current code with search breakpoints has error = 0.019693327732540428
+#current code with search breakpoints has error = 0.009360029713333115 (3*width)
 copyto!(Xm, Xm_original)
 hapset = phase2(Xm, H, width=width)
 

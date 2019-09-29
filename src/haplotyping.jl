@@ -420,61 +420,6 @@ function phase(
     return phase
 end
 
-"""
-Test function that phases by using only the optimal haplotype pairs.
-"""
-function phase3(
-    X::AbstractMatrix{Union{Missing, T}},
-    H::AbstractMatrix{T};
-    width::Int    = 128,
-    verbose::Bool = true
-    ) where T <: Real
-    
-    # problem dimensions
-    snps, people = size(X)
-
-    # number of windows
-    windows = floor(Int, snps / width)
-
-    # get non-redundant haplotype sets
-    hapset = non_redundant_haplotypes(X, H, width=width, verbose=verbose)
-
-    # allocate working arrays
-    phase = [HaplotypeMosaicPair(snps) for i in 1:people]
-
-    # begin phasing
-    for i in 1:people, w in 2:windows
-        hap1 = first(hapset.strand1[w, i])
-        hap2 = first(hapset.strand2[w, i])
-
-        # strand 1
-        push!(phase[i].strand1.start, (w - 1) * width + 1)
-        push!(phase[i].strand1.haplotypelabel, hap1)
-
-        # strand 2
-        push!(phase[i].strand2.start, (w - 1) * width + 1)
-        push!(phase[i].strand2.haplotypelabel, hap2)
-    end
-
-    # phase last window
-    for i in 1:people
-        hap1 = first(hapset.strand1.p[end, i])
-        hap2 = first(hapset.strand2.p[end, i])
-
-        # strand 1
-        push!(phase[i].strand1.start, (windows - 1) * width + 1)
-        push!(phase[i].strand1.haplotypelabel, hap1)
-        
-        # strand 2
-        push!(phase[i].strand2.start, (windows - 1) * width + 1)
-        push!(phase[i].strand2.haplotypelabel, hap2)
-    end
-
-    impute!(X, H, phase) #impute2! seg faults right now...
-
-    return hapset
-end
-
 # TODO: why does benchmark on this function crash the REPL
 function phase2(
     X::AbstractMatrix{Union{Missing, T}},
