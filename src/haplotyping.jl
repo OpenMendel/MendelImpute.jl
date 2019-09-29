@@ -496,7 +496,6 @@ function phase2(
     phase = [HaplotypeMosaicPair(snps) for i in 1:people]
     store = ([copy(hapset.strand1[1, i]) for i in 1:people], [copy(hapset.strand2[1, i]) for i in 1:people])
     window_span = (ones(Int, people), ones(Int, people))
-    # store_prev = deepcopy(store)
 
     # TODO: parallel computing
     # TODO: replace `intersect` and `intersect!` with fast set intersection using bisection/seesaw search
@@ -533,7 +532,7 @@ function phase2(
 
         # strand 2
         if isempty(b)
-            # designate a haplotype in the current set and delete all nonmatching haplotypes in previous windows
+            # delete all nonmatching haplotypes in previous windows
             for ww in (w - window_span[2][i]):(w - 1)
                 hapset.strand2.p[ww, i] = copy(store[2][i]) 
             end
@@ -557,74 +556,56 @@ function phase2(
     end
 
     #phase window by window without checking breakpoints
-    for i in 1:people, w in 2:windows
-        hap1 = first(hapset.strand1[w, i])
-        hap2 = first(hapset.strand2[w, i])
-
-        # strand 1
-        push!(phase[i].strand1.start, (w - 1) * width + 1)
-        push!(phase[i].strand1.haplotypelabel, hap1)
-
-        # strand 2
-        push!(phase[i].strand2.start, (w - 1) * width + 1)
-        push!(phase[i].strand2.haplotypelabel, hap2)
-    end
-
-    # TODO: record phase info in last window too
-    # find optimal break points and record info to phase. 
-    # impute! = gives bug
-    # impute2! error 0.038178 
-
-    # pos = 41
-    # for i in 1:people, w in 2:(windows-1)
-    # # for i in 1:people, w in 2:pos
-    #     Xi = view(X, ((w - 2) * width + 1):(w * width), i)
-    #     Hi = view(H, ((w - 2) * width + 1):(w * width), :)
-    #     (hap1, hap2), bks = continue_haplotype(Xi, Hi,
-    #         (hapset.strand1[w - 1, i], hapset.strand2[w - 1, i]),
-    #         (hapset.strand1[w    , i], hapset.strand2[w    , i]))
-
-    #     # if w == 41 && i == 5
-    #     #     (hap1, hap2), bks = continue_haplotype(Xi, Hi,
-    #     #     (hapset.strand1[w - 1, i], hapset.strand2[w - 1, i]),
-    #     #     (hapset.strand1[w    , i], hapset.strand2[w    , i]), verbose=true)
-
-    #     #     println(hap1)
-    #     #     println(hap2)
-    #     #     println(bks)
-    #     #     fdsa
-    #     # end
-
-    #     # if i == 1
-    #     #     println((hap1, hap2))
-    #     #     println(bks)
-    #     #     println("")
-    #     # end
-
-    #     # strand 1
-    #     if bks[1] > -1 && bks[1] < 2width
-    #         push!(phase[i].strand1.start, (w - 2) * width + 1 + bks[1])
-    #         push!(phase[i].strand1.haplotypelabel, hap1)
-    #     end
-    #     # strand 2
-    #     if bks[2] > -1 && bks[2] < 2width
-    #         push!(phase[i].strand2.start, (w - 2) * width + 1 + bks[2])
-    #         push!(phase[i].strand2.haplotypelabel, hap2)
-    #     end
-    # end
-
-    # for i in 1:people, w in (pos+1):windows
+    # for i in 1:people, w in 2:windows
     #     hap1 = first(hapset.strand1[w, i])
     #     hap2 = first(hapset.strand2[w, i])
 
     #     # strand 1
-    #     push!(phase[i].strand1.start, (w - 2) * width + 1)
+    #     push!(phase[i].strand1.start, (w - 1) * width + 1)
     #     push!(phase[i].strand1.haplotypelabel, hap1)
 
     #     # strand 2
-    #     push!(phase[i].strand2.start, (w - 2) * width + 1)
+    #     push!(phase[i].strand2.start, (w - 1) * width + 1)
     #     push!(phase[i].strand2.haplotypelabel, hap2)
     # end
+
+    # find optimal break points and record info to phase. 
+    store = ([copy(hapset.strand1[1, i]) for i in 1:people], [copy(hapset.strand2[1, i]) for i in 1:people])
+    for i in 1:people, w in 2:(windows-1)
+        
+        a = intersect(store[1][i], hapset.strand1[w, i])
+        b = intersect(store[2][i], hapset.strand2[w, i])
+
+        if isempty(a)
+            # search breakpoints
+            Xi = view(X, ((w - 2) * width + 1):(w * width), i)
+            Hi = view(H, ((w - 2) * width + 1):(w * width), :)
+            prev_and_cur_haplotypes = (hapset.strand1[w - 1, i], hapset.strand1[w, i])
+            bkpt, hap, err_optim = search_breakpoint(Xi, Hi, hapset.strand2[w, i], prev_and_cur_haplotypes)
+
+            # record info into phase
+            push!(phase[i].strand1.start, (w - 2) * width + 1 + bkpt)
+            push!(phase[i].strand1.haplotypelabel, hap)
+
+            # update storage
+            store[1][i] = copy(hapset.strand1[w, i])
+        end
+
+        if isempty(b)
+            # search breakpoints
+            Xi = view(X, ((w - 2) * width + 1):(w * width), i)
+            Hi = view(H, ((w - 2) * width + 1):(w * width), :)
+            prev_and_cur_haplotypes = (hapset.strand2[w - 1, i], hapset.strand2[w, i])
+            bkpt, hap, err_optim = search_breakpoint(Xi, Hi, hapset.strand1[w, i], prev_and_cur_haplotypes)
+
+            # record info into phase
+            push!(phase[i].strand2.start, (w - 2) * width + 1 + bkpt)
+            push!(phase[i].strand2.haplotypelabel, hap)
+
+            # update storage
+            store[2][i] = copy(hapset.strand2[w, i])
+        end
+    end
 
     # phase last window
     # for i in 1:people
@@ -947,23 +928,15 @@ function continue_haplotype(
     # only one strand matches
     # TODO: make sure returning first(k or l) is correct behavior
     if !isempty(a) && isempty(b)
-        # verbose && println("hi")
-
         breakpt, errors = search_breakpoint(X, H, i, (j, l))
         return (first(k), first(l)), (-1, breakpt)
     elseif !isempty(c) && isempty(d)
-        # verbose && println("hii")
-
         breakpt, errors = search_breakpoint(X, H, i, (j, k))
         return (first(l), first(k)), (-1, breakpt)
     elseif !isempty(d) && isempty(c)
-        # println("hiii")
-
         breakpt, errors = search_breakpoint(X, H, j, (i, l))
         return (first(l), first(k)), (breakpt, -1)
     elseif !isempty(b) && isempty(a)
-        # println("hiiii")
-
         breakpt, errors = search_breakpoint(X, H, j, (i, k))
         return (first(k), first(l)), (breakpt, -1)
     end
@@ -1014,7 +987,7 @@ function search_breakpoint(
     return bkpt_optim, err_optim
 end
 
-function search_breakpoint(
+@noinline function search_breakpoint(
     X::AbstractVector,
     H::AbstractMatrix,
     strand1::BitSet,
@@ -1038,7 +1011,7 @@ function search_breakpoint(
     bkpt_optim, err_optim = 0, errors
 
     # quick return if perfect match
-    err_optim == 0 && return 0, 0
+    err_optim == 0 && return 0, s22, 0
 
     # extend haplotype H[:, s2[1]] position by position
     @inbounds for bkpt in 1:n
@@ -1048,12 +1021,12 @@ function search_breakpoint(
             if errors < err_optim
                 bkpt_optim, err_optim = bkpt, errors
                 # quick return if perfect match
-                err_optim == 0 && return bkpt_optim, err_optim
+                err_optim == 0 && return bkpt_optim, s22, err_optim
             end
         end
     end
 
-    return bkpt_optim, err_optim
+    return bkpt_optim, s22, err_optim
 end
 
 """
