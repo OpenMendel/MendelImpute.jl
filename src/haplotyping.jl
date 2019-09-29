@@ -491,15 +491,6 @@ function phase2(
         end
     end
 
-    # phase window 1
-    # TODO: make this consistent with second window
-    for i in 1:people
-        push!(phase[i].strand1.start, 1)
-        push!(phase[i].strand1.haplotypelabel, first(hapset.strand1[1, i]))
-        push!(phase[i].strand2.start, 1)
-        push!(phase[i].strand2.haplotypelabel, first(hapset.strand2[1, i]))
-    end
-
     #phase window by window without checking breakpoints
     # for i in 1:people, w in 2:windows
     #     hap1 = first(hapset.strand1[w, i])
@@ -514,9 +505,17 @@ function phase2(
     #     push!(phase[i].strand2.haplotypelabel, hap2)
     # end
 
+    # phase window 1
+    for i in 1:people
+        push!(phase[i].strand1.start, 1)
+        push!(phase[i].strand1.haplotypelabel, first(hapset.strand1[1, i]))
+        push!(phase[i].strand2.start, 1)
+        push!(phase[i].strand2.haplotypelabel, first(hapset.strand2[1, i]))
+    end
+
     # find optimal break points and record info to phase. 
     store = ([copy(hapset.strand1[1, i]) for i in 1:people], [copy(hapset.strand2[1, i]) for i in 1:people])
-    for i in 1:people, w in 2:(windows-1)
+    for i in 1:people, w in 2:windows
         
         a = intersect(store[1][i], hapset.strand1[w, i])
         b = intersect(store[2][i], hapset.strand2[w, i])
@@ -551,26 +550,6 @@ function phase2(
             store[2][i] = copy(hapset.strand2[w, i])
         end
     end
-
-    # phase last window
-    # for i in 1:people
-    #     Xi = view(X, ((windows - 2) * width + 1):snps, i)
-    #     Hi = view(H, ((windows - 2) * width + 1):snps, :)
-    #     (hap1, hap2), bks = continue_haplotype(Xi, Hi,
-    #         (hapset.strand1[windows - 1, i], hapset.strand2[windows - 1, i]),
-    #         (hapset.strand1[windows    , i], hapset.strand2[windows    , i]))
-
-    #     # strand 1
-    #     if bks[1] > -1 && bks[1] < 2width
-    #         push!(phase[i].strand1.start, (windows - 2) * width + 1 + bks[1])
-    #         push!(phase[i].strand1.haplotypelabel, hap1)
-    #     end
-    #     # strand 2
-    #     if bks[2] > -1 && bks[2] < 2width
-    #         push!(phase[i].strand2.start, (windows - 2) * width + 1 + bks[2])
-    #         push!(phase[i].strand2.haplotypelabel, hap2)
-    #     end
-    # end
 
     # finally, fill in missing entries of X
     # impute!(X, H, phase)
