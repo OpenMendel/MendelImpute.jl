@@ -580,75 +580,6 @@ function phase2(
     # return phase, hapset, bkpts
 end
 
-"""
-Test function that computes the optimal haplotype pairs and stores 
-the result in `non_redund_haps`. 
-
-Each row is a window and each column is a person. 
-"""
-function non_redundant_haplotypes(
-    X::AbstractMatrix{Union{Missing, T}},
-    H::AbstractMatrix{T};
-    width::Int    = 128,
-    verbose::Bool = true
-    ) where T <: Real
-    
-    # problem dimensions
-    snps, people = size(X)
-
-    # number of windows
-    windows = ceil(Int, snps / width)
-
-    # get unique haplotype indices and maps for each window
-    Hunique  = unique_haplotypes(H, width, 'T')
-    num_uniq = length(Hunique.uniqueindex[1])
-
-    # Matrix storing haplotypes. Each column is a person. Rows are optimal haplotypes for each window 
-    non_redund_haps = PeoplesRedundantHaplotypeSet(windows, people) 
-
-    # allocate working arrays
-    happair     = ones(Int, people), ones(Int, people)
-    hapscore    = zeros(T, people)
-    Hwork       = ElasticArray{T}(H[1:width, Hunique.uniqueindex[1]])
-    Xwork       = X[1:width, :]
-    Xwork_float = zeros(T, size(Xwork))
-    M           = zeros(T, num_uniq, num_uniq)
-    N           = ElasticArray{T}(undef, people, num_uniq)
-
-    # In first window, calculate optimal haplotype pair among unique haplotypes
-    haploimpute!(Xwork, Hwork, M, N, happair, hapscore, Xfloat=Xwork_float)
-    for k in 1:people
-        non_redund_haps.strand1.p[1, k] = BitSet(happair[1][k])
-        non_redund_haps.strand2.p[1, k] = BitSet(happair[2][k])
-    end
-
-    #TODO: make this loop multithreaded 
-    for w in 2:(windows-1)
-
-        # sync Xwork and Hwork with original data
-        cur_range = ((w - 1) * width + 1):(w * width)
-        M = resize_and_sync!(Xwork, Hwork, Hunique.uniqueindex[w], cur_range, X, H, M, N)
-
-        # Store optimal haplotype pair in non_redund_haps
-        haploimpute!(Xwork, Hwork, M, N, happair, hapscore, Xfloat=Xwork_float)
-        for k in 1:people
-            non_redund_haps.strand1.p[w, k] = BitSet(happair[1][k])
-            non_redund_haps.strand2.p[w, k] = BitSet(happair[2][k])
-        end
-    end
-
-    # last window
-    last_range = ((windows - 1) * width + 1):snps
-    M = resize_and_sync!(Xwork, Hwork, Hunique.uniqueindex[end], last_range, X, H, M, N)
-    haploimpute!(Xwork, Hwork, M, N, happair, hapscore)
-    for k in 1:people
-        non_redund_haps.strand1.p[end, k] = BitSet(happair[1][end])
-        non_redund_haps.strand2.p[end, k] = BitSet(happair[2][end])
-    end
-
-    return non_redund_haps
-end
-
 function redundant_haplotypes(
     X::AbstractMatrix{Union{Missing, T}},
     H::AbstractMatrix{T};
@@ -846,50 +777,6 @@ function continue_haplotype(
 
 end
 
-function continue_haplotype(
-    X::AbstractVector,
-    H::AbstractMatrix,
-    happair_prev::Tuple{BitSet, BitSet},
-    happair_next::Tuple{BitSet, BitSet};
-    verbose::Bool=false
-    )
-
-    i, j = happair_prev
-    k, l = happair_next
-
-    a = intersect(i, k)
-    b = intersect(j, l)
-    c = intersect(i, l)
-    d = intersect(j, k)
-
-    # both strands match
-    if !isempty(a) && !isempty(b)
-        return (first(a), first(b)), (-1, -1)
-    end
-
-    if !isempty(c) && !isempty(d)
-        return (first(c), first(d)), (-1, -1)
-    end
-
-    # only one strand matches
-    # TODO: make sure returning first(k or l) is correct behavior
-    if !isempty(a) && isempty(b)
-        breakpt, errors = search_breakpoint(X, H, i, (j, l))
-        return (first(k), first(l)), (-1, breakpt)
-    elseif !isempty(c) && isempty(d)
-        breakpt, errors = search_breakpoint(X, H, i, (j, k))
-        return (first(l), first(k)), (-1, breakpt)
-    elseif !isempty(d) && isempty(c)
-        breakpt, errors = search_breakpoint(X, H, j, (i, l))
-        return (first(l), first(k)), (breakpt, -1)
-    elseif !isempty(b) && isempty(a)
-        breakpt, errors = search_breakpoint(X, H, j, (i, k))
-        return (first(k), first(l)), (breakpt, -1)
-    end
-
-    return (first(k), first(l)), (0, 0)
-end
-
 """
     search_breakpoint(X, H, s1, s2)
 
@@ -933,7 +820,7 @@ function search_breakpoint(
     return bkpt_optim, err_optim
 end
 
-@noinline function search_breakpoint(
+function search_breakpoint(
     X::AbstractVector,
     H::AbstractMatrix,
     strand1::BitSet,
