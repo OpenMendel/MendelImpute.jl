@@ -488,18 +488,20 @@ p, n = size(X)
 X2 = Matrix{Union{Missing, eltype(X)}}(X)
 Xm = ifelse.(rand(eltype(X), p, n) .< missingprop, missing, X2)
 Xm_original = copy(Xm)
-width = 64
+width = 400
 windows = floor(Int, p / width)
 
 copyto!(Xm, Xm_original)
 
-#Hua's code without search breakpoints has error = 0.014663744250977082
-#Hua's code with    search breakpoints has error = 0.013899062884015356
+#Hua's code error = 0.013899062884015356 (width = 64)
+#Hua's code error = 0.0033518189729195617 (width = 400) #12.170407 seconds (87.59 k allocations: 23.879 MiB, 0.15% gc time)
 hapset = phase(Xm, H, width)
 impute2!(Xm, H, hapset) 
 
-#current code with search breakpoints has error = 0.019693327732540428
-#current code with search breakpoints has error = 0.009360029713333115 (3*width)
+#current code error = 0.01967560196500439 (width = 64)
+#current code error = 0.009237186022036839 (width = 3*64)
+#current code error = 0.006945615284063669 (width = 400)
+#current code error = 0.004905503108811067 (width = 3*400) #3.769867 seconds (663.78 k allocations: 61.506 MiB, 0.80% gc time)
 copyto!(Xm, Xm_original)
 hapset = phase2(Xm, H, width=width)
 
