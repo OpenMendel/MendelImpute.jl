@@ -488,7 +488,7 @@ p, n = size(X)
 X2 = Matrix{Union{Missing, eltype(X)}}(X)
 Xm = ifelse.(rand(eltype(X), p, n) .< missingprop, missing, X2)
 Xm_original = copy(Xm)
-width = 400
+width = 64
 windows = floor(Int, p / width)
 
 copyto!(Xm, Xm_original)

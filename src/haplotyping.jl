@@ -420,7 +420,6 @@ function phase(
     return phase
 end
 
-# TODO: why does benchmark on this function crash the REPL
 function phase2(
     X::AbstractMatrix{Union{Missing, T}},
     H::AbstractMatrix{T};
