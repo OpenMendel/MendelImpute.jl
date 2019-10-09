@@ -457,15 +457,15 @@ B = rand(1000, 1000)
 
 
 using Revise
+using MendelImpute
 using DelimitedFiles
 using LinearAlgebra
 using BenchmarkTools
-using MendelImpute
 using Random
 using Profile
 using ElasticArrays
 
-cd("/Users/biona001/.julia/dev/MendelImpute/test")
+cd("/Users/biona001/.julia/dev/MendelImpute/data")
 
 rawdata = readdlm("AFRped_geno.txt", ',', Float32);
 people = 664;
@@ -498,10 +498,10 @@ copyto!(Xm, Xm_original)
 hapset = phase(Xm, H, width)
 impute2!(Xm, H, hapset) 
 
-#current code error = 0.01967560196500439 (width = 64)
-#current code error = 0.009237186022036839 (width = 3*64)
-#current code error = 0.006945615284063669 (width = 400)
-#current code error = 0.004905503108811067 (width = 3*400) #3.769867 seconds (663.78 k allocations: 61.506 MiB, 0.80% gc time)
+#current code error = 0.019282749489147502 (width = 64)
+#current code error = 0.008566492445731325 (width = 3*64)
+#current code error = 0.0045481021680262605 (width = 400)
+#current code error = 0.003721998955416397 (width = 3*400) #3.769867 seconds (663.78 k allocations: 61.506 MiB, 0.80% gc time)
 copyto!(Xm, Xm_original)
 hapset = phase2(Xm, H, width=width)
 
@@ -513,7 +513,7 @@ hapset = phase3(Xm, H, width=width)
 
 
 # look at the haplotype intersections
-hapset.strand1.p[1:10, 1]
+hapset.strand1.p[end-10:end, 123]
 hapset.strand2.p[1:10, 1]
 
 
@@ -528,7 +528,7 @@ error_rate = sum(actual_missing_values .!= imputed_missing_values) / total_missi
 
 function naive_impute!(X)
 	n, p = size(X)
-    fillval = convert(eltype(X), 1.0)
+    fillval = convert(eltype(X), 0.0)
 	for j in 1:p, i in 1:n
 		ismissing(X[i, j]) && (X[i, j] = fillval)
 	end
@@ -539,6 +539,17 @@ naive_impute!(Xm) #fill with 2 gives error rate = 0.9672547361808062
 
 
 
+function naive_impute!(X, X_original)
+    n, p = size(X)
+    fillval = 0x00
+    for j in 1:p, i in 1:n
+        if X_original[i, j] == 0x01
+            X[i, j] = fillval
+        else
+            X[i, j] = X_original[i, j]
+        end
+    end
+end
 
 
 

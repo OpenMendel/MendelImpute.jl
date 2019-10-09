@@ -443,7 +443,6 @@ function phase2(
 
     # TODO: parallel computing
     # TODO: replace `intersect` and `intersect!` with fast set intersection using bisection/seesaw search
-    # TODO: last few windows may not be hitting the isempty() command
     @inbounds for i in 1:people, w in 2:windows
 
         # decide how to concatenate next 2 windows to previous windows based on the larger intersection
@@ -487,6 +486,18 @@ function phase2(
         else
             intersect!(store[2][i], hapset.strand2[w, i])
             window_span[2][i] += 1
+        end
+    end
+
+    # TODO: there's a bug in computing redundant haplotypes since last window never agrees with 2nd to last window
+    # handle last few windows separately, since they may not hit the isempty command
+    for i in 1:people
+        for ww in (windows - window_span[1][i] + 1):windows
+            hapset.strand1.p[ww, i] = copy(store[1][i]) 
+        end
+
+        for ww in (windows - window_span[2][i] + 1):windows
+            hapset.strand2.p[ww, i] = copy(store[2][i]) 
         end
     end
 
@@ -942,8 +953,11 @@ function impute2!(
 
     @inbounds for person in 1:n, snp in 1:p
         if ismissing(X[snp, person])
+            #find where snp is located in phase
             hap1_position = searchsortedlast(phase[person].strand1.start, snp)
             hap2_position = searchsortedlast(phase[person].strand2.start, snp)
+
+            #find the correct haplotypes 
             hap1 = phase[person].strand1.haplotypelabel[hap1_position]
             hap2 = phase[person].strand2.haplotypelabel[hap2_position]
 
