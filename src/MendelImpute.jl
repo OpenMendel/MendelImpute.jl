@@ -17,7 +17,10 @@ module MendelImpute
 	export HaplotypeMosaicPair, HaplotypeMosaic, UniqueHaplotypeMaps
 	export PeoplesRedundantHaplotypeSet, phase2, non_redundant_haplotypes
 
+	export UniqueHaplotypes, fast_elimination!, unique_index!
+
 	include("data_structures.jl")
 	include("haplotyping.jl")
+	include("utilities.jl")
 
 end # module

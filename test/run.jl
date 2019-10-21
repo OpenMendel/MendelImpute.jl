@@ -328,13 +328,30 @@ using LinearAlgebra
 using Profile
 
 Random.seed!(123)
-H = bitrand(128, 100000)
+d = 10000
+H = bitrand(128000, d)
 # Hwork = unique_haplotypes(H, 1:128)
 # Hunique = unique_haplotypes(H, 128)
 
-for i in 1:500
+for i in 1:Int(d/2)
 	H[:, 2i] .= H[:, 2i - 1]
 end
+
+windows = 10
+width = 64
+storage = BitMatrix(undef, 64, size(H, 2))
+copyto!(storage, @view(H[1:width, :]))
+
+
+p, d    = size(H)
+windows = ceil(Int, p / width)
+unique_hap = UniqueHaplotypes(windows, d)
+fast_data_type = Dict(8=>UInt8, 16=>UInt16, 32=>UInt32, 64=>UInt64, 128=>UInt128)
+
+HR = reinterpret(fast_data_type[width], storage.chunks) 
+
+
+@time fast_elimination!(unique_hap, H, windows, width, H[1:width, :], fast_data_type) #128000 by 10000 H, width = 64, 43.702105 seconds (47.99 k allocations: 378.702 MiB, 0.57% gc time)
 
 
 # Hwork = unique_haplotypes(H, 1:128, 'T')
@@ -555,8 +572,13 @@ end
 
 
 
+function test(H::BitMatrix)
+    println("H is BitMatrix")
+end
 
-
+function test(H::AbstractMatrix)
+    println("H is AbstractMatrix")
+end
 
 
 

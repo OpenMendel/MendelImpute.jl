@@ -53,7 +53,7 @@ hash(x::Prehashed) = x.hash
 # UniqueHaplotypeMaps(windows::Int, haps::Int) = UniqueHaplotypeMaps(Vector{Vector{Int}}(undef, windows), [zeros(Int, haps) for i in 1:windows])
 
 """
-Data structure for holding the unique haplotypes and mappings for a person.
+Data structure for holding the unique haplotypes and mappings for each window.
 
 + `unique_index`: Vector of BitVectors where each bitvector has length equal 
 to the number of haplotypes. unique_index[w][i] = 1 if the ith haplotype in window w is unique
@@ -66,7 +66,7 @@ struct UniqueHaplotypes
     unique_index::Vector{BitVector}
     redundant_map::Vector{Dict{Int64, Int64}}
 end
-UniqueHaplotypes(windows::Int) = UniqueHaplotypeMaps(Vector{BitVector}(undef, windows))
+UniqueHaplotypes(windows::Int, haps::Int) = UniqueHaplotypes([trues(haps) for i in 1:windows], [Dict{Int64, Int64}() for i in 1:windows])
 
 # """
 # Data structure for storing the redundant haplotypes matching the optimal haplotype in each window. 

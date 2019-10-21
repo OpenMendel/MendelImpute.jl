@@ -6,22 +6,21 @@ Finds the unique haplotypes determined by the reference haplotypes stored
 in the columns of H. 
 
 # Input
-* `H`: an `p x d` reference panel of haplotypes within a genomic window. 
-* `window`: a small window of `H` that is currently undergoing haplotyping.
-
-# Output
-* A `view` of `H` at the appropriate window with all redundant haplotypes eliminated
+* `H`: an `p x d` reference panel of haplotypes. 
+* `width`: The window width 
 """
 function unique_haplotypes(
     H::AbstractMatrix, 
-    window::UnitRange{Int}
+    width::Int,
     )
 
-    lw = length(window)
-    cur_chunk = view(H, window, :)
+    p, d    = size(H)
+    windows = ceil(Int, p / width)
+    unique_hap = UniqueHaplotypes(windows, d)
+    fast_data_type = Dict(8=>UInt8, 16=>UInt16, 32=>UInt32, 64=>UInt64, 128=>UInt128)
 
-    if eltype(H) == Bool && lw in Set([8, 16, 32, 64, 128])
-        unique_hap_index = unique_haplotype_idx(cur_chunk)
+    if eltype(H) == Bool && haskey(fast_data_type, width)
+        fast_elimination!(unique_hap, H, windows, width, H[1:width, :], fast_data_type)
     else
         unique_hap_index = unique(groupslices(cur_chunk))
     end
@@ -29,6 +28,62 @@ function unique_haplotypes(
     unique_hap_index = unique(groupslices(cur_chunk, 2))
     unique_hap = view(H, window, unique_hap_index)
     return unique_hap, size(unique_hap)
+end
+
+"""
+    fast_elimination!(unique_hap, H, windows, width)
+
+Computes the columns of `H` that are unique in each window and stores non-unique mappings. 
+
+# Input
+* `unique_hap`: A `UniqueHaplotypes` storing the unique haplotypes and their mappings. 
+* `H`: an `p x d` reference panel of haplotypes. 
+* `windows`: total number of windows
+* `width`: the width of a window (should be 8, 16, 32, 64, or 128)
+* `storage`: an `width x d` Bitmatrix 
+* `fast_data_type`: the data types that can use fast_elimination
+
+# Output
+* Modified `unique_hap` that stores the correct unique haplotypes and mappings for non-unique haplotypes
+"""
+function fast_elimination!(
+    unique_hap::UniqueHaplotypes,
+    H::BitMatrix, 
+    windows::Int64, 
+    width::Int64,
+    storage::BitMatrix = H[1:width, :],
+    fast_data_type::Dict = Dict(8=>UInt8, 16=>UInt16, 32=>UInt32, 64=>UInt64, 128=>UInt128)
+    )
+
+    # reinterpret each haplotype as an integer
+    HR = reinterpret(fast_data_type[width], storage.chunks) 
+
+    # record unique haplotypes and non-unique mappings in first window
+    unique_index!(unique_hap.unique_index[1], unique_hap.redundant_map[1], HR)
+
+    # loop through windows
+    for w in 2:windows-1
+        copyto!(storage, @view(H[((w - 1) * width + 1):(w * width), :]))
+        HR = reinterpret(fast_data_type[width], storage.chunks) 
+        unique_index!(unique_hap.unique_index[w], unique_hap.redundant_map[w], HR)
+    end
+
+    # TODO: last window may have length ∉ fast_data_type
+    return nothing
+end
+
+# helper function for fast_elimination!
+function unique_index!(u::BitVector, d::Dict{Int64, Int64}, v::AbstractVector)
+    seen = Set{eltype(v)}()
+
+    @inbounds for i in 1:length(v)
+        if v[i] ∈ seen
+            u[i] = false
+            d[i] = findfirst(isequal(v[i]), v)
+        else
+            push!(seen, v[i])
+        end
+    end
 end
 
 """
@@ -48,87 +103,40 @@ structure for examples.
 
 TODO: replace `groupslices!` with fast haplotype elimination strategy when width is a small multiple of 2
 """
-function unique_haplotypes(
-    H::AbstractMatrix,
-    width::Int,
-    trans::Char='N'
-    )
+# function unique_haplotypes(
+#     H::AbstractMatrix,
+#     width::Int,
+#     trans::Char='N'
+#     )
 
-    if trans == 'N'
-        dim = 1
-    elseif trans == 'T'
-        dim = 2
-    else
-        error("trans can only be 'N' or 'T' but was $dim" )
-    end
+#     if trans == 'N'
+#         dim = 1
+#     elseif trans == 'T'
+#         dim = 2
+#     else
+#         error("trans can only be 'N' or 'T' but was $dim" )
+#     end
 
-    p, d    = size(H)
-    windows = ceil(Int, p / width)
-    hapset  = UniqueHaplotypeMaps(windows, d)
+#     p, d    = size(H)
+#     windows = ceil(Int, p / width)
+#     hapset  = UniqueHaplotypeMaps(windows, d)
 
-    # record unique haplotypes and mappings window by window
-    for w in 1:(windows-1)
-        H_cur_window = view(H, ((w - 1) * width + 1):(w * width), :)
-        groupslices!(hapset.hapmap[w], H_cur_window, dim)
-        hapset.uniqueindex[w] = unique(hapset.hapmap[w])
-    end
+#     # record unique haplotypes and mappings window by window
+#     for w in 1:(windows-1)
+#         H_cur_window = view(H, ((w - 1) * width + 1):(w * width), :)
+#         groupslices!(hapset.hapmap[w], H_cur_window, dim)
+#         hapset.uniqueindex[w] = unique(hapset.hapmap[w])
+#     end
 
-    # find unique haplotype in last window
-    H_last_window = view(H, ((windows - 1) * width + 1):p, :)
-    groupslices!(hapset.hapmap[end], H_last_window, dim)
-    hapset.uniqueindex[end] = unique(hapset.hapmap[end])
+#     # find unique haplotype in last window
+#     H_last_window = view(H, ((windows - 1) * width + 1):p, :)
+#     groupslices!(hapset.hapmap[end], H_last_window, dim)
+#     hapset.uniqueindex[end] = unique(hapset.hapmap[end])
 
-    return hapset
-end
+#     return hapset
+# end
 
-"""
-    unique_haplotype_idx(H)
-
-Returns the columns of `H` that are unique. 
-
-# Input
-* `H`: BitMatrix of haplotypes within a genomic window.
-
-# Output
-* BitVector where 1 indicates unique columns of H.
-"""
-function unique_haplotype_idx(H::BitMatrix)
-    p = size(H, 1) 
-
-    # reinterpret each haplotype as an integer
-    if p == 8 
-        HR = reinterpret(UInt8, H.chunks) 
-    elseif p == 16
-        HR = reinterpret(UInt16, H.chunks)
-    elseif p == 32
-        HR = reinterpret(UInt32, H.chunks)
-    elseif p == 64
-        HR = reinterpret(UInt64, H.chunks)
-    elseif p == 128
-        HR = reinterpret(UInt128, H.chunks)
-    end
-
-    return unique_index(HR)
-end
-
-# TODO: need this to keep track of mappings for non-redundant haps to unique haps. Perhaps use Dict
-function unique_index(v::AbstractVector)
-    seen = Set{eltype(v)}()
-    lv   = length(v)
-    unique_index = trues(lv)
-
-    @inbounds for i in 1:lv
-        if in(v[i], seen)
-            unique_index[i] = false
-        else
-            push!(seen, v[i])
-        end
-    end
-
-    return unique_index
-end
-
-function redundant_haplotypes(
+function compute_optimal_halotype_set(
     X::AbstractMatrix{Union{Missing, T}},
     H::AbstractMatrix{T};
     width::Int    = 128,
@@ -188,36 +196,36 @@ function redundant_haplotypes(
 end
 
 # computational routine for recording redundant haplotypes for each window
-function compute_redundant_haplotypes!(
-    redund_haps::PeoplesRedundantHaplotypeSet, 
-    Hunique::UniqueHaplotypeMaps, 
-    happair::Tuple{AbstractVector, AbstractVector}, 
-    H::AbstractMatrix,
-    window::Int,
-    )
+# function compute_redundant_haplotypes!(
+#     redund_haps::PeoplesRedundantHaplotypeSet, 
+#     Hunique::UniqueHaplotypeMaps, 
+#     happair::Tuple{AbstractVector, AbstractVector}, 
+#     H::AbstractMatrix,
+#     window::Int,
+#     )
 
-    people = size(redund_haps, 2)
+#     people = size(redund_haps, 2)
 
-    # loop through all people
-    @inbounds for k in 1:people
-        (Hwork_i, Hwork_j) = (happair[1][k], happair[2][k])
-        # println("person $k's optimal haplotype pairs are: $((Hwork_i, Hwork_j))")
+#     # loop through all people
+#     @inbounds for k in 1:people
+#         (Hwork_i, Hwork_j) = (happair[1][k], happair[2][k])
+#         # println("person $k's optimal haplotype pairs are: $((Hwork_i, Hwork_j))")
 
-        (H_i, H_j) = (Hunique.uniqueindex[window][Hwork_i], Hunique.uniqueindex[window][Hwork_j])
-        # println("person $k's optimal haplotype pairs are located at columns $H_i and $H_j in H")
+#         (H_i, H_j) = (Hunique.uniqueindex[window][Hwork_i], Hunique.uniqueindex[window][Hwork_j])
+#         # println("person $k's optimal haplotype pairs are located at columns $H_i and $H_j in H")
 
-        # loop through all haplotypes and find ones that match either of the optimal haplotypes 
-        for jj in 1:size(H, 2)
-            Hunique.hapmap[window][jj] == H_i && push!(redund_haps.strand1[window, k], jj)
-            Hunique.hapmap[window][jj] == H_j && push!(redund_haps.strand2[window, k], jj)
-        end
+#         # loop through all haplotypes and find ones that match either of the optimal haplotypes 
+#         for jj in 1:size(H, 2)
+#             Hunique.hapmap[window][jj] == H_i && push!(redund_haps.strand1[window, k], jj)
+#             Hunique.hapmap[window][jj] == H_j && push!(redund_haps.strand2[window, k], jj)
+#         end
 
-        # println("person $k's redundant haplotypes are: ")
-        # println(redund_haps[1, k])
-    end
+#         # println("person $k's redundant haplotypes are: ")
+#         # println(redund_haps[1, k])
+#     end
 
-    return nothing
-end
+#     return nothing
+# end
 
 """
     resize_and_sync!(X, H, M, N, Xwork, Hwork, Hnext, window)
