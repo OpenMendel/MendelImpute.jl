@@ -111,6 +111,7 @@ function unique_haplotype_idx(H::BitMatrix)
     return unique_index(HR)
 end
 
+# TODO: need this to keep track of mappings for non-redundant haps to unique haps. Perhaps use Dict
 function unique_index(v::AbstractVector)
     seen = Set{eltype(v)}()
     lv   = length(v)
@@ -126,7 +127,6 @@ function unique_index(v::AbstractVector)
 
     return unique_index
 end
-
 
 function redundant_haplotypes(
     X::AbstractMatrix{Union{Missing, T}},
