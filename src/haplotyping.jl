@@ -1276,12 +1276,12 @@ end
 Returns the columns of `H` that are unique. 
 
 # Input
-* `H`: an abstract bitarray of haplotypes within a genomic window.
+* `H`: BitMatrix of haplotypes within a genomic window.
 
 # Output
-* Vector containing the unique column index of H.
+* BitVector where 1 indicates unique columns of H.
 """
-function unique_haplotype_idx(H::AbstractMatrix)
+function unique_haplotype_idx(H::BitMatrix)
     p = size(H, 1) 
 
     # reinterpret each haplotype as an integer

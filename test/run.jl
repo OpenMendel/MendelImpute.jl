@@ -328,13 +328,14 @@ using LinearAlgebra
 using Profile
 
 Random.seed!(123)
-H = bitrand(1280, 1000)
+H = bitrand(128, 100000)
 # Hwork = unique_haplotypes(H, 1:128)
 # Hunique = unique_haplotypes(H, 128)
 
 for i in 1:500
 	H[:, 2i] .= H[:, 2i - 1]
 end
+
 
 # Hwork = unique_haplotypes(H, 1:128, 'T')
 Hunique = unique_haplotypes(H, 128, 'T')
@@ -495,7 +496,7 @@ copyto!(Xm, Xm_original)
 
 #Hua's code error = 0.013899062884015356 (width = 64)
 #Hua's code error = 0.0033518189729195617 (width = 400) #12.170407 seconds (87.59 k allocations: 23.879 MiB, 0.15% gc time)
-hapset = phase(Xm, H, width)
+@time hapset = phase(Xm, H, width)
 impute2!(Xm, H, hapset) 
 
 #current code error = 0.019282749489147502 (width = 64)
