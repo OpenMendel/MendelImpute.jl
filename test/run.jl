@@ -351,11 +351,16 @@ fast_data_type = Dict(8=>UInt8, 16=>UInt16, 32=>UInt32, 64=>UInt64, 128=>UInt128
 HR = reinterpret(fast_data_type[width], storage.chunks) 
 
 
-@time fast_elimination!(unique_hap, H, windows, width, H[1:width, :], fast_data_type) #128000 by 10000 H, width = 64, 43.702105 seconds (47.99 k allocations: 378.702 MiB, 0.57% gc time)
+#128000 by 10000 H, width = 64,  43.702105 seconds (47.99 k allocations: 378.702 MiB, 0.57% gc time)
+#128000 by 10000 H, width = 128, 35.878729 seconds (49.97 k allocations: 712.912 MiB, 0.96% gc time)
+@time unique_hap = fast_elimination(H, windows, width, H[1:width, :], fast_data_type) 
 
+#128000 by 10000 H, width = 64, 15.323239 seconds (272.48 k allocations: 3.146 GiB, 3.46% gc time)
+#128000 by 10000 H, width = 128, 14.234709 seconds (135.48 k allocations: 1.573 GiB, 2.94% gc time)
+@time Hunique = unique_haplotypes(H, 64, 'T')
 
 # Hwork = unique_haplotypes(H, 1:128, 'T')
-Hunique = unique_haplotypes(H, 128, 'T')
+Hunique = unique_haplotypes(H, 64, 'T')
 
 storage = zeros(Int, 1000)
 hii = groupslices(H, 2)
