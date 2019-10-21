@@ -28,7 +28,7 @@ function unique_haplotypes(
     end
 
     p, d    = size(H)
-    windows = ceil(Int, p / width)
+    windows = floor(Int, p / width)
     hapset  = UniqueHaplotypeMaps(windows, d)
 
     # record unique haplotypes and mappings window by window
@@ -57,7 +57,7 @@ function compute_optimal_halotype_set(
     snps, people = size(X)
 
     # number of windows
-    windows = ceil(Int, snps / width)
+    windows = floor(Int, snps / width)
 
     # get unique haplotype indices and maps for each window
     Hunique  = unique_haplotypes(H, width, 'T')
@@ -96,18 +96,29 @@ function compute_optimal_halotype_set(
     end
 
     # last window
-    # TODO: there is problem with calling resize_and_sync! on the last window since the range is different
     last_range = ((windows - 1) * width + 1):snps
-    M = resize_and_sync!(Xwork, Hwork, Hunique.uniqueindex[end], last_range, X, H, M, N)
-    haploimpute!(Xwork, Hwork, M, N, happair, hapscore)
-    compute_redundant_haplotypes!(optimal_haplotypes, Hunique, happair, H, windows)
+    if mod(length(last_range), width) == 0
+        #resize the typical way if the last window has the same width as previous windows
+        M = resize_and_sync!(Xwork, Hwork, Hunique.uniqueindex[end], last_range, X, H, M, N)
+        haploimpute!(Xwork, Hwork, M, N, happair, hapscore)
+        compute_redundant_haplotypes!(optimal_haplotypes, Hunique, happair, H, windows)
+    else
+        #reallocate everything 
+        num_uniq    = length(Hunique.uniqueindex[end])
+        Hwork       = H[last_range, Hunique.uniqueindex[end]]
+        Xwork       = X[last_range, :]
+        Xwork_float = zeros(T, size(Xwork))
+        M           = zeros(T, num_uniq, num_uniq)
+        N           = zeros(T, people, num_uniq)
+        haploimpute!(Xwork, Hwork, M, N, happair, hapscore)
+        compute_redundant_haplotypes!(optimal_haplotypes, Hunique, happair, H, windows)
+    end
 
     return optimal_haplotypes
 end
 
 """
-Computational routine for recording optimal (but redundant) haplotypes for each window.
-Does not distinguish strands. 
+Helper function for recording optimal-redundant haplotypes for each window.
 """
 function compute_redundant_haplotypes!(
     optimal_haplotypes::Vector{OptimalHaplotypeSet}, 
@@ -129,12 +140,9 @@ function compute_redundant_haplotypes!(
 
         # loop through all haplotypes and find ones that match either of the optimal haplotypes 
         for jj in 1:size(H, 2)
-            Hunique.hapmap[window][jj] == H_i && push!(optimal_haplotypes.strand1[window, k], jj)
-            Hunique.hapmap[window][jj] == H_j && push!(optimal_haplotypes.strand2[window, k], jj)
+            Hunique.hapmap[window][jj] == H_i && (optimal_haplotypes[k].strand1[window][jj] = true)
+            Hunique.hapmap[window][jj] == H_j && (optimal_haplotypes[k].strand2[window][jj] = true)
         end
-
-        # println("person $k's redundant haplotypes are: ")
-        # println(optimal_haplotypes[1, k])
     end
 
     return nothing
@@ -148,7 +156,7 @@ Up/downsizes the dimension of `Hwork`, `M`, and `N` and copies relevant informat
 # Inputs
 * `Xwork`: Worker matrix storing X[window, :]. 
 * `Hwork`: Haplotype matrix in the current window containing only unique haplotypes. Must add/subtract columns. 
-* `Hnext`: The unique haplotype indices of the current haplotype window. 
+* `Hnext`: The unique haplotype indices of the next haplotype window. 
 * `window`: Indices of current window. 
 * `X`: Full genotype matrix. Each column is a person's haplotype
 * `H`: Full haplotype reference panel. Each column is a haplotype

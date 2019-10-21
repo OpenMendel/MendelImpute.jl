@@ -98,4 +98,4 @@ struct OptimalHaplotypeSet
     strand1::Vector{BitVector}
     strand2::Vector{BitVector}
 end
-
+OptimalHaplotypeSet(windows::Int, haps::Int) = OptimalHaplotypeSet([falses(haps) for i in 1:windows], [falses(haps) for i in 1:windows])

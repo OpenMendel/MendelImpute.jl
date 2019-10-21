@@ -514,7 +514,9 @@ Xm_original = copy(Xm)
 width = 64
 windows = floor(Int, p / width)
 
-copyto!(Xm, Xm_original)
+# computes optimal-redundant haplotypes for each window/person
+@time opt = compute_optimal_halotype_set(Xm, H, width=width, verbose=true) #2.187847 seconds (1.55 M allocations: 184.291 MiB)
+opt[1].strand1 #person 1's optimal haplotypes on strand1 for each window
 
 #Hua's code error = 0.013899062884015356 (width = 64)
 #Hua's code error = 0.0033518189729195617 (width = 400) #12.170407 seconds (87.59 k allocations: 23.879 MiB, 0.15% gc time)
