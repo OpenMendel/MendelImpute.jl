@@ -501,20 +501,6 @@ function phase2(
         end
     end
 
-    #phase window by window without checking breakpoints
-    # for i in 1:people, w in 2:windows
-    #     hap1 = first(hapset.strand1[w, i])
-    #     hap2 = first(hapset.strand2[w, i])
-
-    #     # strand 1
-    #     push!(phase[i].strand1.start, (w - 1) * width + 1)
-    #     push!(phase[i].strand1.haplotypelabel, hap1)
-
-    #     # strand 2
-    #     push!(phase[i].strand2.start, (w - 1) * width + 1)
-    #     push!(phase[i].strand2.haplotypelabel, hap2)
-    # end
-
     # phase window 1
     for i in 1:people
         push!(phase[i].strand1.start, 1)
@@ -523,43 +509,57 @@ function phase2(
         push!(phase[i].strand2.haplotypelabel, first(hapset.strand2[1, i]))
     end
 
-    # find optimal break points and record info to phase. 
-    store = ([copy(hapset.strand1[1, i]) for i in 1:people], [copy(hapset.strand2[1, i]) for i in 1:people])
+    #phase window by window without checking breakpoints
     for i in 1:people, w in 2:windows
-        
-        a = intersect(store[1][i], hapset.strand1[w, i])
-        b = intersect(store[2][i], hapset.strand2[w, i])
+        hap1 = first(hapset.strand1[w, i])
+        hap2 = first(hapset.strand2[w, i])
 
-        if isempty(a)
-            # search breakpoints
-            Xi = view(X, ((w - 2) * width + 1):(w * width), i)
-            Hi = view(H, ((w - 2) * width + 1):(w * width), :)
-            prev_and_cur_haplotypes = (hapset.strand1[w - 1, i], hapset.strand1[w, i])
-            bkpt, hap, err_optim = search_breakpoint(Xi, Hi, hapset.strand2[w, i], prev_and_cur_haplotypes)
+        # strand 1
+        push!(phase[i].strand1.start, (w - 1) * width + 1)
+        push!(phase[i].strand1.haplotypelabel, hap1)
 
-            # record info into phase
-            push!(phase[i].strand1.start, (w - 2) * width + 1 + bkpt)
-            push!(phase[i].strand1.haplotypelabel, hap)
-
-            # update storage
-            store[1][i] = copy(hapset.strand1[w, i])
-        end
-
-        if isempty(b)
-            # search breakpoints
-            Xi = view(X, ((w - 2) * width + 1):(w * width), i)
-            Hi = view(H, ((w - 2) * width + 1):(w * width), :)
-            prev_and_cur_haplotypes = (hapset.strand2[w - 1, i], hapset.strand2[w, i])
-            bkpt, hap, err_optim = search_breakpoint(Xi, Hi, hapset.strand1[w, i], prev_and_cur_haplotypes)
-
-            # record info into phase
-            push!(phase[i].strand2.start, (w - 2) * width + 1 + bkpt)
-            push!(phase[i].strand2.haplotypelabel, hap)
-
-            # update storage
-            store[2][i] = copy(hapset.strand2[w, i])
-        end
+        # strand 2
+        push!(phase[i].strand2.start, (w - 1) * width + 1)
+        push!(phase[i].strand2.haplotypelabel, hap2)
     end
+
+    # find optimal break points and record info to phase. 
+    # store = ([copy(hapset.strand1[1, i]) for i in 1:people], [copy(hapset.strand2[1, i]) for i in 1:people])
+    # for i in 1:people, w in 2:windows
+        
+    #     a = intersect(store[1][i], hapset.strand1[w, i])
+    #     b = intersect(store[2][i], hapset.strand2[w, i])
+
+    #     if isempty(a)
+    #         # search breakpoints
+    #         Xi = view(X, ((w - 2) * width + 1):(w * width), i)
+    #         Hi = view(H, ((w - 2) * width + 1):(w * width), :)
+    #         prev_and_cur_haplotypes = (hapset.strand1[w - 1, i], hapset.strand1[w, i])
+    #         bkpt, hap, err_optim = search_breakpoint(Xi, Hi, hapset.strand2[w, i], prev_and_cur_haplotypes)
+
+    #         # record info into phase
+    #         push!(phase[i].strand1.start, (w - 2) * width + 1 + bkpt)
+    #         push!(phase[i].strand1.haplotypelabel, hap)
+
+    #         # update storage
+    #         store[1][i] = copy(hapset.strand1[w, i])
+    #     end
+
+    #     if isempty(b)
+    #         # search breakpoints
+    #         Xi = view(X, ((w - 2) * width + 1):(w * width), i)
+    #         Hi = view(H, ((w - 2) * width + 1):(w * width), :)
+    #         prev_and_cur_haplotypes = (hapset.strand2[w - 1, i], hapset.strand2[w, i])
+    #         bkpt, hap, err_optim = search_breakpoint(Xi, Hi, hapset.strand1[w, i], prev_and_cur_haplotypes)
+
+    #         # record info into phase
+    #         push!(phase[i].strand2.start, (w - 2) * width + 1 + bkpt)
+    #         push!(phase[i].strand2.haplotypelabel, hap)
+
+    #         # update storage
+    #         store[2][i] = copy(hapset.strand2[w, i])
+    #     end
+    # end
 
     # finally, fill in missing entries of X
     # impute!(X, H, phase)

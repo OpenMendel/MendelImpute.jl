@@ -508,9 +508,6 @@ hapset = phase2(Xm, H, width=width)
 copyto!(Xm, Xm_original)
 hapset = phase2(Xm, H, width=3*width)
 
-#non-redundant haplotypes without search breakpoints has error = 0.08077261261736622
-hapset = phase3(Xm, H, width=width)
-
 
 # look at the haplotype intersections
 hapset.strand1.p[end-10:end, 123]
