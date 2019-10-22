@@ -15,9 +15,9 @@ testset "unique_haplotypes" begin
 	@test all(hapset.hapmap[1] .== [1, 2, 2, 4, 2, 6, 1, 6, 1])
 end
 
-testset "redundant_haplotypes" begin
+testset "compute_optimal_halotype_set" begin
 	#import data
-	cd("/Users/biona001/.julia/dev/MendelImpute/test")
+	cd("/Users/biona001/.julia/dev/MendelImpute/data")
 	rawdata = readdlm("AFRped_geno.txt", ',', Float32);
 	people = 664;
 	X = copy(Transpose(rawdata[1:people, 1:(end - 1)]));
@@ -43,13 +43,13 @@ testset "redundant_haplotypes" begin
 	width = 64
 	windows = floor(Int, p / width)
 
-	hapset = redundant_haplotypes(Xm, H, width=width)
+	hapset = compute_optimal_halotype_set(Xm, H, width=width)
 
 	#check if 10th window is correct
 	w = 10
     cur_range = ((w - 1) * width + 1):(w * width)
 	H_cur = H[cur_range, :]	
-	result = collect(hapset.strand1.p[w, 1]) 
+	result = collect(hapset[1].strand1[w]) 
 	all_col_should_agree = H_cur[:, result]
 	@test all(all_col_should_agree[:, 1] .== all_col_should_agree[:, 2])
 	@test all(all_col_should_agree[:, 4] .== all_col_should_agree[:, 8])
@@ -58,7 +58,7 @@ testset "redundant_haplotypes" begin
 	# check if last window is correct
 	last_win_length = mod(p, width)
 	Hlast = H[(end - last_win_length):end, :]
-	result = collect(hapset.strand1.p[end, 1])
+	result = collect(hapset[1].strand1[end])
 	all_col_should_agree = Hlast[:, result]
 	@test all(all_col_should_agree[:, 1] .== all_col_should_agree[:, 8])
 	@test all(all_col_should_agree[:, 3] .== all_col_should_agree[:, 4])
