@@ -606,4 +606,24 @@ end
 
 
 
+# take away: don't use sparse arrays 
+using SparseArrays
+using BenchmarkTools
+
+n = 50_000
+a = falses(n)
+b = falses(n)
+c = falses(n)
+
+b[1:100] .= true
+c[1:100] .= true
+shuffle!(b)
+shuffle!(c)
+
+sa = sparse(a)
+sb = sparse(b)
+sc = sparse(c)
+
+@benchmark $sa .= $sb .& $sc
+@benchmark $a .= $b .& $c
 
