@@ -183,7 +183,7 @@ function phase2(
     window_span = (ones(Int, people), ones(Int, people))
 
     # TODO: parallel computing
-    # TODO: how does crossing over affect `window_span`?
+    # begin intersecting haplotypes window by window 
     @inbounds for i in 1:people, w in 2:windows
 
         # perform next intersection & determine cross over
@@ -194,7 +194,6 @@ function phase2(
             # delete all nonmatching haplotypes in previous windows
             for ww in (w - window_span[1][i]):(w - 1)
                 hapset[i].strand1[ww] .= haplo_chain[1][i]
-                sum(hapset[i].strand1[ww]) == 0 && error("On strand1 person $i window $ww there are no matching haplotypes")
             end
 
             # reset counters and storage
@@ -210,7 +209,6 @@ function phase2(
             # delete all nonmatching haplotypes in previous windows
             for ww in (w - window_span[2][i]):(w - 1)
                 hapset[i].strand2[ww] .= haplo_chain[2][i]
-                sum(hapset[i].strand2[ww]) == 0 && error("On strand1 person $i window $ww there are no matching haplotypes")
             end
 
             # reset counters and storage
@@ -225,11 +223,11 @@ function phase2(
     # handle last few windows separately, since intersection may not become empty
     for i in 1:people
         for ww in (windows - window_span[1][i] + 1):windows
-            hapset[i].strand1[ww] .= chain_next[1]
+            hapset[i].strand1[ww] .= haplo_chain[1][i]
         end
 
         for ww in (windows - window_span[2][i] + 1):windows
-            hapset[i].strand2[ww] .= chain_next[2]
+            hapset[i].strand2[ww] .= haplo_chain[2][i]
         end
     end
 
@@ -242,63 +240,52 @@ function phase2(
     end
 
     #phase window by window without checking breakpoints
-    for i in 1:people, w in 2:windows
-        hap1 = findfirst(hapset[i].strand1[w])
-        hap2 = findfirst(hapset[i].strand2[w])
-
-        # strand 1
-        push!(phase[i].strand1.start, (w - 1) * width + 1)
-        push!(phase[i].strand1.haplotypelabel, hap1)
-
-        # strand 2
-        push!(phase[i].strand2.start, (w - 1) * width + 1)
-        push!(phase[i].strand2.haplotypelabel, hap2)
-    end
-
-    # find optimal break points and record info to phase. 
-    # store = ([copy(hapset.strand1[1, i]) for i in 1:people], [copy(hapset.strand2[1, i]) for i in 1:people])
     # for i in 1:people, w in 2:windows
-        
-    #     a = intersect(store[1][i], hapset.strand1[w, i])
-    #     b = intersect(store[2][i], hapset.strand2[w, i])
+    #     hap1 = findfirst(hapset[i].strand1[w])
+    #     hap2 = findfirst(hapset[i].strand2[w])
 
-    #     if isempty(a)
-    #         # search breakpoints
-    #         Xi = view(X, ((w - 2) * width + 1):(w * width), i)
-    #         Hi = view(H, ((w - 2) * width + 1):(w * width), :)
-    #         prev_and_cur_haplotypes = (hapset.strand1[w - 1, i], hapset.strand1[w, i])
-    #         bkpt, hap, err_optim = search_breakpoint(Xi, Hi, hapset.strand2[w, i], prev_and_cur_haplotypes)
+    #     # strand 1
+    #     push!(phase[i].strand1.start, (w - 1) * width + 1)
+    #     push!(phase[i].strand1.haplotypelabel, hap1)
 
-    #         # record info into phase
-    #         push!(phase[i].strand1.start, (w - 2) * width + 1 + bkpt)
-    #         push!(phase[i].strand1.haplotypelabel, hap)
-
-    #         # update storage
-    #         store[1][i] = copy(hapset.strand1[w, i])
-    #     end
-
-    #     if isempty(b)
-    #         # search breakpoints
-    #         Xi = view(X, ((w - 2) * width + 1):(w * width), i)
-    #         Hi = view(H, ((w - 2) * width + 1):(w * width), :)
-    #         prev_and_cur_haplotypes = (hapset.strand2[w - 1, i], hapset.strand2[w, i])
-    #         bkpt, hap, err_optim = search_breakpoint(Xi, Hi, hapset.strand1[w, i], prev_and_cur_haplotypes)
-
-    #         # record info into phase
-    #         push!(phase[i].strand2.start, (w - 2) * width + 1 + bkpt)
-    #         push!(phase[i].strand2.haplotypelabel, hap)
-
-    #         # update storage
-    #         store[2][i] = copy(hapset.strand2[w, i])
-    #     end
+    #     # strand 2
+    #     push!(phase[i].strand2.start, (w - 1) * width + 1)
+    #     push!(phase[i].strand2.haplotypelabel, hap2)
     # end
 
-    # finally, fill in missing entries of X
-    # impute!(X, H, phase)
-    impute2!(X, H, phase)
+    # find optimal break points and record info to phase. 
+    strand1_intersect = chain_next[1]
+    strand2_intersect = chain_next[2]
+    for i in 1:people, w in 2:windows
+        
+        strand1_intersect .= hapset[i].strand1[w - 1] .& hapset[i].strand1[w]
+        if sum(strand1_intersect) == 0
+            # search breakpoints
+            Xi = view(X, ((w - 2) * width + 1):(w * width), i)
+            Hi = view(H, ((w - 2) * width + 1):(w * width), :)
+            prev_and_cur_haplotypes = (hapset[i].strand1[w - 1], hapset[i].strand1[w])
+            bkpt, hap, err_optim = search_breakpoint(Xi, Hi, hapset[i].strand2[w], prev_and_cur_haplotypes)
 
-    return hapset
-    # return phase, hapset, bkpts
+            # record info into phase
+            push!(phase[i].strand1.start, (w - 2) * width + 1 + bkpt)
+            push!(phase[i].strand1.haplotypelabel, hap)
+        end
+
+        strand2_intersect .= hapset[i].strand2[w - 1] .& hapset[i].strand2[w]
+        if sum(strand2_intersect) == 0
+            # search breakpoints
+            Xi = view(X, ((w - 2) * width + 1):(w * width), i)
+            Hi = view(H, ((w - 2) * width + 1):(w * width), :)
+            prev_and_cur_haplotypes = (hapset[i].strand2[w - 1], hapset[i].strand2[w])
+            bkpt, hap, err_optim = search_breakpoint(Xi, Hi, hapset[i].strand1[w], prev_and_cur_haplotypes)
+
+            # record info into phase
+            push!(phase[i].strand2.start, (w - 2) * width + 1 + bkpt)
+            push!(phase[i].strand2.haplotypelabel, hap)
+        end
+    end
+
+    return hapset, phase 
 end
 
 function impute!(

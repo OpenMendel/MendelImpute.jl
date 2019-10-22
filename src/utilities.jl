@@ -611,16 +611,16 @@ end
 function search_breakpoint(
     X::AbstractVector,
     H::AbstractMatrix,
-    strand1::BitSet,
-    strand2::Tuple{BitSet, BitSet}
+    strand1::BitVector,
+    strand2::Tuple{BitVector, BitVector}
     )
 
     n = length(X)
 
     # all haplotypes in BitSet are equivalent in current window, so get one as representative
-    s1  = first(strand1)
-    s21 = first(strand2[1])
-    s22 = first(strand2[2])
+    s1  = findfirst(strand1)
+    s21 = findfirst(strand2[1])
+    s22 = findfirst(strand2[2])
 
     # count number of errors if second haplotype is all from H[:, s2[2]]
     errors = 0

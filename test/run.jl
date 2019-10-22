@@ -511,7 +511,7 @@ p, n = size(X)
 X2 = Matrix{Union{Missing, eltype(X)}}(X)
 Xm = ifelse.(rand(eltype(X), p, n) .< missingprop, missing, X2)
 Xm_original = copy(Xm)
-width = 64
+width = 400
 windows = floor(Int, p / width)
 
 # computes optimal-redundant haplotypes for each window/person
@@ -520,19 +520,13 @@ opt[1].strand1 #person 1's optimal haplotypes on strand1 for each window
 
 #Hua's code error = 0.013899062884015356 (width = 64)
 #Hua's code error = 0.0033518189729195617 (width = 400) #12.170407 seconds (87.59 k allocations: 23.879 MiB, 0.15% gc time)
-@time hapset = phase(Xm, H, width)
-impute2!(Xm, H, hapset) 
+@time ph = phase(Xm, H, width)
 
-#current code error = 0.019282749489147502 (width = 64)
-#current code error = 0.008566492445731325 (width = 3*64)
-#current code error = 0.0045481021680262605 (width = 400)
-#current code error = 0.003721998955416397 (width = 3*400) #3.769867 seconds (663.78 k allocations: 61.506 MiB, 0.80% gc time)
-copyto!(Xm, Xm_original)
-hapset = phase2(Xm, H, width=width)
+hapset, phase = phase2(Xm, H, width=width)
+hapset, phase = phase2(Xm, H, width=3*width)
 
-copyto!(Xm, Xm_original)
-hapset = phase2(Xm, H, width=3*width)
-
+@benchmark phase2(Xm, H, width=width) seconds=15 # width 64: 2.986 s, 226.95 MiB, 1584324 alloc
+@benchmark phase2(Xm, H, width=width) seconds=15 # width 1200: 4.346 s, 52.47 MiB, 102593 alloc
 
 # look at the haplotype intersections
 findfirst.(hapset[1].strand1)
@@ -541,15 +535,32 @@ findfirst.(hapset[1].strand2)
 findfirst.(hapset[10].strand1)
 findfirst.(hapset[10].strand2)
 
-
 # calculate error rate
+impute2!(Xm, H, phase)
 missing_idx    = ismissing.(Xm_original)
 total_missing  = sum(missing_idx)
 actual_missing_values  = convert(Vector{Int64}, X[missing_idx])  #true values of missing entries
 imputed_missing_values = convert(Vector{Int64}, Xm[missing_idx]) #imputed values of missing entries
 error_rate = sum(actual_missing_values .!= imputed_missing_values) / total_missing
+copyto!(Xm, Xm_original);
 
+# old code error:
+#current code error = 0.019282749489147502 (width = 64)
+#current code error = 0.008566492445731325 (width = 3*64)
+#current code error = 0.0045481021680262605 (width = 400)
+#current code error = 0.003721998955416397 (width = 3*400) #3.769867 seconds (663.78 k allocations: 61.506 MiB, 0.80% gc time)
 
+# Without searching for breakpoints:
+# error = 0.030189043249636106 (width = 64) ====> this should get down to 0.026 since that's the error in old code
+# error = 0.014054060293167706 (width = 3*64)
+# error = 0.007871065240305758 (width = 400)
+# error = 0.0063462370050543174 (width = 1200)
+
+# Searching for breakpoints:
+# error = 0.019286459533515512 (width = 64) ====> this should get down to 0.0192 since that's the error in old code
+# error = 0.008584218213267367 (width = 3*64)
+# error = 0.004584790384554343 (width = 400)
+# error = 0.0038312391506966433 (width = 1200)
 
 function naive_impute!(X)
 	n, p = size(X)
