@@ -215,44 +215,6 @@ function resize_and_sync!(
 end
 
 """
-Routine that performs haplotype intersection with the next window, while checking for cross overs
-"""
-function test_next_intersection!(
-    chain_next::Tuple{BitVector, BitVector},
-    haplo_chain::Tuple{Vector, Vector},
-    hapset::Vector{OptimalHaplotypeSet},
-    person::Int,
-    window::Int
-    )
-
-    # cross haplotype chain 1 with both hapltype set in next window
-    chain_next[1] .= haplo_chain[1][person] .& hapset[person].strand1[window] # not crossing over
-    chain_next[2] .= haplo_chain[1][person] .& hapset[person].strand2[window] # crossing over
-
-    # decide whether to cross over based on the larger intersection
-    # TODO: probably should swap `window_span` too?
-    if sum(chain_next[1]) < sum(chain_next[2])
-        hapset[person].strand1[window], hapset[person].strand2[window] = hapset[person].strand2[window], hapset[person].strand1[window]
-    end
-
-    # if sum(chain_next[1]) < sum(chain_next[2])
-    #     # calculate the next intersection 
-    #     chain_next[1] .= chain_next[2]
-    #     chain_next[2] .= haplo_chain[2][person] .& hapset[person].strand1[window]
-
-    #     # TODO: probably should swap `window_span` too?
-    #     hapset[person].strand1[window], hapset[person].strand2[window] = hapset[person].strand2[window], hapset[person].strand1[window]
-    # else
-    #     # calculate the next intersection 
-    #     chain_next[2] .= haplo_chain[2][person] .& hapset[person].strand2[window]
-    # end
-
-    # calculate the next intersection 
-    chain_next[1] .= haplo_chain[1][person] .& hapset[person].strand1[window]
-    chain_next[2] .= haplo_chain[2][person] .& hapset[person].strand2[window]
-end
-
-"""
     haplopair(X, H)
 
 Calculate the best pair of haplotypes in `H` for each individual in `X`. Assumes `X` 

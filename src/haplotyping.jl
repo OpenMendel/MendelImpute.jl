@@ -186,10 +186,15 @@ function phase2(
     # begin intersecting haplotypes window by window 
     @inbounds for i in 1:people, w in 2:windows
 
-        # perform next intersection & determine cross over
-        test_next_intersection!(chain_next, haplo_chain, hapset, i, w) 
+        # decide whether to cross over based on the larger intersection
+        chain_next[1] .= haplo_chain[1][i] .& hapset[i].strand1[w] # not crossing over
+        chain_next[2] .= haplo_chain[1][i] .& hapset[i].strand2[w] # crossing over
+        if sum(chain_next[1]) < sum(chain_next[2])
+            hapset[i].strand1[w], hapset[i].strand2[w] = hapset[i].strand2[w], hapset[i].strand1[w]
+        end        
 
-        # strand 1
+        # strand 1 
+        chain_next[1] .= haplo_chain[1][i] .& hapset[i].strand1[w]
         if sum(chain_next[1]) == 0
             # delete all nonmatching haplotypes in previous windows
             for ww in (w - window_span[1][i]):(w - 1)
@@ -205,6 +210,7 @@ function phase2(
         end
 
         # strand 2
+        chain_next[2] .= haplo_chain[2][i] .& hapset[i].strand2[w]
         if sum(chain_next[2]) == 0
             # delete all nonmatching haplotypes in previous windows
             for ww in (w - window_span[2][i]):(w - 1)

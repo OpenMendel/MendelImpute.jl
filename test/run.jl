@@ -511,7 +511,7 @@ p, n = size(X)
 X2 = Matrix{Union{Missing, eltype(X)}}(X)
 Xm = ifelse.(rand(eltype(X), p, n) .< missingprop, missing, X2)
 Xm_original = copy(Xm)
-width = 400
+width = 64
 windows = floor(Int, p / width)
 
 # computes optimal-redundant haplotypes for each window/person
@@ -525,8 +525,9 @@ opt[1].strand1 #person 1's optimal haplotypes on strand1 for each window
 hapset, phase = phase2(Xm, H, width=width)
 hapset, phase = phase2(Xm, H, width=3*width)
 
-@benchmark phase2(Xm, H, width=width) seconds=15 # width 64: 2.986 s, 226.95 MiB, 1584324 alloc
-@benchmark phase2(Xm, H, width=width) seconds=15 # width 1200: 4.346 s, 52.47 MiB, 102593 alloc
+@benchmark phase2(Xm, H, width=64) seconds=15   # width 64  : 2.972 s, 226.84 MiB, 2348422 alloc
+@benchmark phase2(Xm, H, width=400) seconds=15  # width 400 : 5.540 s, 64.75 MiB, 454728 alloc
+@benchmark phase2(Xm, H, width=1200) seconds=15 # width 1200: 4.286 s, 54.46 MiB, 172894 alloc
 
 # look at the haplotype intersections
 findfirst.(hapset[1].strand1)
@@ -590,8 +591,10 @@ end
 
 
 
-
-
+a = BitVector(undef, 1_000_000)
+b = bitrand(1_000_000)
+c = bitrand(1_000_000)
+@benchmark $a .= $b .& $c
 
 function test(H::BitMatrix)
     println("H is BitMatrix")
