@@ -46,6 +46,22 @@ function unique_haplotypes(
     return hapset
 end
 
+"""
+    compute_optimal_halotype_set(X, H, width, verbose)
+
+Computes the optimal haplotype pair for each person in each window, then computes
+a set of haplotypes that matches the optimal haplotype pair in the current window.
+
+# Input 
++ `X`: Target genotype matrix with missing entries. Each column is a person's genotype
++ `H`: Reference haplotype panels, each column is a haplotype. 
++ `width`: The width of each window
++ `verbose`: boolean indicating whether to print intermediate results. 
+
+# Output
++ `optimal_haplotypes`: where optimal_haplotypes[i] is a `OptimalHaplotypeSet` recording all
+redundant haplotypes that matches the optimal haplotypes in each window for person i. 
+"""
 function compute_optimal_halotype_set(
     X::AbstractMatrix{Union{Missing, T}},
     H::AbstractMatrix{T};
@@ -53,10 +69,9 @@ function compute_optimal_halotype_set(
     verbose::Bool = true
     ) where T <: Real
 
-    # problem dimensions
+    # define some constants
     snps, people = size(X)
-
-    # number of windows
+    haplotypes = size(H, 2)
     windows = floor(Int, snps / width)
 
     # get unique haplotype indices and maps for each window
@@ -64,7 +79,7 @@ function compute_optimal_halotype_set(
     num_uniq = length(Hunique.uniqueindex[1])
 
     # Initialize data structure for redundant haplotypes that matches the optimal one. 
-    optimal_haplotypes = [OptimalHaplotypeSet(windows, people) for i in 1:people]
+    optimal_haplotypes = [OptimalHaplotypeSet(windows, haplotypes) for i in 1:people]
 
     # allocate working arrays
     happair     = ones(Int, people), ones(Int, people)
@@ -107,7 +122,6 @@ function compute_optimal_halotype_set(
         num_uniq    = length(Hunique.uniqueindex[end])
         Hwork       = H[last_range, Hunique.uniqueindex[end]]
         Xwork       = X[last_range, :]
-        Xwork_float = zeros(T, size(Xwork))
         M           = zeros(T, num_uniq, num_uniq)
         N           = zeros(T, people, num_uniq)
         haploimpute!(Xwork, Hwork, M, N, happair, hapscore)
@@ -198,6 +212,44 @@ function resize_and_sync!(
     copyto!(Hwork, view(H, window, Hnext))
 
     return Mnew
+end
+
+"""
+Routine that performs haplotype intersection with the next window, while checking for cross overs
+"""
+function test_next_intersection!(
+    chain_next::Tuple{BitVector, BitVector},
+    haplo_chain::Tuple{Vector, Vector},
+    hapset::Vector{OptimalHaplotypeSet},
+    person::Int,
+    window::Int
+    )
+
+    # cross haplotype chain 1 with both hapltype set in next window
+    chain_next[1] .= haplo_chain[1][person] .& hapset[person].strand1[window] # not crossing over
+    chain_next[2] .= haplo_chain[1][person] .& hapset[person].strand2[window] # crossing over
+
+    # decide whether to cross over based on the larger intersection
+    # TODO: probably should swap `window_span` too?
+    if sum(chain_next[1]) < sum(chain_next[2])
+        hapset[person].strand1[window], hapset[person].strand2[window] = hapset[person].strand2[window], hapset[person].strand1[window]
+    end
+
+    # if sum(chain_next[1]) < sum(chain_next[2])
+    #     # calculate the next intersection 
+    #     chain_next[1] .= chain_next[2]
+    #     chain_next[2] .= haplo_chain[2][person] .& hapset[person].strand1[window]
+
+    #     # TODO: probably should swap `window_span` too?
+    #     hapset[person].strand1[window], hapset[person].strand2[window] = hapset[person].strand2[window], hapset[person].strand1[window]
+    # else
+    #     # calculate the next intersection 
+    #     chain_next[2] .= haplo_chain[2][person] .& hapset[person].strand2[window]
+    # end
+
+    # calculate the next intersection 
+    chain_next[1] .= haplo_chain[1][person] .& hapset[person].strand1[window]
+    chain_next[2] .= haplo_chain[2][person] .& hapset[person].strand2[window]
 end
 
 """

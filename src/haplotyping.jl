@@ -168,10 +168,9 @@ function phase2(
     verbose::Bool = true
     ) where T <: Real
 
-    # problem dimensions
+    # declare some constants
     snps, people = size(X)
-
-    # number of windows
+    haplotypes = size(H, 2)
     windows = floor(Int, snps / width)
 
     # get redundant haplotype sets. 
@@ -179,81 +178,73 @@ function phase2(
 
     # allocate working arrays
     phase = [HaplotypeMosaicPair(snps) for i in 1:people]
-    store = ([copy(hapset.strand1[1, i]) for i in 1:people], [copy(hapset.strand2[1, i]) for i in 1:people])
+    haplo_chain = ([copy(hapset[i].strand1[1]) for i in 1:people], [copy(hapset[1].strand2[1]) for i in 1:people])
+    chain_next  = (BitVector(undef, haplotypes), BitVector(undef, haplotypes))
     window_span = (ones(Int, people), ones(Int, people))
 
     # TODO: parallel computing
-    # TODO: replace `intersect` and `intersect!` with fast set intersection using bisection/seesaw search
+    # TODO: how does crossing over affect `window_span`?
     @inbounds for i in 1:people, w in 2:windows
 
-        # decide how to concatenate next 2 windows to previous windows based on the larger intersection
-        A = intersect(store[1][i], hapset.strand1[w, i])
-        B = intersect(store[1][i], hapset.strand2[w, i])
-        if length(A) >= length(B)
-            # no need to cross over
-            a = A 
-        else
-            # cross over
-            a = B
-            hapset.strand1.p[w, i], hapset.strand2.p[w, i] = hapset.strand2.p[w, i], hapset.strand1.p[w, i]
-        end
-        b = intersect(store[2][i], hapset.strand2[w, i])
+        # perform next intersection & determine cross over
+        test_next_intersection!(chain_next, haplo_chain, hapset, i, w) 
 
         # strand 1
-        if isempty(a)
+        if sum(chain_next[1]) == 0
             # delete all nonmatching haplotypes in previous windows
             for ww in (w - window_span[1][i]):(w - 1)
-                hapset.strand1.p[ww, i] = copy(store[1][i]) 
+                hapset[i].strand1[ww] .= haplo_chain[1][i]
+                sum(hapset[i].strand1[ww]) == 0 && error("On strand1 person $i window $ww there are no matching haplotypes")
             end
 
-            # update counters and storage
-            store[1][i] = copy(hapset.strand1[w, i])
+            # reset counters and storage
+            haplo_chain[1][i] .= hapset[i].strand1[w]
             window_span[1][i] = 1
         else
-            intersect!(store[1][i], hapset.strand1[w, i])
+            haplo_chain[1][i] .= chain_next[1]
             window_span[1][i] += 1
         end
 
         # strand 2
-        if isempty(b)
+        if sum(chain_next[2]) == 0
             # delete all nonmatching haplotypes in previous windows
             for ww in (w - window_span[2][i]):(w - 1)
-                hapset.strand2.p[ww, i] = copy(store[2][i]) 
+                hapset[i].strand2[ww] .= haplo_chain[2][i]
+                sum(hapset[i].strand2[ww]) == 0 && error("On strand1 person $i window $ww there are no matching haplotypes")
             end
 
-            # update counters and storage
-            store[2][i] = copy(hapset.strand2[w, i])
+            # reset counters and storage
+            haplo_chain[2][i] .= hapset[i].strand2[w]
             window_span[2][i] = 1
         else
-            intersect!(store[2][i], hapset.strand2[w, i])
+            haplo_chain[2][i] .= chain_next[2]
             window_span[2][i] += 1
         end
     end
 
-    # TODO: there's a bug in computing redundant haplotypes since last window never agrees with 2nd to last window
-    # handle last few windows separately, since they may not hit the isempty command
+    # handle last few windows separately, since intersection may not become empty
     for i in 1:people
         for ww in (windows - window_span[1][i] + 1):windows
-            hapset.strand1.p[ww, i] = copy(store[1][i]) 
+            hapset[i].strand1[ww] .= chain_next[1]
         end
 
         for ww in (windows - window_span[2][i] + 1):windows
-            hapset.strand2.p[ww, i] = copy(store[2][i]) 
+            hapset[i].strand2[ww] .= chain_next[2]
         end
     end
 
     # phase window 1
     for i in 1:people
         push!(phase[i].strand1.start, 1)
-        push!(phase[i].strand1.haplotypelabel, first(hapset.strand1[1, i]))
+        push!(phase[i].strand1.haplotypelabel, findfirst(hapset[i].strand1[1]))
         push!(phase[i].strand2.start, 1)
-        push!(phase[i].strand2.haplotypelabel, first(hapset.strand2[1, i]))
+        push!(phase[i].strand2.haplotypelabel, findfirst(hapset[i].strand2[1]))
     end
 
     #phase window by window without checking breakpoints
     for i in 1:people, w in 2:windows
-        hap1 = first(hapset.strand1[w, i])
-        hap2 = first(hapset.strand2[w, i])
+        hap1 = findfirst(hapset[i].strand1[w])
+        hap2 = findfirst(hapset[i].strand2[w])
 
         # strand 1
         push!(phase[i].strand1.start, (w - 1) * width + 1)

@@ -535,8 +535,11 @@ hapset = phase2(Xm, H, width=3*width)
 
 
 # look at the haplotype intersections
-hapset.strand1.p[end-10:end, 123]
-hapset.strand2.p[1:10, 1]
+findfirst.(hapset[1].strand1)
+findfirst.(hapset[1].strand2)
+
+findfirst.(hapset[10].strand1)
+findfirst.(hapset[10].strand2)
 
 
 # calculate error rate
