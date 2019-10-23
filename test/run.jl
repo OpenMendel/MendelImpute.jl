@@ -328,16 +328,39 @@ using LinearAlgebra
 using Profile
 
 Random.seed!(123)
-H = bitrand(1280, 1000)
+d = 10000
+H = bitrand(128000, d)
 # Hwork = unique_haplotypes(H, 1:128)
 # Hunique = unique_haplotypes(H, 128)
 
-for i in 1:500
+for i in 1:Int(d/2)
 	H[:, 2i] .= H[:, 2i - 1]
 end
 
+windows = 10
+width = 64
+storage = BitMatrix(undef, 64, size(H, 2))
+copyto!(storage, @view(H[1:width, :]))
+
+
+p, d    = size(H)
+windows = ceil(Int, p / width)
+unique_hap = UniqueHaplotypes(windows, d)
+fast_data_type = Dict(8=>UInt8, 16=>UInt16, 32=>UInt32, 64=>UInt64, 128=>UInt128)
+
+HR = reinterpret(fast_data_type[width], storage.chunks) 
+
+
+#128000 by 10000 H, width = 64,  43.702105 seconds (47.99 k allocations: 378.702 MiB, 0.57% gc time)
+#128000 by 10000 H, width = 128, 35.878729 seconds (49.97 k allocations: 712.912 MiB, 0.96% gc time)
+@time unique_hap = fast_elimination(H, windows, width, H[1:width, :], fast_data_type) 
+
+#128000 by 10000 H, width = 64, 15.323239 seconds (272.48 k allocations: 3.146 GiB, 3.46% gc time)
+#128000 by 10000 H, width = 128, 14.234709 seconds (135.48 k allocations: 1.573 GiB, 2.94% gc time)
+@time Hunique = unique_haplotypes(H, 64, 'T')
+
 # Hwork = unique_haplotypes(H, 1:128, 'T')
-Hunique = unique_haplotypes(H, 128, 'T')
+Hunique = unique_haplotypes(H, 64, 'T')
 
 storage = zeros(Int, 1000)
 hii = groupslices(H, 2)
@@ -457,15 +480,14 @@ B = rand(1000, 1000)
 
 
 using Revise
+using MendelImpute
 using DelimitedFiles
 using LinearAlgebra
 using BenchmarkTools
-using MendelImpute
 using Random
-using Profile
 using ElasticArrays
 
-cd("/Users/biona001/.julia/dev/MendelImpute/test")
+cd("/Users/biona001/.julia/dev/MendelImpute/data")
 
 rawdata = readdlm("AFRped_geno.txt", ',', Float32);
 people = 664;
@@ -491,40 +513,66 @@ Xm_original = copy(Xm)
 width = 64
 windows = floor(Int, p / width)
 
-copyto!(Xm, Xm_original)
+# computes optimal-redundant haplotypes for each window/person
+@time opt = compute_optimal_halotype_set(Xm, H, width=width, verbose=true) #2.187847 seconds (1.55 M allocations: 184.291 MiB)
+opt[1].strand1 #person 1's optimal haplotypes on strand1 for each window
 
-#Hua's code without search breakpoints has error = 0.014663744250977082
-#Hua's code with    search breakpoints has error = 0.013899062884015356
-hapset = phase(Xm, H, width)
-impute2!(Xm, H, hapset) 
+#Hua's code error = 0.013899062884015356 (width = 64)
+#Hua's code error = 0.0033518189729195617 (width = 400) #12.170407 seconds (87.59 k allocations: 23.879 MiB, 0.15% gc time)
+@time ph = phase(Xm, H, width)
 
-#current code without search breakpoints has error = 0.024447543476567152 
-#current code without search breakpoints has error = 0.013954713549535482 (3*width)
-#current code with    search breakpoints has error = 
-hapset = phase2(Xm, H, width=width)
-hapset = phase2(Xm, H, width=3*width)
+hapset, phase = phase2(Xm, H, width=width)
+hapset, phase = phase2(Xm, H, width=3*width)
 
-#non-redundant haplotypes without search breakpoints has error = 0.08077261261736622
-hapset = phase3(Xm, H, width=width)
-
+@benchmark phase2(Xm, H, width=64) seconds=15   # width 64  : 3.074 s, 226.69 MiB, 2338770 alloc
+@benchmark phase2(Xm, H, width=400) seconds=15  # width 400 : 5.895 s, 64.72 MiB, 452748 alloc
+@benchmark phase2(Xm, H, width=1200) seconds=15 # width 1200: 4.595 s, 54.45 MiB, 172637 alloc
 
 # look at the haplotype intersections
-hapset.strand1.p[1:10, 1]
-hapset.strand2.p[1:10, 1]
+findfirst.(hapset[1].strand1)
+findfirst.(hapset[1].strand2)
 
+findfirst.(hapset[10].strand1)
+findfirst.(hapset[10].strand2)
 
 # calculate error rate
+impute2!(Xm, H, phase)
 missing_idx    = ismissing.(Xm_original)
 total_missing  = sum(missing_idx)
 actual_missing_values  = convert(Vector{Int64}, X[missing_idx])  #true values of missing entries
 imputed_missing_values = convert(Vector{Int64}, Xm[missing_idx]) #imputed values of missing entries
 error_rate = sum(actual_missing_values .!= imputed_missing_values) / total_missing
+copyto!(Xm, Xm_original);
 
+# profiling
+phase2(Xm, H, width=width)
+using Profile
+Profile.clear()
+@profile phase2(Xm, H, width=width)
+using ProfileView
+ProfileView.view()
 
+# old code error:
+#current code error = 0.019282749489147502 (width = 64)
+#current code error = 0.008566492445731325 (width = 3*64)
+#current code error = 0.0045481021680262605 (width = 400)
+#current code error = 0.003721998955416397 (width = 3*400) #3.769867 seconds (663.78 k allocations: 61.506 MiB, 0.80% gc time)
+
+# Without searching for breakpoints:
+# error = 0.030189043249636106 (width = 64) ====> this should get down to 0.026 since that's the error in old code
+# error = 0.014054060293167706 (width = 3*64)
+# error = 0.007871065240305758 (width = 400)
+# error = 0.0063462370050543174 (width = 1200)
+
+# Searching for breakpoints:
+# error = 0.019286459533515512 (width = 64) ====> this should get down to 0.0192 since that's the error in old code
+# error = 0.008584218213267367 (width = 3*64)
+# error = 0.004584790384554343 (width = 400)
+# error = 0.0038312391506966433 (width = 1200)
 
 function naive_impute!(X)
 	n, p = size(X)
-    fillval = convert(eltype(X), 1.0)
+    fillval = convert(eltype(X), 0.0)
 	for j in 1:p, i in 1:n
 		ismissing(X[i, j]) && (X[i, j] = fillval)
 	end
@@ -535,16 +583,65 @@ naive_impute!(Xm) #fill with 2 gives error rate = 0.9672547361808062
 
 
 
+function naive_impute!(X, X_original)
+    n, p = size(X)
+    fillval = 0x00
+    for j in 1:p, i in 1:n
+        if X_original[i, j] == 0x01
+            X[i, j] = fillval
+        else
+            X[i, j] = X_original[i, j]
+        end
+    end
+end
 
 
 
 
+a = BitVector(undef, 1_000_000)
+b = bitrand(1_000_000)
+c = bitrand(1_000_000)
+@benchmark $a .= $b .& $c
+
+function test(H::BitMatrix)
+    println("H is BitMatrix")
+end
+
+function test(H::AbstractMatrix)
+    println("H is AbstractMatrix")
+end
 
 
 
+# take away: don't use sparse arrays 
+using SparseArrays
+using BenchmarkTools
+
+n = 50_000
+a = falses(n)
+b = falses(n)
+c = falses(n)
+
+b[1:100] .= true
+c[1:100] .= true
+shuffle!(b)
+shuffle!(c)
+
+sa = sparse(a)
+sb = sparse(b)
+sc = sparse(c)
+
+@benchmark $sa .= $sb .& $sc
+@benchmark $a .= $b .& $c
 
 
+using BenchmarkTools
 
+n = 50_000
+a = BitVector(undef, n);
+b = rand(1:n, n);
+c = 1
 
+@benchmark $a .= $b .== $c
 
 

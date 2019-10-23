@@ -53,24 +53,12 @@ end
 UniqueHaplotypeMaps(windows::Int, haps::Int) = UniqueHaplotypeMaps(Vector{Vector{Int}}(undef, windows), [zeros(Int, haps) for i in 1:windows])
 
 """
-Data structure for storing the redundant haplotypes matching the optimal haplotype in each window. 
+Data structure for storing all haplotypes that match the optimal haplotype in each window for a person, keeping track of strand.
 
-Each column is a person. Rows are `BitSet`s storing redundant haplotypes for each window 
++ strand1[w] stores a BitVector for window `w`, with length equal to number of haplotypes. Entries of this BitVector is 1 if that haplotype is unique
 """
-struct RedundantHaplotypeSet
-    p::Matrix{BitSet}
+struct OptimalHaplotypeSet
+    strand1::Vector{BitVector}
+    strand2::Vector{BitVector}
 end
-RedundantHaplotypeSet(windows, people) = RedundantHaplotypeSet([BitSet() for i in 1:windows, j in 1:people])
-
-Base.getindex(h::RedundantHaplotypeSet, i::Int, j::Int) = h.p[i, j]
-Base.size(h::RedundantHaplotypeSet) = size(h.p)
-Base.size(h::RedundantHaplotypeSet, k::Int) = size(h.p, k)
-
-struct PeoplesRedundantHaplotypeSet
-    strand1::RedundantHaplotypeSet
-    strand2::RedundantHaplotypeSet
-end
-PeoplesRedundantHaplotypeSet(windows::Int, people::Int) = PeoplesRedundantHaplotypeSet(RedundantHaplotypeSet(windows, people), RedundantHaplotypeSet(windows, people))
-
-Base.size(h::PeoplesRedundantHaplotypeSet) = size(h.strand1)
-Base.size(h::PeoplesRedundantHaplotypeSet, k::Int) = size(h.strand1, k)
+OptimalHaplotypeSet(windows::Int, haps::Int) = OptimalHaplotypeSet([falses(haps) for i in 1:windows], [falses(haps) for i in 1:windows])
