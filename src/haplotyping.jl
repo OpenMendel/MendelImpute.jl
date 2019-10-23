@@ -260,6 +260,7 @@ function phase2(
     # end
 
     # find optimal break points and record info to phase. 
+    # TODO: handle last window separately since view() on X or H is not complete
     strand1_intersect = chain_next[1]
     strand2_intersect = chain_next[2]
     for i in 1:people, w in 2:windows

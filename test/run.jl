@@ -485,7 +485,6 @@ using DelimitedFiles
 using LinearAlgebra
 using BenchmarkTools
 using Random
-using Profile
 using ElasticArrays
 
 cd("/Users/biona001/.julia/dev/MendelImpute/data")
@@ -525,7 +524,7 @@ opt[1].strand1 #person 1's optimal haplotypes on strand1 for each window
 hapset, phase = phase2(Xm, H, width=width)
 hapset, phase = phase2(Xm, H, width=3*width)
 
-@benchmark phase2(Xm, H, width=64) seconds=15   # width 64  : 2.972 s, 226.84 MiB, 2348422 alloc
+@benchmark phase2(Xm, H, width=64) seconds=15   # width 64  : 2.972 s, 226.84 MiB, 2348419 alloc
 @benchmark phase2(Xm, H, width=400) seconds=15  # width 400 : 5.540 s, 64.75 MiB, 454728 alloc
 @benchmark phase2(Xm, H, width=1200) seconds=15 # width 1200: 4.286 s, 54.46 MiB, 172894 alloc
 
@@ -544,6 +543,14 @@ actual_missing_values  = convert(Vector{Int64}, X[missing_idx])  #true values of
 imputed_missing_values = convert(Vector{Int64}, Xm[missing_idx]) #imputed values of missing entries
 error_rate = sum(actual_missing_values .!= imputed_missing_values) / total_missing
 copyto!(Xm, Xm_original);
+
+# profiling
+phase2(Xm, H, width=width)
+using Profile
+Profile.clear()
+@profile phase2(Xm, H, width=width)
+using ProfileView
+ProfileView.view()
 
 # old code error:
 #current code error = 0.019282749489147502 (width = 64)
@@ -626,4 +633,15 @@ sc = sparse(c)
 
 @benchmark $sa .= $sb .& $sc
 @benchmark $a .= $b .& $c
+
+
+using BenchmarkTools
+
+n = 50_000
+a = BitVector(undef, n);
+b = rand(1:n, n);
+c = 1
+
+@benchmark $a .= $b .== $c
+
 

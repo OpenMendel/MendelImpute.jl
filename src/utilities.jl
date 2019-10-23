@@ -145,19 +145,27 @@ function compute_redundant_haplotypes!(
     people = length(optimal_haplotypes)
 
     # loop through all people
-    @inbounds for k in 1:people
-        (Hwork_i, Hwork_j) = (happair[1][k], happair[2][k])
-        # println("person $k's optimal haplotype pairs are: $((Hwork_i, Hwork_j))")
-
-        (H_i, H_j) = (Hunique.uniqueindex[window][Hwork_i], Hunique.uniqueindex[window][Hwork_j])
-        # println("person $k's optimal haplotype pairs are located at columns $H_i and $H_j in H")
-
-        # loop through all haplotypes and find ones that match either of the optimal haplotypes 
-        for jj in 1:size(H, 2)
-            Hunique.hapmap[window][jj] == H_i && (optimal_haplotypes[k].strand1[window][jj] = true)
-            Hunique.hapmap[window][jj] == H_j && (optimal_haplotypes[k].strand2[window][jj] = true)
-        end
+    @inbounds for k in 1:people, jj in 1:size(H, 2)
+        optimal_haplotypes[k].strand1[window][jj] = Hunique.hapmap[window][jj] == Hunique.uniqueindex[window][happair[1][k]]
+        optimal_haplotypes[k].strand2[window][jj] = Hunique.hapmap[window][jj] == Hunique.uniqueindex[window][happair[2][k]]
     end
+
+    # loop through all people
+    # @inbounds for k in 1:people
+    #     Hwork_i = happair[1][k]
+    #     Hwork_j = happair[2][k]
+    #     # println("person $k's optimal haplotype pairs are: $((Hwork_i, Hwork_j))")
+
+    #     H_i = Hunique.uniqueindex[window][Hwork_i]
+    #     H_j = Hunique.uniqueindex[window][Hwork_j]
+    #     # println("person $k's optimal haplotype pairs are located at columns $H_i and $H_j in H")
+
+    #     # loop through all haplotypes and find ones that match either of the optimal haplotypes 
+    #     for jj in 1:size(H, 2)
+    #         optimal_haplotypes[k].strand1[window][jj] = Hunique.hapmap[window][jj] == H_i
+    #         optimal_haplotypes[k].strand2[window][jj] = Hunique.hapmap[window][jj] == H_j
+    #     end
+    # end
 
     return nothing
 end
