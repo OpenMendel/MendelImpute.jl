@@ -239,10 +239,12 @@ function phase2(
 
     # phase window 1
     for i in 1:people
+        hap1 = findfirst(hapset[i].strand1[1]) :: Int64
+        hap2 = findfirst(hapset[i].strand2[1]) :: Int64
         push!(phase[i].strand1.start, 1)
-        push!(phase[i].strand1.haplotypelabel, findfirst(hapset[i].strand1[1]))
+        push!(phase[i].strand1.haplotypelabel, hap1)
         push!(phase[i].strand2.start, 1)
-        push!(phase[i].strand2.haplotypelabel, findfirst(hapset[i].strand2[1]))
+        push!(phase[i].strand2.haplotypelabel, hap2)
     end
 
     #phase window by window without checking breakpoints

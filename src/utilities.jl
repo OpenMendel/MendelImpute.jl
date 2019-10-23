@@ -132,7 +132,9 @@ function compute_optimal_halotype_set(
 end
 
 """
-Helper function for recording optimal-redundant haplotypes for each window.
+Records optimal-redundant haplotypes for each window. 
+
+This routine takes up roughly 1/5 of the total computation time.
 """
 function compute_redundant_haplotypes!(
     optimal_haplotypes::Vector{OptimalHaplotypeSet}, 
@@ -144,28 +146,25 @@ function compute_redundant_haplotypes!(
 
     people = length(optimal_haplotypes)
 
-    # loop through all people
-    @inbounds for k in 1:people, jj in 1:size(H, 2)
-        optimal_haplotypes[k].strand1[window][jj] = Hunique.hapmap[window][jj] == Hunique.uniqueindex[window][happair[1][k]]
-        optimal_haplotypes[k].strand2[window][jj] = Hunique.hapmap[window][jj] == Hunique.uniqueindex[window][happair[2][k]]
+    @inbounds for k in 1:people
+        Hwork_i = happair[1][k]
+        Hwork_j = happair[2][k]
+        # println("person $k's optimal haplotype pairs are: $((Hwork_i, Hwork_j))")
+
+        H_i = Hunique.uniqueindex[window][Hwork_i]
+        H_j = Hunique.uniqueindex[window][Hwork_j]
+        # println("person $k's optimal haplotype pairs are located at columns $H_i and $H_j in H")
+
+        # loop through all haplotypes and find ones that match either of the optimal haplotypes 
+        map1 = Hunique.hapmap[window]
+        map2 = Hunique.hapmap[window]
+        hap1 = optimal_haplotypes[k].strand1[window]
+        hap2 = optimal_haplotypes[k].strand2[window]
+        for jj in 1:size(H, 2)
+            map1[jj] == H_i && (hap1[jj] = true)
+            map2[jj] == H_j && (hap2[jj] = true)
+        end
     end
-
-    # loop through all people
-    # @inbounds for k in 1:people
-    #     Hwork_i = happair[1][k]
-    #     Hwork_j = happair[2][k]
-    #     # println("person $k's optimal haplotype pairs are: $((Hwork_i, Hwork_j))")
-
-    #     H_i = Hunique.uniqueindex[window][Hwork_i]
-    #     H_j = Hunique.uniqueindex[window][Hwork_j]
-    #     # println("person $k's optimal haplotype pairs are located at columns $H_i and $H_j in H")
-
-    #     # loop through all haplotypes and find ones that match either of the optimal haplotypes 
-    #     for jj in 1:size(H, 2)
-    #         optimal_haplotypes[k].strand1[window][jj] = Hunique.hapmap[window][jj] == H_i
-    #         optimal_haplotypes[k].strand2[window][jj] = Hunique.hapmap[window][jj] == H_j
-    #     end
-    # end
 
     return nothing
 end
@@ -335,7 +334,7 @@ function haplopair!(
 
     @inbounds for k in 1:d, j in 1:k
         # loop over individuals
-        for i in 1:n
+        @simd for i in 1:n
             score = M[j, k] - N[i, j] - N[i, k]
             if score < hapmin[i]
                 hapmin[i], happair[1][i], happair[2][i] = score, j, k
@@ -588,9 +587,9 @@ function search_breakpoint(
     n = length(X)
 
     # all haplotypes in BitSet are equivalent in current window, so get one as representative
-    s1  = findfirst(strand1)
-    s21 = findfirst(strand2[1])
-    s22 = findfirst(strand2[2])
+    s1  = findfirst(strand1) :: Int64
+    s21 = findfirst(strand2[1]) :: Int64
+    s22 = findfirst(strand2[2]) :: Int64
 
     # count number of errors if second haplotype is all from H[:, s2[2]]
     errors = 0

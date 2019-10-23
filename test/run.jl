@@ -524,9 +524,9 @@ opt[1].strand1 #person 1's optimal haplotypes on strand1 for each window
 hapset, phase = phase2(Xm, H, width=width)
 hapset, phase = phase2(Xm, H, width=3*width)
 
-@benchmark phase2(Xm, H, width=64) seconds=15   # width 64  : 2.972 s, 226.84 MiB, 2348419 alloc
-@benchmark phase2(Xm, H, width=400) seconds=15  # width 400 : 5.540 s, 64.75 MiB, 454728 alloc
-@benchmark phase2(Xm, H, width=1200) seconds=15 # width 1200: 4.286 s, 54.46 MiB, 172894 alloc
+@benchmark phase2(Xm, H, width=64) seconds=15   # width 64  : 3.074 s, 226.69 MiB, 2338770 alloc
+@benchmark phase2(Xm, H, width=400) seconds=15  # width 400 : 5.895 s, 64.72 MiB, 452748 alloc
+@benchmark phase2(Xm, H, width=1200) seconds=15 # width 1200: 4.595 s, 54.45 MiB, 172637 alloc
 
 # look at the haplotype intersections
 findfirst.(hapset[1].strand1)

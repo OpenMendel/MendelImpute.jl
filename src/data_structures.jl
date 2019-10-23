@@ -54,6 +54,8 @@ UniqueHaplotypeMaps(windows::Int, haps::Int) = UniqueHaplotypeMaps(Vector{Vector
 
 """
 Data structure for storing all haplotypes that match the optimal haplotype in each window for a person, keeping track of strand.
+
++ strand1[w] stores a BitVector for window `w`, with length equal to number of haplotypes. Entries of this BitVector is 1 if that haplotype is unique
 """
 struct OptimalHaplotypeSet
     strand1::Vector{BitVector}
