@@ -64,3 +64,4 @@ testset "compute_optimal_halotype_set" begin
 	@test all(all_col_should_agree[:, 3] .== all_col_should_agree[:, 4])
 	@test all(all_col_should_agree[:, 2] .== all_col_should_agree[:, 7])
  end
+ 

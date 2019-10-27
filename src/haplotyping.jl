@@ -272,12 +272,14 @@ function phase2(
             # search breakpoints
             Xi = view(X, ((w - 2) * width + 1):(w * width), i)
             Hi = view(H, ((w - 2) * width + 1):(w * width), :)
-            prev_and_cur_haplotypes = (hapset[i].strand1[w - 1], hapset[i].strand1[w])
-            bkpt, hap, err_optim = search_breakpoint(Xi, Hi, hapset[i].strand2[w], prev_and_cur_haplotypes)
+            s2 = findfirst(hapset[i].strand2[w]) :: Int64
+            s1_cur  = findfirst(hapset[i].strand1[w - 1]) :: Int64
+            s1_next = findfirst(hapset[i].strand1[w]) :: Int64
+            bkpt, err_optim = search_breakpoint(Xi, Hi, s2, (s1_cur, s1_next))
 
             # record info into phase
             push!(phase[i].strand1.start, (w - 2) * width + 1 + bkpt)
-            push!(phase[i].strand1.haplotypelabel, hap)
+            push!(phase[i].strand1.haplotypelabel, s1_next)
         end
 
         strand2_intersect .= hapset[i].strand2[w - 1] .& hapset[i].strand2[w]
@@ -285,14 +287,66 @@ function phase2(
             # search breakpoints
             Xi = view(X, ((w - 2) * width + 1):(w * width), i)
             Hi = view(H, ((w - 2) * width + 1):(w * width), :)
-            prev_and_cur_haplotypes = (hapset[i].strand2[w - 1], hapset[i].strand2[w])
-            bkpt, hap, err_optim = search_breakpoint(Xi, Hi, hapset[i].strand1[w], prev_and_cur_haplotypes)
+            s1 = findfirst(hapset[i].strand1[w]) :: Int64
+            s2_cur  = findfirst(hapset[i].strand2[w - 1]) :: Int64
+            s2_next = findfirst(hapset[i].strand2[w]) :: Int64
+            bkpt, err_optim = search_breakpoint(Xi, Hi, s1, (s2_cur, s2_next))
 
             # record info into phase
             push!(phase[i].strand2.start, (w - 2) * width + 1 + bkpt)
-            push!(phase[i].strand2.haplotypelabel, hap)
+            push!(phase[i].strand2.haplotypelabel, s2_next)
         end
     end
+
+    # phase window by window, excluding first and last
+    # for i in 1:people, w in 2:(windows - 1)
+    #     # create haplotypes for current window
+    #     Xi = view(X, ((w - 2) * width + 1):(w * width), i)
+    #     Hw = view(H, ((w - 2) * width + 1):(w * width), :)
+    #     hap1_prev = findfirst(hapset[i].strand1[w - 1]) :: Int64
+    #     hap2_prev = findfirst(hapset[i].strand2[w - 1]) :: Int64
+    #     hap1_cur  = findfirst(hapset[i].strand1[w]) :: Int64
+    #     hap2_cur  = findfirst(hapset[i].strand2[w]) :: Int64
+
+    #     # assign haplotypes while search for cross overs once again
+    #     (hap1, hap2), bkpts = continue_haplotype(Xi, Hw, (hap1_prev, hap2_prev), (hap1_cur, hap2_cur))
+
+    #     # strand 1
+    #     if bkpts[1] > -1 && bkpts[1] < 2width
+    #         push!(phase[i].strand1.start, (w - 2) * width + 1 + bkpts[1])
+    #         push!(phase[i].strand1.haplotypelabel, hap1)
+    #     end
+    #     # strand 2
+    #     if bkpts[2] > -1 && bkpts[2] < 2width
+    #         push!(phase[i].strand2.start, (w - 2) * width + 1 + bkpts[2])
+    #         push!(phase[i].strand2.haplotypelabel, hap2)
+    #     end
+    # end
+
+    #phase last window separately
+    # for i in 1:people
+    #     # create haplotypes for current window
+    #     Xi = view(X, ((windows - 2) * width + 1):snps, i)
+    #     Hw = view(H, ((windows - 2) * width + 1):snps, :)
+    #     hap1_prev = findfirst(hapset[i].strand1[windows - 1]) :: Int64
+    #     hap2_prev = findfirst(hapset[i].strand2[windows - 1]) :: Int64
+    #     hap1_cur  = findfirst(hapset[i].strand1[windows]) :: Int64
+    #     hap2_cur  = findfirst(hapset[i].strand2[windows]) :: Int64
+
+    #     # assign haplotypes while search for cross overs once again
+    #     (hap1, hap2), bkpts = continue_haplotype(Xi, Hw, (hap1_prev, hap2_prev), (hap1_cur, hap2_cur))
+
+    #     # strand 1
+    #     if bkpts[1] > -1 && bkpts[1] < 2width
+    #         push!(phase[i].strand1.start, (windows - 2) * width + 1 + bkpts[1])
+    #         push!(phase[i].strand1.haplotypelabel, hap1)
+    #     end
+    #     # strand 2
+    #     if bkpts[2] > -1 && bkpts[2] < 2width
+    #         push!(phase[i].strand2.start, (windows - 2) * width + 1 + bkpts[2])
+    #         push!(phase[i].strand2.haplotypelabel, hap2)
+    #     end
+    # end
 
     return hapset, phase 
 end

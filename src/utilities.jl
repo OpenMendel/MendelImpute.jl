@@ -540,6 +540,8 @@ end
 Find the optimal break point between s2[1] and s2[2] in configuration
 s1 | s2[1]
 s1 | s2[2]
+
+TODO: there is type instability with this function (called in unit tests)
 """
 function search_breakpoint(
     X::AbstractVector,
@@ -569,54 +571,12 @@ function search_breakpoint(
             if errors < err_optim
                 bkpt_optim, err_optim = bkpt, errors
                 # quick return if perfect match
-                err_optim == 0 && return bkpt_optim, err_optim
+                err_optim == 0 && return bkpt_optim, err_optim :: Int
             end
         end
     end
 
-    return bkpt_optim, err_optim
-end
-
-function search_breakpoint(
-    X::AbstractVector,
-    H::AbstractMatrix,
-    strand1::BitVector,
-    strand2::Tuple{BitVector, BitVector}
-    )
-
-    n = length(X)
-
-    # all haplotypes in BitSet are equivalent in current window, so get one as representative
-    s1  = findfirst(strand1) :: Int64
-    s21 = findfirst(strand2[1]) :: Int64
-    s22 = findfirst(strand2[2]) :: Int64
-
-    # count number of errors if second haplotype is all from H[:, s2[2]]
-    errors = 0
-    for pos in 1:n
-        if !ismissing(X[pos])
-            errors += X[pos] ≠ H[pos, s1] + H[pos, s22]
-        end
-    end
-    bkpt_optim, err_optim = 0, errors
-
-    # quick return if perfect match
-    err_optim == 0 && return 0, s22, 0
-
-    # extend haplotype H[:, s2[1]] position by position
-    @inbounds for bkpt in 1:n
-        if !ismissing(X[bkpt]) && H[bkpt, s21] ≠ H[bkpt, s22]
-            errors -= X[bkpt] ≠ H[bkpt, s1] + H[bkpt, s22]
-            errors += X[bkpt] ≠ H[bkpt, s1] + H[bkpt, s21]
-            if errors < err_optim
-                bkpt_optim, err_optim = bkpt, errors
-                # quick return if perfect match
-                err_optim == 0 && return bkpt_optim, s22, err_optim
-            end
-        end
-    end
-
-    return bkpt_optim, s22, err_optim
+    return bkpt_optim, err_optim :: Int
 end
 
 """

@@ -521,12 +521,14 @@ opt[1].strand1 #person 1's optimal haplotypes on strand1 for each window
 #Hua's code error = 0.0033518189729195617 (width = 400) #12.170407 seconds (87.59 k allocations: 23.879 MiB, 0.15% gc time)
 @time ph = phase(Xm, H, width)
 
-hapset, phase = phase2(Xm, H, width=width)
-hapset, phase = phase2(Xm, H, width=3*width)
+hapset, phase = phase2(Xm, H, width=64);
+hapset, phase = phase2(Xm, H, width=3*64);
+hapset, phase = phase2(Xm, H, width=400);
+hapset, phase = phase2(Xm, H, width=1200);
 
-@benchmark phase2(Xm, H, width=64) seconds=15   # width 64  : 3.074 s, 226.69 MiB, 2338770 alloc
-@benchmark phase2(Xm, H, width=400) seconds=15  # width 400 : 5.895 s, 64.72 MiB, 452748 alloc
-@benchmark phase2(Xm, H, width=1200) seconds=15 # width 1200: 4.595 s, 54.45 MiB, 172637 alloc
+@benchmark phase2(Xm, H, width=64) seconds=15   # width 64  : 2.925 s, 215.08 MiB, 1941655 alloc
+@benchmark phase2(Xm, H, width=400) seconds=15  # width 400 : 5.149 s, 62.97 MiB, 390094 alloc
+@benchmark phase2(Xm, H, width=1200) seconds=15 # width 1200: 4.603 s, 53.94 MiB, 153625 alloc
 
 # look at the haplotype intersections
 findfirst.(hapset[1].strand1)
@@ -643,5 +645,62 @@ b = rand(1:n, n);
 c = 1
 
 @benchmark $a .= $b .== $c
+
+
+
+
+# simulate utilities test
+using Revise
+using MendelImpute
+using DelimitedFiles
+using LinearAlgebra
+using BenchmarkTools
+using Random
+using ElasticArrays
+
+cd("/Users/biona001/.julia/dev/MendelImpute/data")
+
+rawdata = readdlm("AFRped_geno.txt", ',', Float32);
+people = 665;
+X = copy(Transpose(rawdata[1:people, 1:(end - 1)]));
+function create_hap(x)
+    n, p = size(x)
+    h = one(eltype(x))
+    for j in 1:p, i in 1:n
+        if x[i, j] != 0
+            x[i, j] -= h
+        end
+    end
+    return copy(Transpose(x))
+end
+H = create_hap(rawdata[(people + 1):end, 1:(end - 1)]);
+
+# tgt = convert(Matrix{Int}, X)
+# ref = convert(BitArray{2}, H)
+# make_refvcf_file(ref, filename="AFRped_ref.vcf")
+# make_tgtvcf_file(tgt, filename="AFRped_tgt.vcf")
+
+Random.seed!(123)
+missingprop = 0.1
+p, n = size(X)
+X2 = Matrix{Union{Missing, eltype(X)}}(X)
+Xm = ifelse.(rand(eltype(X), p, n) .< missingprop, missing, X2)
+Xm_original = copy(Xm)
+width = 64
+windows = floor(Int, p / width)
+
+hapset, phase = phase2(Xm, H, width=64);  #error = 0.019300418, 215.47MB, 3.070s, 1944069 alloc
+hapset, phase = phase2(Xm, H, width=700); #error = 0.003373971, 48.53MB, 4.880s, 205942 alloc
+
+# calculate error rate
+impute2!(Xm, H, phase)
+missing_idx    = ismissing.(Xm_original)
+total_missing  = sum(missing_idx)
+actual_missing_values  = convert(Vector{Int64}, X[missing_idx])  #true values of missing entries
+imputed_missing_values = convert(Vector{Int64}, Xm[missing_idx]) #imputed values of missing entries
+error_rate = sum(actual_missing_values .!= imputed_missing_values) / total_missing
+copyto!(Xm, Xm_original);
+
+
 
 

@@ -5,4 +5,4 @@
 .ipynb_checkpoints
 AFRped_geno.txt
 GBR_data.csv
-data/*
+data/
