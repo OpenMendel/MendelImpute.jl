@@ -26,9 +26,9 @@ function make_refvcf_file(
         write(io, "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n")
 
         # header line
-        write(io, "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t")
+        write(io, "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT")
         for i in 1:Int(d / 2)
-            write(io, "ref1$i\t")
+            write(io, "\tref$i")
         end
         write(io, "\n")
 
@@ -58,9 +58,9 @@ function make_tgtvcf_file(
         write(io, "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n")
 
         # header line
-        write(io, "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t")
+        write(io, "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT")
         for i in 1:d
-            write(io, "target$i\t")
+            write(io, "\ttarget$i")
         end
         write(io, "\n")
 
