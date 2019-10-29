@@ -87,65 +87,22 @@ function make_tgtvcf_file(
 end
 
 """
-    simulate_correlated_snparray(n, p, s; block_length, hap, prob)
+    simulate_markov_haplotypes(p, d, prob)
 
-Simulates a SnpArray with correlation. SNPs are divided into blocks where each
-adjacent SNP is the same with probability prob. There are no correlation between blocks.
+Simulates a haplotype matrix where a minor allele (0 or 1) will transition 
+to the opposite allele with probability `prob`. 
 
-# Arguments:
-- `p`: number of SNPs
-- `d`: number of people
-- `s`: name of SnpArray that will be created (memory mapped) in the current directory. To not memory map, use `undef`.
-
-# Output:
-* `H`: `p x d` haplotype matrix. Each column is a haplotype.
-
-# Optional arguments:
-- `block_length`: length of each LD block
-- `pool_size`: haplotype pool size for each block
-- `prob`: with probability `prob` an adjacent SNP would be the same. 
+# Inputs
+- `p`: Length of each haplotype.
+- `d`: Total number of haplotypes. 
+- `prob`: transition probability.
 """
-function simulate_haplotypes(
-    p::Int64, 
-    d::Int64; 
-    block_length::Int64=113, 
-    pool_size::Int=20, 
-    prob::Float64=0.75
-    )
-    
-    @assert mod(p, block_length) == 0 "block_length ($block_length) is not divible by p ($p)"
-    @assert 0 < prob < 1 "transition probably should be between 0 and 1, got $prob"
-
-    H = BitArray(undef, p, d)
-    haplotypes = BitArray(undef, block_length, pool_size)
-    blocks = Int(p / block_length)
-
-    @inbounds for b in 1:blocks
-
-        #create pool of haplotypes for current block
-        _simulate_haptotype_blocks!(haplotypes, prob)
-
-        for i in 1:n
-            #sample 2 haplotypes with replacement from the pool of haplotypes
-            row1 = rand(1:pool_size)
-            row2 = rand(1:pool_size)
-            for j in 1:block_length
-                snps[j] = haplotypes[row1, j] + haplotypes[row2, j]
-            end
-
-            #copy haplotypes into x
-            _copy_blocks!(x, i, snps, b, block_length)
-        end
-    end
-
-    return x
-end
-
-function simulate_haplotypes(
+function simulate_markov_haplotypes(
     p::Int64, 
     d::Int64;
-    prob = 0.75,
+    prob = 0.25,
     )
+    @assert 0 < prob < 1 "transition probably should be between 0 and 1, got $prob"
 
     H = falses(p, d)
     @inbounds for j in 1:d
@@ -159,19 +116,48 @@ function simulate_haplotypes(
     return H
 end
 
-# function _copy_blocks!(x::SnpArray, row, snps, cur_block, block_length)
-#     #copy sampled snps into SnpArray
-#     @inbounds for k in 1:length(snps)
-#         c = snps[k]
-#         col = (cur_block - 1) * block_length + k
-#         if c == 0
-#             x[row, col] = 0x00
-#         elseif c == 1
-#             x[row, col] = 0x02
-#         elseif c == 2
-#             x[row, col] = 0x03
-#         else
-#             throw(error("SNP values should be 0, 1, or 2 but was $c"))
-#         end
-#     end
-# end
+"""
+    simulate_genotypes(H; block_length)
+
+Simulates a genotype matrix `X` from a pool of haplotypes `H`. SNPs are 
+divided into blocks of length `block_length` where a pair of haplotypes 
+are drawn uniformly from `H` to form the genotype of that given block. 
+
+# Arguments:
+- `H`: `p x d` haplotype matrix. Each column is a haplotype. 
+- `block_length`: length of each LD block
+
+# Output:
+* `X`: `p x d` genotype matrix. Each column is a person's genotype. 
+"""
+function simulate_genotypes(
+    H::BitArray{2}; 
+    block_length::Int64=113
+    )
+    
+    p, d = size(H)
+    X = zeros(Int, p, d)
+    blocks = Int(ceil(p / block_length))
+
+    # for each block, sample 2 ` with replacement from the pool of haplotypes
+    for b in 1:(blocks - 1), i in 1:d
+        hap1 = rand(1:d)
+        hap2 = rand(1:d)
+        block_start = (b - 1) * block_length
+        for j in 1:block_length
+            X[block_start + j, i] = H[block_start + j, hap1] + H[block_start + j, hap2]
+        end
+    end
+
+    # treat last block separately
+    for i in 1:d
+        hap1 = rand(1:d)
+        hap2 = rand(1:d)
+        block_start = (blocks - 1) * block_length
+        for j in 1:(p - block_start)
+            X[block_start + j, i] = H[block_start + j, hap1] + H[block_start + j, hap2]
+        end
+    end
+
+    return X
+end

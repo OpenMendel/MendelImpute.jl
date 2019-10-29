@@ -20,6 +20,7 @@ module MendelImpute
 	# export UniqueHaplotypes, fast_elimination, unique_index!
 	export OptimalHaplotypeSet, compute_optimal_halotype_set
 	export make_refvcf_file, make_tgtvcf_file
+	export simulate_haplotypes, simulate_markov_haplotypes, simulate_genotypes
 
 	include("data_structures.jl")
 	include("haplotyping.jl")

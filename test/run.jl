@@ -702,5 +702,35 @@ error_rate = sum(actual_missing_values .!= imputed_missing_values) / total_missi
 copyto!(Xm, Xm_original);
 
 
+#simulation code
+using Revise
+using MendelImpute
+using DelimitedFiles
+using LinearAlgebra
+using BenchmarkTools
+using Random
+using ElasticArrays
+
+p = 1000
+d = 250
+
+Random.seed!(2019)
+
+H = simulate_markov_haplotypes(p, d)
+X = simulate_genotypes(H)
+
+count(iszero, H)
+count(isone, H)
+
+count(iszero, X)
+count(isone, X)
+
+
+
+
+
+
+
+
 
 
