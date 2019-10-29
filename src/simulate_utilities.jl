@@ -89,8 +89,8 @@ end
 """
     simulate_markov_haplotypes(p, d, prob)
 
-Simulates a haplotype matrix where a minor allele (0 or 1) will transition 
-to the opposite allele with probability `prob`. 
+Simulates a haplotype matrix as a markov chain. The `i`th allele (0 or 1) will transition 
+to the opposite allele (0 or 1) with probability `prob` at the `i + 1`th allele. 
 
 # Inputs
 - `p`: Length of each haplotype.
@@ -108,9 +108,33 @@ function simulate_markov_haplotypes(
     @inbounds for j in 1:d
         H[1, j] = rand(Bool)
         for i in 2:p
-            if rand() < prob
-                H[i, j] = !H[i, j]
-            end
+            H[i, j] = (rand() < prob ? !H[i - 1, j] : H[i - 1, j])
+        end
+    end
+    return H
+end
+
+"""
+    simulate_uniform_haplotypes(p, d, prob)
+
+Simulates a haplotype matrix `H` where `H[i, j] = 1` with probability `prob`. 
+
+# Inputs
+- `p`: Length of each haplotype.
+- `d`: Total number of haplotypes. 
+- `prob`: probability that an entry in H is 1.
+"""
+function simulate_uniform_haplotypes(
+    p::Int64, 
+    d::Int64;
+    prob = 0.25,
+    )
+    @assert 0 < prob < 1 "transition probably should be between 0 and 1, got $prob"
+
+    H = falses(p, d)
+    @inbounds for j in 1:d, i in 1:p
+        if rand() < prob
+            H[i, j] = true
         end
     end
     return H
