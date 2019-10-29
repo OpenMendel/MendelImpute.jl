@@ -102,29 +102,33 @@ adjacent SNP is the same with probability prob. There are no correlation between
 
 # Optional arguments:
 - `block_length`: length of each LD block
-- `hap`: haplotype pool size for each block
+- `pool_size`: haplotype pool size for each block
 - `prob`: with probability `prob` an adjacent SNP would be the same. 
 """
-function simulate_haplotypes(p::Int64, d::Int64, s::Union{String, UndefInitializer}; 
-            block_length::Int64=20, hap::Int=20, prob::Float64=0.75)
+function simulate_haplotypes(
+    p::Int64, 
+    d::Int64; 
+    block_length::Int64=113, 
+    pool_size::Int=20, 
+    prob::Float64=0.75
+    )
     
     @assert mod(p, block_length) == 0 "block_length ($block_length) is not divible by p ($p)"
     @assert 0 < prob < 1 "transition probably should be between 0 and 1, got $prob"
 
     H = BitArray(undef, p, d)
-    haplotypes = zeros(hap, block_length)
-    snps = zeros(block_length)
+    haplotypes = BitArray(undef, block_length, pool_size)
     blocks = Int(p / block_length)
 
     @inbounds for b in 1:blocks
 
-        #create pool of haplotypes for each block
-        _sample_haptotypes!(haplotypes, prob)
+        #create pool of haplotypes for current block
+        _simulate_haptotype_blocks!(haplotypes, prob)
 
         for i in 1:n
             #sample 2 haplotypes with replacement from the pool of haplotypes
-            row1 = rand(1:hap)
-            row2 = rand(1:hap)
+            row1 = rand(1:pool_size)
+            row2 = rand(1:pool_size)
             for j in 1:block_length
                 snps[j] = haplotypes[row1, j] + haplotypes[row2, j]
             end
@@ -137,24 +141,22 @@ function simulate_haplotypes(p::Int64, d::Int64, s::Union{String, UndefInitializ
     return x
 end
 
-function _sample_haptotypes!(haplotypes::Matrix, prob::Float64)
-    n, p = size(haplotypes)
-    fill!(haplotypes, 0)
+function simulate_haplotypes(
+    p::Int64, 
+    d::Int64;
+    prob = 0.75,
+    )
 
-    @inbounds for i in 1:n
-        cur_row_sum = 0
-        while cur_row_sum == 0
-            curr = rand(0:1)
-            haplotypes[i, 1] = curr
-            cur_row_sum += curr
-            for j in 2:p
-                stay = rand(Bernoulli(prob)) #stay = 1 means retain the current value
-                curr = (stay == 1 ? curr : 1 - curr)
-                haplotypes[i, j] = curr
-                cur_row_sum += curr
+    H = falses(p, d)
+    @inbounds for j in 1:d
+        H[1, j] = rand(Bool)
+        for i in 2:p
+            if rand() < prob
+                H[i, j] = !H[i, j]
             end
         end
     end
+    return H
 end
 
 # function _copy_blocks!(x::SnpArray, row, snps, cur_block, block_length)
