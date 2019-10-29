@@ -717,25 +717,25 @@ d = 250
 Random.seed!(2019)
 
 H = simulate_markov_haplotypes(p, d)
-X = simulate_genotypes(H)
+X = simulate_genotypes(H, people = 100)
 
 count(iszero, H) #124388
 count(isone, H) #125612
 
-count(iszero, X) #62218
-count(isone, X) #124394
-count(x -> x == 2, X) #63388
+count(iszero, X) #24774
+count(isone, X) #50058
+count(x -> x == 2, X) #25168
 
 Random.seed!(2019)
 H = simulate_uniform_haplotypes(p, d)
-X = simulate_genotypes(H)
+X = simulate_genotypes(H, people = 100)
 
 count(iszero, H) #187795
 count(isone, H) #62205
 
-count(iszero, X) #141148
-count(isone, X) #93325
-count(x -> x == 2, X) #15527
+count(iszero, X) #56689
+count(isone, X) #37049
+count(x -> x == 2, X) #6262
 
 
 

@@ -96,13 +96,16 @@ to the opposite allele (0 or 1) with probability `prob` at the `i + 1`th allele.
 - `p`: Length of each haplotype.
 - `d`: Total number of haplotypes. 
 - `prob`: transition probability.
+
+# Output
+- `H`: `p x d` haplotype matrix. Each column is a haplotype
 """
 function simulate_markov_haplotypes(
     p::Int64, 
     d::Int64;
     prob = 0.25,
     )
-    @assert 0 < prob < 1 "transition probably should be between 0 and 1, got $prob"
+    @assert 0 < prob < 1 "transition probably `prob` should be between 0 and 1, got $prob"
 
     H = falses(p, d)
     @inbounds for j in 1:d
@@ -123,13 +126,16 @@ Simulates a haplotype matrix `H` where `H[i, j] = 1` with probability `prob`.
 - `p`: Length of each haplotype.
 - `d`: Total number of haplotypes. 
 - `prob`: probability that an entry in H is 1.
+
+# Output
+- `H`: `p x d` haplotype matrix. Each column is a haplotype
 """
 function simulate_uniform_haplotypes(
     p::Int64, 
     d::Int64;
     prob = 0.25,
     )
-    @assert 0 < prob < 1 "transition probably should be between 0 and 1, got $prob"
+    @assert 0 < prob < 1 "prob should be between 0 and 1, got $prob"
 
     H = falses(p, d)
     @inbounds for j in 1:d, i in 1:p
@@ -149,22 +155,24 @@ are drawn uniformly from `H` to form the genotype of that given block.
 
 # Arguments:
 - `H`: `p x d` haplotype matrix. Each column is a haplotype. 
+- `people`: number of samples desired for the genotype matrix
 - `block_length`: length of each LD block
 
 # Output:
-* `X`: `p x d` genotype matrix. Each column is a person's genotype. 
+* `X`: `p x people` genotype matrix. Each column is a person's genotype. 
 """
 function simulate_genotypes(
     H::BitArray{2}; 
+    people::Int = size(H, 2),
     block_length::Int64=113
     )
     
     p, d = size(H)
-    X = zeros(Int, p, d)
+    X = zeros(Int, p, people)
     blocks = Int(ceil(p / block_length))
 
     # for each block, sample 2 ` with replacement from the pool of haplotypes
-    for b in 1:(blocks - 1), i in 1:d
+    for b in 1:(blocks - 1), i in 1:people
         hap1 = rand(1:d)
         hap2 = rand(1:d)
         block_start = (b - 1) * block_length
@@ -174,7 +182,7 @@ function simulate_genotypes(
     end
 
     # treat last block separately
-    for i in 1:d
+    for i in 1:people
         hap1 = rand(1:d)
         hap2 = rand(1:d)
         block_start = (blocks - 1) * block_length
