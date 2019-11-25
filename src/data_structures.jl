@@ -35,12 +35,12 @@ generate a set of redundant haplotypes in window `w`.
 
 Suppose in window `w` there are 9 haplotypes (represented by different letters):
 
-	H[w, :] = [a b b c b d a d a]
+    H[w, :] = [a b b c b d a d a]
 
 then
 
-	uniqueindex[w]  = [1 2 4 6]
-	hapmap[w] = [1 2 2 4 2 6 1 6 1].
+    uniqueindex[w]  = [1 2 4 6]
+    hapmap[w] = [1 2 2 4 2 6 1 6 1].
 
 `hapmap` is used to find the set of matching haplotypes after identifying the best
 haplotype pair. If (b, c) is the optimal haplotype pair in the current window, then 
