@@ -788,3 +788,10 @@ write(writer, phase, H)
 
 
 
+io = open("myfile.txt", "w");
+x = 0
+write(io, x, '\n')
+print(io, x, '\t', 0.0, "hi");
+close(io);
+
+

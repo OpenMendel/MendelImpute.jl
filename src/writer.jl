@@ -1,15 +1,20 @@
+"""
+	write(writer, phase, H)
+
+Writes phased data to file.
+
+TODO: Check if `a1` and `a2` needs to change depending on REF/ALT. 
+"""
 function Base.write(
 	writer::VCF.Writer,
 	phase::Vector{HaplotypeMosaicPair},
-    H::AbstractMatrix,
-	)
-	n = 0
+    H::AbstractMatrix{T},
+	) where T <: Real
 	samples = length(phase)
 	records = phase[1].strand1.length
 	for i in 1:records
 		for j in 1:samples
             #find where snp is located in phase
-            # println("i = $i, j = $j")
             hap1_position = searchsortedlast(phase[j].strand1.start, i)
             hap2_position = searchsortedlast(phase[j].strand2.start, i)
 
@@ -18,13 +23,12 @@ function Base.write(
             hap2 = phase[j].strand2.haplotypelabel[hap2_position]
 
             # actual allele
-			a1 = H[j, hap1]
-			a2 = H[j, hap2]
+			a1 = convert(Int, H[i, hap1])
+			a2 = convert(Int, H[i, hap2])
 
 			# write to io
-			n += write(writer.stream, a1, '|', a2, '\t')
+			print(writer.stream, a1, '|', a2, '\t')
 		end
-		n += write(writer.stream, '\n')
+		write(writer.stream, '\n')
 	end
-	return n
 end

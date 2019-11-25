@@ -9,6 +9,8 @@ LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 ElasticArrays = "fdbdab4c-e67f-52f5-8c3f-e7b388dad3d4"
+GeneticVariation = "9bc6ac9d-e6b2-5f70-b0a8-242a01662520"
+VCFTools = "a620830f-fdd7-5ebc-8d26-3621ab35fbfe"
 
 [compat]
 Documenter = ">=0.20"
