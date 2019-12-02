@@ -32,4 +32,5 @@ function Base.write(
         end
         write(writer.stream, '\n')
     end
+    flush(writer)
 end

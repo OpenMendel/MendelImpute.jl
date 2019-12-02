@@ -20,10 +20,9 @@ function phase(
     outfile::AbstractString = "imputed." * tgtfile,
     width::Int = 700
     )
-    # convert vcf files to matrices
-    T = Float32
-    X = convert_gt(T, tgtfile)
-    H = convert_ht(T, reffile)
+    # convert vcf files to numeric matrices
+    X = convert_gt(Float32, tgtfile)
+    H = convert_ht(Float32, reffile)
 
     # compute redundant haplotype sets. 
     hapset = compute_optimal_halotype_set(X, H, width = width, verbose = false)
@@ -31,13 +30,21 @@ function phase(
     # phasing (haplotyping)
     phase = phase(X, H, hapset, width = width, verbose = false)
 
-    # imputation & write to file
     if impute
+        # imputation
         impute2!(X, H, phase)
-        # writer = VCF.Writer(openvcf(outfile, "w"), filter_header(reader, sample_mask))
+
+        # write to file
+        reader = VCF.Reader(openvcf(src, "r"))
+        writer = VCF.Writer(openvcf(outfile, "w"), header(reader))
+        write(writer, phase, H)
+
+        # close 
+        close(reader)
+        close(VCF.BioCore.IO.stream(writer))
     end
 
-    return phase
+    return hapset, phase
 end
 
 """
