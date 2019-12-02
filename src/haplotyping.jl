@@ -1,4 +1,46 @@
 """
+    phase(tgtfile, reffile, outfile; impute = true, width = 700)
+
+Phasing (haplotying) of `tgtfile` from a pool of haplotypes `reffile`
+by sliding windows and saves result in `outfile`. By default, we will perform
+imputation after phasing and window width is 700.
+
+
+# Input
+- `reffile`: VCF file with reference genotype (GT) data
+- `tgtfile`: VCF file with target genotype (GT) data
+- `impute` : true = imputes missing genotypes with phase information.
+- `outfile`: the prefix for output filenames. Will not be generated if `impute` is false
+- `width`  : number of SNPs (markers) in each sliding window. 
+"""
+function phase(
+    tgtfile::AbstractString,
+    reffile::AbstractString;
+    impute::Bool = true,
+    outfile::AbstractString = "imputed." * tgtfile,
+    width::Int = 700
+    )
+    # convert vcf files to matrices
+    T = Float32
+    X = convert_gt(T, tgtfile)
+    H = convert_ht(T, reffile)
+
+    # compute redundant haplotype sets. 
+    hapset = compute_optimal_halotype_set(X, H, width = width, verbose = false)
+
+    # phasing (haplotyping)
+    phase = phase(X, H, hapset, width = width, verbose = false)
+
+    # imputation & write to file
+    if impute
+        impute2!(X, H, phase)
+        # writer = VCF.Writer(openvcf(outfile, "w"), filter_header(reader, sample_mask))
+    end
+
+    return phase
+end
+
+"""
     phase(X, H, width=400, verbose=true)
 
 Phasing (haplotying) of genotype matrix `X` from a pool of haplotypes `H`
@@ -13,6 +55,7 @@ by sliding windows.
 function phase(
     X::AbstractMatrix{Union{Missing, T}},
     H::AbstractMatrix{T};
+    hapset::Union{Vector{OptimalHaplotypeSet}, Nothing} = nothing,
     width::Int    = 700,
     verbose::Bool = true
     ) where T <: Real
@@ -22,8 +65,10 @@ function phase(
     haplotypes = size(H, 2)
     windows = floor(Int, snps / width)
 
-    # get redundant haplotype sets. 
-    hapset = compute_optimal_halotype_set(X, H, width=width, verbose=verbose)
+    # compute redundant haplotype sets. 
+    if isnothing(hapset)
+        hapset = compute_optimal_halotype_set(X, H, width=width, verbose=verbose)
+    end
 
     # allocate working arrays
     phase = [HaplotypeMosaicPair(snps) for i in 1:people]
@@ -133,7 +178,7 @@ function phase(
         end
     end
 
-    return hapset, phase 
+    return phase 
 end
 
 """
