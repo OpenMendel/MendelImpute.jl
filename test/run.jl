@@ -55,15 +55,15 @@ u = rand(0:1, 512)
 
 #add using BigInt
 function bits_to_int(v::AbstractVector)
-	l = length(v)
-	total = BigInt(0)
-	for i in 1:l
-		cur = l - i + 1
-		if v[i] == 1 
-			total += 2^BigInt(cur - 1)
-		end
-	end
-	return total 
+    l = length(v)
+    total = BigInt(0)
+    for i in 1:l
+        cur = l - i + 1
+        if v[i] == 1 
+            total += 2^BigInt(cur - 1)
+        end
+    end
+    return total 
 end
 
 #concatenate bits to string then parse to BigInt
@@ -74,7 +74,7 @@ end
 
 #concatenate bits to string in buffer, then parse to BigInt
 function bits_to_int3(v::AbstractVector)
-	io = IOBuffer() 
+    io = IOBuffer() 
     for entry in v 
         print(io, entry) 
     end 
@@ -197,8 +197,8 @@ using BenchmarkTools
 Random.seed!(123)
 
 function julia_unique(H)
-	uH = unique(H, dims=1)
-	return convert(Matrix{Float32}, uH)  
+    uH = unique(H, dims=1)
+    return convert(Matrix{Float32}, uH)  
 end
 
 p = 8     # number of SNPs within a window
@@ -279,10 +279,10 @@ all(hapscore .== hapscore2)
 
 
 function run()
-	b = ones(100)
-	for i in 1:100
-		x .= U \ (L \ b)
-	end
+    b = ones(100)
+    for i in 1:100
+        x .= U \ (L \ b)
+    end
 end
 
 
@@ -334,7 +334,7 @@ H = bitrand(128000, d)
 # Hunique = unique_haplotypes(H, 128)
 
 for i in 1:Int(d/2)
-	H[:, 2i] .= H[:, 2i - 1]
+    H[:, 2i] .= H[:, 2i - 1]
 end
 
 windows = 10
@@ -573,11 +573,11 @@ ProfileView.view()
 # error = 0.0038312391506966433 (width = 1200)
 
 function naive_impute!(X)
-	n, p = size(X)
+    n, p = size(X)
     fillval = convert(eltype(X), 0.0)
-	for j in 1:p, i in 1:n
-		ismissing(X[i, j]) && (X[i, j] = fillval)
-	end
+    for j in 1:p, i in 1:n
+        ismissing(X[i, j]) && (X[i, j] = fillval)
+    end
 end
 naive_impute!(Xm) #fill with 0 gives error rate = 0.09844272948788609
 naive_impute!(Xm) #fill with 1 gives error rate = 0.9343025343313078
@@ -777,14 +777,15 @@ Xm_original = copy(Xm)
 width = 64
 windows = floor(Int, p / width)
 
-hapset, phase = phase2(Xm, H, width=64); 
+hapset, phase = phase2(Xm, H, width=700); 
 
 vcffile = "test.08Jun17.d8b.vcf"
 des = "phased." * vcffile
 reader = VCF.Reader(openvcf(vcffile, "r"))
 writer = VCF.Writer(openvcf(des, "w"), reader.header)
 
-write(writer, phase, H)
+@time hapset, phase = phase2(Xm, H, width=700); #4.497113 seconds (205.95 k allocations: 48.530 MiB, 0.38% gc time)
+@time write(writer, phase, H) #7.760277 seconds (97.08 M allocations: 4.340 GiB, 5.29% gc time)
 
 
 
