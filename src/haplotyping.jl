@@ -1,5 +1,5 @@
 """
-    phase(tgtfile, reffile, outfile; impute = true, width = 700)
+    phase(tgtfile, reffile, outfile; impute = true, width = 1200)
 
 Phasing (haplotying) of `tgtfile` from a pool of haplotypes `reffile`
 by sliding windows and saves result in `outfile`. By default, we will perform
@@ -18,33 +18,76 @@ function phase(
     reffile::AbstractString;
     impute::Bool = true,
     outfile::AbstractString = "imputed." * tgtfile,
-    width::Int = 700
+    width::Int = 1200
     )
     # convert vcf files to numeric matrices
     X = convert_gt(Float32, tgtfile)
     H = convert_ht(Float32, reffile)
 
     # compute redundant haplotype sets. 
-    hapset = compute_optimal_halotype_set(X, H, width = width, verbose = false)
+    X = copy(X')
+    H = copy(H')
+    hs = compute_optimal_halotype_set(X, H, width = width, verbose = false)
 
     # phasing (haplotyping)
-    phase = phase(X, H, hapset, width = width, verbose = false)
+    ph = phase(X, H, hapset = hs, width = width, verbose = false)
 
     if impute
-        # imputation
-        impute2!(X, H, phase)
+        # imputation without changing known entries
+        # impute2!(X, H, ph)
 
-        # write to file
-        reader = VCF.Reader(openvcf(src, "r"))
+        # create VCF reader and writer
+        reader = VCF.Reader(openvcf(tgtfile, "r"))
         writer = VCF.Writer(openvcf(outfile, "w"), header(reader))
-        write(writer, phase, H)
+
+        # loop over each record
+        for (i, record) in enumerate(reader)
+            gtkey = VCF.findgenokey(record, "GT")
+            _, _, _, _, _, _, _, _, minor_allele, _, _ = gtstats(record, nothing)
+            if !isnothing(gtkey) 
+                # loop over genotypes
+                for (j, geno) in enumerate(record.genotype)
+                    # if missing = '.' = 0x2e
+                    if record.data[geno[gtkey][1]] == 0x2e
+                        #find where snp is located in phase
+                        hap1_position = searchsortedlast(ph[j].strand1.start, i)
+                        hap2_position = searchsortedlast(ph[j].strand2.start, i)
+
+                        #find the correct haplotypes 
+                        hap1 = ph[j].strand1.haplotypelabel[hap1_position]
+                        hap2 = ph[j].strand2.haplotypelabel[hap2_position]
+
+                        # actual allele
+                        a1 = convert(Bool, H[i, hap1])
+                        a2 = convert(Bool, H[i, hap2])
+
+                        # TODO: what should below be?
+                        # record.data[geno[gtkey][1]] = ht_to_UInt8(a1, minor_allele)
+                        # record.data[geno[gtkey][3]] = ht_to_UInt8(a2, minor_allele)
+                        record.data[geno[gtkey][1]] = ifelse(a1, 0x31, 0x30)
+                        record.data[geno[gtkey][3]] = ifelse(a2, 0x31, 0x30)
+                    end
+                end
+            end
+            write(writer, record)
+        end
 
         # close 
-        close(reader)
-        close(VCF.BioCore.IO.stream(writer))
+        flush(writer); close(reader); close(writer)
     end
 
-    return hapset, phase
+    return hs, ph
+end
+
+function ht_to_UInt8(
+    a::Bool,
+    minor_allele::Bool
+    ) where T <: Real
+    if minor_allele # REF is the minor allele
+        return 0x30 # '0'
+    else # ALT is the minor allele
+        return 0x31 # '1'
+    end
 end
 
 """

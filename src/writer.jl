@@ -9,8 +9,8 @@ TODO: Check if `a1` and `a2` needs to change depending on REF/ALT.
 function Base.write(
     writer::VCF.Writer,
     phase::Vector{HaplotypeMosaicPair},
-    H::AbstractMatrix{T},
-    ) where T <: Real
+    H::AbstractMatrix,
+    )
     samples = length(phase)
     records = phase[1].strand1.length
     for i in 1:records
