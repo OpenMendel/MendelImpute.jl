@@ -18,11 +18,11 @@ function phase(
     reffile::AbstractString;
     impute::Bool = true,
     outfile::AbstractString = "imputed." * tgtfile,
-    width::Int = 1200
+    width::Int = 400
     )
     # convert vcf files to numeric matrices
-    X = convert_gt(Float32, tgtfile)
-    H = convert_ht(Float32, reffile)
+    X = convert_gt(Float32, tgtfile, as_minorallele=false)
+    H = convert_ht(Float32, reffile, as_minorallele=false)
 
     # compute redundant haplotype sets. 
     X = copy(X')
@@ -43,9 +43,8 @@ function phase(
         # loop over each record
         for (i, record) in enumerate(reader)
             gtkey = VCF.findgenokey(record, "GT")
-            _, _, _, _, _, _, _, _, minor_allele, _, _ = gtstats(record, nothing)
             if !isnothing(gtkey) 
-                # loop over genotypes
+                # loop over samples
                 for (j, geno) in enumerate(record.genotype)
                     # if missing = '.' = 0x2e
                     if record.data[geno[gtkey][1]] == 0x2e
@@ -57,14 +56,10 @@ function phase(
                         hap1 = ph[j].strand1.haplotypelabel[hap1_position]
                         hap2 = ph[j].strand2.haplotypelabel[hap2_position]
 
-                        # actual allele
-                        a1 = convert(Bool, H[i, hap1])
-                        a2 = convert(Bool, H[i, hap2])
-
-                        # TODO: what should below be?
-                        # record.data[geno[gtkey][1]] = ht_to_UInt8(a1, minor_allele)
-                        # record.data[geno[gtkey][3]] = ht_to_UInt8(a2, minor_allele)
+                        # save actual allele to data. "0" (REF) => 0x30, "1" (ALT) => 0x31
+                        a1, a2 = convert(Bool, H[i, hap1]), convert(Bool, H[i, hap2])
                         record.data[geno[gtkey][1]] = ifelse(a1, 0x31, 0x30)
+                        record.data[geno[gtkey][2]] = 0x7c # phased data has separator '|'
                         record.data[geno[gtkey][3]] = ifelse(a2, 0x31, 0x30)
                     end
                 end
@@ -77,17 +72,6 @@ function phase(
     end
 
     return hs, ph
-end
-
-function ht_to_UInt8(
-    a::Bool,
-    minor_allele::Bool
-    ) where T <: Real
-    if minor_allele # REF is the minor allele
-        return 0x30 # '0'
-    else # ALT is the minor allele
-        return 0x31 # '1'
-    end
 end
 
 """
@@ -106,7 +90,7 @@ function phase(
     X::AbstractMatrix{Union{Missing, T}},
     H::AbstractMatrix{T};
     hapset::Union{Vector{OptimalHaplotypeSet}, Nothing} = nothing,
-    width::Int    = 700,
+    width::Int    = 400,
     verbose::Bool = true
     ) where T <: Real
 
