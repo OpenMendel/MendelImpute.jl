@@ -796,3 +796,44 @@ print(io, x, '\t', 0.0, "hi");
 close(io);
 
 
+
+
+using Revise
+using MendelImpute
+using DelimitedFiles
+using LinearAlgebra
+using BenchmarkTools
+using Random
+using ElasticArrays
+
+cd("/Users/biona001/.julia/dev/MendelImpute/data")
+
+rawdata = readdlm("AFRped_geno.txt", ',', Float32);
+people = 664;
+X = copy(Transpose(rawdata[1:people, 1:(end - 1)]));
+function create_hap(x)
+    n, p = size(x)
+    h = one(eltype(x))
+    for j in 1:p, i in 1:n
+        if x[i, j] != 0
+            x[i, j] -= h
+        end
+    end
+    return copy(Transpose(x))
+end
+H = create_hap(rawdata[(people + 1):end, 1:(end - 1)]);
+
+Random.seed!(123)
+missingprop = 0.1
+p, n = size(X)
+X2 = Matrix{Union{Missing, eltype(X)}}(X)
+Xm = ifelse.(rand(eltype(X), p, n) .< missingprop, missing, X2)
+Xm_original = copy(Xm)
+width = 64
+windows = floor(Int, p / width)
+
+ph = phase(Xm, H, width=64)
+
+@benchmark phase(Xm, H, width=64) seconds=15   # width 64  : 3.914 s, 401.31 MiB, 11887397 alloc (this includes calculating optimal hapset)
+@benchmark phase(Xm, H, width=400) seconds=15  # width 400 : 
+@benchmark phase(Xm, H, width=1200) seconds=15 # width 1200: 

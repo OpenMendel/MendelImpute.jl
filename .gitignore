@@ -3,8 +3,17 @@
 *.jl.mem
 .DS_Store
 .ipynb_checkpoints
+
+# don't track real data
 AFRped_geno.txt
 GBR_data.csv
 data/
+
+# don't track simulations 
 *.vcf
 *.vcf.gz
+*.m3vcf
+*.m3vcf.gz
+*.info
+*.log
+
