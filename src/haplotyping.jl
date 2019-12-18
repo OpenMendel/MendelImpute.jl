@@ -91,7 +91,8 @@ function phase(
     H::AbstractMatrix{T};
     hapset::Union{Vector{OptimalHaplotypeSet}, Nothing} = nothing,
     width::Int    = 400,
-    verbose::Bool = true
+    verbose::Bool = true,
+    Xtrue::Union{AbstractMatrix, Nothing} = nothing # for testing
     ) where T <: Real
 
     # declare some constants
@@ -101,7 +102,7 @@ function phase(
 
     # compute redundant haplotype sets. 
     if isnothing(hapset)
-        hapset = compute_optimal_halotype_set(X, H, width=width, verbose=verbose)
+        hapset = compute_optimal_halotype_set(X, H, width=width, verbose=verbose, Xtrue=Xtrue)
     end
 
     # allocate working arrays

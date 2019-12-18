@@ -66,7 +66,8 @@ function compute_optimal_halotype_set(
     X::AbstractMatrix{Union{Missing, T}},
     H::AbstractMatrix{T};
     width::Int    = 128,
-    verbose::Bool = true
+    verbose::Bool = true,
+    Xtrue::Union{AbstractMatrix, Nothing} = nothing # for testing
     ) where T <: Real
 
     # define some constants
@@ -89,9 +90,16 @@ function compute_optimal_halotype_set(
     Xwork_float = zeros(T, size(Xwork))
     M           = zeros(T, num_uniq, num_uniq)
     N           = ElasticArray{T}(undef, people, num_uniq)
+    
+    # for testing
+    if isnothing(Xtrue)
+        Xtrue_work = nothing
+    else
+        Xtrue_work = Xtrue[1:width, :]
+    end
 
     # In first window, calculate optimal haplotype pair among unique haplotypes
-    haploimpute!(Xwork, Hwork, M, N, happair, hapscore, Xfloat=Xwork_float)
+    haploimpute!(Xwork, Hwork, M, N, happair, hapscore, Xfloat=Xwork_float, Xtrue=Xtrue_work)
 
     # find all haplotypes matching the optimal haplotype pairs
     compute_redundant_haplotypes!(optimal_haplotypes, Hunique, happair, H, 1)
@@ -102,9 +110,10 @@ function compute_optimal_halotype_set(
         # sync Xwork and Hwork with original data
         cur_range = ((w - 1) * width + 1):(w * width)
         M = resize_and_sync!(Xwork, Hwork, Hunique.uniqueindex[w], cur_range, X, H, M, N)
+        isnothing(Xtrue) || copyto!(Xtrue_work, view(Xtrue, cur_range, :)) # for testing
 
         # Calculate optimal haplotype pair among unique haplotypes
-        haploimpute!(Xwork, Hwork, M, N, happair, hapscore, Xfloat=Xwork_float)
+        haploimpute!(Xwork, Hwork, M, N, happair, hapscore, Xfloat=Xwork_float, Xtrue=Xtrue_work)
 
         # find all haplotypes matching the optimal haplotype pairs
         compute_redundant_haplotypes!(optimal_haplotypes, Hunique, happair, H, w)
@@ -408,32 +417,48 @@ Initializes the matrix `Xfloat` where missing values of matrix `X` by `2 x` alle
 """
 function initmissing!(
     X::AbstractMatrix;
-    Xfloat::AbstractMatrix = zeros(Float32, size(X))
+    Xfloat::AbstractMatrix = zeros(eltype(X), size(X)),
+    Xtrue::Union{AbstractMatrix, Nothing} = nothing # for testing
     )
     
     T = eltype(X)
     p, n = size(X)
 
-    for i in 1:p
-        # allele frequency
-        cnnz = 0
-        csum = zero(T)
-        for j in 1:n
-            if !ismissing(X[i, j])
-                cnnz += 1
-                csum += X[i, j]
-            end
-        end
-        # set missing values to 2freq
-        imp = csum / cnnz
-        for j in 1:n
-            if ismissing(X[i, j]) 
-                Xfloat[i, j] = imp
+    if Xtrue != nothing
+        for j in 1:n, i in 1:p
+            if ismissing(X[i, j])
+                Xfloat[i, j] = Xtrue[i, j]
             else
                 Xfloat[i, j] = X[i, j]
             end
         end
+    else
+        for i in 1:p
+            # allele frequency
+            cnnz = 0
+            csum = zero(T)
+            for j in 1:n
+                if !ismissing(X[i, j])
+                    cnnz += 1
+                    csum += X[i, j]
+                end
+            end
+            # set missing values to 2freq
+            imp = csum / cnnz
+            for j in 1:n
+                if ismissing(X[i, j]) 
+                    Xfloat[i, j] = imp
+                else
+                    Xfloat[i, j] = X[i, j]
+                end
+            end
+        end
     end
+
+    # initialize using 0
+    # for i in 1:p, j in 1:n
+    #     Xfloat[i, j] = ifelse(ismissing(X[i, j]), zero(T), X[i, j])
+    # end
 
     return nothing
 end
@@ -465,11 +490,12 @@ function haploimpute!(
     hapscore::AbstractVector;
     Xfloat::AbstractMatrix = zeros(eltype(M), size(X)),
     maxiters::Int  = 1,
-    tolfun::Number = 1e-3
+    tolfun::Number = 1e-3,
+    Xtrue::Union{AbstractMatrix, Nothing} = nothing # for testing
     )
 
     obj = typemax(eltype(hapscore))
-    initmissing!(X, Xfloat=Xfloat) #Xfloat[i, j] = X[i, j] on observed entries
+    initmissing!(X, Xfloat=Xfloat, Xtrue=Xtrue) #Xfloat[i, j] = X[i, j] on observed entries
 
     # haplotyping
     haplopair!(Xfloat, H, M, N, happair, hapscore)
