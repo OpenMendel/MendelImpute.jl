@@ -355,31 +355,34 @@ function haplopair!(
 end
 
 """
-    fillmissing!(X, H, haplopair)
+    fillmissing!(Xm, Xwork, H, haplopair)
 
 Fill in missing genotypes in `X` according to haplotypes. Non-missing genotypes
 remain same.
 
 # Input
-* `X`: `p x n` genotype matrix. Each column is an individual.
+* `Xm`: `p x n` genotype matrix with missing values. Each column is an individual.
+* `Xwork`: `p x n` genotype matrix where missing values are filled with sum of 2 haplotypes.
 * `H`: `p x d` haplotype matrix. Each column is a haplotype.
 * `happair`: pair of haplotypes. `X[:, k] = H[:, happair[1][k]] + H[:, happair[2][k]]`.
 """
 function fillmissing!(
-    X::AbstractMatrix,
-    H::AbstractMatrix,
+    Xm::AbstractMatrix{Union{T, Missing}},
+    Xwork::AbstractMatrix{T},
+    H::AbstractMatrix{T},
     happair::Tuple{AbstractVector, AbstractVector},
-    )
+    ) where T <: Real
 
-    p, n = size(X)
-
+    p, n = size(Xm)
+    discrepancy = zero(promote_type(eltype(Xwork), eltype(H)))
     @inbounds for j in 1:n, i in 1:p
-        if ismissing(X[i, j])
-            X[i, j] = H[i, happair[1][j]] + H[i, happair[2][j]]
+        if ismissing(Xm[i, j])
+            tmp = H[i, happair[1][j]] + H[i, happair[2][j]]
+            discrepancy += abs2(Xwork[i, j] - tmp)
+            Xwork[i, j] = tmp
         end
     end
-
-    return nothing
+    return discrepancy
 end
 
 """
@@ -489,7 +492,7 @@ function haploimpute!(
     happair::Tuple{AbstractVector, AbstractVector},
     hapscore::AbstractVector;
     Xfloat::AbstractMatrix = zeros(eltype(M), size(X)),
-    maxiters::Int  = 1,
+    maxiters::Int  = 5,
     tolfun::Number = 1e-3,
     Xtrue::Union{AbstractMatrix, Nothing} = nothing # for testing
     )
@@ -497,12 +500,21 @@ function haploimpute!(
     obj = typemax(eltype(hapscore))
     initmissing!(X, Xfloat=Xfloat, Xtrue=Xtrue) #Xfloat[i, j] = X[i, j] on observed entries
 
-    # haplotyping
-    haplopair!(Xfloat, H, M, N, happair, hapscore)
-
-    # impute missing entries according to current haplotypes
-    # fillmissing!(X, H, happair)
-
+    # mm iteration
+    for iter in 1:maxiters
+        # haplotyping
+        haplopair!(Xfloat, H, M, N, happair, hapscore)
+        # impute missing entries according to current haplotypes
+        discrepancy = fillmissing!(X, Xfloat, H, happair)
+        # println("discrepancy = $discrepancy")
+        # convergence criterion
+        objold = obj
+        obj = sum(hapscore) - discrepancy
+        # println("iter = $iter, obj = $obj")
+        if abs(obj - objold) < tolfun * (objold + 1)
+            break
+        end
+    end
     return nothing
 end
 
