@@ -3,6 +3,7 @@
 *.jl.mem
 .DS_Store
 .ipynb_checkpoints
+biona001@hoffman2.idre.ucla.edu
 
 # don't track real data
 AFRped_geno.txt
