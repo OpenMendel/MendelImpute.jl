@@ -99,13 +99,15 @@ function compute_optimal_halotype_set(
     end
 
     # In first window, calculate optimal haplotype pair among unique haplotypes
-    haploimpute!(Xwork, Hwork, M, N, happair, hapscore, Xfloat=Xwork_float, Xtrue=Xtrue_work)
+    # haploimpute!(Xwork, Hwork, M, N, happair, hapscore, Xfloat=Xwork_float, Xtrue=Xtrue_work)
+    haploimpute2!(Xwork, Hwork, M, N, happair, hapscore, Xfloat=Xwork_float, Xtrue=Xtrue_work)
 
     # find all haplotypes matching the optimal haplotype pairs
     compute_redundant_haplotypes!(optimal_haplotypes, Hunique, happair, H, 1)
 
     #TODO: make this loop multithreaded 
     for w in 2:(windows-1)
+        println("running window $w / $windows now...")
 
         # sync Xwork and Hwork with original data
         cur_range = ((w - 1) * width + 1):(w * width)
@@ -113,7 +115,8 @@ function compute_optimal_halotype_set(
         isnothing(Xtrue) || copyto!(Xtrue_work, view(Xtrue, cur_range, :)) # for testing
 
         # Calculate optimal haplotype pair among unique haplotypes
-        haploimpute!(Xwork, Hwork, M, N, happair, hapscore, Xfloat=Xwork_float, Xtrue=Xtrue_work)
+        # haploimpute!(Xwork, Hwork, M, N, happair, hapscore, Xfloat=Xwork_float, Xtrue=Xtrue_work)
+        haploimpute2!(Xwork, Hwork, M, N, happair, hapscore, Xfloat=Xwork_float, Xtrue=Xtrue_work)
 
         # find all haplotypes matching the optimal haplotype pairs
         compute_redundant_haplotypes!(optimal_haplotypes, Hunique, happair, H, w)
@@ -124,7 +127,8 @@ function compute_optimal_halotype_set(
     if mod(length(last_range), width) == 0
         #resize the typical way if the last window has the same width as previous windows
         M = resize_and_sync!(Xwork, Hwork, Hunique.uniqueindex[end], last_range, X, H, M, N)
-        haploimpute!(Xwork, Hwork, M, N, happair, hapscore)
+        # haploimpute!(Xwork, Hwork, M, N, happair, hapscore)
+        haploimpute2!(Xwork, Hwork, M, N, happair, hapscore)
         compute_redundant_haplotypes!(optimal_haplotypes, Hunique, happair, H, windows)
     else
         #reallocate everything 
@@ -133,7 +137,8 @@ function compute_optimal_halotype_set(
         Xwork       = X[last_range, :]
         M           = zeros(T, num_uniq, num_uniq)
         N           = zeros(T, people, num_uniq)
-        haploimpute!(Xwork, Hwork, M, N, happair, hapscore)
+        # haploimpute!(Xwork, Hwork, M, N, happair, hapscore)
+        haploimpute2!(Xwork, Hwork, M, N, happair, hapscore)
         compute_redundant_haplotypes!(optimal_haplotypes, Hunique, happair, H, windows)
     end
 
@@ -525,6 +530,38 @@ function haploimpute!(
         # println("iter = $iter, obj = $obj")
         if abs(obj - objold) < tolfun * (objold + 1)
             break
+        end
+    end
+    return nothing
+end
+
+function haploimpute2!(
+    X::AbstractMatrix,
+    H::AbstractMatrix,
+    M::AbstractMatrix,
+    N::AbstractMatrix,
+    happair::Tuple{AbstractVector, AbstractVector},
+    hapscore::AbstractVector;
+    Xfloat::AbstractMatrix = zeros(eltype(M), size(X)),
+    maxiters::Int  = 1,
+    tolfun::Number = 1e-3,
+    Xtrue::Union{AbstractMatrix, Nothing} = nothing # for testing
+    )
+
+    n = size(X, 2)
+    d = size(H, 2)
+    obj = typemax(eltype(hapscore))
+    fill!(hapscore, typemax(eltype(hapscore)))
+
+    for i in 1:n
+        Xi = @view(X[:, i])
+        for j in 1:d, k in j:d
+            Hj = @view(H[:, j])
+            Hk = @view(H[:, k])
+            score = mapreduce(x -> x^2, +, skipmissing(Xi - Hj - Hk)) # perhaps try other norms?
+            if score < hapscore[i]
+                hapscore[i], happair[1][i], happair[2][i] = score, j, k
+            end
         end
     end
     return nothing
