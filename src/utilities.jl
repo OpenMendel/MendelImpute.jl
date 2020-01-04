@@ -456,6 +456,18 @@ function initmissing!(
                 end
             end
         end
+        # impute using mode
+        # for i in 1:p
+        #     # set missing values to mode
+        #     imp = mode(@view(X[i, :]))
+        #     for j in 1:n
+        #         if ismissing(X[i, j]) 
+        #             Xfloat[i, j] = imp
+        #         else
+        #             Xfloat[i, j] = X[i, j]
+        #         end
+        #     end
+        # end
     end
 
     # initialize using 0
@@ -492,7 +504,7 @@ function haploimpute!(
     happair::Tuple{AbstractVector, AbstractVector},
     hapscore::AbstractVector;
     Xfloat::AbstractMatrix = zeros(eltype(M), size(X)),
-    maxiters::Int  = 5,
+    maxiters::Int  = 1,
     tolfun::Number = 1e-3,
     Xtrue::Union{AbstractMatrix, Nothing} = nothing # for testing
     )
@@ -506,7 +518,7 @@ function haploimpute!(
         haplopair!(Xfloat, H, M, N, happair, hapscore)
         # impute missing entries according to current haplotypes
         discrepancy = fillmissing!(X, Xfloat, H, happair)
-        # println("discrepancy = $discrepancy")
+        # println("iter = $iter, discrepancy = $discrepancy")
         # convergence criterion
         objold = obj
         obj = sum(hapscore) - discrepancy
