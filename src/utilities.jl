@@ -155,7 +155,7 @@ function compute_redundant_haplotypes!(
     H::AbstractMatrix,
     window::Int,
     )
-
+    
     people = length(optimal_haplotypes)
 
     @inbounds for k in 1:people
@@ -177,6 +177,59 @@ function compute_redundant_haplotypes!(
         for jj in 1:size(H, 2)
             map1[jj] == H_i && (hap1[jj] = true)
             map2[jj] == H_j && (hap2[jj] = true)
+        end
+    end
+
+    # for k in 1:people, happair in happairs[k]
+    #     Hi_uniqueidx = happair[1]
+    #     Hj_uniqueidx = happair[2]
+    #     # println("person $k's optimal haplotype pairs are: $((Hi_uniqueidx, Hj_uniqueidx))")
+
+    #     Hi_idx = Hunique.uniqueindex[window][Hi_uniqueidx]
+    #     Hj_idx = Hunique.uniqueindex[window][Hj_uniqueidx]
+    #     # println("person $k's optimal haplotype pairs are located at columns $Hi_idx and $Hj_idx in current window of H")
+
+    #     # loop through all haplotypes and find ones that match either of the optimal haplotypes 
+    #     mapping = Hunique.hapmap[window]
+    #     redunhaps_bitvec1 = optimal_haplotypes[k].strand1[window]
+    #     redunhaps_bitvec2 = optimal_haplotypes[k].strand2[window]
+    #     for jj in 1:size(H, 2)
+    #         mapping[jj] == Hi_idx && (redunhaps_bitvec1[jj] = true)
+    #         mapping[jj] == Hj_idx && (redunhaps_bitvec2[jj] = true)
+    #     end
+    # end
+
+    return nothing
+end
+
+function compute_redundant_haplotypes2!(
+    optimal_haplotypes::Vector{OptimalHaplotypeSet}, 
+    Hunique::UniqueHaplotypeMaps, 
+    happairs::Vector{Vector{Tuple{Int, Int}}}, 
+    H::AbstractMatrix,
+    window::Int,
+    )
+
+    people = length(optimal_haplotypes)
+
+    @inbounds for k in 1:people
+        for happair in happairs[k]
+            Hi_uniqueidx = happair[1]
+            Hj_uniqueidx = happair[2]
+            # println("person $k's optimal haplotype pairs are: $((Hi_uniqueidx, Hj_uniqueidx))")
+
+            Hi_idx = Hunique.uniqueindex[window][Hi_uniqueidx]
+            Hj_idx = Hunique.uniqueindex[window][Hj_uniqueidx]
+            # println("person $k's optimal haplotype pairs are located at columns $Hi_idx and $Hj_idx in current window of H")
+
+            # loop through all haplotypes and find ones that match either of the optimal haplotypes 
+            mapping = Hunique.hapmap[window]
+            redunhaps_bitvec1 = optimal_haplotypes[k].strand1[window]
+            redunhaps_bitvec2 = optimal_haplotypes[k].strand2[window]
+            for jj in 1:size(H, 2)
+                mapping[jj] == Hi_idx && (redunhaps_bitvec1[jj] = true)
+                mapping[jj] == Hj_idx && (redunhaps_bitvec2[jj] = true)
+            end
         end
     end
 
@@ -387,7 +440,7 @@ function fillmissing!(
     discrepancy = zero(promote_type(eltype(Xwork), eltype(H)))
     @inbounds for j in 1:n, i in 1:p
         if ismissing(Xm[i, j])
-            first_happair = happairs[i][1] #choose the first optimal happair
+            first_happair = happairs[j][1] #choose the first optimal happair for now
             tmp = H[i, first_happair[1]] + H[i, first_happair[2]]
             discrepancy += abs2(Xwork[i, j] - tmp)
             Xwork[i, j] = tmp
@@ -527,13 +580,14 @@ function haploimpute!(
     for iter in 1:maxiters
         # haplotyping
         haplopair!(Xfloat, H, M, N, happairs, hapscore)
+        # screen for best haplotype pair
+        choose_happair!(X, H, happairs, hapscore)
         # impute missing entries according to current haplotypes
         discrepancy = fillmissing!(X, Xfloat, H, happairs)
-        # println("iter = $iter, discrepancy = $discrepancy")
         # convergence criterion
         objold = obj
         obj = sum(hapscore) - discrepancy
-        # println("iter = $iter, obj = $obj")
+        # println("iter = $iter, discrepancy = $discrepancy, obj = $obj")
         if abs(obj - objold) < tolfun * (objold + 1)
             break
         end
@@ -541,35 +595,63 @@ function haploimpute!(
     return nothing
 end
 
-function haploimpute2!(
-    X::AbstractMatrix,
-    H::AbstractMatrix,
-    M::AbstractMatrix,
-    N::AbstractMatrix,
-    happair::Tuple{AbstractVector, AbstractVector},
-    hapscore::AbstractVector;
-    Xfloat::AbstractMatrix = zeros(eltype(M), size(X)),
-    maxiters::Int  = 1,
-    tolfun::Number = 1e-3,
-    Xtrue::Union{AbstractMatrix, Nothing} = nothing # for testing
-    )
+"""
+    choose_happair!(X, H, happairs, hapscore)
 
+Calculates error ||x - hi - hj||^2 only on the observed entries and save result in `hapscore`.
+`happairs` will keep only the best haplotype pair based on the error of observed entries. 
+"""
+function choose_happair!(
+    X::AbstractMatrix{Union{Missing, T}},
+    H::AbstractMatrix,
+    happairs::Vector{Vector{Tuple{Int, Int}}},
+    hapscore::AbstractVector;
+    ) where T <: Real
+
+    p = size(X, 1)
     n = size(X, 2)
     d = size(H, 2)
-    obj = typemax(eltype(hapscore))
-    fill!(hapscore, typemax(eltype(hapscore)))
+    p == size(H, 1) || error("Dimension mismatch: size(X, 1) = $p but size(H, 1) = $(size(H, 1))")
 
-    for i in 1:n
-        Xi = @view(X[:, i])
-        for j in 1:d, k in j:d
-            Hj = @view(H[:, j])
-            Hk = @view(H[:, k])
-            score = mapreduce(x -> x^2, +, skipmissing(Xi - Hj - Hk)) # perhaps try other norms?
-            if score < hapscore[i]
-                hapscore[i], happair[1][i], happair[2][i] = score, j, k
+    # for i in 1:n
+    #     Xi = @view(X[:, i])
+    #     for j in 1:d, k in j:d
+    #         Hj = @view(H[:, j])
+    #         Hk = @view(H[:, k])
+    #         score = mapreduce(x -> x^2, +, skipmissing(Xi - Hj - Hk)) # perhaps try other norms?
+    #         if score < hapscore[i]
+    #             hapscore[i], happair[1][i], happair[2][i] = score, j, k
+    #         end
+    #     end
+    # end
+
+    # loop over each person's genotype
+    for j in 1:n
+        best_error = typemax(eltype(hapscore))
+        best_happair = (0, 0)
+        for happair in happairs[j]
+            # compute errors for each pair based on observed entries
+            h1, h2 = happair[1], happair[2]
+            err = 0
+            for i in 1:p
+                if X[i, j] !== missing 
+                    err += (X[i, j] - H[i, h1] - H[i, h2])^2
+                end
+            end
+            if err < best_error
+                best_error = err
+                best_happair = happair
             end
         end
+
+        # keep only best haplotype pair in happairs
+        if length(happairs[j]) > 1
+            empty!(happairs[j])
+            push!(happairs[j], best_happair)
+        end
+        hapscore[j] = best_error
     end
+
     return nothing
 end
 
