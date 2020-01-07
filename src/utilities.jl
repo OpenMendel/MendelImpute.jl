@@ -613,18 +613,6 @@ function choose_happair!(
     d = size(H, 2)
     p == size(H, 1) || error("Dimension mismatch: size(X, 1) = $p but size(H, 1) = $(size(H, 1))")
 
-    # for i in 1:n
-    #     Xi = @view(X[:, i])
-    #     for j in 1:d, k in j:d
-    #         Hj = @view(H[:, j])
-    #         Hk = @view(H[:, k])
-    #         score = mapreduce(x -> x^2, +, skipmissing(Xi - Hj - Hk)) # perhaps try other norms?
-    #         if score < hapscore[i]
-    #             hapscore[i], happair[1][i], happair[2][i] = score, j, k
-    #         end
-    #     end
-    # end
-
     # loop over each person's genotype
     for j in 1:n
         best_error = typemax(eltype(hapscore))
@@ -632,7 +620,7 @@ function choose_happair!(
         for happair in happairs[j]
             # compute errors for each pair based on observed entries
             h1, h2 = happair[1], happair[2]
-            err = 0
+            err = zero(eltype(H))
             for i in 1:p
                 if X[i, j] !== missing 
                     err += (X[i, j] - H[i, h1] - H[i, h2])^2
@@ -649,7 +637,7 @@ function choose_happair!(
             empty!(happairs[j])
             push!(happairs[j], best_happair)
         end
-        hapscore[j] = best_error
+        hapscore[j] = convert(eltype(hapscore), best_error)
     end
 
     return nothing
