@@ -392,9 +392,10 @@ sufficient statistics `M` and `N`.
 function haplopair!(
     happairs::Vector{Vector{Tuple{Int, Int}}},
     hapmin::Vector,
-    M::AbstractMatrix,
-    N::AbstractMatrix
-    )
+    M::AbstractMatrix{T},
+    N::AbstractMatrix{T},
+    interval::T = convert(T, 3)
+    ) where T <: Real
 
     n, d = size(N)
     fill!(hapmin, typemax(eltype(hapmin)))
@@ -404,10 +405,35 @@ function haplopair!(
         # loop over individuals
         @simd for i in 1:n
             score = M[j, k] - N[i, j] - N[i, k]
-            if score == hapmin[i]
-                push!(happairs[i], (j, k))
-            elseif score < hapmin[i]
-                empty!(happairs[i])
+
+            # keep best happair (original code)
+            # if score < hapmin[i]
+            #     empty!(happairs[i])
+            #     push!(happairs[i], (j, k))
+            #     hapmin[i] = score
+            # end
+
+            # keep all happairs that are equally good
+            # if score == hapmin[i]
+            #     push!(happairs[i], (j, k))
+            # elseif score < hapmin[i]
+            #     empty!(happairs[i])
+            #     push!(happairs[i], (j, k))
+            #     hapmin[i] = score
+            # end
+
+            # keep top 10 haplotype pairs
+            # if score < hapmin[i]
+            #     length(happairs[i]) == 10 && popfirst!(happairs[i])
+            #     push!(happairs[i], (j, k))
+            #     hapmin[i] = score
+            # elseif score <= hapmin[i] + interval
+            #     length(happairs[i]) == 10 && popfirst!(happairs[i])
+            #     push!(happairs[i], (j, k))
+            # end
+
+            # keep all previous best pairs
+            if score < hapmin[i]
                 push!(happairs[i], (j, k))
                 hapmin[i] = score
             end
@@ -578,10 +604,22 @@ function haploimpute!(
 
     # mm iteration
     for iter in 1:maxiters
-        # haplotyping
+        # compute top 10 haplotype pairs for each genotype vector
         haplopair!(Xfloat, H, M, N, happairs, hapscore)
         # screen for best haplotype pair
+
+        # println(happairs[1])
+        # println(happairs[20])
+        # println(happairs[30])
+        # println(length.(happairs))
+
         choose_happair!(X, H, happairs, hapscore)
+
+        # println(happairs[1])
+        # println(happairs[20])
+        # println(happairs[30])
+        # fdsa
+
         # impute missing entries according to current haplotypes
         discrepancy = fillmissing!(X, Xfloat, H, happairs)
         # convergence criterion
@@ -615,12 +653,12 @@ function choose_happair!(
 
     # loop over each person's genotype
     for j in 1:n
-        best_error = typemax(eltype(hapscore))
+        best_error = typemax(eltype(H))
         best_happair = (0, 0)
         for happair in happairs[j]
             # compute errors for each pair based on observed entries
             h1, h2 = happair[1], happair[2]
-            err = zero(eltype(H))
+            err = zero(promote_type(eltype(X), eltype(H)))
             for i in 1:p
                 if X[i, j] !== missing 
                     err += (X[i, j] - H[i, h1] - H[i, h2])^2
