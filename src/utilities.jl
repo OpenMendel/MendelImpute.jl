@@ -108,6 +108,7 @@ function compute_optimal_halotype_set(
     #TODO: make this loop multithreaded 
     for w in 2:(windows-1)
         # sync Xwork and Hwork with original data
+        # cur_range = ((w - 2) * width + 1):((w + 1) * width) # includes flanking windows
         cur_range = ((w - 1) * width + 1):(w * width)
         M = resize_and_sync!(Xwork, Hwork, Hunique.uniqueindex[w], cur_range, X, H, M, N)
         isnothing(Xtrue) || copyto!(Xtrue_work, view(Xtrue, cur_range, :)) # for testing
@@ -604,22 +605,10 @@ function haploimpute!(
 
     # mm iteration
     for iter in 1:maxiters
-        # compute top 10 haplotype pairs for each genotype vector
+        # compute top haplotype pairs for each genotype vector
         haplopair!(Xfloat, H, M, N, happairs, hapscore)
         # screen for best haplotype pair
-
-        # println(happairs[1])
-        # println(happairs[20])
-        # println(happairs[30])
-        # println(length.(happairs))
-
         choose_happair!(X, H, happairs, hapscore)
-
-        # println(happairs[1])
-        # println(happairs[20])
-        # println(happairs[30])
-        # fdsa
-
         # impute missing entries according to current haplotypes
         discrepancy = fillmissing!(X, Xfloat, H, happairs)
         # convergence criterion
@@ -655,11 +644,11 @@ function choose_happair!(
     for j in 1:n
         best_error = typemax(eltype(H))
         best_happair = (0, 0)
-        for happair in happairs[j]
+        @inbounds for happair in happairs[j]
             # compute errors for each pair based on observed entries
             h1, h2 = happair[1], happair[2]
             err = zero(promote_type(eltype(X), eltype(H)))
-            for i in 1:p
+            @simd for i in 1:p
                 if X[i, j] !== missing 
                     err += (X[i, j] - H[i, h1] - H[i, h2])^2
                 end

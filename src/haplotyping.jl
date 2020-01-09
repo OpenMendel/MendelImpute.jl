@@ -177,7 +177,6 @@ function phase(
     end
 
     # find optimal break points and record info to phase. 
-    # TODO: handle last window separately since view() on X or H is not complete
     strand1_intersect = chain_next[1]
     strand2_intersect = chain_next[2]
     for i in 1:people, w in 2:windows
@@ -190,6 +189,20 @@ function phase(
             s2 = findfirst(hapset[i].strand2[w]) :: Int64
             s1_cur  = findfirst(hapset[i].strand1[w - 1]) :: Int64
             s1_next = findfirst(hapset[i].strand1[w]) :: Int64
+
+            redundant_idx = findall(isone, hapset[i].strand1[w - 1])
+            println(all(Hi[:, redundant_idx[1]] .== Hi[:, redundant_idx[2]]))
+            println(all(Hi[:, redundant_idx[2]] .== Hi[:, redundant_idx[3]]))
+            println(all(Hi[:, redundant_idx[3]] .== Hi[:, redundant_idx[4]]))
+            println(all(Hi[:, redundant_idx[4]] .== Hi[:, redundant_idx[5]]))
+            println(all(Hi[:, redundant_idx[5]] .== Hi[:, redundant_idx[6]]))
+            println(all(Hi[:, redundant_idx[6]] .== Hi[:, redundant_idx[7]]))
+            println(all(Hi[:, redundant_idx[7]] .== Hi[:, redundant_idx[8]]))
+            fdsa
+
+            # s2 = rand(findall(isone, hapset[i].strand2[w]))
+            # s1_cur = rand(findall(isone, hapset[i].strand1[w - 1]))
+            # s1_next = rand(findall(isone, hapset[i].strand1[w]))
             bkpt, err_optim = search_breakpoint(Xi, Hi, s2, (s1_cur, s1_next))
 
             # record info into phase
@@ -205,6 +218,9 @@ function phase(
             s1 = findfirst(hapset[i].strand1[w]) :: Int64
             s2_cur  = findfirst(hapset[i].strand2[w - 1]) :: Int64
             s2_next = findfirst(hapset[i].strand2[w]) :: Int64
+            # s1 = rand(findall(isone, hapset[i].strand1[w]))
+            # s2_cur = rand(findall(isone, hapset[i].strand2[w - 1]))
+            # s2_next = rand(findall(isone, hapset[i].strand2[w]))
             bkpt, err_optim = search_breakpoint(Xi, Hi, s1, (s2_cur, s2_next))
 
             # record info into phase
