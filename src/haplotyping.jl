@@ -191,13 +191,16 @@ function phase(
             s1_next = findfirst(hapset[i].strand1[w]) :: Int64
 
             redundant_idx = findall(isone, hapset[i].strand1[w - 1])
-            println(all(Hi[:, redundant_idx[1]] .== Hi[:, redundant_idx[2]]))
-            println(all(Hi[:, redundant_idx[2]] .== Hi[:, redundant_idx[3]]))
-            println(all(Hi[:, redundant_idx[3]] .== Hi[:, redundant_idx[4]]))
-            println(all(Hi[:, redundant_idx[4]] .== Hi[:, redundant_idx[5]]))
-            println(all(Hi[:, redundant_idx[5]] .== Hi[:, redundant_idx[6]]))
-            println(all(Hi[:, redundant_idx[6]] .== Hi[:, redundant_idx[7]]))
-            println(all(Hi[:, redundant_idx[7]] .== Hi[:, redundant_idx[8]]))
+            println(w)
+            println(all(Hi[((w - 1) * width + 1):(w * width), redundant_idx[1]] .== Hi[((w - 1) * width + 1):(w * width), redundant_idx[2]]))
+            println(all(Hi[((w - 1) * width + 1):(w * width), redundant_idx[2]] .== Hi[((w - 1) * width + 1):(w * width), redundant_idx[3]]))
+            println(all(Hi[((w - 1) * width + 1):(w * width), redundant_idx[3]] .== Hi[((w - 1) * width + 1):(w * width), redundant_idx[4]]))
+            println(all(Hi[((w - 1) * width + 1):(w * width), redundant_idx[4]] .== Hi[((w - 1) * width + 1):(w * width), redundant_idx[5]]))
+            println(all(Hi[((w - 2) * width + 1):((w - 1) * width + 1), redundant_idx[5]] .== Hi[((w - 2) * width + 1):((w - 1) * width + 1), redundant_idx[6]]))
+            println(all(Hi[((w - 2) * width + 1):((w - 1) * width + 1), redundant_idx[6]] .== Hi[((w - 2) * width + 1):((w - 1) * width + 1), redundant_idx[7]]))
+            println(all(Hi[((w - 2) * width + 1):((w - 1) * width + 1), redundant_idx[7]] .== Hi[((w - 2) * width + 1):((w - 1) * width + 1), redundant_idx[8]]))
+            println(Hi[((w - 2) * width + 1):((w - 1) * width + 1), redundant_idx[5]])
+            println(Hi[((w - 2) * width + 1):((w - 1) * width + 1), redundant_idx[6]])
             fdsa
 
             # s2 = rand(findall(isone, hapset[i].strand2[w]))
