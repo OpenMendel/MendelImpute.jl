@@ -625,8 +625,9 @@ end
 """
     choose_happair!(X, H, happairs, hapscore)
 
-Calculates error ||x - hi - hj||^2 only on the observed entries and save result in `hapscore`.
-`happairs` will keep only the best haplotype pair based on the error of observed entries. 
+Calculates error ||x - hi - hj||^2 only on the observed entries and save observed error in `hapscore`.
+`happairs` will keep only the best haplotype pairs based on the error of observed entries. All happairs
+that attain the best observed error will be kept.
 """
 function choose_happair!(
     X::AbstractMatrix{Union{Missing, T}},
@@ -641,9 +642,10 @@ function choose_happair!(
     p == size(H, 1) || error("Dimension mismatch: size(X, 1) = $p but size(H, 1) = $(size(H, 1))")
 
     # loop over each person's genotype
+    best_happair = Tuple{Int, Int}[]
     for j in 1:n
         best_error = typemax(eltype(H))
-        best_happair = (0, 0)
+        empty!(best_happair)
         @inbounds for happair in happairs[j]
             # compute errors for each pair based on observed entries
             h1, h2 = happair[1], happair[2]
@@ -655,14 +657,19 @@ function choose_happair!(
             end
             if err < best_error
                 best_error = err
-                best_happair = happair
+                empty!(best_happair)
+                push!(best_happair, happair)
+            elseif err == best_error
+                push!(best_happair, happair)
             end
         end
 
         # keep only best haplotype pair in happairs
         if length(happairs[j]) > 1
             empty!(happairs[j])
-            push!(happairs[j], best_happair)
+            for pair in best_happair
+                push!(happairs[j], pair)
+            end
         end
         hapscore[j] = convert(eltype(hapscore), best_error)
     end
