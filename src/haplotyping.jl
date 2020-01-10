@@ -184,29 +184,29 @@ function phase(
         strand1_intersect .= hapset[i].strand1[w - 1] .& hapset[i].strand1[w]
         strand2_intersect .= hapset[i].strand2[w - 1] .& hapset[i].strand2[w]
  
-        # if sum(strand1_intersect) == 0 && sum(strand2_intersect) == 0 
-        #     Xi = view(X, ((w - 2) * width + 1):(w * width), i)
-        #     Hi = view(H, ((w - 2) * width + 1):(w * width), :)
-        #     s1_cur  = findfirst(hapset[i].strand1[w - 1]) :: Int64
-        #     s1_next = findfirst(hapset[i].strand1[w]) :: Int64
-        #     s2_cur  = findfirst(hapset[i].strand2[w - 1]) :: Int64
-        #     s2_next = findfirst(hapset[i].strand2[w]) :: Int64
-        #     bkpt, err_optim = search_breakpoint(Xi, Hi, (s1_cur, s1_next), (s2_cur, s2_next))
+        if sum(strand1_intersect) == 0 && sum(strand2_intersect) == 0 
+            Xi = view(X, ((w - 2) * width + 1):(w * width), i)
+            Hi = view(H, ((w - 2) * width + 1):(w * width), :)
+            s1_prev = phase[i].strand1.haplotypelabel[end]
+            s2_prev = phase[i].strand2.haplotypelabel[end]
+            s1_next = findfirst(hapset[i].strand1[w]) :: Int64
+            s2_next = findfirst(hapset[i].strand2[w]) :: Int64
+            bkpt, err_optim = search_breakpoint(Xi, Hi, (s1_prev, s1_next), (s2_prev, s2_next))
 
-        #     # record info into phase
-        #     push!(phase[i].strand1.start, (w - 2) * width + 1 + bkpt[1])
-        #     push!(phase[i].strand2.start, (w - 2) * width + 1 + bkpt[2])
-        #     push!(phase[i].strand1.haplotypelabel, s1_next)
-        #     push!(phase[i].strand2.haplotypelabel, s2_next)
-        # else
+            # record info into phase
+            push!(phase[i].strand1.start, (w - 2) * width + 1 + bkpt[1])
+            push!(phase[i].strand2.start, (w - 2) * width + 1 + bkpt[2])
+            push!(phase[i].strand1.haplotypelabel, s1_next)
+            push!(phase[i].strand2.haplotypelabel, s2_next)
+        else
             if sum(strand1_intersect) == 0
                 # search strand1 breakpoints
                 Xi = view(X, ((w - 2) * width + 1):(w * width), i)
                 Hi = view(H, ((w - 2) * width + 1):(w * width), :)
                 s2 = findfirst(hapset[i].strand2[w]) :: Int64
-                s1_cur  = findfirst(hapset[i].strand1[w - 1]) :: Int64
+                s1_prev = phase[i].strand1.haplotypelabel[end]
                 s1_next = findfirst(hapset[i].strand1[w]) :: Int64
-                bkpt, err_optim = search_breakpoint(Xi, Hi, s2, (s1_cur, s1_next))
+                bkpt, err_optim = search_breakpoint(Xi, Hi, s2, (s1_prev, s1_next))
                 # record info into phase
                 push!(phase[i].strand1.start, (w - 2) * width + 1 + bkpt)
                 push!(phase[i].strand1.haplotypelabel, s1_next)
@@ -236,9 +236,9 @@ function phase(
                 Xi = view(X, ((w - 2) * width + 1):(w * width), i)
                 Hi = view(H, ((w - 2) * width + 1):(w * width), :)
                 s1 = findfirst(hapset[i].strand1[w]) :: Int64
-                s2_cur  = findfirst(hapset[i].strand2[w - 1]) :: Int64
+                s2_prev = phase[i].strand2.haplotypelabel[end]
                 s2_next = findfirst(hapset[i].strand2[w]) :: Int64
-                bkpt, err_optim = search_breakpoint(Xi, Hi, s1, (s2_cur, s2_next))
+                bkpt, err_optim = search_breakpoint(Xi, Hi, s1, (s2_prev, s2_next))
                 # record info into phase
                 push!(phase[i].strand2.start, (w - 2) * width + 1 + bkpt)
                 push!(phase[i].strand2.haplotypelabel, s2_next)
@@ -263,7 +263,7 @@ function phase(
                 # push!(phase[i].strand2.start, (w - 2) * width + 1 + best_bktp)
                 # push!(phase[i].strand2.haplotypelabel, best_s2_next)
             end
-        # end
+        end
     end
 
     return phase 
