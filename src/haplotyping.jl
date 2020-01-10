@@ -92,7 +92,8 @@ function phase(
     hapset::Union{Vector{OptimalHaplotypeSet}, Nothing} = nothing,
     width::Int    = 400,
     verbose::Bool = true,
-    Xtrue::Union{AbstractMatrix, Nothing} = nothing # for testing
+    Xtrue::Union{AbstractMatrix, Nothing} = nothing, # for testing
+    fast_method::Bool = true
     ) where T <: Real
 
     # declare some constants
@@ -184,7 +185,7 @@ function phase(
         strand1_intersect .= hapset[i].strand1[w - 1] .& hapset[i].strand1[w]
         strand2_intersect .= hapset[i].strand2[w - 1] .& hapset[i].strand2[w]
  
-        if sum(strand1_intersect) == 0 && sum(strand2_intersect) == 0 
+        if sum(strand1_intersect) == 0 && sum(strand2_intersect) == 0 && !fast_method
             Xi = view(X, ((w - 2) * width + 1):(w * width), i)
             Hi = view(H, ((w - 2) * width + 1):(w * width), :)
             s1_prev = phase[i].strand1.haplotypelabel[end]
