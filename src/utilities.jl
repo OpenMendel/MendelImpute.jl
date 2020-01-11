@@ -411,9 +411,7 @@ function haplopair!(
             end
 
             # keep all previous best pairs and equally good pairs
-            # if score == hapmin[i]
-            #     push!(happairs[i], (j, k))
-            # elseif score < hapmin[i]
+            # if score <= hapmin[i]
             #     push!(happairs[i], (j, k))
             #     hapmin[i] = score
             # end
@@ -443,16 +441,22 @@ function fillmissing!(
     ) where T <: Real
 
     p, n = size(Xm)
-    discrepancy = zero(promote_type(eltype(Xwork), eltype(H)))
-    @inbounds for j in 1:n, i in 1:p
-        if ismissing(Xm[i, j])
-            first_happair = happairs[j][1] #choose the first optimal happair for now
-            tmp = H[i, first_happair[1]] + H[i, first_happair[2]]
-            discrepancy += abs2(Xwork[i, j] - tmp)
-            Xwork[i, j] = tmp
+    best_discrepancy = typemax(eltype(Xwork))
+    
+    for j in 1:n, happair in happairs[j]
+        discrepancy = zero(promote_type(eltype(Xwork), eltype(H)))
+        for i in 1:p
+            if ismissing(Xm[i, j])
+                tmp = H[i, happair[1]] + H[i, happair[2]]
+                discrepancy += abs2(Xwork[i, j] - tmp)
+                Xwork[i, j] = tmp
+            end
+        end
+        if discrepancy < best_discrepancy
+            best_discrepancy = discrepancy
         end
     end
-    return discrepancy
+    return best_discrepancy
 end
 
 """
@@ -586,7 +590,7 @@ function haploimpute!(
     for iter in 1:maxiters
         # compute top haplotype pairs for each genotype vector
         haplopair!(Xfloat, H, M, N, happairs, hapscore)
-        # screen for best haplotype pair
+        # screen for best haplotype pair based on observed entries
         choose_happair!(X, H, happairs, hapscore)
         # impute missing entries according to current haplotypes
         discrepancy = fillmissing!(X, Xfloat, H, happairs)
@@ -625,11 +629,11 @@ function choose_happair!(
     for j in 1:n
         best_error = typemax(eltype(H))
         empty!(best_happair)
-        @inbounds for happair in happairs[j]
+        for happair in happairs[j]
             # compute errors for each pair based on observed entries
             h1, h2 = happair[1], happair[2]
             err = zero(promote_type(eltype(X), eltype(H)))
-            @simd for i in 1:p
+            @inbounds @simd for i in 1:p
                 if X[i, j] !== missing 
                     err += (X[i, j] - H[i, h1] - H[i, h2])^2
                 end

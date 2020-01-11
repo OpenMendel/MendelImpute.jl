@@ -199,10 +199,10 @@ function phase(
             push!(phase[i].strand1.haplotypelabel, s1_next)
             push!(phase[i].strand2.haplotypelabel, s2_next)
         else
+            Xi = view(X, ((w - 2) * width + 1):(w * width), i)
+            Hi = view(H, ((w - 2) * width + 1):(w * width), :)
             if sum(strand1_intersect) == 0
                 # search strand1 breakpoints
-                # Xi = view(X, ((w - 2) * width + 1):(w * width), i)
-                # Hi = view(H, ((w - 2) * width + 1):(w * width), :)
                 # s2 = findfirst(hapset[i].strand2[w]) :: Int64
                 # s1_prev = phase[i].strand1.haplotypelabel[end]
                 # s1_next = findfirst(hapset[i].strand1[w]) :: Int64
@@ -212,8 +212,6 @@ function phase(
                 # push!(phase[i].strand1.haplotypelabel, s1_next)
 
                 # search breakpoints among all possible haplotypes (this improves error slightly but quite slow)
-                Xi = view(X, ((w - 2) * width + 1):(w * width), i)
-                Hi = view(H, ((w - 2) * width + 1):(w * width), :)
                 s1_prev = phase[i].strand1.haplotypelabel[end]
                 next_win_s1 = findall(hapset[i].strand1[w])
                 s2_win_next = findall(hapset[i].strand2[w])
@@ -233,8 +231,6 @@ function phase(
 
             if sum(strand2_intersect) == 0
                 # search strand2 breakpoints
-                # Xi = view(X, ((w - 2) * width + 1):(w * width), i)
-                # Hi = view(H, ((w - 2) * width + 1):(w * width), :)
                 # s1 = findfirst(hapset[i].strand1[w]) :: Int64
                 # s2_prev = phase[i].strand2.haplotypelabel[end]
                 # s2_next = findfirst(hapset[i].strand2[w]) :: Int64
@@ -244,8 +240,6 @@ function phase(
                 # push!(phase[i].strand2.haplotypelabel, s2_next)
 
                 # search breakpoints among all possible haplotypes (this improves error slightly but quite slow)
-                Xi = view(X, ((w - 2) * width + 1):(w * width), i)
-                Hi = view(H, ((w - 2) * width + 1):(w * width), :)
                 s2_prev = phase[i].strand2.haplotypelabel[end]
                 s2_win_next = findall(hapset[i].strand2[w])
                 s1_win_next = findall(hapset[i].strand1[w])
