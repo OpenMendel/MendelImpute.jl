@@ -5,6 +5,7 @@ module MendelImpute
     #needed for groupslices function
     import Base.hash
     import Base.Cartesian, Base.Cartesian.@nloops, Base.Cartesian.@nref
+    import StatsBase: sample
 
     using LinearAlgebra
     using StatsBase

@@ -149,47 +149,46 @@ end
 """
     simulate_genotypes(H; block_length)
 
-Simulates a genotype matrix `X` from a pool of haplotypes `H`. SNPs are 
-divided into blocks of length `block_length` where a pair of haplotypes 
-are drawn uniformly from `H` to form the genotype of that given block. 
+Simulates a genotype matrix `X` from a pool of haplotypes `H`. Each person's
+genotype are divided into contiguous segments, and 2 haplotypes are randomly
+chosen from a pool of haplotypes `H` to form the genotype in that segment. 
 
 # Arguments:
 - `H`: `p x d` haplotype matrix. Each column is a haplotype. 
-- `people`: number of samples desired for the genotype matrix
-- `block_length`: length of each LD block
+- `people`: number of samples
+- `T`: Type of output matrix. 
+- `min_cross_over`: Minimum number of breakpoints for each person's genotype. 
+- `max_cross_over`: Maximum number of breakpoints for each person's genotype. 
 
 # Output:
 * `X`: `p x people` genotype matrix. Each column is a person's genotype. 
 """
+
 function simulate_genotypes(
-    H::BitArray{2}; 
-    people::Int = size(H, 2),
-    block_length::Int64=113
+    H::BitArray{2},
+    people::Int;
+    T::Type = Float64,
+    min_cross_over::Int64=1,
+    max_cross_over::Int64=5
     )
     
     p, d = size(H)
-    X = zeros(Int, p, people)
-    blocks = Int(ceil(p / block_length))
+    X = zeros(T, p, people)
+    min_cross_over <= max_cross_over || error("Please supply min_cross_over and max_cross_over satisfying min_cross_over <= max_cross_over.")
 
-    # for each block, sample 2 ` with replacement from the pool of haplotypes
-    for b in 1:(blocks - 1), i in 1:people
-        hap1 = rand(1:d)
-        hap2 = rand(1:d)
-        block_start = (b - 1) * block_length
-        for j in 1:block_length
-            X[block_start + j, i] = H[block_start + j, hap1] + H[block_start + j, hap2]
-        end
-    end
-
-    # treat last block separately
+    # loop through each person
     for i in 1:people
-        hap1 = rand(1:d)
-        hap2 = rand(1:d)
-        block_start = (blocks - 1) * block_length
-        for j in 1:(p - block_start)
-            X[block_start + j, i] = H[block_start + j, hap1] + H[block_start + j, hap2]
-        end
+        cross_overs = rand(min_cross_over:max_cross_over)
+        cross_over_location = sample(2:(p - 1), cross_overs, replace=false)
+        #create various segments vased on cross over points
+        segments = [1:cross_over_location[1]]
+        [push!(segments, (cross_over_location[i] + 1):cross_over_location[i + 1]) for i in 1:(length(cross_over_location) - 1)]
+        push!(segments, (cross_over_location[end] + 1):p)
+        # fill X with sum of 2 randomly chosen haplotypes in each segment
+        for cur_range in segments
+            h1, h2 = rand(1:d), rand(1:d)
+            X[cur_range, i] = H[cur_range, h1] + H[cur_range, h2]
+        end           
     end
-
     return X
 end
