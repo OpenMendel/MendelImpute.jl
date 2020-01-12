@@ -1,10 +1,11 @@
 """
-    make_vcf_file(H, filename, phased)
+    make_refvcf_file(H, filename, phased)
 
-Creates a .vcf file with `filename` based on reference panels `H`. Consecutive columns are treated as genotypes
+Creates a .vcf file with `filename` based on reference panels `H`. Consecutive columns are treated as genotypes.
+REF/ALT alleles are always A/C.
 
 # Inputs:
-+ `H`: Matrix of 0s or 1s. Each column is a haplotype. e.g. Columns 1 and 2 form the genotype for person 1. 
++ `H`: BitMatrix of haplotypes. Each column is a haplotype. e.g. Columns 1 and 2 form the genotype for sample 1. 
 + `filename`: A string for the resulting .vcf file. 
 + `phased`: True uses '|' as separator. False uses '/' as separator. 
 """
@@ -43,6 +44,17 @@ function make_refvcf_file(
     end
 end
 
+"""
+    make_tgtvcf_file(X, filename)
+
+Creates a .vcf file given a genotype matrix `X`. Missing entries in `X` will become `./.`. 
+Otherwise, X[i, j] should be either 0, 1, or 2. 0 = '0/0', 1 = '1/0', and 2 = '1/1'. REF/ALT 
+alleles are always A/C.
+
+# Inputs:
++ `X`: Matrix of 0, 1, or 2. Each column is a person's genotype. 
++ `filename`: A string for the resulting .vcf file. 
+"""
 function make_tgtvcf_file(
     X::Matrix{Union{Int, Missing}};
     filename="simulated_tgt.vcf", 
@@ -167,7 +179,7 @@ chosen from a pool of haplotypes `H` to form the genotype in that segment.
 function simulate_genotypes(
     H::BitArray{2},
     people::Int;
-    T::Type = Float64,
+    T::Type = Int,
     min_cross_over::Int64=1,
     max_cross_over::Int64=5
     )
@@ -177,18 +189,23 @@ function simulate_genotypes(
     min_cross_over <= max_cross_over || error("Please supply min_cross_over and max_cross_over satisfying min_cross_over <= max_cross_over.")
 
     # loop through each person
+    segments = UnitRange{Int64}[]
+    sizehint!(segments, max_cross_over)
     for i in 1:people
         cross_overs = rand(min_cross_over:max_cross_over)
         cross_over_location = sample(2:(p - 1), cross_overs, replace=false)
         #create various segments vased on cross over points
-        segments = [1:cross_over_location[1]]
-        [push!(segments, (cross_over_location[i] + 1):cross_over_location[i + 1]) for i in 1:(length(cross_over_location) - 1)]
+        empty!(segments)
+        push!(segments, 1:cross_over_location[1])
+        for i in 1:(length(cross_over_location) - 1)
+            push!(segments, (cross_over_location[i] + 1):cross_over_location[i + 1])
+        end
         push!(segments, (cross_over_location[end] + 1):p)
         # fill X with sum of 2 randomly chosen haplotypes in each segment
         for cur_range in segments
             h1, h2 = rand(1:d), rand(1:d)
-            X[cur_range, i] = H[cur_range, h1] + H[cur_range, h2]
-        end           
+            X[cur_range, i] .= H[cur_range, h1] .+ H[cur_range, h2]
+        end
     end
     return X
 end
