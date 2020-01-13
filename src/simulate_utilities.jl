@@ -11,37 +11,36 @@ REF/ALT alleles are always A/C.
 """
 function make_refvcf_file(
     H::BitArray{2};
-    filename="simulated_ref.vcf", 
+    vcffilename="simulated_ref.vcf", 
     phased = true
     )
 
     p, d = size(H)
     separator = (phased ? '|' : '/')
     iseven(d) || error("make_vcf_file: number of haplotypes must be even but was $d")
-    endswith(filename, ".vcf") || (filename = filename * ".vcf")
 
-    open(filename, "w") do io
-        # minimal meta information
-        write(io, "##fileformat=VCFv4.3\n")
-        write(io, "##source=MendelImpute\n")
-        write(io, "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n")
+    io = openvcf(vcffilename, "w")
+    # minimal meta information
+    write(io, "##fileformat=VCFv4.3\n")
+    write(io, "##source=MendelImpute\n")
+    write(io, "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n")
 
-        # header line
-        write(io, "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT")
-        for i in 1:Int(d / 2)
-            write(io, "\tref$i")
+    # header line
+    write(io, "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT")
+    for i in 1:Int(d / 2)
+        write(io, "\tref$i")
+    end
+    write(io, "\n")
+
+    # write phase info
+    for snp in 1:p
+        write(io, "1\t$snp\tref_snp_$snp\tA\tC\t.\tPASS\t.\tGT")
+        for i in 1:2:d
+            write(io, string("\t", Int(H[snp, i]), separator, Int(H[snp, i + 1])))
         end
         write(io, "\n")
-
-        # write phase info
-        for snp in 1:p
-            write(io, "1\t$snp\tref_snp_$snp\tA\tC\t.\tPASS\t.\tGT")
-            for i in 1:2:d
-                write(io, string("\t", Int(H[snp, i]), separator, Int(H[snp, i + 1])))
-            end
-            write(io, "\n")
-        end
     end
+    close(io)
 end
 
 """
@@ -57,45 +56,46 @@ alleles are always A/C.
 """
 function make_tgtvcf_file(
     X::Matrix{Union{Int, Missing}};
-    filename="simulated_tgt.vcf", 
+    vcffilename="simulated_tgt.vcf", 
+    phased = false
     )
 
     p, d = size(X)
-    endswith(filename, ".vcf") || (filename = filename * ".vcf")
+    separator = (phased ? '|' : '/')
+    io = openvcf(vcffilename, "w")
 
-    open(filename, "w") do io
-        # minimal meta information
-        write(io, "##fileformat=VCFv4.3\n")
-        write(io, "##source=MendelImpute\n")
-        write(io, "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n")
+    # minimal meta information
+    write(io, "##fileformat=VCFv4.3\n")
+    write(io, "##source=MendelImpute\n")
+    write(io, "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n")
 
-        # header line
-        write(io, "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT")
+    # header line
+    write(io, "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT")
+    for i in 1:d
+        write(io, "\ttarget$i")
+    end
+    write(io, "\n")
+
+    # write phase info
+    for snp in 1:p
+        write(io, "1\t$snp\ttgt_snp_$snp\tA\tC\t.\tPASS\t.\tGT")
         for i in 1:d
-            write(io, "\ttarget$i")
+            if ismissing(X[snp, i])
+                genotype = "./."
+            elseif X[snp, i] == 2
+                genotype = "1/1"
+            elseif X[snp, i] == 1
+                genotype = "1/0"
+            elseif X[snp, i] == 0
+                genotype = "0/0"
+            else
+                error("genotypes can only be 0, 1, 2, or missing, but was $(X[snp, i])")
+            end
+            write(io, string("\t", genotype))
         end
         write(io, "\n")
-
-        # write phase info
-        for snp in 1:p
-            write(io, "1\t$snp\ttgt_snp_$snp\tA\tC\t.\tPASS\t.\tGT")
-            for i in 1:d
-                if ismissing(X[snp, i])
-                    genotype = "./."
-                elseif X[snp, i] == 2
-                    genotype = "1/1"
-                elseif X[snp, i] == 1
-                    genotype = "1/0"
-                elseif X[snp, i] == 0
-                    genotype = "0/0"
-                else
-                    error("genotypes can only be 0, 1, 2, or missing, but was $(X[snp, i])")
-                end
-                write(io, string("\t", genotype))
-            end
-            write(io, "\n")
-        end
     end
+    close(io)
 end
 
 """
@@ -179,13 +179,13 @@ chosen from a pool of haplotypes `H` to form the genotype in that segment.
 function simulate_genotypes(
     H::BitArray{2},
     people::Int;
-    T::Type = Int,
+    T::Type = Union{Int, Missing},
     min_cross_over::Int64=1,
     max_cross_over::Int64=5
     )
     
     p, d = size(H)
-    X = zeros(T, p, people)
+    X = zeros(Union{T, Missing}, p, people)
     min_cross_over <= max_cross_over || error("Please supply min_cross_over and max_cross_over satisfying min_cross_over <= max_cross_over.")
 
     # loop through each person
