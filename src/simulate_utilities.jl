@@ -57,7 +57,12 @@ alleles are always A/C.
 function make_tgtvcf_file(
     X::Matrix{Union{Int, Missing}};
     vcffilename="simulated_tgt.vcf", 
-    phased = false
+    phased = false,
+    marker_chrom::Vector{String}=["1" for i in 1:size(X, 1)],
+    marker_pos::Vector{Int}=collect(1:size(X, 1)),
+    marker_ID::Vector{String}=["tgt_snp_$i" for i in 1:size(X, 1)],
+    marker_REF::Vector{String}=["A" for i in 1:size(X, 1)],
+    marker_ALT::Vector{String}=["C" for i in 1:size(X, 1)]
     )
 
     p, d = size(X)
@@ -78,8 +83,9 @@ function make_tgtvcf_file(
 
     # write phase info
     for snp in 1:p
-        write(io, "1\t$snp\ttgt_snp_$snp\tA\tC\t.\tPASS\t.\tGT")
-        for i in 1:d
+        write(io, marker_chrom[snp], '\t', string(marker_pos[snp]), '\t', marker_ID[snp], '\t', 
+            marker_REF[snp], '\t', marker_ALT[snp], "\t.\tPASS\t.\tGT")
+        @inbounds for i in 1:d
             if ismissing(X[snp, i])
                 genotype = "./."
             elseif X[snp, i] == 2
@@ -91,9 +97,9 @@ function make_tgtvcf_file(
             else
                 error("genotypes can only be 0, 1, 2, or missing, but was $(X[snp, i])")
             end
-            write(io, string("\t", genotype))
+            write(io, '\t', genotype)
         end
-        write(io, "\n")
+        write(io, '\n')
     end
     close(io)
 end
@@ -177,11 +183,11 @@ chosen from a pool of haplotypes `H` to form the genotype in that segment.
 """
 
 function simulate_genotypes(
-    H::BitArray{2},
+    H::AbstractMatrix,
     people::Int;
     T::Type = Union{Int, Missing},
     min_cross_over::Int64=1,
-    max_cross_over::Int64=5
+    max_cross_over::Int64=5,
     )
     
     p, d = size(H)
@@ -204,8 +210,42 @@ function simulate_genotypes(
         # fill X with sum of 2 randomly chosen haplotypes in each segment
         for cur_range in segments
             h1, h2 = rand(1:d), rand(1:d)
-            X[cur_range, i] .= H[cur_range, h1] .+ H[cur_range, h2]
+            X[cur_range, i] .= convert.(T, H[cur_range, h1] .+ H[cur_range, h2])
         end
     end
     return X
 end
+
+# choose 2 haplotypes block by block
+# function simulate_genotypes2(
+#     H::BitArray{2}; 
+#     people::Int = size(H, 2),
+#     block_length::Int64=1447
+#     )
+    
+#     p, d = size(H)
+#     X = zeros(Int, p, people)
+#     blocks = Int(ceil(p / block_length))
+
+#     # for each block, sample 2 ` with replacement from the pool of haplotypes
+#     for b in 1:(blocks - 1), i in 1:people
+#         hap1 = rand(1:d)
+#         hap2 = rand(1:d)
+#         block_start = (b - 1) * block_length
+#         for j in 1:block_length
+#             X[block_start + j, i] = H[block_start + j, hap1] + H[block_start + j, hap2]
+#         end
+#     end
+
+#     # treat last block separately
+#     for i in 1:people
+#         hap1 = rand(1:d)
+#         hap2 = rand(1:d)
+#         block_start = (blocks - 1) * block_length
+#         for j in 1:(p - block_start)
+#             X[block_start + j, i] = H[block_start + j, hap1] + H[block_start + j, hap2]
+#         end
+#     end
+
+#     return X
+# end

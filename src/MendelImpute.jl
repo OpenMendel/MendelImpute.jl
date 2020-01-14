@@ -19,6 +19,7 @@ module MendelImpute
     export compute_redundant_haplotypes!, redundant_haplotypes
     export HaplotypeMosaicPair, HaplotypeMosaic, UniqueHaplotypeMaps
     export PeoplesRedundantHaplotypeSet, phase2, non_redundant_haplotypes
+    export simulate_genotypes2
 
     # export UniqueHaplotypes, fast_elimination, unique_index!
     export OptimalHaplotypeSet, compute_optimal_halotype_set

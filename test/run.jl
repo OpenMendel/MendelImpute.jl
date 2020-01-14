@@ -537,8 +537,10 @@ findfirst.(hapset[1].strand2)
 findfirst.(hapset[10].strand1)
 findfirst.(hapset[10].strand2)
 
+ph = phase(Xm, H, width=width)
+
 # calculate error rate
-impute2!(Xm, H, phase)
+impute2!(Xm, H, ph)
 missing_idx    = ismissing.(Xm_original)
 total_missing  = sum(missing_idx)
 actual_missing_values  = convert(Vector{Int64}, X[missing_idx])  #true values of missing entries
@@ -837,3 +839,10 @@ ph = phase(Xm, H, width=64)
 @benchmark phase(Xm, H, width=64) seconds=15   # width 64  : 3.914 s, 401.31 MiB, 11887397 alloc (this includes calculating optimal hapset)
 @benchmark phase(Xm, H, width=400) seconds=15  # width 400 : 
 @benchmark phase(Xm, H, width=1200) seconds=15 # width 1200: 
+
+
+using Revise
+using MendelImpute
+H = simulate_markov_haplotypes(10000, 500)
+X = simulate_genotypes(H, 100)
+X2 = simulate_genotypes2(H, people=100)
