@@ -11,16 +11,21 @@ REF/ALT alleles are always A/C.
 """
 function make_refvcf_file(
     H::BitArray{2};
-    vcffilename="simulated_ref.vcf", 
-    phased = true
+    vcffilename::AbstractString = "simulated_ref.vcf", 
+    phased::Bool = true,
+    marker_chrom::Vector{String} = ["1" for i in 1:size(X, 1)],
+    marker_pos::Vector{Int} = collect(1:size(X, 1)),
+    marker_ID::Vector{String} = ["tgt_snp_$i" for i in 1:size(X, 1)],
+    marker_REF::Vector{String} = ["A" for i in 1:size(X, 1)],
+    marker_ALT::Vector{String} = ["C" for i in 1:size(X, 1)]
     )
 
     p, d = size(H)
     separator = (phased ? '|' : '/')
     iseven(d) || error("make_vcf_file: number of haplotypes must be even but was $d")
 
+    # first write minimal meta information
     io = openvcf(vcffilename, "w")
-    # minimal meta information
     write(io, "##fileformat=VCFv4.3\n")
     write(io, "##source=MendelImpute\n")
     write(io, "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n")
@@ -55,21 +60,27 @@ alleles are always A/C.
 + `filename`: A string for the resulting .vcf file. 
 """
 function make_tgtvcf_file(
-    X::Matrix{Union{Int, Missing}};
-    vcffilename="simulated_tgt.vcf", 
-    phased = false,
-    marker_chrom::Vector{String}=["1" for i in 1:size(X, 1)],
-    marker_pos::Vector{Int}=collect(1:size(X, 1)),
-    marker_ID::Vector{String}=["tgt_snp_$i" for i in 1:size(X, 1)],
-    marker_REF::Vector{String}=["A" for i in 1:size(X, 1)],
-    marker_ALT::Vector{String}=["C" for i in 1:size(X, 1)]
+    X::AbstractMatrix;
+    vcffilename::AbstractString = "simulated_tgt.vcf", 
+    phased::Bool = false,
+    marker_chrom::Vector{String} = ["1" for i in 1:size(X, 1)],
+    marker_pos::Vector{Int} = collect(1:size(X, 1)),
+    marker_ID::Vector{String} = ["tgt_snp_$i" for i in 1:size(X, 1)],
+    marker_REF::Vector{String} = ["A" for i in 1:size(X, 1)],
+    marker_ALT::Vector{String} = ["C" for i in 1:size(X, 1)]
     )
 
     p, d = size(X)
+    lc = length(marker_chrom)
+    lp = length(marker_pos)
+    li = length(marker_ID)
+    lr = length(marker_REF)
+    la = length(marker_ALT)
+    p == lc == lp == li == lr == la || error("There are $p markers in X but CHROM/POS/ID/REF/ALT vectors are of length $lc, $lp, $li, $lr, $la")
     separator = (phased ? '|' : '/')
-    io = openvcf(vcffilename, "w")
 
-    # minimal meta information
+    # first write minimal meta information
+    io = openvcf(vcffilename, "w")    
     write(io, "##fileformat=VCFv4.3\n")
     write(io, "##source=MendelImpute\n")
     write(io, "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n")
