@@ -13,11 +13,11 @@ function make_refvcf_file(
     H::BitArray{2};
     vcffilename::AbstractString = "simulated_ref.vcf", 
     phased::Bool = true,
-    marker_chrom::Vector{String} = ["1" for i in 1:size(X, 1)],
-    marker_pos::Vector{Int} = collect(1:size(X, 1)),
-    marker_ID::Vector{String} = ["tgt_snp_$i" for i in 1:size(X, 1)],
-    marker_REF::Vector{String} = ["A" for i in 1:size(X, 1)],
-    marker_ALT::Vector{String} = ["C" for i in 1:size(X, 1)]
+    marker_chrom::Vector{String} = ["1" for i in 1:size(H, 1)],
+    marker_pos::Vector{Int} = collect(1:size(H, 1)),
+    marker_ID::Vector{String} = ["tgt_snp_$i" for i in 1:size(H, 1)],
+    marker_REF::Vector{String} = ["A" for i in 1:size(H, 1)],
+    marker_ALT::Vector{String} = ["C" for i in 1:size(H, 1)]
     )
 
     p, d = size(H)
