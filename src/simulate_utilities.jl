@@ -192,7 +192,6 @@ chosen from a pool of haplotypes `H` to form the genotype in that segment.
 # Output:
 * `X`: `p x people` genotype matrix. Each column is a person's genotype. 
 """
-
 function simulate_genotypes(
     H::AbstractMatrix,
     people::Int;
