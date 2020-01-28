@@ -11,6 +11,7 @@ StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 ElasticArrays = "fdbdab4c-e67f-52f5-8c3f-e7b388dad3d4"
 GeneticVariation = "9bc6ac9d-e6b2-5f70-b0a8-242a01662520"
 VCFTools = "a620830f-fdd7-5ebc-8d26-3621ab35fbfe"
+GroupSlices = "d853e229-7c7c-56e9-b6be-9a1acc5f13d9"
 
 [compat]
 Documenter = ">=0.20"

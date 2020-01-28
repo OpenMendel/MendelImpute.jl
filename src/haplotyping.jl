@@ -20,7 +20,7 @@ function phase(
     outfile::AbstractString = "imputed." * tgtfile,
     width::Int = 400
     )
-    # convert vcf files to numeric matrices
+    # convert vcf files to numeric matrices (need a routine so it does this transposed)
     X = convert_gt(Float32, tgtfile, as_minorallele=false)
     H = convert_ht(Float32, reffile, as_minorallele=false)
 
