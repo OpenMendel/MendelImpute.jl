@@ -15,6 +15,13 @@ using Random
 using Test
 using BenchmarkTools
 
+"""
+Starting at position `n`, search through to the end of `seq1` and `seq2` to see if 
+position `seq1[n - 1]` and `seq2[n - 1]` should be swapped. Swapping index are 
+stored in `flip_idx`. 
+
+Returns the total number of breakpoints in `seq1` and `seq2` after swapping. 
+"""
 function binary_flip!(n, seq1, seq2, flip_idx,
     intermediates::Vector{Int} = [-1 for i in 1:(length(seq1) + 1)]
     )
@@ -58,8 +65,8 @@ y = [1 0 0 0]
 flip = falses(4)
 @test binary_flip!(x, y, flip) == 0
 @test flip == [true; false; false; false]
-@test x = [1 1 1 1]
-@test y = [0 0 0 0]
+@test x == [1 1 1 1]
+@test y == [0 0 0 0]
 
 x = [1 0 1 0]
 y = [0 1 0 0]
@@ -68,6 +75,14 @@ flip = falses(4)
 @test flip == [false; true; false; false]
 @test x == [1 1 1 0]
 @test y == [0 0 0 0]
+
+x = [1 0 1 0]
+y = [0 1 0 1]
+flip = falses(4)
+@test binary_flip!(x, y, flip) == 0
+@test flip == [true; false; true; false]
+@test x == [0 0 0 0]
+@test y == [1 1 1 1]
 
 x = [0 1 1 1 0 0]
 y = [1 1 1 0 0 0]
@@ -101,24 +116,60 @@ flip = falses(6)
 @test x == [1 1 1 0 0 0]
 @test y == [0 0 1 1 1 1]
 
+x = [0 1 1 1 1 0]
+y = [1 0 1 1 0 1]
+flip = falses(6)
+@test binary_flip!(x, y, flip) == 2
+@test flip == [true; false; false; false; true; false]
+@test x == [1 1 1 1 0 0]
+@test y == [0 0 1 1 1 1]
+
 # nonmemoized (bitrand(100) would fail)
 x = bitrand(30)
 y = bitrand(30)
-@btime binary_flip($x, $y) # 54.562 μs (1 allocation: 336 bytes)
+flip = falses(30)
+@btime binary_flip!($x, $y, $flip) # 54.562 μs (1 allocation: 336 bytes)
 
 # memoized 
 x = bitrand(30)
 y = bitrand(30)
-@btime binary_flip($x, $y) # 484.790 ns (1 allocation: 336 bytes)
+@btime binary_flip!($x, $y, $flip) # 737.567 ns (1 allocation: 336 bytes)
 
 x = bitrand(10000)
 y = bitrand(10000)
-@time binary_flip(x, y)
+@time binary_flip!(x, y)
 
 
+Random.seed!(2020)
+x = bitrand(10)
+y = bitrand(10)
+[x y]
+flip = falses(10);
+@time binary_flip!(x, y, flip)
+[x y]
 
+Random.seed!(2020)
+x = bitrand(20)
+y = bitrand(20)
+[x y]
+flip = falses(20);
+@time binary_flip!(x, y, flip)
+[x y]
 
+#more examples
+x = bitrand(10)
+y = bitrand(10)
+[x y]
+flip = falses(10);
+@time binary_flip!(x, y, flip)
+[x y]
 
+x = bitrand(10000)
+y = bitrand(10000)
+[x y]
+flip = falses(10000);
+@time binary_flip!(x, y, flip)
+[x y]
 
 function a()
     println("reached a!")
