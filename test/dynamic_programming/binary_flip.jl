@@ -214,3 +214,98 @@ c = a() + b()
 # reached a!
 # reached b!
 # 3
+
+function has_intersect!(c::BitVector, a::BitVector, b::BitVector)
+    c .= a .& b
+    return any(c)
+end
+
+function has_intersect(a::BitVector, b::BitVector)
+    @inbounds for i in eachindex(a)
+        if a[i] && b[i]
+            return true
+        end
+    end
+    return false
+end
+
+a = falses(100_000)
+b = falses(100_000)
+c = falses(100_000)
+
+Random.seed!(2020)
+a[1:1000] .= b[1:1000] .= true
+shuffle!(a)
+shuffle!(b)
+
+@btime has_intersect($a, $b)
+@btime has_intersect!($c, $a, $b)
+
+function set_flip!(
+    n::Int, 
+    vector_set1::Vector{BitVector}, 
+    vector_set2::Vector{BitVector}, 
+    flip_idx::BitVector,
+    intermediates::Vector{Int} = [-1 for i in 1:(length(vector_set1) + 1)],
+    storage::BitVector = falses(length(vector_set1[1]))
+    )
+    # quick lookup
+    if intermediates[n] != -1
+        return intermediates[n]
+    end
+
+    if n > length(vector_set1)
+        return 0
+    elseif n == 1
+        # only flip bits in previous position
+        return set_flip!(n + 1, vector_set1, vector_set2, flip_idx, intermediates)
+    elseif vector_set1[n] == vector_set2[n]
+        # don't flip and only calculate error
+        return set_flip!(n + 1, vector_set1, vector_set2, flip_idx, intermediates) + 
+                !has_intersect!(storage, vector_set1[n], vector_set1[n - 1]) +
+                !has_intersect!(storage, vector_set2[n], vector_set2[n - 1])
+    else
+        # calculate error of flip/noflip by recursion
+        yesflip = set_flip!(n + 1, vector_set1, vector_set2, flip_idx, intermediates) + 
+                    !has_intersect!(storage, vector_set1[n], vector_set2[n - 1]) + 
+                    !has_intersect!(storage, vector_set2[n], vector_set1[n - 1])
+        noflip  = set_flip!(n + 1, vector_set1, vector_set2, flip_idx, intermediates) + 
+                    !has_intersect!(storage, vector_set1[n], vector_set1[n - 1]) + 
+                    !has_intersect!(storage, vector_set2[n], vector_set2[n - 1])
+
+        # store intermediate results for later retrival
+        intermediates[n] = min(yesflip, noflip)
+        if yesflip < noflip
+            # record flipping location, flip 2 sequence at previous location, 
+            flip_idx[n - 1] = true
+            vector_set1[n - 1], vector_set2[n - 1] = vector_set2[n - 1], vector_set1[n - 1]
+        end
+        return min(yesflip, noflip)
+    end
+end
+set_flip!(vector_set1, vector_set2, flip) = set_flip!(2, vector_set1, vector_set2, flip) #start at position 2
+
+
+
+Random.seed!(2020)
+
+x = [bitrand(10), bitrand(10), bitrand(10), bitrand(10)]
+y = [bitrand(10), bitrand(10), bitrand(10), bitrand(10)]
+flip = falses(4);
+@test set_flip!(x, y, flip) == 2
+@test flip == [false; true; false; false]
+
+
+x = [bitrand(5), bitrand(5), bitrand(5), bitrand(5), bitrand(5), bitrand(5), bitrand(5)]
+y = [bitrand(5), bitrand(5), bitrand(5), bitrand(5), bitrand(5), bitrand(5), bitrand(5)]
+flip = falses(7);
+@test set_flip!(x, y, flip) == 2
+@test flip == [false; true; false; false; false; true; false]
+
+
+
+
+
+
+
+
