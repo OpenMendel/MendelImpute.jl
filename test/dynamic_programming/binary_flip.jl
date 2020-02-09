@@ -1,15 +1,23 @@
 ###### GOAL: #######
-### Determine minimum number of breakpoints in both strands.
-### You can exchange bits in 2 bitvectors at the same position.
+### By exchanging bits of 2 bitvectors at the same position, 
+### minimize the number of breakpoints in both strands, and
+### ruturn that number.
 ####################
-# e.g. 
+# Example 1
 # x = [0 1 1 1]
 # y = [1 0 0 0]
-# breakpoint(x, y) = 2 (since there is flip from position 1 to 2 in both)
-# But we can exchange position 1:
+# We can exchange position 1:
 # x = [1 1 1 1]
 # y = [0 0 0 0]
-# then breakpoint(x, y) = 0
+# then breakpoint = 0
+# 
+# Example 2
+# x = [0 1 0 0 1]
+# y = [1 0 1 0 0]
+# we can exchange position 2:
+# x = [0 0 0 0 1]
+# y = [1 1 1 0 0]
+# then breakpoint = 2 (1 at end of x and another at middle of y)
 
 using Random
 using Test
@@ -33,24 +41,37 @@ function binary_flip!(n, seq1, seq2, flip_idx,
     if n > length(seq1)
         return 0
     elseif n == 1
+        # only flip bits in previous position
         return binary_flip!(n + 1, seq1, seq2, intermediates)
     elseif seq1[n] == seq2[n]
+        # don't flip and only calculate error
         return binary_flip!(n + 1, seq1, seq2, flip_idx, intermediates) + !(seq1[n] == seq1[n - 1]) + !(seq2[n] == seq2[n - 1])
     else
+        # calculate error of flip/noflip by recursion
         yesflip = binary_flip!(n + 1, seq1, seq2, flip_idx, intermediates) + !(seq1[n] == seq2[n - 1]) + !(seq2[n] == seq1[n - 1])
         noflip  = binary_flip!(n + 1, seq1, seq2, flip_idx, intermediates) + !(seq1[n] == seq1[n - 1]) + !(seq2[n] == seq2[n - 1])
         # println("n = $n, yesflip = $yesflip, noflip = $noflip, min = $(min(yesflip, noflip))")
+        # store intermediate results for later retrival
         intermediates[n] = min(yesflip, noflip)
         if yesflip < noflip
+            # record flipping location, flip 2 sequence at previous location, 
             flip_idx[n - 1] = true
             seq1[n - 1], seq2[n - 1] = seq2[n - 1], seq1[n - 1]
-            yesflip, noflip = noflip, yesflip
-            println("flipped $(n - 1)!")
+            # println("flipped $(n - 1)!")
         end
         return min(yesflip, noflip)
     end
 end
 binary_flip!(seq1, seq2, flip) = binary_flip!(2, seq1, seq2, flip) #start at position 2
+
+
+x = [1 0]
+y = [0 1]
+flip = falses(2)
+@test binary_flip!(x, y, flip) == 0
+@test flip == [true; false]
+@test x == [0 0]
+@test y == [1 1]
 
 x = [1 0 1]
 y = [0 1 0]
@@ -75,6 +96,14 @@ flip = falses(4)
 @test flip == [false; true; false; false]
 @test x == [1 1 1 0]
 @test y == [0 0 0 0]
+
+x = [0 1 0 0 1]
+y = [1 0 1 0 0]
+flip = falses(5)
+@test binary_flip!(x, y, flip) == 2
+@test flip == [false; true; false; false; false]
+@test x == [0 0 0 0 1]
+@test y == [1 1 1 0 0]
 
 x = [1 0 1 0]
 y = [0 1 0 1]
@@ -128,7 +157,7 @@ flip = falses(6)
 x = bitrand(30)
 y = bitrand(30)
 flip = falses(30)
-@btime binary_flip!($x, $y, $flip) # 54.562 μs (1 allocation: 336 bytes)
+@btime binary_flip!($x, $y, $flip) # 298.914 μs (1 allocation: 336 bytes)
 
 # memoized 
 x = bitrand(30)
