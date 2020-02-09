@@ -316,4 +316,23 @@ flip = falses(7);
 
 
 
+using Random
+using Test
+using BenchmarkTools
+
+Random.seed!(1)
+
+a = bitrand(5)
+b = bitrand(5)
+
+struct bitvec_pair
+
+end
+
+for pair in (a, b)
+    println(pair)
+end
+
+
+
 
