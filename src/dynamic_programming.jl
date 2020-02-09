@@ -61,6 +61,10 @@ function binary_flip!(n, seq1, seq2, flip_idx,
 end
 binary_flip!(seq1, seq2, flip) = binary_flip!(2, seq1, seq2, flip) #start at position 2
 
+function has_intersect!(c::BitVector, a::BitVector, b::BitVector)
+    c .= a .& b
+    return any(c)
+end
 
 function set_flip!(
     n::Int, 

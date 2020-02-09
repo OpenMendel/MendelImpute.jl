@@ -286,6 +286,14 @@ end
 set_flip!(vector_set1, vector_set2, flip) = set_flip!(2, vector_set1, vector_set2, flip) #start at position 2
 
 
+function has_intersect!(c::BitVector, a::BitVector, b::BitVector)
+    c .= a .& b
+    return any(c)
+end
+
+using Random
+using Test
+using BenchmarkTools
 
 Random.seed!(2020)
 
@@ -299,8 +307,8 @@ flip = falses(4);
 x = [bitrand(5), bitrand(5), bitrand(5), bitrand(5), bitrand(5), bitrand(5), bitrand(5)]
 y = [bitrand(5), bitrand(5), bitrand(5), bitrand(5), bitrand(5), bitrand(5), bitrand(5)]
 flip = falses(7);
-@test set_flip!(x, y, flip) == 2
-@test flip == [false; true; false; false; false; true; false]
+@test set_flip!(x, y, flip) == 1
+@test flip == [false; false; false; false; true; false; false]
 
 
 

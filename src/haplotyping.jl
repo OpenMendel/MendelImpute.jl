@@ -107,13 +107,19 @@ function phase(
     end
 
     # allocate working arrays
+    # flips = [falses(windows) for i in 1:people]
     phase = [HaplotypeMosaicPair(snps) for i in 1:people]
     haplo_chain = ([copy(hapset[i].strand1[1]) for i in 1:people], [copy(hapset[1].strand2[1]) for i in 1:people])
     chain_next  = (BitVector(undef, haplotypes), BitVector(undef, haplotypes))
     window_span = (ones(Int, people), ones(Int, people))
 
+    # first pass to decide haplotype configurations (i.e. hapset switchings)
+    # for i in 1:people
+    #     set_flip!(hapset[i].strand1, hapset[i].strand2, flips[i])
+    # end
+
     # TODO: parallel computing
-    # begin intersecting haplotypes window by window 
+    # second pass to phase and merge breakpoints
     @inbounds for i in 1:people, w in 2:windows
 
         # Decide whether to cross over based on the larger intersection

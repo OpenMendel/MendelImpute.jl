@@ -21,6 +21,7 @@ module MendelImpute
     export HaplotypeMosaicPair, HaplotypeMosaic, UniqueHaplotypeMaps
     export PeoplesRedundantHaplotypeSet, phase2, non_redundant_haplotypes
     export simulate_genotypes2
+    export set_flip!
 
     # export UniqueHaplotypes, fast_elimination, unique_index!
     export OptimalHaplotypeSet, compute_optimal_halotype_set
@@ -31,5 +32,6 @@ module MendelImpute
     include("haplotyping.jl")
     include("utilities.jl")
     include("simulate_utilities.jl")
+    include("dynamic_programming.jl")
 
 end # module
