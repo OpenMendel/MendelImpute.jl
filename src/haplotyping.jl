@@ -93,7 +93,7 @@ function phase(
     width::Int    = 400,
     verbose::Bool = true,
     Xtrue::Union{AbstractMatrix, Nothing} = nothing, # for testing
-    fast_method::Bool = true
+    fast_method::Bool = false
     ) where T <: Real
 
     # declare some constants
@@ -107,13 +107,14 @@ function phase(
     end
 
     # allocate working arrays
-    # flips = [falses(windows) for i in 1:people]
+    flips = [falses(windows) for i in 1:people]
     phase = [HaplotypeMosaicPair(snps) for i in 1:people]
     haplo_chain = ([copy(hapset[i].strand1[1]) for i in 1:people], [copy(hapset[1].strand2[1]) for i in 1:people])
     chain_next  = (BitVector(undef, haplotypes), BitVector(undef, haplotypes))
     window_span = (ones(Int, people), ones(Int, people))
 
     # first pass to decide haplotype configurations (i.e. hapset switchings)
+    # this increases error slightly but seems like it decreases computational time
     # for i in 1:people
     #     set_flip!(hapset[i].strand1, hapset[i].strand2, flips[i])
     # end
@@ -135,17 +136,6 @@ function phase(
         chain_next[2] .= haplo_chain[2][i] .& hapset[i].strand2[w] # not crossing over
         BC = sum(chain_next[1])
         BD = sum(chain_next[2])
-        # if xor(AC == 0, BD == 0) && AD != 0 && BC != 0
-        #     # cross over if not crossing results in breakpoint but crossing have no breakpoints  
-        #     hapset[i].strand1[w], hapset[i].strand2[w] = hapset[i].strand2[w], hapset[i].strand1[w]
-        # elseif xor(AD == 0, BC == 0) && AC != 0 && BD != 0
-        #     # don't cross over if crossing results in breakpoint but parallel have no breakpoints  
-        #     continue
-        # elseif AC + BD < AD + BC
-        #     # decide crossing or not based on larger intersection
-        #     hapset[i].strand1[w], hapset[i].strand2[w] = hapset[i].strand2[w], hapset[i].strand1[w]
-        # end
-
         if AC + BD < AD + BC
             # decide crossing or not based on larger intersection
             hapset[i].strand1[w], hapset[i].strand2[w] = hapset[i].strand2[w], hapset[i].strand1[w]
