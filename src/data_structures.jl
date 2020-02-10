@@ -17,17 +17,11 @@ struct HaplotypeMosaicPair
 end
 HaplotypeMosaicPair(len) = HaplotypeMosaicPair(HaplotypeMosaic(len), HaplotypeMosaic(len))
 
-# needed for groupslices function
-struct Prehashed
-    hash::UInt
-end
-hash(x::Prehashed) = x.hash
-
 """
 Data structure for keeping track of unique haplotypes in each window. 
 
 Let `w` be the current window, then `uniqueindex[w]` is the unique haplotype indices
-of window `w`. `hapmap1[w]` maps every haplotype to its unique haplotype. Once 
+of window `w`. `hapmap[w]` maps every haplotype to its unique haplotype. Once 
 the best haplotype pair (h1, h2) is identified, one can use `hapmap` to 
 generate a set of redundant haplotypes in window `w`. 
 
@@ -55,7 +49,7 @@ UniqueHaplotypeMaps(windows::Int, haps::Int) = UniqueHaplotypeMaps(Vector{Vector
 """
 Data structure for storing all haplotypes that match the optimal haplotype in each window for a person, keeping track of strand.
 
-+ strand1[w] stores a BitVector for window `w`, with length equal to number of haplotypes. Entries of this BitVector is 1 if that haplotype is unique
++ strand1[w] stores a BitVector for window `w`. length(strand1[w]) = number of haplotypes. Entries of this BitVector is 1 if that haplotype matches the optimal haplotype.
 """
 struct OptimalHaplotypeSet
     strand1::Vector{BitVector}

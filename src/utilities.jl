@@ -31,16 +31,24 @@ function unique_haplotypes(
     windows = floor(Int, p / width)
     hapset  = UniqueHaplotypeMaps(windows, d)
 
-    # record unique haplotypes and mappings window by window
-    for w in 1:(windows-1)
-        H_cur_window = view(H, ((w - 1) * width + 1):(w * width), :)
-        groupslices!(hapset.hapmap[w], H_cur_window, dim)
+    # find unique haplotypes in first & second window 
+    H_cur_window = view(H, 1:2width, :)
+    hapset.hapmap[1] = groupslices(H_cur_window, dim)
+    hapset.uniqueindex[1] = unique(hapset.hapmap[1])
+
+    # record unique haplotypes and mappings window by window (using flanking windows)
+    # first  1/3: ((w - 2) * width + 1):((w - 1) * width)
+    # middle 1/3: ((w - 1) * width + 1):(      w * width)
+    # last   1/3: (      w * width + 1):((w + 1) * width)
+    for w in 2:(windows-1)
+        H_cur_window = view(H, ((w - 2) * width + 1):((w + 1) * width), :)
+        hapset.hapmap[w] = groupslices(H_cur_window, dim)
         hapset.uniqueindex[w] = unique(hapset.hapmap[w])
     end
 
-    # find unique haplotype in last window
-    H_last_window = view(H, ((windows - 1) * width + 1):p, :)
-    groupslices!(hapset.hapmap[end], H_last_window, dim)
+    # find unique haplotype in penultimate & last window
+    H_cur_window = view(H, ((windows - 2) * width + 1):p, :)
+    hapset.hapmap[end] = groupslices(H_cur_window, dim)
     hapset.uniqueindex[end] = unique(hapset.hapmap[end])
 
     return hapset
@@ -77,20 +85,10 @@ function compute_optimal_halotype_set(
 
     # get unique haplotype indices and maps for each window
     Hunique  = unique_haplotypes(H, width, 'T')
-    num_uniq = length(Hunique.uniqueindex[1])
 
     # Initialize data structure for redundant haplotypes that matches the optimal one. 
     optimal_haplotypes = [OptimalHaplotypeSet(windows, haplotypes) for i in 1:people]
 
-    # allocate working arrays
-    happair     = ones(Int, people), ones(Int, people)
-    hapscore    = zeros(T, people)
-    Hwork       = ElasticArray{T}(H[1:width, Hunique.uniqueindex[1]])
-    Xwork       = X[1:width, :]
-    Xwork_float = zeros(T, size(Xwork))
-    M           = zeros(T, num_uniq, num_uniq)
-    N           = ElasticArray{T}(undef, people, num_uniq)
-    
     # for testing
     if isnothing(Xtrue)
         Xtrue_work = nothing
@@ -98,36 +96,46 @@ function compute_optimal_halotype_set(
         Xtrue_work = Xtrue[1:width, :]
     end
 
+    # allocate working arrays
+    happairs    = [Tuple{Int, Int}[] for i in 1:people]
+    hapscore    = zeros(T, people)
+    Hwork       = ElasticArray{T}(H[1:3width, Hunique.uniqueindex[1]]) # array type that allows rescaling last dim 
+    Xwork       = X[1:3width, :]
+    Xwork_float = zeros(T, size(Xwork))
+    num_uniq    = length(Hunique.uniqueindex[1])
+    M           = zeros(T, num_uniq, num_uniq)
+    N           = ElasticArray{T}(undef, people, num_uniq)
+
     # In first window, calculate optimal haplotype pair among unique haplotypes
-    haploimpute!(Xwork, Hwork, M, N, happair, hapscore, Xfloat=Xwork_float, Xtrue=Xtrue_work)
-    # haploimpute2!(Xwork, Hwork, M, N, happair, hapscore, Xfloat=Xwork_float, Xtrue=Xtrue_work)
+    haploimpute!(Xwork, Hwork, M, N, happairs, hapscore, Xfloat=Xwork_float, Xtrue=Xtrue_work)
 
     # find all haplotypes matching the optimal haplotype pairs
-    compute_redundant_haplotypes!(optimal_haplotypes, Hunique, happair, H, 1)
+    compute_redundant_haplotypes!(optimal_haplotypes, Hunique, happairs, H, 1)
 
     #TODO: make this loop multithreaded 
+    # first  1/3: ((w - 2) * width + 1):((w - 1) * width)
+    # middle 1/3: ((w - 1) * width + 1):(      w * width)
+    # last   1/3: (      w * width + 1):((w + 1) * width)
     for w in 2:(windows-1)
         # sync Xwork and Hwork with original data
-        cur_range = ((w - 1) * width + 1):(w * width)
+        cur_range = ((w - 2) * width + 1):((w + 1) * width) # includes flanking windows
         M = resize_and_sync!(Xwork, Hwork, Hunique.uniqueindex[w], cur_range, X, H, M, N)
         isnothing(Xtrue) || copyto!(Xtrue_work, view(Xtrue, cur_range, :)) # for testing
 
         # Calculate optimal haplotype pair among unique haplotypes
-        haploimpute!(Xwork, Hwork, M, N, happair, hapscore, Xfloat=Xwork_float, Xtrue=Xtrue_work)
-        # haploimpute2!(Xwork, Hwork, M, N, happair, hapscore, Xfloat=Xwork_float, Xtrue=Xtrue_work)
+        haploimpute!(Xwork, Hwork, M, N, happairs, hapscore, Xfloat=Xwork_float, Xtrue=Xtrue_work)
 
         # find all haplotypes matching the optimal haplotype pairs
-        compute_redundant_haplotypes!(optimal_haplotypes, Hunique, happair, H, w)
+        compute_redundant_haplotypes!(optimal_haplotypes, Hunique, happairs, H, w)
     end
 
     # last window
-    last_range = ((windows - 1) * width + 1):snps
+    last_range = ((windows - 2) * width + 1):snps
     if mod(length(last_range), width) == 0
         #resize the typical way if the last window has the same width as previous windows
         M = resize_and_sync!(Xwork, Hwork, Hunique.uniqueindex[end], last_range, X, H, M, N)
-        haploimpute!(Xwork, Hwork, M, N, happair, hapscore)
-        # haploimpute2!(Xwork, Hwork, M, N, happair, hapscore)
-        compute_redundant_haplotypes!(optimal_haplotypes, Hunique, happair, H, windows)
+        haploimpute!(Xwork, Hwork, M, N, happairs, hapscore)
+        compute_redundant_haplotypes!(optimal_haplotypes, Hunique, happairs, H, windows)
     else
         #reallocate everything 
         num_uniq    = length(Hunique.uniqueindex[end])
@@ -135,9 +143,8 @@ function compute_optimal_halotype_set(
         Xwork       = X[last_range, :]
         M           = zeros(T, num_uniq, num_uniq)
         N           = zeros(T, people, num_uniq)
-        haploimpute!(Xwork, Hwork, M, N, happair, hapscore)
-        # haploimpute2!(Xwork, Hwork, M, N, happair, hapscore)
-        compute_redundant_haplotypes!(optimal_haplotypes, Hunique, happair, H, windows)
+        haploimpute!(Xwork, Hwork, M, N, happairs, hapscore)
+        compute_redundant_haplotypes!(optimal_haplotypes, Hunique, happairs, H, windows)
     end
 
     return optimal_haplotypes
@@ -151,30 +158,50 @@ This routine takes up roughly 1/5 of the total computation time.
 function compute_redundant_haplotypes!(
     optimal_haplotypes::Vector{OptimalHaplotypeSet}, 
     Hunique::UniqueHaplotypeMaps, 
-    happair::Tuple{AbstractVector, AbstractVector}, 
+    happairs::Vector{Vector{Tuple{Int, Int}}}, 
     H::AbstractMatrix,
     window::Int,
     )
-
+    
     people = length(optimal_haplotypes)
 
-    @inbounds for k in 1:people
-        Hwork_i = happair[1][k]
-        Hwork_j = happair[2][k]
-        # println("person $k's optimal haplotype pairs are: $((Hwork_i, Hwork_j))")
+    # @inbounds for k in 1:people
+    #     first_happair = happairs[k][1] # choose first haplotype pair
+    #     Hwork_i = first_happair[1]
+    #     Hwork_j = first_happair[2]
+    #     # println("person $k's optimal haplotype pairs are: $((Hwork_i, Hwork_j))")
 
-        H_i = Hunique.uniqueindex[window][Hwork_i]
-        H_j = Hunique.uniqueindex[window][Hwork_j]
-        # println("person $k's optimal haplotype pairs are located at columns $H_i and $H_j in H")
+    #     H_i = Hunique.uniqueindex[window][Hwork_i]
+    #     H_j = Hunique.uniqueindex[window][Hwork_j]
+    #     # println("person $k's optimal haplotype pairs are located at columns $H_i and $H_j in H")
+
+    #     # loop through all haplotypes and find ones that match either of the optimal haplotypes 
+    #     map1 = Hunique.hapmap[window]
+    #     map2 = Hunique.hapmap[window]
+    #     hap1 = optimal_haplotypes[k].strand1[window]
+    #     hap2 = optimal_haplotypes[k].strand2[window]
+    #     for jj in 1:size(H, 2)
+    #         map1[jj] == H_i && (hap1[jj] = true)
+    #         map2[jj] == H_j && (hap2[jj] = true)
+    #     end
+    # end
+
+    @inbounds for k in 1:people, happair in happairs[k]
+        Hi_uniqueidx = happair[1]
+        Hj_uniqueidx = happair[2]
+        # println("person $k's optimal haplotype pairs are: $((Hi_uniqueidx, Hj_uniqueidx))")
+
+        Hi_idx = Hunique.uniqueindex[window][Hi_uniqueidx]
+        Hj_idx = Hunique.uniqueindex[window][Hj_uniqueidx]
+        # println("person $k's optimal haplotype pairs are located at columns $Hi_idx and $Hj_idx in current window of H")
 
         # loop through all haplotypes and find ones that match either of the optimal haplotypes 
-        map1 = Hunique.hapmap[window]
-        map2 = Hunique.hapmap[window]
-        hap1 = optimal_haplotypes[k].strand1[window]
-        hap2 = optimal_haplotypes[k].strand2[window]
+        mapping = Hunique.hapmap[window]
+        redunhaps_bitvec1 = optimal_haplotypes[k].strand1[window]
+        redunhaps_bitvec2 = optimal_haplotypes[k].strand2[window]
         for jj in 1:size(H, 2)
-            map1[jj] == H_i && (hap1[jj] = true)
-            map2[jj] == H_j && (hap2[jj] = true)
+            mapping[jj] == Hi_idx && (redunhaps_bitvec1[jj] = true)
+            mapping[jj] == Hj_idx && (redunhaps_bitvec2[jj] = true)
         end
     end
 
@@ -256,11 +283,11 @@ function haplopair(
     d        = size(H, 2)
     M        = zeros(eltype(H), d, d)
     N        = zeros(promote_type(eltype(H), eltype(X)), n, d)
-    happair  = ones(Int, n), ones(Int, n)
+    happairs = [Tuple{Int, Int}[] for i in 1:n]
     hapscore = zeros(eltype(N), n)
-    haplopair!(X, H, M, N, happair, hapscore)
+    haplopair!(X, H, M, N, happairs, hapscore)
 
-    return happair, hapscore
+    return happairs, hapscore
 end
 
 """
@@ -285,7 +312,7 @@ function haplopair!(
     H::AbstractMatrix,
     M::AbstractMatrix,
     N::AbstractMatrix,
-    happair::Tuple{AbstractVector, AbstractVector},
+    happairs::Vector{Vector{Tuple{Int, Int}}},
     hapscore::AbstractVector
     )
 
@@ -307,7 +334,7 @@ function haplopair!(
     end
 
     # computational routine
-    haplopair!(happair, hapscore, M, N)
+    haplopair!(happairs, hapscore, M, N)
 
     # supplement the constant terms in objective
     @inbounds for j in 1:n
@@ -335,22 +362,59 @@ sufficient statistics `M` and `N`.
     in columns.
 """
 function haplopair!(
-    happair::Tuple{AbstractVector, AbstractVector},
+    happairs::Vector{Vector{Tuple{Int, Int}}},
     hapmin::Vector,
-    M::AbstractMatrix,
-    N::AbstractMatrix
-    )
+    M::AbstractMatrix{T},
+    N::AbstractMatrix{T},
+    interval::T = convert(T, 3)
+    ) where T <: Real
 
     n, d = size(N)
     fill!(hapmin, typemax(eltype(hapmin)))
+    empty!.(happairs)
 
     @inbounds for k in 1:d, j in 1:k
         # loop over individuals
         @simd for i in 1:n
             score = M[j, k] - N[i, j] - N[i, k]
+
+            # keep best happair (original code)
+            # if score < hapmin[i]
+            #     empty!(happairs[i])
+            #     push!(happairs[i], (j, k))
+            #     hapmin[i] = score
+            # end
+
+            # keep all happairs that are equally good
+            # if score == hapmin[i]
+            #     push!(happairs[i], (j, k))
+            # elseif score < hapmin[i]
+            #     empty!(happairs[i])
+            #     push!(happairs[i], (j, k))
+            #     hapmin[i] = score
+            # end
+
+            # keep top 10 haplotype pairs
+            # if score < hapmin[i]
+            #     length(happairs[i]) == 10 && popfirst!(happairs[i])
+            #     push!(happairs[i], (j, k))
+            #     hapmin[i] = score
+            # elseif score <= hapmin[i] + interval
+            #     length(happairs[i]) == 10 && popfirst!(happairs[i])
+            #     push!(happairs[i], (j, k))
+            # end
+
+            # keep all previous best pairs
             if score < hapmin[i]
-                hapmin[i], happair[1][i], happair[2][i] = score, j, k
+                push!(happairs[i], (j, k))
+                hapmin[i] = score
             end
+
+            # keep all previous best pairs and equally good pairs
+            # if score <= hapmin[i]
+            #     push!(happairs[i], (j, k))
+            #     hapmin[i] = score
+            # end
         end
     end
 
@@ -358,7 +422,7 @@ function haplopair!(
 end
 
 """
-    fillmissing!(Xm, Xwork, H, haplopair)
+    fillmissing!(Xm, Xwork, H, haplopairs)
 
 Fill in missing genotypes in `X` according to haplotypes. Non-missing genotypes
 remain same.
@@ -373,19 +437,26 @@ function fillmissing!(
     Xm::AbstractMatrix{Union{T, Missing}},
     Xwork::AbstractMatrix{T},
     H::AbstractMatrix{T},
-    happair::Tuple{AbstractVector, AbstractVector},
+    happairs::Vector{Vector{Tuple{Int, Int}}},
     ) where T <: Real
 
     p, n = size(Xm)
-    discrepancy = zero(promote_type(eltype(Xwork), eltype(H)))
-    @inbounds for j in 1:n, i in 1:p
-        if ismissing(Xm[i, j])
-            tmp = H[i, happair[1][j]] + H[i, happair[2][j]]
-            discrepancy += abs2(Xwork[i, j] - tmp)
-            Xwork[i, j] = tmp
+    best_discrepancy = typemax(eltype(Xwork))
+    
+    for j in 1:n, happair in happairs[j]
+        discrepancy = zero(promote_type(eltype(Xwork), eltype(H)))
+        for i in 1:p
+            if ismissing(Xm[i, j])
+                tmp = H[i, happair[1]] + H[i, happair[2]]
+                discrepancy += abs2(Xwork[i, j] - tmp)
+                Xwork[i, j] = tmp
+            end
+        end
+        if discrepancy < best_discrepancy
+            best_discrepancy = discrepancy
         end
     end
-    return discrepancy
+    return best_discrepancy
 end
 
 """
@@ -399,18 +470,18 @@ genotypes may be changed.
 * `H`: `p x d` haplotype matrix. Each column is a haplotype.
 * `happair`: pair of haplotypes. `X[:, k] = H[:, happair[1][k]] + H[:, happair[2][k]]`.
 """
-function fillgeno!(
-    X::AbstractMatrix,
-    H::AbstractMatrix,
-    happair::Tuple{AbstractVector, AbstractVector}
-    )
+# function fillgeno!(
+#     X::AbstractMatrix,
+#     H::AbstractMatrix,
+#     happair::Tuple{AbstractVector, AbstractVector}
+#     )
 
-    @inbounds for j in 1:size(X, 2), i in 1:size(X, 1)
-        X[i, j] = H[i, happair[1][j]] + H[i, happair[2][j]]
-    end
-    return nothing
+#     @inbounds for j in 1:size(X, 2), i in 1:size(X, 1)
+#         X[i, j] = H[i, happair[1][j]] + H[i, happair[2][j]]
+#     end
+#     return nothing
 
-end
+# end
 
 """
     initmissing(X, Xwork)
@@ -493,7 +564,7 @@ missing genotypes in `X` according to haplotypes.
 * `M`: overwritten by `M[i, j] = 2dot(H[:, i], H[:, j]) + sumabs2(H[:, i]) +
     sumabs2(H[:, j])`.
 * `N`: overwritten by `n x d` matrix `2X'H`.
-* `happair`: optimal haplotype pair. `X[:, k] ≈ H[:, happair[k, 1]] + H[:, happair[k, 2]]`.
+* `happair`: vector of optimal haplotype pair. `X[:, k] ≈ H[:, happair[k, 1]] + H[:, happair[k, 2]]`.
 * `hapscore`: haplotyping score. 0 means best. Larger means worse.
 * `Xfloat`: copy of `X` where missing values are filled with mean. This engages in linear algebra for computing `N`
 * `maxiters`: number of MM iterations. Default is 1.
@@ -504,7 +575,7 @@ function haploimpute!(
     H::AbstractMatrix,
     M::AbstractMatrix,
     N::AbstractMatrix,
-    happair::Tuple{AbstractVector, AbstractVector},
+    happairs::Vector{Vector{Tuple{Int, Int}}},
     hapscore::AbstractVector;
     Xfloat::AbstractMatrix = zeros(eltype(M), size(X)),
     maxiters::Int  = 1,
@@ -517,15 +588,16 @@ function haploimpute!(
 
     # mm iteration
     for iter in 1:maxiters
-        # haplotyping
-        haplopair!(Xfloat, H, M, N, happair, hapscore)
+        # compute top haplotype pairs for each genotype vector
+        haplopair!(Xfloat, H, M, N, happairs, hapscore)
+        # screen for best haplotype pair based on observed entries
+        choose_happair!(X, H, happairs, hapscore)
         # impute missing entries according to current haplotypes
-        discrepancy = fillmissing!(X, Xfloat, H, happair)
-        # println("iter = $iter, discrepancy = $discrepancy")
+        discrepancy = fillmissing!(X, Xfloat, H, happairs)
         # convergence criterion
         objold = obj
         obj = sum(hapscore) - discrepancy
-        # println("iter = $iter, obj = $obj")
+        # println("iter = $iter, discrepancy = $discrepancy, obj = $obj")
         if abs(obj - objold) < tolfun * (objold + 1)
             break
         end
@@ -533,35 +605,58 @@ function haploimpute!(
     return nothing
 end
 
-function haploimpute2!(
-    X::AbstractMatrix,
-    H::AbstractMatrix,
-    M::AbstractMatrix,
-    N::AbstractMatrix,
-    happair::Tuple{AbstractVector, AbstractVector},
-    hapscore::AbstractVector;
-    Xfloat::AbstractMatrix = zeros(eltype(M), size(X)),
-    maxiters::Int  = 1,
-    tolfun::Number = 1e-3,
-    Xtrue::Union{AbstractMatrix, Nothing} = nothing # for testing
-    )
+"""
+    choose_happair!(X, H, happairs, hapscore)
 
+Calculates error ||x - hi - hj||^2 only on the observed entries and save observed error in `hapscore`.
+`happairs` will keep only the best haplotype pairs based on the error of observed entries. All happairs
+that attain the best observed error will be kept.
+"""
+function choose_happair!(
+    X::AbstractMatrix{Union{Missing, T}},
+    H::AbstractMatrix,
+    happairs::Vector{Vector{Tuple{Int, Int}}},
+    hapscore::AbstractVector;
+    ) where T <: Real
+
+    p = size(X, 1)
     n = size(X, 2)
     d = size(H, 2)
-    obj = typemax(eltype(hapscore))
-    fill!(hapscore, typemax(eltype(hapscore)))
+    p == size(H, 1) || error("Dimension mismatch: size(X, 1) = $p but size(H, 1) = $(size(H, 1))")
 
-    for i in 1:n
-        Xi = @view(X[:, i])
-        for j in 1:d, k in j:d
-            Hj = @view(H[:, j])
-            Hk = @view(H[:, k])
-            score = mapreduce(x -> x^2, +, skipmissing(Xi - Hj - Hk)) # perhaps try other norms?
-            if score < hapscore[i]
-                hapscore[i], happair[1][i], happair[2][i] = score, j, k
+    # loop over each person's genotype
+    best_happair = Tuple{Int, Int}[]
+    for j in 1:n
+        best_error = typemax(eltype(H))
+        empty!(best_happair)
+        for happair in happairs[j]
+            # compute errors for each pair based on observed entries
+            h1, h2 = happair[1], happair[2]
+            err = zero(promote_type(eltype(X), eltype(H)))
+            @inbounds @simd for i in 1:p
+                if X[i, j] !== missing 
+                    err += (X[i, j] - H[i, h1] - H[i, h2])^2
+                end
+            end
+            if err < best_error
+                best_error = err
+                empty!(best_happair)
+                push!(best_happair, happair)
+            elseif err == best_error
+                push!(best_happair, happair)
             end
         end
+
+        # keep only best haplotype pair in happairs
+        if length(happairs[j]) > 1
+            empty!(happairs[j])
+            for pair in best_happair
+                push!(happairs[j], pair)
+            end
+        end
+        hapscore[j] = convert(eltype(hapscore), best_error)
     end
+
     return nothing
 end
 
@@ -731,270 +826,3 @@ function search_breakpoint(
 
     return bkpts_optim, err_optim
 end
-
-"""
-    groupslices(A, dim)
-
-Returns a vector of integers where each integer element of the returned vector
-is a group number corresponding to the unique slices along dimension `dim` as
-returned from `unique(A, dim)`, where `A` can be a multidimensional array.
-
-# Example usage:
-If `C = unique(A, dim)`, `ic = groupslices(A, dim)`, and
-`ndims(A) == ndims(C) == 3`, then:
-```
-if dim == 1
-   all(A .== C[ic,:,:])
-elseif dim == 2
-   all(A .== C[:,ic,:])
-elseif dim == 3
-   all(A .== C[:,:,ic])
-end
-```
-
-Function from: https://github.com/mcabbott/GroupSlices.jl/blob/master/src/GroupSlices.jl
-Can delete this function when this issue gets resolved: https://github.com/JuliaLang/julia/issues/1845 
-"""
-@generated function groupslices(A::AbstractArray{T,N}, dim::Int) where {T,N}
-    quote
-        if !(1 <= dim <= $N)
-            ArgumentError("Input argument dim must be 1 <= dim <= $N, but is currently $dim")
-        end
-        hashes = zeros(UInt, size(A, dim))
-
-        # Compute hash for each row
-        k = 0
-        @nloops $N i A d->(if d == dim; k = i_d; end) begin
-            @inbounds hashes[k] = hash(hashes[k], hash((@nref $N A i)))
-        end
-
-        # Collect index of first row for each hash
-        uniquerow = Vector{Int}(undef, size(A, dim))
-        firstrow = Dict{Prehashed,Int}()
-        for k = 1:size(A, dim)
-            uniquerow[k] = get!(firstrow, Prehashed(hashes[k]), k)
-        end
-        uniquerows = collect(values(firstrow))
-
-        # Check for collisions
-        collided = falses(size(A, dim))
-        @inbounds begin
-            @nloops $N i A d->(if d == dim
-                k = i_d
-                j_d = uniquerow[k]
-            else
-                j_d = i_d
-            end) begin
-                if (@nref $N A j) != (@nref $N A i)
-                    collided[k] = true
-                end
-            end
-        end
-
-        if any(collided)
-            nowcollided = BitArray(size(A, dim))
-            while any(collided)
-                # Collect index of first row for each collided hash
-                empty!(firstrow)
-                for j = 1:size(A, dim)
-                    collided[j] || continue
-                    uniquerow[j] = get!(firstrow, Prehashed(hashes[j]), j)
-                end
-                for v in values(firstrow)
-                    push!(uniquerows, v)
-                end
-
-                # Check for collisions
-                fill!(nowcollided, false)
-                @nloops $N i A d->begin
-                    if d == dim
-                        k = i_d
-                        j_d = uniquerow[k]
-                        (!collided[k] || j_d == k) && continue
-                    else
-                        j_d = i_d
-                    end
-                end begin
-                    if (@nref $N A j) != (@nref $N A i)
-                        nowcollided[k] = true
-                    end
-                end
-                (collided, nowcollided) = (nowcollided, collided)
-            end
-        end
-        ie = unique(uniquerow)
-        ic_dict = Dict{Int,Int}()
-        for k = 1:length(ie)
-            ic_dict[ie[k]] = k
-        end
-
-        ic = similar(uniquerow)
-        for k = 1:length(ic)
-            ic[k] = ie[ic_dict[uniquerow[k]]]
-        end
-        return ic
-    end
-end
-
-@generated function groupslices!(ic::AbstractArray, A::AbstractArray{T,N}, dim::Int) where {T,N}
-    quote
-        if !(1 <= dim <= $N)
-            ArgumentError("Input argument dim must be 1 <= dim <= $N, but is currently $dim")
-        end
-        hashes = zeros(UInt, size(A, dim))
-
-        # Compute hash for each row
-        k = 0
-        @nloops $N i A d->(if d == dim; k = i_d; end) begin
-            @inbounds hashes[k] = hash(hashes[k], hash((@nref $N A i)))
-        end
-
-        # Collect index of first row for each hash
-        uniquerow = Vector{Int}(undef, size(A, dim))
-        firstrow = Dict{Prehashed,Int}()
-        for k = 1:size(A, dim)
-            uniquerow[k] = get!(firstrow, Prehashed(hashes[k]), k)
-        end
-        uniquerows = collect(values(firstrow))
-
-        # Check for collisions
-        collided = falses(size(A, dim))
-        @inbounds begin
-            @nloops $N i A d->(if d == dim
-                k = i_d
-                j_d = uniquerow[k]
-            else
-                j_d = i_d
-            end) begin
-                if (@nref $N A j) != (@nref $N A i)
-                    collided[k] = true
-                end
-            end
-        end
-
-        if any(collided)
-            nowcollided = BitArray(size(A, dim))
-            while any(collided)
-                # Collect index of first row for each collided hash
-                empty!(firstrow)
-                for j = 1:size(A, dim)
-                    collided[j] || continue
-                    uniquerow[j] = get!(firstrow, Prehashed(hashes[j]), j)
-                end
-                for v in values(firstrow)
-                    push!(uniquerows, v)
-                end
-
-                # Check for collisions
-                fill!(nowcollided, false)
-                @nloops $N i A d->begin
-                    if d == dim
-                        k = i_d
-                        j_d = uniquerow[k]
-                        (!collided[k] || j_d == k) && continue
-                    else
-                        j_d = i_d
-                    end
-                end begin
-                    if (@nref $N A j) != (@nref $N A i)
-                        nowcollided[k] = true
-                    end
-                end
-                (collided, nowcollided) = (nowcollided, collided)
-            end
-        end
-        ie = unique(uniquerow)
-        ic_dict = Dict{Int,Int}()
-        for k = 1:length(ie)
-            ic_dict[ie[k]] = k
-        end
-
-        for k = 1:length(ic)
-            ic[k] = ie[ic_dict[uniquerow[k]]]
-        end
-    end
-end
-
-# """
-#     unique_haplotypes(H, width)
-
-# Finds the unique haplotypes determined by the reference haplotypes stored 
-# in the columns of H. 
-
-# Note: This seems to be ~3x slower than using groupslices. 
-
-# # Input
-# * `H`: an `p x d` reference panel of haplotypes. 
-# * `width`: The window width 
-# """
-# function unique_haplotypes(
-#     H::AbstractMatrix, 
-#     width::Int,
-#     )
-
-#     p, d    = size(H)
-#     windows = ceil(Int, p / width)
-#     fast_data_type = Dict(8=>UInt8, 16=>UInt16, 32=>UInt32, 64=>UInt64, 128=>UInt128)
-
-#     if eltype(H) == Bool && haskey(fast_data_type, width)
-#         return fast_elimination(H, windows, width, H[1:width, :], fast_data_type)
-#     else
-#         ??
-#     end
-# end
-
-# """
-#     fast_elimination!(unique_hap, H, windows, width)
-
-# Computes the columns of `H` that are unique in each window and stores non-unique mappings. 
-
-# # Input
-# * `H`: an `p x d` reference panel of haplotypes. 
-# * `windows`: total number of windows
-# * `width`: the width of a window (should be 8, 16, 32, 64, or 128)
-# * `storage`: an `width x d` Bitmatrix 
-# * `fast_data_type`: the data types that can use fast_elimination
-
-# # Output
-# * `unique_hap` that stores the correct unique haplotypes and mappings for non-unique haplotypes
-# """
-# function fast_elimination(
-#     H::BitMatrix, 
-#     windows::Int64, 
-#     width::Int64,
-#     storage::BitMatrix = H[1:width, :],
-#     fast_data_type::Dict = Dict(8=>UInt8, 16=>UInt16, 32=>UInt32, 64=>UInt64, 128=>UInt128)
-#     )
-
-#     unique_hap = UniqueHaplotypes(windows, size(H, 2))
-
-#     # reinterpret each haplotype as an integer
-#     HR = reinterpret(fast_data_type[width], storage.chunks) 
-
-#     # record unique haplotypes and non-unique mappings in first window
-#     unique_index!(unique_hap.unique_index[1], unique_hap.redundant_map[1], HR)
-
-#     # loop through windows
-#     for w in 2:windows-1
-#         copyto!(storage, @view(H[((w - 1) * width + 1):(w * width), :]))
-#         HR = reinterpret(fast_data_type[width], storage.chunks) 
-#         unique_index!(unique_hap.unique_index[w], unique_hap.redundant_map[w], HR)
-#     end
-
-#     # TODO: last window may have length ∉ fast_data_type
-#     return nothing
-# end
-
-# # helper function for fast_elimination!
-# function unique_index!(u::BitVector, d::Dict{Int64, Int64}, v::AbstractVector)
-#     seen = Set{eltype(v)}()
-
-#     @inbounds for i in 1:length(v)
-#         if v[i] ∈ seen
-#             u[i] = false
-#             d[i] = findfirst(isequal(v[i]), v)
-#         else
-#             push!(seen, v[i])
-#         end
-#     end
-# end
