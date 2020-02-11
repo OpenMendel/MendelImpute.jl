@@ -20,7 +20,7 @@ function phase(
     outfile::AbstractString = "imputed." * tgtfile,
     width::Int = 400
     )
-    # convert vcf files to numeric matrices
+    # convert vcf files to numeric matrices (need a routine so it does this transposed)
     X = convert_gt(Float32, tgtfile, as_minorallele=false)
     H = convert_ht(Float32, reffile, as_minorallele=false)
 
@@ -92,7 +92,8 @@ function phase(
     hapset::Union{Vector{OptimalHaplotypeSet}, Nothing} = nothing,
     width::Int    = 400,
     verbose::Bool = true,
-    Xtrue::Union{AbstractMatrix, Nothing} = nothing # for testing
+    Xtrue::Union{AbstractMatrix, Nothing} = nothing, # for testing
+    fast_method::Bool = false
     ) where T <: Real
 
     # declare some constants
@@ -106,24 +107,44 @@ function phase(
     end
 
     # allocate working arrays
+    flips = [falses(windows) for i in 1:people]
     phase = [HaplotypeMosaicPair(snps) for i in 1:people]
     haplo_chain = ([copy(hapset[i].strand1[1]) for i in 1:people], [copy(hapset[1].strand2[1]) for i in 1:people])
     chain_next  = (BitVector(undef, haplotypes), BitVector(undef, haplotypes))
     window_span = (ones(Int, people), ones(Int, people))
 
+    # first pass to decide haplotype configurations (i.e. hapset switchings)
+    # this increases error slightly but seems like it decreases computational time
+    # for i in 1:people
+    #     set_flip!(hapset[i].strand1, hapset[i].strand2, flips[i])
+    # end
+
     # TODO: parallel computing
-    # begin intersecting haplotypes window by window 
+    # second pass to phase and merge breakpoints
+    # begin intersecting haplotypes window by window
     @inbounds for i in 1:people, w in 2:windows
 
-        # decide whether to cross over based on the larger intersection
+        # Decide whether to cross over based on the larger intersection
+        # A   B      A   B
+        # |   |  or    X
+        # C   D      C   D
         chain_next[1] .= haplo_chain[1][i] .& hapset[i].strand1[w] # not crossing over
         chain_next[2] .= haplo_chain[1][i] .& hapset[i].strand2[w] # crossing over
-        if sum(chain_next[1]) < sum(chain_next[2])
+        AC = sum(chain_next[1])
+        AD = sum(chain_next[2])
+        chain_next[1] .= haplo_chain[2][i] .& hapset[i].strand1[w] # crossing over
+        chain_next[2] .= haplo_chain[2][i] .& hapset[i].strand2[w] # not crossing over
+        BC = sum(chain_next[1])
+        BD = sum(chain_next[2])
+        if AC + BD < AD + BC
             hapset[i].strand1[w], hapset[i].strand2[w] = hapset[i].strand2[w], hapset[i].strand1[w]
-        end        
+        end
 
-        # strand 1 
+        # intersect all surviving haplotypes with next window
         chain_next[1] .= haplo_chain[1][i] .& hapset[i].strand1[w]
+        chain_next[2] .= haplo_chain[2][i] .& hapset[i].strand2[w]
+
+        # strand 1 becomes empty
         if sum(chain_next[1]) == 0
             # delete all nonmatching haplotypes in previous windows
             for ww in (w - window_span[1][i]):(w - 1)
@@ -138,8 +159,7 @@ function phase(
             window_span[1][i] += 1
         end
 
-        # strand 2
-        chain_next[2] .= haplo_chain[2][i] .& hapset[i].strand2[w]
+        # strand 2 becomes empty
         if sum(chain_next[2]) == 0
             # delete all nonmatching haplotypes in previous windows
             for ww in (w - window_span[2][i]):(w - 1)
@@ -174,42 +194,128 @@ function phase(
         push!(phase[i].strand1.haplotypelabel, hap1)
         push!(phase[i].strand2.start, 1)
         push!(phase[i].strand2.haplotypelabel, hap2)
+
+        # search all possible haplotypes configurations between window 1 and 2 (super slow)
+        # Xi = view(X, 1:(2width), i)
+        # Hi = view(H, 1:(2width), :)
+        # hap1_win_cur = findall(hapset[i].strand1[1])
+        # hap2_win_cur = findall(hapset[i].strand2[1])
+        # hap1_win_next = findall(hapset[i].strand1[2])
+        # hap2_win_next = findall(hapset[i].strand2[2])
+        # best_hap1 = 0
+        # best_hap2 = 0
+        # best_bktp = 0
+        # best_err  = typemax(Int)
+        # for hap1_next in hap1_win_next, hap2_next in hap2_win_next, hap1 in hap1_win_cur, hap2 in hap2_win_cur
+        #     bkpt, err_optim = search_breakpoint(Xi, Hi, (hap1, hap1_next), (hap2, hap2_next))
+        #     if err_optim < best_err
+        #         best_bktp, best_err, best_hap1, best_hap2 = bkpt, err_optim, hap1, hap2
+        #     end
+        # end
+        # push!(phase[i].strand1.start, 1)
+        # push!(phase[i].strand1.haplotypelabel, best_hap1)
+        # push!(phase[i].strand2.start, 1)
+        # push!(phase[i].strand2.haplotypelabel, best_hap2)
     end
 
     # find optimal break points and record info to phase. 
-    # TODO: handle last window separately since view() on X or H is not complete
     strand1_intersect = chain_next[1]
     strand2_intersect = chain_next[2]
-    for i in 1:people, w in 2:windows
-        
-        strand1_intersect .= hapset[i].strand1[w - 1] .& hapset[i].strand1[w]
-        if sum(strand1_intersect) == 0
-            # search breakpoints
-            Xi = view(X, ((w - 2) * width + 1):(w * width), i)
-            Hi = view(H, ((w - 2) * width + 1):(w * width), :)
-            s2 = findfirst(hapset[i].strand2[w]) :: Int64
-            s1_cur  = findfirst(hapset[i].strand1[w - 1]) :: Int64
-            s1_next = findfirst(hapset[i].strand1[w]) :: Int64
-            bkpt, err_optim = search_breakpoint(Xi, Hi, s2, (s1_cur, s1_next))
+    @inbounds for w in 2:windows
+        Hi = view(H, ((w - 2) * width + 1):(w * width), :)
+        for i in 1:people
+            strand1_intersect .= hapset[i].strand1[w - 1] .& hapset[i].strand1[w]
+            strand2_intersect .= hapset[i].strand2[w - 1] .& hapset[i].strand2[w]
+            if sum(strand1_intersect) == 0 && sum(strand2_intersect) == 0 && !fast_method
+                Xi = view(X, ((w - 2) * width + 1):(w * width), i)
+                s1_prev = phase[i].strand1.haplotypelabel[end]
+                s2_prev = phase[i].strand2.haplotypelabel[end]
 
-            # record info into phase
-            push!(phase[i].strand1.start, (w - 2) * width + 1 + bkpt)
-            push!(phase[i].strand1.haplotypelabel, s1_next)
-        end
+                # search breakpoints when choosing first pair
+                s1_next = findfirst(hapset[i].strand1[w]) :: Int64
+                s2_next = findfirst(hapset[i].strand2[w]) :: Int64
+                bkpt, err_optim = search_breakpoint(Xi, Hi, (s1_prev, s1_next), (s2_prev, s2_next))
+                # record info into phase
+                push!(phase[i].strand1.start, (w - 2) * width + 1 + bkpt[1])
+                push!(phase[i].strand2.start, (w - 2) * width + 1 + bkpt[2])
+                push!(phase[i].strand1.haplotypelabel, s1_next)
+                push!(phase[i].strand2.haplotypelabel, s2_next)
 
-        strand2_intersect .= hapset[i].strand2[w - 1] .& hapset[i].strand2[w]
-        if sum(strand2_intersect) == 0
-            # search breakpoints
-            Xi = view(X, ((w - 2) * width + 1):(w * width), i)
-            Hi = view(H, ((w - 2) * width + 1):(w * width), :)
-            s1 = findfirst(hapset[i].strand1[w]) :: Int64
-            s2_cur  = findfirst(hapset[i].strand2[w - 1]) :: Int64
-            s2_next = findfirst(hapset[i].strand2[w]) :: Int64
-            bkpt, err_optim = search_breakpoint(Xi, Hi, s1, (s2_cur, s2_next))
+                # search breakpoints among all possible haplotypes (this improves error slightly but quite slow)
+                # s1_win_next = findall(hapset[i].strand1[w])
+                # s2_win_next = findall(hapset[i].strand2[w])
+                # best_bktp = (0, 0)
+                # best_err  = typemax(Int)
+                # best_s1_next = 0
+                # best_s2_next = 0
+                # for s2_next in s2_win_next, s1_next in s1_win_next
+                #     bkpt, err_optim = search_breakpoint(Xi, Hi, (s1_prev, s1_next), (s2_prev, s2_next))
+                #     if err_optim < best_err
+                #         best_bktp, best_err, best_s1_next, best_s2_next = bkpt, err_optim, s1_next, s2_next
+                #     end
+                # end
+                # push!(phase[i].strand1.start, (w - 2) * width + 1 + best_bktp[1])
+                # push!(phase[i].strand2.start, (w - 2) * width + 1 + best_bktp[2])
+                # push!(phase[i].strand1.haplotypelabel, best_s1_next)
+                # push!(phase[i].strand2.haplotypelabel, best_s2_next)
+            else
+                Xi = view(X, ((w - 2) * width + 1):(w * width), i)
+                if sum(strand1_intersect) == 0
+                    # search strand1 breakpoints
+                    # s2 = findfirst(hapset[i].strand2[w]) :: Int64
+                    # s1_prev = phase[i].strand1.haplotypelabel[end]
+                    # s1_next = findfirst(hapset[i].strand1[w]) :: Int64
+                    # bkpt, err_optim = search_breakpoint(Xi, Hi, s2, (s1_prev, s1_next))
+                    # # record info into phase
+                    # push!(phase[i].strand1.start, (w - 2) * width + 1 + bkpt)
+                    # push!(phase[i].strand1.haplotypelabel, s1_next)
 
-            # record info into phase
-            push!(phase[i].strand2.start, (w - 2) * width + 1 + bkpt)
-            push!(phase[i].strand2.haplotypelabel, s2_next)
+                    # search breakpoints among all possible haplotypes (this improves error slightly but quite slow)
+                    s1_prev = phase[i].strand1.haplotypelabel[end]
+                    s1_win_next = findall(hapset[i].strand1[w])
+                    s2_win_next = findall(hapset[i].strand2[w])
+                    best_bktp = 0
+                    best_err  = typemax(Int)
+                    best_s1_next = 0
+                    for s1_next in s1_win_next, s2_next in s2_win_next
+                        bkpt, err_optim = search_breakpoint(Xi, Hi, s2_next, (s1_prev, s1_next))
+                        if err_optim < best_err
+                            best_bktp, best_err, best_s1_next = bkpt, err_optim, s1_next
+                        end
+                    end
+                    # record info into phase
+                    push!(phase[i].strand1.start, (w - 2) * width + 1 + best_bktp)
+                    push!(phase[i].strand1.haplotypelabel, best_s1_next)
+                end
+
+                if sum(strand2_intersect) == 0
+                    # search strand2 breakpoints
+                    # s1 = findfirst(hapset[i].strand1[w]) :: Int64
+                    # s2_prev = phase[i].strand2.haplotypelabel[end]
+                    # s2_next = findfirst(hapset[i].strand2[w]) :: Int64
+                    # bkpt, err_optim = search_breakpoint(Xi, Hi, s1, (s2_prev, s2_next))
+                    # # record info into phase
+                    # push!(phase[i].strand2.start, (w - 2) * width + 1 + bkpt)
+                    # push!(phase[i].strand2.haplotypelabel, s2_next)
+
+                    # search breakpoints among all possible haplotypes (this improves error slightly but quite slow)
+                    s2_prev = phase[i].strand2.haplotypelabel[end]
+                    s2_win_next = findall(hapset[i].strand2[w])
+                    s1_win_next = findall(hapset[i].strand1[w])
+                    best_bktp = 0
+                    best_err  = typemax(Int)
+                    best_s2_next = 0
+                    for s2_next in s2_win_next, s1_next in s1_win_next
+                        bkpt, err_optim = search_breakpoint(Xi, Hi, s1_next, (s2_prev, s2_next))
+                        if err_optim < best_err
+                            best_bktp, best_err, best_s2_next = bkpt, err_optim, s2_next
+                        end
+                    end
+                    # record info into phase
+                    push!(phase[i].strand2.start, (w - 2) * width + 1 + best_bktp)
+                    push!(phase[i].strand2.haplotypelabel, best_s2_next)
+                end
+            end
         end
     end
 
