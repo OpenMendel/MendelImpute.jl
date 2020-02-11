@@ -35,6 +35,7 @@ function unique_haplotypes(
     H_cur_window = view(H, 1:2width, :)
     hapset.hapmap[1] = groupslices(H_cur_window, dim)
     hapset.uniqueindex[1] = unique(hapset.hapmap[1])
+    hapset.range[1] = 1:2width
 
     # record unique haplotypes and mappings window by window (using flanking windows)
     # first  1/3: ((w - 2) * width + 1):((w - 1) * width)
@@ -44,12 +45,14 @@ function unique_haplotypes(
         H_cur_window = view(H, ((w - 2) * width + 1):((w + 1) * width), :)
         hapset.hapmap[w] = groupslices(H_cur_window, dim)
         hapset.uniqueindex[w] = unique(hapset.hapmap[w])
+        hapset.range[w] = ((w - 2) * width + 1):((w + 1) * width)
     end
 
     # find unique haplotype in penultimate & last window
     H_cur_window = view(H, ((windows - 2) * width + 1):p, :)
     hapset.hapmap[end] = groupslices(H_cur_window, dim)
     hapset.uniqueindex[end] = unique(hapset.hapmap[end])
+    hapset.range[end] = ((windows - 2) * width + 1):p
 
     return hapset
 end
@@ -84,7 +87,7 @@ function compute_optimal_halotype_set(
     windows = floor(Int, snps / width)
 
     # get unique haplotype indices and maps for each window
-    Hunique  = unique_haplotypes(H, width, 'T')
+    Hunique = unique_haplotypes(H, width, 'T')
 
     # Initialize data structure for redundant haplotypes that matches the optimal one. 
     optimal_haplotypes = [OptimalHaplotypeSet(windows, haplotypes) for i in 1:people]

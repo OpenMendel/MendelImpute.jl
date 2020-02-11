@@ -13,6 +13,7 @@ module MendelImpute
     using GeneticVariation
     using VCFTools
     using GroupSlices
+    using Distances
 
     export continue_haplotype, haplopair!, haplopair, haploimpute!
     export impute!, impute2!, phase, search_breakpoint, unique_haplotypes
@@ -22,6 +23,7 @@ module MendelImpute
     export PeoplesRedundantHaplotypeSet, phase2, non_redundant_haplotypes
     export simulate_genotypes2
     export set_flip!
+    export phase_prephased
 
     # export UniqueHaplotypes, fast_elimination, unique_index!
     export OptimalHaplotypeSet, compute_optimal_halotype_set

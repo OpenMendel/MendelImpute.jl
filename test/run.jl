@@ -846,3 +846,26 @@ using MendelImpute
 H = simulate_markov_haplotypes(10000, 500)
 X = simulate_genotypes(H, 100)
 X2 = simulate_genotypes2(H, people=100)
+
+
+
+using Revise
+using MendelImpute
+using VCFTools
+using DelimitedFiles
+using LinearAlgebra
+using BenchmarkTools
+using Random
+using ElasticArrays
+
+cd("/Users/biona001/.julia/dev/MendelImpute/data")
+
+file = "test.08Jun17.d8b.vcf.gz"
+X = convert_ht(Float32, file, has_missing=true)
+H = convert_ht(Float32, file)
+X = copy(X')
+H = copy(H')
+
+width = 400
+hapset = phase_prephased(X, H, width=width)
+

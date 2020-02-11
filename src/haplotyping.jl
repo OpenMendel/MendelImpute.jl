@@ -74,6 +74,59 @@ function phase(
     return hs, ph
 end
 
+function phase_prephased(
+    X::AbstractMatrix{Union{Missing, T}},
+    H::AbstractMatrix{T};
+    width::Int    = 400
+    ) where T <: Real
+    
+    # declare some constants
+    snps = size(X, 1)
+    people = Int(size(X, 2) / 2)
+    haplotypes = size(H, 2)
+    windows = floor(Int, snps / width)
+
+    # get unique haplotype indices and maps for current window
+    Hunique = unique_haplotypes(H, width, 'T')
+    hapset  = [OptimalHaplotypeSet(windows, haplotypes) for i in 1:people]
+
+    for w in 1:windows, i in 1:people
+        cur_range = Hunique.range[w]
+        Hi_unique = Hunique.uniqueindex[w]
+        best_err1 = typemax(eltype(H))
+        best_err2 = typemax(eltype(H))
+
+        # loop through 2 genotype strands to find best matching haplotype
+        Xi1 = @view(X[cur_range, 2i - 1])
+        Xi2 = @view(X[cur_range, 2i])
+        Hi1 = 0
+        Hi2 = 0
+        for j in Hi_unique
+            Hi = @view(H[cur_range, j])
+            # strand1
+            err = euclidean(Xi1, Hi)
+            if err < best_err1
+                Hi1 = j
+                best_err1 = err
+            end
+            # strand2
+            err = euclidean(Xi2, Hi)
+            if err < best_err2
+                Hi2 = j
+                best_err2 = err
+            end
+        end
+        # find all haplotypes that matches the unique one 
+        mapping = Hunique.hapmap[w]
+        for j in 1:haplotypes
+            mapping[j] == Hi1 && (hapset[i].strand1[w][j] = true)
+            mapping[j] == Hi2 && (hapset[i].strand2[w][j] = true)
+        end
+    end
+
+    return hapset
+end
+
 """
     phase(X, H, width=400, verbose=true)
 
@@ -101,7 +154,7 @@ function phase(
     haplotypes = size(H, 2)
     windows = floor(Int, snps / width)
 
-    # compute redundant haplotype sets. 
+    # compute redundant haplotype sets using least squares criteria
     if isnothing(hapset)
         hapset = compute_optimal_halotype_set(X, H, width=width, verbose=verbose, Xtrue=Xtrue)
     end
