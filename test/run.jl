@@ -867,5 +867,5 @@ X = copy(X')
 H = copy(H')
 
 width = 400
-hapset = phase_prephased(X, H, width=width)
+hapset = compute_optimal_halotype_set_prephased(X, H, width=width)
 
