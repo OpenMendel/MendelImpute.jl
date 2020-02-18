@@ -2,18 +2,14 @@ __precompile__()
 
 module MendelImpute
 
-    #needed for groupslices function
-    import Base.hash
-    import Base.Cartesian, Base.Cartesian.@nloops, Base.Cartesian.@nref
     import StatsBase: sample
-
+    
     using LinearAlgebra
     using StatsBase
     using ElasticArrays
     using GeneticVariation
     using VCFTools
     using GroupSlices
-    using Distances
 
     export continue_haplotype, haplopair!, haplopair, haploimpute!
     export impute!, impute2!, phase, search_breakpoint, unique_haplotypes
