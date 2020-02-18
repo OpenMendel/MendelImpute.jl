@@ -16,7 +16,8 @@ structure for examples.
 function unique_haplotypes(
     H::AbstractMatrix,
     width::Int,
-    trans::Char
+    trans::Char;
+    flankwidth::Int = round(Int, 0.1width)
     )
 
     if trans == 'N'
@@ -31,28 +32,31 @@ function unique_haplotypes(
     windows = floor(Int, p / width)
     hapset  = UniqueHaplotypeMaps(windows, d)
 
-    # find unique haplotypes in first & second window 
-    H_cur_window = view(H, 1:2width, :)
+    # find unique haplotypes in first & second window
+    first_range = 1:(width + flankwidth)
+    H_cur_window = view(H, first_range, :)
     hapset.hapmap[1] = groupslices(H_cur_window, dim)
     hapset.uniqueindex[1] = unique(hapset.hapmap[1])
-    hapset.range[1] = 1:2width
+    hapset.range[1] = first_range
 
     # record unique haplotypes and mappings window by window (using flanking windows)
     # first  1/3: ((w - 2) * width + 1):((w - 1) * width)
     # middle 1/3: ((w - 1) * width + 1):(      w * width)
     # last   1/3: (      w * width + 1):((w + 1) * width)
-    for w in 2:(windows-1)
-        H_cur_window = view(H, ((w - 2) * width + 1):((w + 1) * width), :)
+    for w in 2:(windows - 1)
+        cur_range = ((w - 1) * width - flankwidth + 1):(w * width + flankwidth)
+        H_cur_window = view(H, cur_range, :)
         hapset.hapmap[w] = groupslices(H_cur_window, dim)
         hapset.uniqueindex[w] = unique(hapset.hapmap[w])
-        hapset.range[w] = ((w - 2) * width + 1):((w + 1) * width)
+        hapset.range[w] = cur_range
     end
 
     # find unique haplotype in penultimate & last window
-    H_cur_window = view(H, ((windows - 2) * width + 1):p, :)
+    last_range   = ((windows - 1) * width - flankwidth + 1):p
+    H_cur_window = view(H, last_range, :)
     hapset.hapmap[end] = groupslices(H_cur_window, dim)
     hapset.uniqueindex[end] = unique(hapset.hapmap[end])
-    hapset.range[end] = ((windows - 2) * width + 1):p
+    hapset.range[end] = last_range
 
     return hapset
 end
@@ -109,7 +113,7 @@ function compute_optimal_halotype_set(
     hapscore    = zeros(T, people)
     num_uniq    = length(Hunique.uniqueindex[1])
     M           = zeros(T, num_uniq, num_uniq)
-    N           = ElasticArray{T}(undef, people, num_uniq)
+    N           = ElasticArray{T}(undef, people, num_uniq) # array type that allows rescaling last dim 
 
     # In first window, calculate optimal haplotype pair among unique haplotypes
     cur_range   = Hunique.range[1]
@@ -122,8 +126,9 @@ function compute_optimal_halotype_set(
     compute_redundant_haplotypes!(optimal_haplotypes, Hunique, happairs, H, 1)
 
     # resizable working arrays
-    Hwork       = ElasticArray{T}(H[1:3width, Hunique.uniqueindex[1]]) # array type that allows rescaling last dim 
-    Xwork       = X[1:3width, :]
+    cur_range   = Hunique.range[2]
+    Hwork       = ElasticArray{T}(H[cur_range, Hunique.uniqueindex[1]]) # array type that allows rescaling last dim 
+    Xwork       = X[cur_range, :]
     Xwork_float = zeros(T, size(Xwork))
 
     #TODO: make this loop multithreaded 

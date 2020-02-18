@@ -293,7 +293,7 @@ function phase(
     width::Int    = 400,
     verbose::Bool = true,
     Xtrue::Union{AbstractMatrix, Nothing} = nothing, # for testing
-    fast_method::Bool = false
+    fast_method::Bool = true
     ) where T <: Real
 
     # declare some constants
