@@ -107,26 +107,32 @@ function compute_optimal_halotype_set(
     # allocate working arrays
     happairs    = [Tuple{Int, Int}[] for i in 1:people]
     hapscore    = zeros(T, people)
-    Hwork       = ElasticArray{T}(H[1:3width, Hunique.uniqueindex[1]]) # array type that allows rescaling last dim 
-    Xwork       = X[1:3width, :]
-    Xwork_float = zeros(T, size(Xwork))
     num_uniq    = length(Hunique.uniqueindex[1])
     M           = zeros(T, num_uniq, num_uniq)
     N           = ElasticArray{T}(undef, people, num_uniq)
 
     # In first window, calculate optimal haplotype pair among unique haplotypes
+    cur_range   = Hunique.range[1]
+    Hwork       = H[cur_range, Hunique.uniqueindex[1]]
+    Xwork       = X[cur_range, :]
+    Xwork_float = zeros(T, size(Xwork))
     haploimpute!(Xwork, Hwork, M, N, happairs, hapscore, Xfloat=Xwork_float, Xtrue=Xtrue_work)
 
     # find all haplotypes matching the optimal haplotype pairs
     compute_redundant_haplotypes!(optimal_haplotypes, Hunique, happairs, H, 1)
 
+    # resizable working arrays
+    Hwork       = ElasticArray{T}(H[1:3width, Hunique.uniqueindex[1]]) # array type that allows rescaling last dim 
+    Xwork       = X[1:3width, :]
+    Xwork_float = zeros(T, size(Xwork))
+
     #TODO: make this loop multithreaded 
     # first  1/3: ((w - 2) * width + 1):((w - 1) * width)
     # middle 1/3: ((w - 1) * width + 1):(      w * width)
     # last   1/3: (      w * width + 1):((w + 1) * width)
-    for w in 2:(windows-1)
+    for w in 2:(windows - 1)
         # sync Xwork and Hwork with original data
-        cur_range = ((w - 2) * width + 1):((w + 1) * width) # includes flanking windows
+        cur_range = Hunique.range[w]
         M = resize_and_sync!(Xwork, Hwork, Hunique.uniqueindex[w], cur_range, X, H, M, N)
         isnothing(Xtrue) || copyto!(Xtrue_work, view(Xtrue, cur_range, :)) # for testing
 
@@ -137,23 +143,15 @@ function compute_optimal_halotype_set(
         compute_redundant_haplotypes!(optimal_haplotypes, Hunique, happairs, H, w)
     end
 
-    # last window
-    last_range = ((windows - 2) * width + 1):snps
-    if mod(length(last_range), width) == 0
-        #resize the typical way if the last window has the same width as previous windows
-        M = resize_and_sync!(Xwork, Hwork, Hunique.uniqueindex[end], last_range, X, H, M, N)
-        haploimpute!(Xwork, Hwork, M, N, happairs, hapscore)
-        compute_redundant_haplotypes!(optimal_haplotypes, Hunique, happairs, H, windows)
-    else
-        #reallocate everything 
-        num_uniq    = length(Hunique.uniqueindex[end])
-        Hwork       = H[last_range, Hunique.uniqueindex[end]]
-        Xwork       = X[last_range, :]
-        M           = zeros(T, num_uniq, num_uniq)
-        N           = zeros(T, people, num_uniq)
-        haploimpute!(Xwork, Hwork, M, N, happairs, hapscore)
-        compute_redundant_haplotypes!(optimal_haplotypes, Hunique, happairs, H, windows)
-    end
+    # last window reallocate everything 
+    last_range = Hunique.range[end]
+    num_uniq    = length(Hunique.uniqueindex[end])
+    Hwork       = H[last_range, Hunique.uniqueindex[end]]
+    Xwork       = X[last_range, :]
+    M           = zeros(T, num_uniq, num_uniq)
+    N           = zeros(T, people, num_uniq)
+    haploimpute!(Xwork, Hwork, M, N, happairs, hapscore)
+    compute_redundant_haplotypes!(optimal_haplotypes, Hunique, happairs, H, windows)
 
     return optimal_haplotypes
 end
@@ -188,13 +186,13 @@ function compute_optimal_halotype_set_prephased(
         for j in Hi_unique
             Hi = @view(H[cur_range, j])
             # strand1
-            err = euclidean(Xi1, Hi)
+            err = euclidean_skipmissing(Xi1, Hi)
             if err < best_err1
                 Hi1 = j
                 best_err1 = err
             end
             # strand2
-            err = euclidean(Xi2, Hi)
+            err = euclidean_skipmissing(Xi2, Hi)
             if err < best_err2
                 Hi2 = j
                 best_err2 = err
@@ -210,6 +208,19 @@ function compute_optimal_halotype_set_prephased(
     end
 
     return hapset
+end
+
+function euclidean_skipmissing(
+    x::AbstractVector{U}, 
+    y::AbstractVector{T}
+    ) where U <: Union{T, Missing} where T <: Real
+    s = zero(T)
+    @inbounds @simd for i in eachindex(x)
+        if x[i] !== missing
+            s += (x[i] - y[i])^2
+        end
+    end
+    return s
 end
 
 """

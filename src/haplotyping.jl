@@ -86,6 +86,7 @@ end
 function phase_prephased(
     X::AbstractMatrix{Union{Missing, T}},
     H::AbstractMatrix{T};
+    width::Int = 400,
     hapset::Union{Vector{OptimalHaplotypeSet}, Nothing} = nothing,
     fast_method::Bool = false
     ) where T <: Real
@@ -292,7 +293,7 @@ function phase(
     width::Int    = 400,
     verbose::Bool = true,
     Xtrue::Union{AbstractMatrix, Nothing} = nothing, # for testing
-    fast_method::Bool = false
+    fast_method::Bool = true
     ) where T <: Real
 
     # declare some constants
