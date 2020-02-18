@@ -87,8 +87,9 @@ function phase_prephased(
     X::AbstractMatrix{Union{Missing, T}},
     H::AbstractMatrix{T};
     width::Int = 400,
+    flankwidth::Int = round(Int, 0.1width),
     hapset::Union{Vector{OptimalHaplotypeSet}, Nothing} = nothing,
-    fast_method::Bool = false
+    fast_method::Bool = true
     ) where T <: Real
 
     # declare some constants
@@ -99,7 +100,7 @@ function phase_prephased(
 
     # compute redundant haplotype sets for each strand
     if isnothing(hapset)
-        hapset = compute_optimal_halotype_set(X, H, width=width, verbose=verbose, prephased=true, Xtrue=Xtrue)
+        hapset = compute_optimal_halotype_set(X, H, width=width, verbose=verbose, prephased=true, Xtrue=Xtrue, flankwidth=flankwidth)
     end
 
     # allocate working arrays
@@ -291,9 +292,10 @@ function phase(
     H::AbstractMatrix{T};
     hapset::Union{Vector{OptimalHaplotypeSet}, Nothing} = nothing,
     width::Int    = 400,
+    flankwidth::Int = round(Int, 0.1width),
     verbose::Bool = true,
     Xtrue::Union{AbstractMatrix, Nothing} = nothing, # for testing
-    fast_method::Bool = true
+    fast_method::Bool = false
     ) where T <: Real
 
     # declare some constants
@@ -307,7 +309,6 @@ function phase(
     end
 
     # allocate working arrays
-    # flips = [falses(windows) for i in 1:people]
     phase = [HaplotypeMosaicPair(snps) for i in 1:people]
     haplo_chain = ([copy(hapset[i].strand1[1]) for i in 1:people], [copy(hapset[1].strand2[1]) for i in 1:people])
     chain_next  = (BitVector(undef, haplotypes), BitVector(undef, haplotypes))
@@ -315,9 +316,10 @@ function phase(
 
     # first pass to decide haplotype configurations (i.e. hapset switchings)
     # this increases error slightly but seems like it decreases computational time
-    # for i in 1:people
-    #     set_flip!(hapset[i].strand1, hapset[i].strand2, flips[i])
-    # end
+    flips = [falses(windows) for i in 1:people]
+    for i in 1:people
+        set_flip!(hapset[i].strand1, hapset[i].strand2, flips[i])
+    end
 
     # TODO: parallel computing
     # second pass to phase and merge breakpoints

@@ -81,6 +81,7 @@ function compute_optimal_halotype_set(
     X::AbstractMatrix{Union{Missing, T}},
     H::AbstractMatrix{T};
     width::Int    = 128,
+    flankwidth::Int = round(Int, 0.1width),
     verbose::Bool = true,
     prephased::Bool = false,
     Xtrue::Union{AbstractMatrix, Nothing} = nothing # for testing
@@ -96,7 +97,7 @@ function compute_optimal_halotype_set(
     windows = floor(Int, snps / width)
 
     # get unique haplotype indices and maps for each window
-    Hunique = unique_haplotypes(H, width, 'T')
+    Hunique = unique_haplotypes(H, width, 'T', flankwidth = flankwidth)
 
     # Initialize data structure for redundant haplotypes that matches the optimal one. 
     optimal_haplotypes = [OptimalHaplotypeSet(windows, haplotypes) for i in 1:people]
@@ -164,7 +165,8 @@ end
 function compute_optimal_halotype_set_prephased(
     X::AbstractMatrix{Union{Missing, T}},
     H::AbstractMatrix{T};
-    width::Int    = 400
+    width::Int    = 400,
+    flankwidth::Int = round(Int, 0.1width),
     ) where T <: Real
     
     # declare some constants
@@ -174,7 +176,7 @@ function compute_optimal_halotype_set_prephased(
     windows = floor(Int, snps / width)
 
     # get unique haplotype indices and maps for current window
-    Hunique = unique_haplotypes(H, width, 'T')
+    Hunique = unique_haplotypes(H, width, 'T', flankwidth = flankwidth)
     hapset  = [OptimalHaplotypeSet(windows, haplotypes) for i in 1:people]
 
     for w in 1:windows, i in 1:people
