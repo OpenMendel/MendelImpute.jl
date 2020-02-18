@@ -19,7 +19,8 @@ function phase(
     impute::Bool = true,
     prephased::Bool=false,
     outfile::AbstractString = "imputed." * tgtfile,
-    width::Int = 400
+    width::Int = 400,
+    flankwidth::Int = round(Int, 0.1width)
     )
     # convert vcf files to numeric matrices (need a routine so it does this transposed)
     H = convert_ht(Float32, reffile)
@@ -32,13 +33,13 @@ function phase(
     # compute redundant haplotype sets. 
     X = copy(X')
     H = copy(H')
-    hs = compute_optimal_halotype_set(X, H, width = width, prephased = prephased)
+    hs = compute_optimal_halotype_set(X, H, width = width, prephased = prephased, flankwidth=flankwidth)
 
     # phasing (haplotyping)
     if prephased
-        ph = phase_prephased(X, H, hapset=hs, width=width)
+        ph = phase_prephased(X, H, hapset=hs, width=width, flankwidth=flankwidth)
     else
-        ph = phase(X, H, hapset = hs, width = width, verbose = false)
+        ph = phase(X, H, hapset = hs, width = width, verbose = false, flankwidth=flankwidth)
     end
 
     if impute
