@@ -10,7 +10,7 @@ REF/ALT alleles are always A/C.
 + `phased`: True uses '|' as separator. False uses '/' as separator. 
 """
 function make_refvcf_file(
-    H::BitArray{2};
+    H::AbstractMatrix;
     vcffilename::AbstractString = "simulated_ref.vcf", 
     phased::Bool = true,
     marker_chrom::Vector{String} = ["1" for i in 1:size(H, 1)],
@@ -132,7 +132,8 @@ to the opposite allele (0 or 1) with probability `prob` at the `i + 1`th allele.
 function simulate_markov_haplotypes(
     p::Int64, 
     d::Int64;
-    prob = 0.25,
+    prob::AbstractFloat = 0.25,
+    vcffilename::String = ""
     )
     @assert 0 < prob < 1 "transition probably `prob` should be between 0 and 1, got $prob"
 
@@ -143,6 +144,12 @@ function simulate_markov_haplotypes(
             H[i, j] = (rand() < prob ? !H[i - 1, j] : H[i - 1, j])
         end
     end
+
+    # create VCF file on disk if vcffilename is provided
+    if vcffilename != ""
+        make_refvcf_file(H, vcffilename=vcffilename)
+    end
+
     return H
 end
 
@@ -195,7 +202,7 @@ chosen from a pool of haplotypes `H` to form the genotype in that segment.
 function simulate_genotypes(
     H::AbstractMatrix,
     people::Int;
-    T::Type = Union{Int, Missing},
+    T::Type = Int,
     min_cross_over::Int64=1,
     max_cross_over::Int64=5,
     )
@@ -210,11 +217,12 @@ function simulate_genotypes(
     for i in 1:people
         cross_overs = rand(min_cross_over:max_cross_over)
         cross_over_location = sample(2:(p - 1), cross_overs, replace=false)
+        sort!(cross_over_location)
         #create various segments vased on cross over points
         empty!(segments)
         push!(segments, 1:cross_over_location[1])
-        for i in 1:(length(cross_over_location) - 1)
-            push!(segments, (cross_over_location[i] + 1):cross_over_location[i + 1])
+        for j in 1:(length(cross_over_location) - 1)
+            push!(segments, (cross_over_location[j] + 1):cross_over_location[j + 1])
         end
         push!(segments, (cross_over_location[end] + 1):p)
         # fill X with sum of 2 randomly chosen haplotypes in each segment
@@ -224,6 +232,66 @@ function simulate_genotypes(
         end
     end
     return X
+end
+
+"""
+Simulates genotype from haplotype reference panels. 
+
+Returns `hap_mosaics` and `hap_mosaic_range` where 
++ `hap_mosaics[i]` is a vector haplotypes [(hi, hj), ...] that was used to simulate person `i`'s genotype
++ `hap_mosaic_range` is a vector of ranges [1:100, ...] that records the range of SNPs where (hi, hj) filled.
+"""
+function simulate_phased_genotypes(
+    H::Union{AbstractMatrix, String},
+    people::Int;
+    T::Type = Int,
+    min_cross_over::Int64=1,
+    max_cross_over::Int64=5,
+    vcffilename::String = ""
+    )
+    if typeof(H) == String
+        H = convert_ht(Float32, H)
+    end
+
+    p, d = size(H)
+    separator = '|'
+    iseven(d) || error("simulate_phased_genotypes: number of haplotypes must be even but was $d")
+
+    # create target matrix, where 2 columns form 1 genotype
+    X = zeros(Union{T, Missing}, p, 2people)
+    hap_mosaics = [Tuple{Int, Int}[] for i in 1:people] 
+    hap_mosaic_range = [UnitRange{Int64}[] for i in 1:people]
+
+    segments = UnitRange{Int64}[]
+    sizehint!(segments, max_cross_over)
+    for i in 1:people
+        cross_overs = rand(min_cross_over:max_cross_over)
+        cross_over_location = sample(2:(p - 1), cross_overs, replace=false)
+        sort!(cross_over_location)
+        #create various segments vased on cross over points
+        empty!(segments)
+        push!(segments, 1:cross_over_location[1])
+        for j in 1:(length(cross_over_location) - 1)
+            push!(segments, (cross_over_location[j] + 1):cross_over_location[j + 1])
+        end
+        push!(segments, (cross_over_location[end] + 1):p)
+        # fill X with 2 randomly chosen haplotypes in each segment
+        for cur_range in segments
+            h1, h2 = rand(1:d), rand(1:d)
+            X[cur_range, 2i - 1] .= convert.(T, H[cur_range, h1])
+            X[cur_range, 2i    ] .= convert.(T, H[cur_range, h2])
+
+            # record haplotypes and range
+            push!(hap_mosaics[i], (h1, h2))
+            push!(hap_mosaic_range[i], cur_range)
+        end
+    end
+
+    if vcffilename != ""
+        make_refvcf_file(X, vcffilename=vcffilename)
+    end
+
+    return X, hap_mosaics, hap_mosaic_range
 end
 
 # choose 2 haplotypes block by block
