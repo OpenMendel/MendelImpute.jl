@@ -21,6 +21,7 @@ module MendelImpute
     export set_flip!
     export phase_prephased
     export compute_optimal_halotype_set_prephased
+    export simulate_phased_genotypes
 
     # export UniqueHaplotypes, fast_elimination, unique_index!
     export OptimalHaplotypeSet, compute_optimal_halotype_set
