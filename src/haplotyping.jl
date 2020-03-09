@@ -315,8 +315,7 @@ function phase(
     chain_next  = (BitVector(undef, haplotypes), BitVector(undef, haplotypes))
     window_span = (ones(Int, people), ones(Int, people))
 
-    # first pass to decide haplotype configurations (i.e. hapset switchings)
-    # this increases error slightly but seems like it decreases computational time
+    # first pass to decide haplotype configurations (this usually don't help)
     # flips = [falses(windows) for i in 1:people]
     # for i in 1:people
     #     set_flip!(hapset[i].strand1, hapset[i].strand2, flips[i])
