@@ -243,6 +243,10 @@ end
 """
 Simulates genotype from haplotype reference panels. 
 
+# Inputs
++ `H`: Haplotype matrix. Columns are haplotypes
++ `people`: Integer for number of samples you want to simulate. 
+
 Returns `hap_mosaics` and `hap_mosaic_range` where 
 + `hap_mosaics[i]` is a vector haplotypes [(hi, hj), ...] that was used to simulate person `i`'s genotype
 + `hap_mosaic_range` is a vector of ranges (e.g. [1:100, ...]) that records the range of SNPs where (hi, hj) filled.
