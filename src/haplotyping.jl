@@ -90,7 +90,7 @@ function phase_prephased(
     width::Int = 400,
     flankwidth::Int = round(Int, 0.1width),
     hapset::Union{Vector{OptimalHaplotypeSet}, Nothing} = nothing,
-    fast_method::Bool = true
+    fast_method::Bool = false
     ) where T <: Real
 
     # declare some constants
@@ -311,22 +311,21 @@ function phase(
 
     # allocate working arrays
     phase = [HaplotypeMosaicPair(snps) for i in 1:people]
-    haplo_chain = ([copy(hapset[i].strand1[1]) for i in 1:people], [copy(hapset[1].strand2[1]) for i in 1:people])
+    haplo_chain = ([copy(hapset[i].strand1[1]) for i in 1:people], [copy(hapset[i].strand2[1]) for i in 1:people])
     chain_next  = (BitVector(undef, haplotypes), BitVector(undef, haplotypes))
     window_span = (ones(Int, people), ones(Int, people))
 
     # first pass to decide haplotype configurations (i.e. hapset switchings)
     # this increases error slightly but seems like it decreases computational time
-    flips = [falses(windows) for i in 1:people]
-    for i in 1:people
-        set_flip!(hapset[i].strand1, hapset[i].strand2, flips[i])
-    end
+    # flips = [falses(windows) for i in 1:people]
+    # for i in 1:people
+    #     set_flip!(hapset[i].strand1, hapset[i].strand2, flips[i])
+    # end
 
     # TODO: parallel computing
     # second pass to phase and merge breakpoints
     # begin intersecting haplotypes window by window
     @inbounds for i in 1:people, w in 2:windows
-
         # Decide whether to cross over based on the larger intersection
         # A   B      A   B
         # |   |  or    X
@@ -443,7 +442,6 @@ function phase(
                 push!(phase[i].strand2.start, (w - 2) * width + 1 + bkpt[2])
                 push!(phase[i].strand1.haplotypelabel, s1_next)
                 push!(phase[i].strand2.haplotypelabel, s2_next)
-
                 # search breakpoints among all possible haplotypes (this improves error slightly but quite slow)
                 # s1_win_next = findall(hapset[i].strand1[w])
                 # s2_win_next = findall(hapset[i].strand2[w])
