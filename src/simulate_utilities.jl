@@ -215,9 +215,15 @@ function simulate_genotypes(
     segments = UnitRange{Int64}[]
     sizehint!(segments, max_cross_over)
     for i in 1:people
+        # simulate cross overs. no crossovers in first/last windows and 2 crossover cannot occur within 1 window
         cross_overs = rand(min_cross_over:max_cross_over)
-        cross_over_location = sample(2:(p - 1), cross_overs, replace=false)
-        sort!(cross_over_location)
+        cross_over_location = collect(1:cross_overs)
+        while true
+            cross_over_location .= sample((width + 1):(p - width - 1), cross_overs, replace=false) 
+            sort!(cross_over_location)
+            cross_overs == 1 && break
+            minimum(diff(cross_over_location)) > width && break
+        end
         #create various segments vased on cross over points
         empty!(segments)
         push!(segments, 1:cross_over_location[1])
@@ -239,7 +245,7 @@ Simulates genotype from haplotype reference panels.
 
 Returns `hap_mosaics` and `hap_mosaic_range` where 
 + `hap_mosaics[i]` is a vector haplotypes [(hi, hj), ...] that was used to simulate person `i`'s genotype
-+ `hap_mosaic_range` is a vector of ranges [1:100, ...] that records the range of SNPs where (hi, hj) filled.
++ `hap_mosaic_range` is a vector of ranges (e.g. [1:100, ...]) that records the range of SNPs where (hi, hj) filled.
 """
 function simulate_phased_genotypes(
     H::Union{AbstractMatrix, String},
@@ -247,7 +253,8 @@ function simulate_phased_genotypes(
     T::Type = Int,
     min_cross_over::Int64=1,
     max_cross_over::Int64=5,
-    vcffilename::String = ""
+    vcffilename::String = "",
+    width=400
     )
     if typeof(H) == String
         H = convert_ht(Float32, H)
@@ -265,9 +272,15 @@ function simulate_phased_genotypes(
     segments = UnitRange{Int64}[]
     sizehint!(segments, max_cross_over)
     for i in 1:people
+        # simulate cross overs. no crossovers in first/last windows and 2 crossover cannot occur within 1 window
         cross_overs = rand(min_cross_over:max_cross_over)
-        cross_over_location = sample(2:(p - 1), cross_overs, replace=false)
-        sort!(cross_over_location)
+        cross_over_location = collect(1:cross_overs)
+        while true
+            cross_over_location .= sample((width + 1):(p - width - 1), cross_overs, replace=false) 
+            sort!(cross_over_location)
+            cross_overs == 1 && break
+            minimum(diff(cross_over_location)) > width && break
+        end
         #create various segments vased on cross over points
         empty!(segments)
         push!(segments, 1:cross_over_location[1])
