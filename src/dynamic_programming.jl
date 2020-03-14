@@ -1,4 +1,3 @@
-
 """
 By exchanging entries of 2 vectors at the same position, this 
 function minimize the number of breakpoints in both strands, 

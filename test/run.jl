@@ -869,3 +869,48 @@ H = copy(H')
 width = 400
 hapset = compute_optimal_halotype_set_prephased(X, H, width=width)
 
+
+
+# simulate haplotypes in windows for visualization
+
+using Revise
+using MendelImpute
+using VCFTools
+using DelimitedFiles
+using LinearAlgebra
+using BenchmarkTools
+using Random
+using ElasticArrays
+using StatsBase
+
+Random.seed!(2020)
+windows = 10
+
+# strand 1
+s1 = [Int[] for w in 1:windows]
+for w in 1:windows
+    nhaps = rand(2:5)
+    haps  = sample(1:10, nhaps, replace=false) # sample 2~5 haplotypes from 1:10
+    sort!(haps)
+    for i in haps
+        push!(s1[w], i)
+    end
+end
+s1
+
+# strand 2
+s2 = [Int[] for w in 1:windows]
+for w in 1:windows
+    nhaps = rand(2:5)
+    haps  = sample(1:10, nhaps, replace=false) # sample 2~5 haplotypes from 1:10
+    sort!(haps)
+    for i in haps
+        push!(s2[w], i)
+    end
+end
+s2
+
+
+
+
+
