@@ -886,6 +886,12 @@ using StatsBase
 Random.seed!(2020)
 windows = 10
 
+# generate happairs in windows
+T = Tuple{Int, Int}
+windows = 5
+haplotype_set = Vector{Vector{T}}(undef, windows)
+pu
+
 # strand 1
 s1 = [Int[] for w in 1:windows]
 for w in 1:windows
@@ -913,4 +919,57 @@ s2
 
 
 
+# simulate haplotypes in windows for visualization
+
+using Revise
+using MendelImpute
+using VCFTools
+using DelimitedFiles
+using LinearAlgebra
+using BenchmarkTools
+using Random
+using ElasticArrays
+using StatsBase
+
+# generate happairs in windows
+T = Tuple{Int, Int}
+windows = 4
+haplotype_set = [T[] for i in 1:windows]
+push!(haplotype_set[1], (1, 4))
+push!(haplotype_set[1], (1, 5))
+push!(haplotype_set[1], (1, 6))
+push!(haplotype_set[1], (2, 4))
+push!(haplotype_set[1], (2, 5))
+push!(haplotype_set[1], (2, 6))
+push!(haplotype_set[1], (3, 4))
+push!(haplotype_set[1], (3, 5))
+push!(haplotype_set[1], (3, 6))
+
+push!(haplotype_set[2], (1, 5))
+push!(haplotype_set[2], (1, 7))
+push!(haplotype_set[2], (1, 8))
+push!(haplotype_set[2], (2, 5))
+push!(haplotype_set[2], (2, 7))
+push!(haplotype_set[2], (2, 8))
+push!(haplotype_set[2], (6, 5))
+push!(haplotype_set[2], (6, 7))
+push!(haplotype_set[2], (6, 8))
+
+push!(haplotype_set[3], (1, 1))
+push!(haplotype_set[3], (1, 5))
+push!(haplotype_set[3], (3, 1))
+push!(haplotype_set[3], (3, 5))
+
+push!(haplotype_set[4], (4, 4))
+push!(haplotype_set[4], (4, 6))
+push!(haplotype_set[4], (4, 8))
+push!(haplotype_set[4], (5, 4))
+push!(haplotype_set[4], (5, 6))
+push!(haplotype_set[4], (5, 8))
+push!(haplotype_set[4], (8, 4))
+push!(haplotype_set[4], (8, 6))
+push!(haplotype_set[4], (8, 8))
+haplotype_set
+
+sol_path, memory, best_err = connect_happairs(haplotype_set)
 

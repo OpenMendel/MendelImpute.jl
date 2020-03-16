@@ -65,6 +65,10 @@ function has_intersect!(c::BitVector, a::BitVector, b::BitVector)
     return any(c)
 end
 
+"""
+Essentially the same code as `binary_flip!`. The difference is, instead 
+of exchanging 0s and 1s, we exchange sets.  
+"""
 function set_flip!(
     n::Int, 
     vector_set1::Vector{BitVector}, 
@@ -109,3 +113,86 @@ function set_flip!(
 end
 set_flip!(vector_set1, vector_set2, flip) = set_flip!(2, vector_set1, vector_set2, flip) #start at position 2
 
+"""
+Finds the optimal sequence of haplotype pairs across all windows 
+such that number of switch points is minimized. 
+
+# Inputs
+- `w`: Current window
+- `happair`: Haplotype pair in current window being considered. 
+- `haplotype_set`: A vector of vectors. `haplotype_set[1]` stores all pairs of haplotypes in window 1 in a vector, and so on. 
+- `λ`: Error associated with 1 mismatch when comparing 2 pairs of haplotypes. e.g. (h1, h2) vs (h1, h3) have error λ. 
+"""
+function connect_happairs(haplotype_set::Vector{Vector{T}}; λ::Float64 = 1.0) where T <: Tuple{Int, Int}
+    windows  = length(haplotype_set)
+    memory   = [Dict{T, Float64}() for i in 1:windows]
+    sol_path = Vector{T}(undef, windows)
+
+    best_err  = Inf
+    best_pair1 = (0, 0)
+    best_pair2 = (0, 0)
+    for happair in haplotype_set[1], pair in haplotype_set[2]
+        err = pair_error(happair, pair) + connect_happairs(2, pair, haplotype_set, λ = λ, memory = memory, solution_path = sol_path)
+        if err < best_err
+            best_pair1 = happair
+            best_pair2 = pair
+            best_err   = err
+        end
+    end
+
+    # save best pair in first 2 windows
+    sol_path[1] = best_pair1
+    sol_path[2] = best_pair2
+
+    return sol_path, memory, best_err
+end
+
+"""
+# Inputs
+- `w`: Current window
+- `happair`: Haplotype pair in current window being considered. 
+- `haplotype_set`: A vector of vectors. `haplotype_set[1]` stores all pairs of haplotypes in window 1 in a vector, and so on. 
+- `λ`: Error associated with 1 mismatch when comparing 2 pairs of haplotypes. e.g. (h1, h2) vs (h1, h3) have error λ. 
+"""
+function connect_happairs(
+    w::Int,
+    happair::T, 
+    haplotype_set::Vector{Vector{T}};
+    λ::Float64 = 1.0,
+    memory = [Dict{T, Float64}() for i in 1:length(haplotype_set)],
+    solution_path = Vector{T}(undef, length(haplotype_set))
+    ) where T <: Tuple{Int, Int}
+
+    if haskey(memory[w], happair)
+        return memory[w][happair] # quick lookup
+    elseif w == length(haplotype_set)
+        return 0 # last window contributes no extra error
+    else
+        # recursion: solve next subtree 
+        best_err = Inf
+        best_next_pair = (0, 0)
+        for pair in haplotype_set[w + 1]
+            err = pair_error(happair, pair) + connect_happairs(w + 1, pair, haplotype_set, λ = λ, memory = memory, solution_path = solution_path)
+            if err < best_err
+                best_next_pair = pair
+                best_err = err
+            end
+        end
+
+        # record best error and solution path
+        memory[w][happair] = best_err
+        solution_path[w + 1] = best_next_pair
+        return best_err
+    end
+end
+
+function pair_error(pair1::T, pair2::T; λ::Real = 1.0) where T <: Tuple{Int, Int}
+    difference = zero(eltype(λ))
+    if pair1[1] != pair2[1] && pair1[1] != pair2[2]
+        difference += one(eltype(λ))
+    end
+    if pair1[2] != pair2[1] && pair1[2] != pair2[2]
+        difference += one(eltype(λ))
+    end
+    return λ * difference
+end
