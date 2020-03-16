@@ -997,3 +997,17 @@ end
 haplotype_set
 
 sol_path, memory, best_err = connect_happairs(haplotype_set)
+
+
+
+# generate happairs in windows
+windows = 10000
+haplotype_set = [T[] for i in 1:windows]
+
+Random.seed!(2020)
+for w in 1:windows
+    haplotype_set[w] = [(rand(1:10000), rand(1:10000)) for i in 1:rand(1:100)]
+end
+haplotype_set
+
+sol_path, memory, best_err = connect_happairs(haplotype_set)
