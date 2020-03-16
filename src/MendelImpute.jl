@@ -10,6 +10,7 @@ module MendelImpute
     using GeneticVariation
     using VCFTools
     using GroupSlices
+    using Random
 
     export continue_haplotype, haplopair!, haplopair, haploimpute!
     export impute!, impute2!, phase, search_breakpoint, unique_haplotypes

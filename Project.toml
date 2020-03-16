@@ -13,6 +13,7 @@ GeneticVariation = "9bc6ac9d-e6b2-5f70-b0a8-242a01662520"
 VCFTools = "a620830f-fdd7-5ebc-8d26-3621ab35fbfe"
 GroupSlices = "d853e229-7c7c-56e9-b6be-9a1acc5f13d9"
 Distances = "b4f34e82-e78d-54a5-968a-f98e89d6e8f7"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 
 [compat]
 Documenter = ">=0.20"
