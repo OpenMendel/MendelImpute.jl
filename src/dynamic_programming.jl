@@ -123,16 +123,20 @@ such that number of switch points is minimized.
 - `haplotype_set`: A vector of vectors. `haplotype_set[1]` stores all pairs of haplotypes in window 1 in a vector, and so on. 
 - `λ`: Error associated with 1 mismatch when comparing 2 pairs of haplotypes. e.g. (h1, h2) vs (h1, h3) have error λ. 
 """
-function connect_happairs(haplotype_set::Vector{Vector{T}}; λ::Float64 = 1.0) where T <: Tuple{Int, Int}
+function connect_happairs(
+    haplotype_set::Vector{Vector{T}}; 
+    λ::Float64 = 1.0
+    ) where T <: Tuple{Int, Int}
     windows  = length(haplotype_set)
     memory   = [Dict{T, Float64}() for i in 1:windows]
     sol_path = Vector{T}(undef, windows)
+    path_err = [Inf for i in 1:windows]
 
     best_err  = Inf
     best_pair1 = (0, 0)
     best_pair2 = (0, 0)
     for happair in haplotype_set[1], pair in haplotype_set[2]
-        err = pair_error(happair, pair) + connect_happairs(2, pair, haplotype_set, λ = λ, memory = memory, solution_path = sol_path)
+        err = pair_error(happair, pair) + connect_happairs!(2, pair, haplotype_set, λ = λ, memory = memory, solution_path = sol_path, path_err = path_err)
         if err < best_err
             best_pair1 = happair
             best_pair2 = pair
@@ -154,13 +158,14 @@ end
 - `haplotype_set`: A vector of vectors. `haplotype_set[1]` stores all pairs of haplotypes in window 1 in a vector, and so on. 
 - `λ`: Error associated with 1 mismatch when comparing 2 pairs of haplotypes. e.g. (h1, h2) vs (h1, h3) have error λ. 
 """
-function connect_happairs(
+function connect_happairs!(
     w::Int,
     happair::T, 
     haplotype_set::Vector{Vector{T}};
     λ::Float64 = 1.0,
     memory = [Dict{T, Float64}() for i in 1:length(haplotype_set)],
-    solution_path = Vector{T}(undef, length(haplotype_set))
+    solution_path = Vector{T}(undef, length(haplotype_set)),
+    path_err = [Inf for i in 1:length(haplotype_set)]
     ) where T <: Tuple{Int, Int}
 
     if haskey(memory[w], happair)
@@ -172,16 +177,24 @@ function connect_happairs(
         best_err = Inf
         best_next_pair = (0, 0)
         for pair in haplotype_set[w + 1]
-            err = pair_error(happair, pair) + connect_happairs(w + 1, pair, haplotype_set, λ = λ, memory = memory, solution_path = solution_path)
+            err = pair_error(happair, pair) + connect_happairs!(w + 1, pair, haplotype_set, λ = λ, memory = memory, solution_path = solution_path, path_err = path_err)
+            # println("pair $happair's next pair = ", pair, " has error = $err") # proof that memoization is working
+
             if err < best_err
+                # keep track of error in current subtree
                 best_next_pair = pair
                 best_err = err
+
+                # if error better than all subtree in current window, save this error
+                if err < path_err[w]
+                    path_err[w] = err
+                    solution_path[w + 1] = best_next_pair
+                end
             end
         end
 
-        # record best error and solution path
+        # record best error for current subtree
         memory[w][happair] = best_err
-        solution_path[w + 1] = best_next_pair
         return best_err
     end
 end

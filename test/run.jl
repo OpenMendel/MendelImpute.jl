@@ -973,3 +973,27 @@ haplotype_set
 
 sol_path, memory, best_err = connect_happairs(haplotype_set)
 
+
+
+using Revise
+using MendelImpute
+using VCFTools
+using DelimitedFiles
+using LinearAlgebra
+using BenchmarkTools
+using Random
+using ElasticArrays
+using StatsBase
+
+# generate happairs in windows
+T = Tuple{Int, Int}
+windows = 5
+haplotype_set = [T[] for i in 1:windows]
+
+Random.seed!(2020)
+for w in 1:windows
+    haplotype_set[w] = [(rand(1:10), rand(1:10)) for i in 1:rand(1:10)]
+end
+haplotype_set
+
+sol_path, memory, best_err = connect_happairs(haplotype_set)
