@@ -314,7 +314,7 @@ function phase(
 
     # loop over each person
     for i in 1:people
-        # @info "imputing person $i"
+        @info "imputing person $i"
 
         # first find optimal haplotype pair in each window using dynamic programming
         sol_path, _, best_err = connect_happairs(hapset[i])
@@ -335,24 +335,25 @@ function phase(
 
         # phase middle windows
         for w in 2:(windows - 1)
+            # no breakpoints
+            pair_error(sol_path[w - 1], sol_path[w]) == 0 && continue
+
+            # at least 1 breakpoint
             Xwi = view(X, ((w - 2) * width + 1):(w * width), i)
             Hw  = view(H, ((w - 2) * width + 1):(w * width), :)
-            # i == 10 && println("happrev = $(sol_path[w - 1])")
-            # i == 10 && println("hapnext = $(sol_path[w])")
-            (h1, h2), bkpts = continue_haplotype(Xwi, Hw, sol_path[w - 1], sol_path[w])
+            s1_prev = phase[i].strand1.haplotypelabel[end]
+            s2_prev = phase[i].strand2.haplotypelabel[end]
+            (h1, h2), bkpts = continue_haplotype(Xwi, Hw, (s1_prev, s2_prev), sol_path[w])
             # strand 1
             if bkpts[1] > -1 && bkpts[1] < 2width
-                # i == 10 && println("search bkpt in strand1: bkpt = $(bkpts[1])")
                 push!(phase[i].strand1.start, (w - 2) * width + 1 + bkpts[1])
                 push!(phase[i].strand1.haplotypelabel, h1)
             end
             # strand 2
             if bkpts[2] > -1 && bkpts[2] < 2width
-                # i == 10 && println("search bkpt in strand2: bkpt = $(bkpts[2])")
                 push!(phase[i].strand2.start, (w - 2) * width + 1 + bkpts[2])
                 push!(phase[i].strand2.haplotypelabel, h2)
             end
-            # i == 10 && println("")
         end
 
         # phase last window

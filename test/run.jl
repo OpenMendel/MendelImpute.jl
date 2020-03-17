@@ -1068,14 +1068,16 @@ n, p = size(X_mendel)
 error_rate = sum(X_mendel .!= X_complete) / n / p
 
 # searching only 1 strand's bkpt: 
-# 86.970893 seconds (1.71 G allocations: 81.636 GiB, 12.53% gc time)
-# error = 0.003945257029253053
+# 84.299528 seconds (1.71 G allocations: 81.620 GiB, 13.19% gc time)
+# error = 0.002731468332859983
 
 # searching both strand's bkpt: 
-# 151.065885 seconds (1.71 G allocations: 81.619 GiB, 7.22% gc time)
-# error = 0.0033593084351036637
+# 156.966622 seconds (1.71 G allocations: 81.618 GiB, 7.09% gc time)
+# error = 0.001771336268105652
 
-
+# searching both strand's bkpt in 2 different ways
+# 220.421479 seconds (1.71 G allocations: 81.618 GiB, 5.17% gc time)
+# error = 0.0015127094575404715
 
 using Revise
 using VCFTools
@@ -1093,9 +1095,9 @@ width   = 800
 @time hs, ph = phase(tgtfile, reffile, impute=true, outfile = outfile, width = width);
 
 # import imputed result and compare with true
-X_complete  = convert_gt(Float32, "./compare6/target.vcf.gz"; as_minorallele=false)
-X_mendel = convert_gt(Float32, outfile, as_minorallele=false)
-n, p = size(X_mendel)
+X_complete  = convert_gt(Float32, "./compare6/target.vcf.gz"; as_minorallele=false);
+X_mendel = convert_gt(Float32, outfile, as_minorallele=false);
+n, p = size(X_mendel);
 error_rate = sum(X_mendel .!= X_complete) / n / p
 
 # print error for everybody
