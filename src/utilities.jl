@@ -797,6 +797,9 @@ function continue_haplotype(
     elseif j == l && i ≠ k
         breakpt, errors = search_breakpoint(X, H, j, (i, k))
         return (k, l), (breakpt, -1)
+    else
+        breakpt, errors = search_breakpoint(X, H, (i, j), (k, l))
+        return (k, l), (breakpt[1], breakpt[2])
     end
 
     return (k, l), (0, 0)

@@ -1067,5 +1067,10 @@ X_mendel = convert_gt(Float32, outfile, as_minorallele=false)
 n, p = size(X_mendel)
 error_rate = sum(X_mendel .!= X_complete) / n / p
 
+# searching only 1 strand's bkpt: 
+# 86.970893 seconds (1.71 G allocations: 81.636 GiB, 12.53% gc time)
+# error = 0.003945257029253053
 
-
+# searching both strand's bkpt: 
+# 151.065885 seconds (1.71 G allocations: 81.619 GiB, 7.22% gc time)
+# error = 0.0033593084351036637
