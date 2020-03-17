@@ -1035,3 +1035,37 @@ y = [T[] for i in 1:n]
 @benchmark test_push(y) # 47.175 μs
 
 
+
+
+using Revise
+using VCFTools
+using MendelImpute
+using GeneticVariation
+using Random
+cd("/Users/biona001/.julia/dev/MendelImpute/simulation")
+
+# impute 
+tgtfile = "./compare6/target_masked.vcf.gz"
+reffile = "./compare6/haplo_ref.vcf"
+outfile = "./compare6/imputed_target.vcf.gz"
+width   = 800
+
+H = convert_ht(Float32, reffile)
+X = convert_gt(Float32, tgtfile)
+X = copy(X')
+H = copy(H')
+hapset = compute_optimal_halotype_set(X, H, width = width)
+
+# hapset[1][1]
+@time sol_path, _, best_err = connect_happairs(hapset[1]);
+
+@time hs, ph = phase(tgtfile, reffile, impute=true, outfile = outfile, width = width);
+
+# import imputed result and compare with true
+X_complete  = convert_gt(Float32, "./compare6/target.vcf.gz"; as_minorallele=false)
+X_mendel = convert_gt(Float32, outfile, as_minorallele=false)
+n, p = size(X_mendel)
+error_rate = sum(X_mendel .!= X_complete) / n / p
+
+
+

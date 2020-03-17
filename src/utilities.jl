@@ -238,7 +238,6 @@ This routine takes up roughly 1/5 of the total computation time.
 """
 function compute_redundant_haplotypes!(
     redundant_haplotypes::Vector{Vector{Vector{T}}}, 
-    # redundant_haplotypes::Vector{OptimalHaplotypeSet},
     Hunique::UniqueHaplotypeMaps, 
     happairs::Vector{Vector{T}}, 
     window::Int,
@@ -285,9 +284,8 @@ function compute_redundant_haplotypes!(
         end
 
         # push all possible happair into `redundant_haplotypes` 
-        destin = redundant_haplotypes[k][window]
         for h1 in h1_set, h2 in h2_set
-            push!(destin, (h1, h2))
+            push!(redundant_haplotypes[k][window], (h1, h2))
         end
     end
 
