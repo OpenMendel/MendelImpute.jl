@@ -101,6 +101,7 @@ function compute_optimal_halotype_set(
 
     # Each person stores a vector of redundant haplotypes matching the optimal one for each window
     redundant_haplotypes = [[Tuple{Int, Int}[] for i in 1:windows] for j in 1:people]
+    # redundant_haplotypes = [OptimalHaplotypeSet(windows, haplotypes) for i in 1:people]
 
     # for testing
     if isnothing(Xtrue)
@@ -124,7 +125,7 @@ function compute_optimal_halotype_set(
     haploimpute!(Xwork, Hwork, M, N, happairs, hapscore, Xfloat=Xwork_float, Xtrue=Xtrue_work)
 
     # find all haplotypes matching the optimal haplotype pairs
-    compute_redundant_haplotypes!(redundant_haplotypes, Hunique, happairs, H, 1)
+    compute_redundant_haplotypes!(redundant_haplotypes, Hunique, happairs, 1)
 
     # resizable working arrays
     cur_range   = Hunique.range[2]
@@ -146,7 +147,7 @@ function compute_optimal_halotype_set(
         haploimpute!(Xwork, Hwork, M, N, happairs, hapscore, Xfloat=Xwork_float, Xtrue=Xtrue_work)
 
         # find all haplotypes matching the optimal haplotype pairs
-        compute_redundant_haplotypes!(redundant_haplotypes, Hunique, happairs, H, w)
+        compute_redundant_haplotypes!(redundant_haplotypes, Hunique, happairs, w)
     end
 
     # last window reallocate everything 
@@ -157,7 +158,7 @@ function compute_optimal_halotype_set(
     M           = zeros(T, num_uniq, num_uniq)
     N           = zeros(T, people, num_uniq)
     haploimpute!(Xwork, Hwork, M, N, happairs, hapscore)
-    compute_redundant_haplotypes!(redundant_haplotypes, Hunique, happairs, H, windows)
+    compute_redundant_haplotypes!(redundant_haplotypes, Hunique, happairs, windows)
 
     return redundant_haplotypes
 end
@@ -237,18 +238,17 @@ This routine takes up roughly 1/5 of the total computation time.
 """
 function compute_redundant_haplotypes!(
     redundant_haplotypes::Vector{Vector{Vector{T}}}, 
+    # redundant_haplotypes::Vector{OptimalHaplotypeSet},
     Hunique::UniqueHaplotypeMaps, 
     happairs::Vector{Vector{T}}, 
-    H::AbstractMatrix,
     window::Int,
     ) where T <: Tuple{Int, Int}
     
     people = length(redundant_haplotypes)
 
-    # @inbounds for k in 1:people
-    #     first_happair = happairs[k][1] # choose first haplotype pair
-    #     Hwork_i = first_happair[1]
-    #     Hwork_j = first_happair[2]
+    # @inbounds for k in 1:people, happair in happairs[k]
+    #     Hwork_i = happair[1]
+    #     Hwork_j = happair[2]
     #     # println("person $k's optimal haplotype pairs are: $((Hwork_i, Hwork_j))")
 
     #     H_i = Hunique.uniqueindex[window][Hwork_i]
@@ -258,14 +258,15 @@ function compute_redundant_haplotypes!(
     #     # loop through all haplotypes and find ones that match either of the optimal haplotypes 
     #     map1 = Hunique.hapmap[window]
     #     map2 = Hunique.hapmap[window]
-    #     hap1 = optimal_haplotypes[k].strand1[window]
-    #     hap2 = optimal_haplotypes[k].strand2[window]
+    #     hap1 = redundant_haplotypes[k].strand1[window]
+    #     hap2 = redundant_haplotypes[k].strand2[window]
     #     for jj in 1:size(H, 2)
     #         map1[jj] == H_i && (hap1[jj] = true)
     #         map2[jj] == H_j && (hap2[jj] = true)
     #     end
     # end
 
+    h1_set, h2_set = Int[], Int[]
     @inbounds for k in 1:people, happair in happairs[k]
         Hi_uniqueidx = happair[1]
         Hj_uniqueidx = happair[2]
@@ -276,9 +277,12 @@ function compute_redundant_haplotypes!(
         # println("person $k's optimal haplotype pairs are located at columns $Hi_idx and $Hj_idx in current window of H")
 
         # loop through all haplotypes and find ones that match either of the optimal haplotypes 
-        mapping = Hunique.hapmap[window]
-        h1_set  = findall(x -> x == Hi_idx, mapping)
-        h2_set  = findall(x -> x == Hj_idx, mapping)
+        empty!(h1_set)
+        empty!(h2_set)
+        for (idx, hap) in enumerate(Hunique.hapmap[window])
+            hap == Hi_idx && push!(h1_set, idx)
+            hap == Hj_idx && push!(h2_set, idx)
+        end
 
         # push all possible happair into `redundant_haplotypes` 
         destin = redundant_haplotypes[k][window]
