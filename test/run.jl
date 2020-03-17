@@ -1074,3 +1074,42 @@ error_rate = sum(X_mendel .!= X_complete) / n / p
 # searching both strand's bkpt: 
 # 151.065885 seconds (1.71 G allocations: 81.619 GiB, 7.22% gc time)
 # error = 0.0033593084351036637
+
+
+
+using Revise
+using VCFTools
+using MendelImpute
+using GeneticVariation
+using Random
+cd("/Users/biona001/.julia/dev/MendelImpute/simulation")
+
+# impute 
+tgtfile = "./compare6/target_masked.vcf.gz"
+reffile = "./compare6/haplo_ref.vcf"
+outfile = "./compare6/imputed_target.vcf.gz"
+width   = 800
+
+@time hs, ph = phase(tgtfile, reffile, impute=true, outfile = outfile, width = width);
+
+# import imputed result and compare with true
+X_complete  = convert_gt(Float32, "./compare6/target.vcf.gz"; as_minorallele=false)
+X_mendel = convert_gt(Float32, outfile, as_minorallele=false)
+n, p = size(X_mendel)
+error_rate = sum(X_mendel .!= X_complete) / n / p
+
+# print error for everybody
+for person in 1:people
+    error_rate = sum(X_complete[person, :] .!= X_mendel[person, :]) / p
+    println("person $person error = $error_rate")
+end
+
+# print one person's error in each window
+windows = floor(Int, snps / width)
+person = 10
+for w in 1:windows
+    win_range = ((w - 1) * width + 1):(w * width)
+    error_rate = sum(X_complete[person, win_range] .!= X_mendel[person, win_range]) / length(win_range)
+    println("person $person window $w error = $error_rate")
+end
+tot_error = sum(X_complete[person, :] .!= X_mendel[person, :]) / p
