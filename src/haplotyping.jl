@@ -315,12 +315,6 @@ function phase(
     chain_next  = (BitVector(undef, haplotypes), BitVector(undef, haplotypes))
     window_span = (ones(Int, people), ones(Int, people))
 
-    # first pass to decide haplotype configurations (this usually don't help)
-    # flips = [falses(windows) for i in 1:people]
-    # for i in 1:people
-    #     set_flip!(hapset[i].strand1, hapset[i].strand2, flips[i])
-    # end
-
     # TODO: parallel computing
     # second pass to phase and merge breakpoints
     # begin intersecting haplotypes window by window
