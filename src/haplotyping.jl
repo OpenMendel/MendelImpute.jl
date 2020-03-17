@@ -381,6 +381,17 @@ function phase(
         end
     end
 
+    # phase without searching for breakpoints
+    # for w in 1:windows, i in 1:people
+    #     hap1 = findfirst(hapset[i].strand1[w]) :: Int64
+    #     hap2 = findfirst(hapset[i].strand2[w]) :: Int64
+    #     cur_start = (w - 1) * width + 1
+    #     push!(phase[i].strand1.start, cur_start)
+    #     push!(phase[i].strand1.haplotypelabel, hap1)
+    #     push!(phase[i].strand2.start, cur_start)
+    #     push!(phase[i].strand2.haplotypelabel, hap2)
+    # end
+
     # phase window 1
     for i in 1:people
         hap1 = findfirst(hapset[i].strand1[1]) :: Int64
