@@ -867,7 +867,7 @@ X = copy(X')
 H = copy(H')
 
 width = 400
-hapset = compute_optimal_halotype_set_prephased(X, H, width=width)
+hapset = compute_optimal_halotype_set(X, H, width=width)
 
 
 
@@ -1011,3 +1011,27 @@ end
 haplotype_set
 
 sol_path, memory, best_err = connect_happairs(haplotype_set)
+
+
+# vector of sets vs vector of vector of tuples
+using BenchmarkTools
+n = 1000
+T = Tuple{Int, Int}
+@benchmark x = [Set{T}() for i in 1:n] # 4.291 ms, 617.44 KiB
+@benchmark y = [T[] for i in 1:n]      # 72.620 μs, 86.19 KiB
+@benchmark push!($x[1], (1, 2)) # 11.392 ns, 0 bytes
+@benchmark push!($y[1], (1, 2)) # 15.803 ns, 0 bytes
+
+
+function test_push(x)
+    for i in 1:1000
+        push!(x[rand(1:1000)], (rand(1:100000), rand(1:100000)))
+    end
+    return x
+end
+x = [Set{T}() for i in 1:n]
+y = [T[] for i in 1:n]
+@benchmark test_push(x) # 205.370 μs
+@benchmark test_push(y) # 47.175 μs
+
+
