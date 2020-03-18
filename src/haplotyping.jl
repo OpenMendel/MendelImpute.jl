@@ -294,7 +294,7 @@ function phase(
     hapset::Union{Vector{Vector{Vector{Tuple{Int, Int}}}}, Nothing} = nothing,
     width::Int = 400,
     flankwidth::Int = round(Int, 0.1width),
-    verbose::Bool = true,
+    verbose::Bool = false,
     Xtrue::Union{AbstractMatrix, Nothing} = nothing, # for testing
     fast_method::Bool = false
     ) where T <: Real
@@ -317,18 +317,10 @@ function phase(
 
     # loop over each person
     for i in 1:people
-        @info "imputing person $i"
+        verbose && @info "imputing person $i"
 
         # first find optimal haplotype pair in each window using dynamic programming
         connect_happairs!(hapset[i], memory=memory, sol_path=sol_path, path_err=path_err)
-
-        # no searching for breakpoints
-        # for (w, happair) in enumerate(sol_path)
-        #     push!(phase[i].strand1.start, (w - 1) * width + 1)
-        #     push!(phase[i].strand1.haplotypelabel, happair[1])
-        #     push!(phase[i].strand2.start, (w - 1) * width + 1)
-        #     push!(phase[i].strand2.haplotypelabel, happair[2])
-        # end
 
         # phase first window 
         push!(phase[i].strand1.start, 1)
