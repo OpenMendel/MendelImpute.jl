@@ -1068,8 +1068,8 @@ n, p = size(X_mendel)
 error_rate = sum(X_mendel .!= X_complete) / n / p
 
 # searching only 1 strand's bkpt: 
-# 84.299528 seconds (1.71 G allocations: 81.620 GiB, 13.19% gc time)
-# error = 0.002731468332859983
+# 85.052532 seconds (1.71 G allocations: 81.347 GiB, 12.15% gc time)
+# error = 0.0022138596989491623
 
 # searching both strand's bkpt: 
 # 156.966622 seconds (1.71 G allocations: 81.618 GiB, 7.09% gc time)

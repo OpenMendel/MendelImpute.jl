@@ -811,7 +811,8 @@ function continue_haplotype(
     #     end
     end
 
-    return (k, l), (0, 0)
+    width = Int(length(X) / 2)
+    return (k, l), (width, width)
 
 end
 
