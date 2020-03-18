@@ -1079,13 +1079,9 @@ error_rate = sum(X_mendel .!= X_complete) / n / p
 # 81.521703 seconds (1.71 G allocations: 81.347 GiB, 11.82% gc time)
 # error = 0.0006049417779040046
 
-# searching both strand's bkpt (w = 800): 
-# 156.966622 seconds (1.71 G allocations: 81.618 GiB, 7.09% gc time)
-# error = 0.001771336268105652
-
 # searching both strand's bkpt in 2 different ways (w = 800)
-# 220.421479 seconds (1.71 G allocations: 81.618 GiB, 5.17% gc time)
-# error = 0.0015127094575404715
+# 232.166963 seconds (1.74 G allocations: 82.618 GiB, 4.10% gc time)
+# error = 0.00023839108207895484
 
 using Revise
 using VCFTools
@@ -1110,7 +1106,7 @@ error_rate = sum(X_mendel .!= X_complete) / n / p
 
 # print one person's error in each window
 windows = floor(Int, p / width)
-person = 1
+person = 3
 for w in 1:windows
     win_range = ((w - 1) * width + 1):(w * width)
     error_rate = sum(X_complete[person, win_range] .!= X_mendel[person, win_range]) / length(win_range)
