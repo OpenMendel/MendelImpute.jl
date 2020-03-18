@@ -1050,8 +1050,8 @@ reffile = "./compare6/haplo_ref.vcf"
 outfile = "./compare6/imputed_target.vcf.gz"
 width   = 800
 
-H = convert_ht(Float32, reffile)
-X = convert_gt(Float32, tgtfile)
+H = convert_ht(Float64, reffile)
+X = convert_gt(Float64, tgtfile)
 X = copy(X')
 H = copy(H')
 hapset = compute_optimal_halotype_set(X, H, width = width)
@@ -1067,15 +1067,23 @@ X_mendel = convert_gt(Float32, outfile, as_minorallele=false)
 n, p = size(X_mendel)
 error_rate = sum(X_mendel .!= X_complete) / n / p
 
-# searching only 1 strand's bkpt: 
-# 85.052532 seconds (1.71 G allocations: 81.347 GiB, 12.15% gc time)
-# error = 0.0022138596989491623
+# not searching breakpoints (w = 400):
+# 3462.416399 seconds (77.81 G allocations: 3.402 TiB, 12.66% gc time)
+# error = 0.00037152087475149104
 
-# searching both strand's bkpt: 
+# not searching breakpoints (w = 800):
+# 80.676385 seconds (1.71 G allocations: 81.339 GiB, 12.29% gc time)
+# error = 0.0006830445896052257
+
+# searching only 1 strand's bkpt (w = 800): 
+# 81.521703 seconds (1.71 G allocations: 81.347 GiB, 11.82% gc time)
+# error = 0.0006049417779040046
+
+# searching both strand's bkpt (w = 800): 
 # 156.966622 seconds (1.71 G allocations: 81.618 GiB, 7.09% gc time)
 # error = 0.001771336268105652
 
-# searching both strand's bkpt in 2 different ways
+# searching both strand's bkpt in 2 different ways (w = 800)
 # 220.421479 seconds (1.71 G allocations: 81.618 GiB, 5.17% gc time)
 # error = 0.0015127094575404715
 
@@ -1100,18 +1108,33 @@ X_mendel = convert_gt(Float32, outfile, as_minorallele=false);
 n, p = size(X_mendel);
 error_rate = sum(X_mendel .!= X_complete) / n / p
 
+# print one person's error in each window
+windows = floor(Int, p / width)
+person = 1
+for w in 1:windows
+    win_range = ((w - 1) * width + 1):(w * width)
+    error_rate = sum(X_complete[person, win_range] .!= X_mendel[person, win_range]) / length(win_range)
+    println("person $person window $w = $win_range has error = $error_rate")
+end
+tot_error = sum(X_complete[person, :] .!= X_mendel[person, :]) / p
+
+# calculate error for 1 window in 1 person skipmissing
+x = X[5601:6400, 1]
+h1 = H[5601:6400, 1165]
+h2 = H[5601:6400, 542]
+function run()
+    errors = 0
+    for pos in 1:n
+        if !ismissing(x[pos])
+            errors += x[pos] ≠ h1[pos] + h2[pos]
+        end
+    end
+    println(errors)
+end
+run()
+
 # print error for everybody
 for person in 1:people
     error_rate = sum(X_complete[person, :] .!= X_mendel[person, :]) / p
     println("person $person error = $error_rate")
 end
-
-# print one person's error in each window
-windows = floor(Int, snps / width)
-person = 10
-for w in 1:windows
-    win_range = ((w - 1) * width + 1):(w * width)
-    error_rate = sum(X_complete[person, win_range] .!= X_mendel[person, win_range]) / length(win_range)
-    println("person $person window $w error = $error_rate")
-end
-tot_error = sum(X_complete[person, :] .!= X_mendel[person, :]) / p
