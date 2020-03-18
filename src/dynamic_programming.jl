@@ -18,6 +18,7 @@ function connect_happairs!(
 
     # reset storage
     empty!.(memory)
+    path_err .= Inf
 
     best_err  = Inf
     for happair in haplotype_set[1]
