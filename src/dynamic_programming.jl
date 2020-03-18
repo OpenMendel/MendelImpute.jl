@@ -8,14 +8,16 @@ such that number of switch points is minimized.
 - `haplotype_set`: A vector of vectors. `haplotype_set[1]` stores all pairs of haplotypes in window 1 in a vector, and so on. 
 - `λ`: Error associated with 1 mismatch when comparing 2 pairs of haplotypes. e.g. (h1, h2) vs (h1, h3) have error λ. 
 """
-function connect_happairs(
+function connect_happairs!(
     haplotype_set::Vector{Vector{T}}; 
-    λ::Float64 = 1.0
+    λ::Float64 = 1.0,
+    memory   = [Dict{T, Float64}() for i in 1:(length(haplotype_set) - 1)],
+    sol_path = Vector{T}(undef, length(haplotype_set)),
+    path_err = [Inf for i in 1:length(haplotype_set)]
     ) where T <: Tuple{Int, Int}
-    windows  = length(haplotype_set)
-    memory   = [Dict{T, Float64}() for i in 1:(windows - 1)]
-    sol_path = Vector{T}(undef, windows)
-    path_err = [Inf for i in 1:windows]
+
+    # reset storage
+    empty!.(memory)
 
     best_err  = Inf
     for happair in haplotype_set[1]
@@ -23,7 +25,7 @@ function connect_happairs(
         happair_err = Inf
         best_pair2  = (0, 0)
         for pair in haplotype_set[2]
-            err = pair_error(happair, pair) + connect_happairs!(2, pair, haplotype_set, λ = λ, memory = memory, solution_path = sol_path, path_err = path_err)
+            err = pair_error(happair, pair) + _connect_happairs!(2, pair, haplotype_set, λ = λ, memory = memory, solution_path = sol_path, path_err = path_err)
             if err < happair_err
                 best_pair2  = pair
                 happair_err = err
@@ -43,6 +45,7 @@ function connect_happairs(
 
     return sol_path, memory, best_err
 end
+connect_happairs(haplotype_set; args...) = connect_happairs!(haplotype_set, args...)
 
 """
 # Inputs
@@ -51,7 +54,7 @@ end
 - `haplotype_set`: A vector of vectors. `haplotype_set[1]` stores all pairs of haplotypes in window 1 in a vector, and so on. 
 - `λ`: Error associated with 1 mismatch when comparing 2 pairs of haplotypes. e.g. (h1, h2) vs (h1, h3) have error λ. 
 """
-function connect_happairs!(
+function _connect_happairs!(
     w::Int,
     happair::T, 
     haplotype_set::Vector{Vector{T}};
@@ -70,7 +73,7 @@ function connect_happairs!(
         best_err = Inf
         best_next_pair = (0, 0)
         for pair in haplotype_set[w + 1]
-            err = pair_error(happair, pair) + connect_happairs!(w + 1, pair, haplotype_set, λ = λ, memory = memory, solution_path = solution_path, path_err = path_err)
+            err = pair_error(happair, pair) + _connect_happairs!(w + 1, pair, haplotype_set, λ = λ, memory = memory, solution_path = solution_path, path_err = path_err)
             # println("pair $happair's next pair = ", pair, " has error = $err") # proof that memoization is working
 
             if err < best_err

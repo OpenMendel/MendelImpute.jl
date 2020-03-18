@@ -311,65 +311,76 @@ function phase(
 
     # allocate working arrays
     phase = [HaplotypeMosaicPair(snps) for i in 1:people]
+    memory   = [Dict{Tuple{Int, Int}, Float64}() for i in 1:(windows - 1)]
+    sol_path = Vector{Tuple{Int, Int}}(undef, windows)
+    path_err = [Inf for i in 1:windows]
 
     # loop over each person
     for i in 1:people
         @info "imputing person $i"
 
         # first find optimal haplotype pair in each window using dynamic programming
-        sol_path, _, best_err = connect_happairs(hapset[i])
+        connect_happairs!(hapset[i], memory=memory, sol_path=sol_path, path_err=path_err)
 
         # no searching for breakpoints
-        # for (w, happair) in enumerate(sol_path)
-        #     push!(phase[i].strand1.start, (w - 1) * width + 1)
-        #     push!(phase[i].strand1.haplotypelabel, happair[1])
-        #     push!(phase[i].strand2.start, (w - 1) * width + 1)
-        #     push!(phase[i].strand2.haplotypelabel, happair[2])
-        # end
+        for (w, happair) in enumerate(sol_path)
+            push!(phase[i].strand1.start, (w - 1) * width + 1)
+            push!(phase[i].strand1.haplotypelabel, happair[1])
+            push!(phase[i].strand2.start, (w - 1) * width + 1)
+            push!(phase[i].strand2.haplotypelabel, happair[2])
+        end
 
         # phase first window 
-        push!(phase[i].strand1.start, 1)
-        push!(phase[i].strand1.haplotypelabel, sol_path[1][1])
-        push!(phase[i].strand2.start, 1)
-        push!(phase[i].strand2.haplotypelabel, sol_path[1][2])
+        # push!(phase[i].strand1.start, 1)
+        # push!(phase[i].strand1.haplotypelabel, sol_path[1][1])
+        # push!(phase[i].strand2.start, 1)
+        # push!(phase[i].strand2.haplotypelabel, sol_path[1][2])
 
-        # phase middle windows
-        for w in 2:(windows - 1)
-            # no breakpoints
-            pair_error(sol_path[w - 1], sol_path[w]) == 0 && continue
+        # # phase middle windows
+        # for w in 2:(windows - 1)
+        #     # no breakpoints
+        #     pair_error(sol_path[w - 1], sol_path[w]) == 0 && continue
 
-            # at least 1 breakpoint
-            Xwi = view(X, ((w - 2) * width + 1):(w * width), i)
-            Hw  = view(H, ((w - 2) * width + 1):(w * width), :)
-            s1_prev = phase[i].strand1.haplotypelabel[end]
-            s2_prev = phase[i].strand2.haplotypelabel[end]
-            (h1, h2), bkpts = continue_haplotype(Xwi, Hw, (s1_prev, s2_prev), sol_path[w])
-            # strand 1
-            if bkpts[1] > -1 && bkpts[1] < 2width
-                push!(phase[i].strand1.start, (w - 2) * width + 1 + bkpts[1])
-                push!(phase[i].strand1.haplotypelabel, h1)
-            end
-            # strand 2
-            if bkpts[2] > -1 && bkpts[2] < 2width
-                push!(phase[i].strand2.start, (w - 2) * width + 1 + bkpts[2])
-                push!(phase[i].strand2.haplotypelabel, h2)
-            end
-        end
+        #     # at least 1 breakpoint
+        #     Xwi = view(X, ((w - 2) * width + 1):(w * width), i)
+        #     Hw  = view(H, ((w - 2) * width + 1):(w * width), :)
+        #     (h1, h2), bkpts = continue_haplotype(Xwi, Hw, sol_path[w - 1], sol_path[w])
 
-        # phase last window
-        Xwi = view(X, ((windows - 2) * width + 1):snps, i)
-        Hw  = view(H, ((windows - 2) * width + 1):snps, :)
-        (h1, h2), bkpts = continue_haplotype(Xwi, Hw, sol_path[windows - 1], sol_path[windows])
-        # strand 1
-        if bkpts[1] > -1 && bkpts[1] < 2width
-            push!(phase[i].strand1.start, (windows - 2) * width + 1 + bkpts[1])
-            push!(phase[i].strand1.haplotypelabel, h1)
-        end
-        # strand 2
-        if bkpts[2] > -1 && bkpts[2] < 2width
-            push!(phase[i].strand2.start, (windows - 2) * width + 1 + bkpts[2])
-            push!(phase[i].strand2.haplotypelabel, h2)
-        end
+        #     println("window = $w")
+        #     println("person = $i")
+        #     println("sol_path prev = ", sol_path[w - 1])
+        #     println("sol_path curr = ", sol_path[w])
+        #     println("proposed next pair = ", (h1, h2))
+        #     println("breakpoints = ", bkpts)
+        #     println("strand2 start = ", (w - 2) * width + 1 + bkpts[2])
+        #     println("")
+
+        #     # strand 1
+        #     if bkpts[1] > -1 && bkpts[1] < 2width
+        #         push!(phase[i].strand1.start, (w - 2) * width + 1 + bkpts[1])
+        #         push!(phase[i].strand1.haplotypelabel, h1)
+        #     end
+        #     # strand 2
+        #     if bkpts[2] > -1 && bkpts[2] < 2width
+        #         push!(phase[i].strand2.start, (w - 2) * width + 1 + bkpts[2])
+        #         push!(phase[i].strand2.haplotypelabel, h2)
+        #     end
+        # end
+
+        # # phase last window
+        # Xwi = view(X, ((windows - 2) * width + 1):snps, i)
+        # Hw  = view(H, ((windows - 2) * width + 1):snps, :)
+        # (h1, h2), bkpts = continue_haplotype(Xwi, Hw, sol_path[windows - 1], sol_path[windows])
+        # # strand 1
+        # if bkpts[1] > -1 && bkpts[1] < 2width
+        #     push!(phase[i].strand1.start, (windows - 2) * width + 1 + bkpts[1])
+        #     push!(phase[i].strand1.haplotypelabel, h1)
+        # end
+        # # strand 2
+        # if bkpts[2] > -1 && bkpts[2] < 2width
+        #     push!(phase[i].strand2.start, (windows - 2) * width + 1 + bkpts[2])
+        #     push!(phase[i].strand2.haplotypelabel, h2)
+        # end
     end
 
     return phase 

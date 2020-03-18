@@ -797,18 +797,18 @@ function continue_haplotype(
     elseif j == l && i ≠ k
         breakpt, errors = search_breakpoint(X, H, j, (i, k))
         return (k, l), (breakpt, -1)
-    else
-        # both strand mismatch
-        # breakpt1, errors1 = search_breakpoint(X, H, (i, j), (k, l))
-        # return (k, l), (breakpt1[1], breakpt1[2])
+    # else
+    #     # both strand mismatch
+    #     # breakpt1, errors1 = search_breakpoint(X, H, (i, j), (k, l))
+    #     # return (k, l), (breakpt1[1], breakpt1[2])
 
-        breakpt1, errors1 = search_breakpoint(X, H, (i, j), (k, l))
-        breakpt2, errors2 = search_breakpoint(X, H, (i, j), (l, k))
-        if errors1 < errors2
-            return (k, l), (breakpt1[1], breakpt1[2])
-        else
-            return (l, k), (breakpt2[1], breakpt2[2])
-        end
+    #     breakpt1, errors1 = search_breakpoint(X, H, (i, j), (k, l))
+    #     breakpt2, errors2 = search_breakpoint(X, H, (i, j), (l, k))
+    #     if errors1 < errors2
+    #         return (k, l), (breakpt1[1], breakpt1[2])
+    #     else
+    #         return (l, k), (breakpt2[1], breakpt2[2])
+    #     end
     end
 
     return (k, l), (0, 0)
