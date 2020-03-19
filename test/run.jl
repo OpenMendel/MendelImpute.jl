@@ -1248,5 +1248,3 @@ hapset = compute_optimal_halotype_set(X, H, width = width);
 # 170.842336 seconds (30.75 k allocations: 14.574 MiB, 0.09% gc time)
 # total = 2915200 pairs of integers = 46MB, so above memory usage is reasonable
 
-sum(length.(hapset[1]))
-

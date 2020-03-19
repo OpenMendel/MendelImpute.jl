@@ -9,47 +9,56 @@ such that number of switch points is minimized.
 - `λ`: Error associated with 1 mismatch when comparing 2 pairs of haplotypes. e.g. (h1, h2) vs (h1, h3) have error λ. 
 """
 function connect_happairs!(
-    haplotype_set::Vector{Vector{T}}; 
+    sol_path::Vector{T},
+    memory::Vector{Dict{T, Float64}},
+    path_err::Vector{Float64},
+    haplotype_set::Vector{Vector{T}};
     λ::Float64 = 1.0,
-    memory   = [Dict{T, Float64}() for i in 1:(length(haplotype_set) - 1)],
-    sol_path = Vector{T}(undef, length(haplotype_set)),
-    path_err = [Inf for i in 1:length(haplotype_set)]
     ) where T <: Tuple{Int, Int}
 
     # reset storage
     empty!.(memory)
     path_err .= Inf
-    # [sizehint!(memory[i], length(haplotype_set[i])) for i in 1:(length(haplotype_set) - 1)]
 
+    # preallocate returning values
     best_err  = Inf
+
     for happair in haplotype_set[1]
         # calculate current happair's subtree error resursively
-        happair_err = Inf
-        best_pair2  = (0, 0)
-        for pair in haplotype_set[2]
-            err = pair_error(happair, pair) + _connect_happairs!(2, pair, haplotype_set, λ, memory, sol_path, path_err)
-            if err < happair_err
-                best_pair2  = pair
-                happair_err = err
-            end
-        end
-
-        # record happair if it is better than previously tested happairs
-        if happair_err < best_err
-            best_err    = happair_err
+        err = _connect_happairs!(sol_path, memory, path_err, haplotype_set, λ, 1, happair)
+        if err < best_err
+            best_err    = err
             sol_path[1] = happair
-            sol_path[2] = best_pair2
         end
 
-        # record best error for current subtree
-        memory[1][happair] = happair_err
+        # record error for current subtree
+        memory[1][happair] = err
     end
 
-    return sol_path, memory, best_err
+    return best_err
 end
-connect_happairs(haplotype_set; args...) = connect_happairs!(haplotype_set, args...)
+
+function connect_happairs(
+    haplotype_set::Vector{Vector{T}};
+    λ::Float64 = 1.0
+    ) where T <: Tuple{Int, Int}
+
+    # allocate working arrays
+    windows  = length(haplotype_set)
+    memory   = [Dict{T, Float64}() for i in 1:(windows - 1)]
+    sol_path = Vector{T}(undef, windows)
+    path_err = [Inf for i in 1:windows]
+
+    # computational routine
+    best_err = connect_happairs!(sol_path, memory, path_err, haplotype_set, λ = λ)
+
+    return sol_path, memory, path_err, best_err
+end
 
 """
+Helper function that calculates the optimal subtree starting with `happair` as root node
+in window `w`. 
+
 # Inputs
 - `w`: Current window
 - `happair`: Haplotype pair in current window being considered. 
@@ -57,13 +66,13 @@ connect_happairs(haplotype_set; args...) = connect_happairs!(haplotype_set, args
 - `λ`: Error associated with 1 mismatch when comparing 2 pairs of haplotypes. e.g. (h1, h2) vs (h1, h3) have error λ. 
 """
 function _connect_happairs!(
-    w::Int,
-    happair::T, 
+    solution_path::Vector{T},
+    memory::Vector{Dict{T, Float64}},
+    path_err::Vector{Float64},
     haplotype_set::Vector{Vector{T}},
     λ::Float64,
-    memory::Vector{Dict{T, Float64}},
-    solution_path::Vector{T},
-    path_err::Vector{Float64}
+    w::Int,
+    happair::T, 
     ) where T <: Tuple{Int, Int}
 
     if w == length(haplotype_set)
@@ -75,7 +84,7 @@ function _connect_happairs!(
         best_err = Inf
         best_next_pair = (0, 0)
         for pair in haplotype_set[w + 1]
-            err = pair_error(happair, pair) + _connect_happairs!(w + 1, pair, haplotype_set, λ, memory, solution_path, path_err)
+            err = pair_error(happair, pair) + _connect_happairs!(solution_path, memory, path_err, haplotype_set, λ, w + 1, pair)
             # println("pair $happair's next pair = ", pair, " has error = $err") # proof that memoization is working
 
             if err < best_err
@@ -107,26 +116,3 @@ function pair_error(pair1::T, pair2::T; λ::Real = 1.0) where T <: Tuple{Int, In
     end
     return λ * difference
 end
-
-function connect_happairs_bottom_up(
-    haplotype_set::Vector{Vector{T}}; 
-    λ::Float64 = 1.0,
-    memory   = Dict{T, Float64}(),
-    sol_path = T[],
-    ) where T <: Tuple{Int, Int}
-    
-    windows = length(haplotype_set)
-    
-    # loop over windows, starting from 2nd right most window
-    for w in Iterators.reverse(1:(windows - 1))
-        for pair in haplotype_set[w]
-
-        end
-    end
-end
-
-
-
-
-
-

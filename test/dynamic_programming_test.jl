@@ -39,7 +39,7 @@
     push!(haplotype_set[4], (8, 6))
     push!(haplotype_set[4], (8, 8))
 
-    sol_path, memory, best_err = connect_happairs(haplotype_set)
+    sol_path, memory, path_err, best_err = connect_happairs(haplotype_set)
 
     @test best_err == 1.0
     @test sol_path == [(1, 5), (1, 5), (1, 5), (5, 4)]
@@ -77,7 +77,7 @@
     for w in 1:windows
         haplotype_set[w] = [(rand(1:10), rand(1:10)) for i in 1:rand(1:10)]
     end
-    sol_path, memory, best_err = connect_happairs(haplotype_set)
+    sol_path, memory, path_err, best_err = connect_happairs(haplotype_set)
 
     @test best_err == 4.0
     @test sol_path == [(3, 10), (2, 9), (6, 9), (3, 9), (9, 3)]
