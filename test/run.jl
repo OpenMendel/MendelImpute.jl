@@ -1057,7 +1057,9 @@ H = copy(H')
 hapset = compute_optimal_halotype_set(X, H, width = width)
 
 # hapset[1][1]
-@time sol_path, _, best_err = connect_happairs(hapset[1]);
+@time sol_path, memory, best_err = connect_happairs(hapset[1]);
+# 0.077636 seconds (201 allocations: 676.344 KiB)
+
 
 @time hs, ph = phase(tgtfile, reffile, impute=true, outfile = outfile, width = width);
 
@@ -1071,16 +1073,12 @@ error_rate = sum(X_mendel .!= X_complete) / n / p
 # 3462.416399 seconds (77.81 G allocations: 3.402 TiB, 12.66% gc time)
 # error = 0.00037152087475149104
 
-# not searching breakpoints (w = 800):
-# 80.676385 seconds (1.71 G allocations: 81.339 GiB, 12.29% gc time)
-# error = 0.0006830445896052257
-
 # searching only 1 strand's bkpt (w = 800): 
-# 81.521703 seconds (1.71 G allocations: 81.347 GiB, 11.82% gc time)
+# 62.271048 seconds (97.64 M allocations: 9.198 GiB, 2.17% gc time)
 # error = 0.0006049417779040046
 
 # searching both strand's bkpt in 2 different ways (w = 800)
-# 232.166963 seconds (1.74 G allocations: 82.618 GiB, 4.10% gc time)
+# 213.153604 seconds (96.96 M allocations: 9.166 GiB, 0.55% gc time)
 # error = 0.00023839108207895484
 
 using Revise
@@ -1134,3 +1132,68 @@ for person in 1:people
     error_rate = sum(X_complete[person, :] .!= X_mendel[person, :]) / p
     println("person $person error = $error_rate")
 end
+
+
+
+
+######## try to make dynamic programming efficient
+
+# profile mamory usage
+julia --track-allocation=user
+
+using Revise
+using VCFTools
+using MendelImpute
+using GeneticVariation
+using BenchmarkTools
+using Random
+using Profile
+
+cd("/Users/biona001/.julia/dev/MendelImpute/simulation")
+tgtfile = "./compare6/target_masked.vcf.gz"
+reffile = "./compare6/haplo_ref.vcf"
+outfile = "./compare6/imputed_target.vcf.gz"
+width   = 800
+
+H = convert_ht(Float64, reffile)
+X = convert_gt(Float64, tgtfile)
+X = copy(X')
+H = copy(H')
+hapset = compute_optimal_halotype_set(X, H, width = width)
+
+# test if adding/looking up dictionaries is efficient
+function mytest()
+    mydict = [Dict{Tuple{Int, Int}, Float64}() for i in 1:length(hapset[3])]
+    
+    my_arbitrary_sum = 0.0
+    for i in 1:length(hapset[3])
+        # add to dictionaries
+        num = length(hapset[3][i])
+        for n in 1:num
+            mydict[i][(rand(1:100), rand(1:100))] = rand() # add arbitrary pair
+        end
+
+        # lookup a bunch of times
+        for n in 1:num
+            pair = (rand(1:100), rand(1:100))
+            if haskey(mydict[i], pair)
+                my_arbitrary_sum += pair[1] + pair[2]
+            end
+        end
+    end
+
+    return mydict, my_arbitrary_sum
+end
+mydict, my_arbitrary_sum = mytest()
+@benchmark mytest() # 2.728 ms, 2.58 MiB
+
+windows  = length(hapset[3])
+memory   = [Dict{Tuple{Int, Int}, Float64}() for i in 1:(windows - 1)]
+sol_path = Vector{Tuple{Int, Int}}(undef, windows)
+path_err = [Inf for i in 1:windows]
+@time MendelImpute.connect_happairs!(hapset[3], memory=memory, sol_path=sol_path, path_err=path_err)
+# 0.314128 seconds (6.52 M allocations: 298.534 MiB, 13.38% gc time)
+
+Profile.clear_malloc_data()
+MendelImpute.connect_happairs!(hapset[3], memory=memory, sol_path=sol_path, path_err=path_err)
+
