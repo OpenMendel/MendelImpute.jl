@@ -800,18 +800,16 @@ function continue_haplotype(
     end
 
     # both strand mismatch
-    # breakpt1, errors1 = search_breakpoint(X, H, (i, j), (k, l))
-    # return (k, l), breakpt1
-    # breakpt1, errors1 = search_breakpoint(X, H, (i, k), (j, l))
-    # breakpt2, errors2 = search_breakpoint(X, H, (i, l), (j, k))
-    # if errors1 < errors2
-    #     return (k, l), breakpt1
-    # else
-    #     return (l, k), breakpt2
-    # end
+    breakpt1, errors1 = search_breakpoint(X, H, (i, k), (j, l))
+    breakpt2, errors2 = search_breakpoint(X, H, (i, l), (j, k))
+    if errors1 < errors2
+        return (k, l), breakpt1
+    else
+        return (l, k), breakpt2
+    end
 
-    width = Int(length(X) / 2)
-    return (k, l), (width, width)
+    # width = Int(length(X) / 2)
+    # return (k, l), (width, width)
 end
 
 """

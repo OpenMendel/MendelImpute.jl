@@ -1145,7 +1145,6 @@ using Revise
 using VCFTools
 using MendelImpute
 using GeneticVariation
-using BenchmarkTools
 using Random
 using Profile
 
@@ -1160,6 +1159,18 @@ X = convert_gt(Float64, tgtfile)
 X = copy(X')
 H = copy(H')
 hapset = compute_optimal_halotype_set(X, H, width = width)
+
+windows  = length(hapset[3])
+mymemory = [Dict{Tuple{Int, Int}, Float64}() for i in 1:(windows - 1)]
+    sol_path = Vector{Tuple{Int, Int}}(undef, windows)
+    path_err = [Inf for i in 1:windows]
+@time MendelImpute.connect_happairs!(hapset[3], memory=mymemory, sol_path=sol_path, path_err=path_err);
+# 0.229913 seconds (12 allocations: 672 bytes)
+
+Profile.clear_malloc_data()
+MendelImpute.connect_happairs!(hapset[3], memory=mymemory, sol_path=sol_path, path_err=path_err);
+
+
 
 # test if adding/looking up dictionaries is efficient
 function mytest()
@@ -1187,13 +1198,55 @@ end
 mydict, my_arbitrary_sum = mytest()
 @benchmark mytest() # 2.728 ms, 2.58 MiB
 
-windows  = length(hapset[3])
-memory   = [Dict{Tuple{Int, Int}, Float64}() for i in 1:(windows - 1)]
-sol_path = Vector{Tuple{Int, Int}}(undef, windows)
-path_err = [Inf for i in 1:windows]
-@time MendelImpute.connect_happairs!(hapset[3], memory=memory, sol_path=sol_path, path_err=path_err)
-# 0.314128 seconds (6.52 M allocations: 298.534 MiB, 13.38% gc time)
 
+
+# profile mamory usage
+julia --track-allocation=user
+
+# using Revise
+using VCFTools
+using MendelImpute
+using GeneticVariation
+using BenchmarkTools
+using Random
+using Profile
+
+cd("/Users/biona001/.julia/dev/MendelImpute/simulation")
+tgtfile = "./compare3/target_masked.vcf.gz"
+reffile = "./compare3/haplo_ref.vcf.gz"
+outfile = "./compare3/imputed_target.vcf.gz"
+width   = 400
+
+hs, ph = phase(tgtfile, reffile, impute=true, outfile = outfile, width = width);
 Profile.clear_malloc_data()
-MendelImpute.connect_happairs!(hapset[3], memory=memory, sol_path=sol_path, path_err=path_err)
+hs, ph = phase(tgtfile, reffile, impute=true, outfile = outfile, width = width);
+
+
+
+
+
+using Revise
+using VCFTools
+using MendelImpute
+using GeneticVariation
+using Random
+using Profile
+
+cd("/Users/biona001/.julia/dev/MendelImpute/simulation")
+tgtfile = "./compare6/target_masked.vcf.gz"
+reffile = "./compare6/haplo_ref.vcf"
+outfile = "./compare6/imputed_target.vcf.gz"
+width   = 800
+
+H = convert_ht(Float64, reffile)
+X = convert_gt(Float64, tgtfile)
+X = copy(X')
+H = copy(H')
+hapset = compute_optimal_halotype_set(X, H, width = width);
+
+@time ph = phase(X, H, hapset=hapset, width=width);
+# 170.842336 seconds (30.75 k allocations: 14.574 MiB, 0.09% gc time)
+# total = 2915200 pairs of integers = 46MB, so above memory usage is reasonable
+
+sum(length.(hapset[1]))
 
