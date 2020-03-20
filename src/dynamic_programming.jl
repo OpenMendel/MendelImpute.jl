@@ -185,6 +185,7 @@ function connect_happairs2!(
     ) where {T <: Tuple{Int, Int}, P <: Tuple{Float64, T}}
 
     windows = length(haplotype_set)
+    empty!.(memory) # reset storage
 
     # base case: last window induces no error and connects to nothing
     for pair in haplotype_set[windows]
@@ -211,7 +212,8 @@ function connect_happairs2!(
     best_start = (0, 0) 
     for (key, val) in memory[1]
         if val[1] < best_err
-            best_start = val[2]
+            best_start = key
+            best_err   = val[1]
         end
     end
 

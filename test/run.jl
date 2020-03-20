@@ -997,7 +997,8 @@ for w in 1:windows
 end
 haplotype_set
 
-sol_path, memory, best_err = connect_happairs(haplotype_set)
+sol_path, memory, path_err, best_err = connect_happairs(haplotype_set)
+sol_path, memory, best_err = connect_happairs2(haplotype_set)
 
 
 
@@ -1011,8 +1012,9 @@ for w in 1:windows
 end
 haplotype_set
 
-sol_path, memory, best_err = connect_happairs(haplotype_set)
-
+sol_path1, memory, path_err, best_err = connect_happairs(haplotype_set)#636.229 ms, 61.76 MiB
+sol_path2, memory, best_err = connect_happairs2(haplotype_set) #333.806 ms, 95.85 MiB
+sum(sol_path1 .!= sol_path2) # 89 places different
 
 # vector of sets vs vector of vector of tuples
 using BenchmarkTools
