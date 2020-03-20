@@ -22,6 +22,8 @@ function phase(
     width::Int = 400,
     flankwidth::Int = round(Int, 0.1width)
     )
+    @info "Importing data..."
+
     # convert vcf files to numeric matrices (need a routine so it does this transposed)
     H = convert_ht(Float32, reffile)
     if prephased
@@ -49,6 +51,7 @@ function phase(
         # create VCF reader and writer
         reader = VCF.Reader(openvcf(tgtfile, "r"))
         writer = VCF.Writer(openvcf(outfile, "w"), header(reader))
+        pmeter = Progress(nrecords(tgtfile), 1, "Writing to file...")
 
         # loop over each record
         for (i, record) in enumerate(reader)
@@ -75,6 +78,7 @@ function phase(
                 end
             end
             write(writer, record)
+            next!(pmeter)
         end
 
         # close 
@@ -314,6 +318,7 @@ function phase(
     memory   = [Dict{Tuple{Int, Int}, Float64}() for i in 1:(windows - 1)]
     sol_path = Vector{Tuple{Int, Int}}(undef, windows)
     path_err = [Inf for i in 1:windows]
+    pmeter = Progress(people, 5, "Imputing samples...")
 
     # loop over each person
     for i in 1:people
@@ -360,6 +365,8 @@ function phase(
             push!(phase[i].strand2.start, (windows - 2) * width + 1 + bkpts[2])
             push!(phase[i].strand2.haplotypelabel, sol_path[windows][2])
         end
+        # update progress
+        next!(pmeter)
     end
 
     return phase 

@@ -1212,7 +1212,7 @@ mydict, my_arbitrary_sum = mytest()
 # profile mamory usage
 julia --track-allocation=user
 
-# using Revise
+using Revise
 using VCFTools
 using MendelImpute
 using GeneticVariation
@@ -1226,7 +1226,8 @@ reffile = "./compare3/haplo_ref.vcf.gz"
 outfile = "./compare3/imputed_target.vcf.gz"
 width   = 400
 
-hs, ph = phase(tgtfile, reffile, impute=true, outfile = outfile, width = width);
+@time hs, ph = phase(tgtfile, reffile, impute=true, outfile = outfile, width = width);
+
 Profile.clear_malloc_data()
 hs, ph = phase(tgtfile, reffile, impute=true, outfile = outfile, width = width);
 

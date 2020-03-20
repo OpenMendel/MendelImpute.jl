@@ -123,6 +123,7 @@ function compute_optimal_halotype_set(
     Xwork       = X[cur_range, :]
     Xwork_float = zeros(T, size(Xwork))
     haploimpute!(Xwork, Hwork, M, N, happairs, hapscore, Xfloat=Xwork_float, Xtrue=Xtrue_work)
+    pmeter = Progress(windows, 1, "Computing optimal haplotype pairs...")
 
     # find all haplotypes matching the optimal haplotype pairs
     compute_redundant_haplotypes!(redundant_haplotypes, Hunique, happairs, 1)
@@ -148,6 +149,9 @@ function compute_optimal_halotype_set(
 
         # find all haplotypes matching the optimal haplotype pairs
         compute_redundant_haplotypes!(redundant_haplotypes, Hunique, happairs, w)
+    
+        # update progress
+        next!(pmeter)
     end
 
     # last window reallocate everything 
