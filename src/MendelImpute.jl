@@ -23,7 +23,7 @@ module MendelImpute
     export phase_prephased
     export compute_optimal_halotype_set_prephased
     export simulate_phased_genotypes
-    export connect_happairs
+    export connect_happairs, connect_happairs2
 
     # export UniqueHaplotypes, fast_elimination, unique_index!
     export OptimalHaplotypeSet, compute_optimal_halotype_set

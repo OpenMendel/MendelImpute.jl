@@ -971,7 +971,8 @@ push!(haplotype_set[4], (8, 6))
 push!(haplotype_set[4], (8, 8))
 haplotype_set
 
-sol_path, memory, best_err = connect_happairs(haplotype_set)
+sol_path, memory, path_err, best_err = connect_happairs(haplotype_set)
+sol_path, memory, best_err = connect_happairs2(haplotype_set)
 
 
 
@@ -1258,3 +1259,4 @@ hapset = compute_optimal_halotype_set(X, H, width = width);
 # 170.842336 seconds (30.75 k allocations: 14.574 MiB, 0.09% gc time)
 # total = 2915200 pairs of integers = 46MB, so above memory usage is reasonable
 
+@time hs, ph = phase(tgtfile, reffile, impute=true, outfile = outfile, width = width);

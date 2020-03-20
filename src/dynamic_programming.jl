@@ -123,6 +123,7 @@ function _connect_happairs!(
         if best_err < path_err[w]
             path_err[w] = best_err
             solution_path[w + 1] = best_next_pair
+            # println("window $(w + 1)'s best pair is now $best_next_pair")
         end
 
         # record best error for current subtree
@@ -155,4 +156,71 @@ function pair_error(pair1::T, pair2::T; λ::Real = 1.0) where T <: Tuple{Int, In
         difference += one(eltype(λ))
     end
     return λ * difference
+end
+
+"""
+Bottom-up approach to dynamic programming. 
+"""
+function connect_happairs2(
+    haplotype_set::Vector{Vector{T}};
+    λ::Float64 = 1.0
+    ) where T <: Tuple{Int, Int}
+
+    # allocate working arrays
+    windows  = length(haplotype_set)
+    sol_path = Vector{T}(undef, windows)
+    memory   = [Dict{T, Tuple{Float64, T}}() for i in 1:windows]
+
+    # computational routine
+    best_err = connect_happairs2!(sol_path, memory, haplotype_set, λ = λ)
+
+    return sol_path, memory, best_err
+end
+
+function connect_happairs2!(
+    sol_path::Vector{T},
+    memory::Vector{Dict{T, P}},
+    haplotype_set::Vector{Vector{T}};
+    λ::Float64 = 1.0,
+    ) where {T <: Tuple{Int, Int}, P <: Tuple{Float64, T}}
+
+    windows = length(haplotype_set)
+
+    # base case: last window induces no error and connects to nothing
+    for pair in haplotype_set[windows]
+        memory[windows][pair] = (0.0, (0, 0))
+    end
+
+    # search for best haplotype pair in each window bottom-up 
+    for w in Iterators.reverse(1:(windows - 1)), happair in haplotype_set[w]
+        # search all pairs in next window
+        best_err = Inf
+        best_next_pair = (0, 0)
+        for pair in haplotype_set[w + 1]
+            err = pair_error(happair, pair) + memory[w + 1][pair][1]
+            if err < best_err
+                best_err = err
+                best_next_pair = pair
+            end
+        end
+        memory[w][happair] = (best_err, best_next_pair)
+    end
+
+    # find best starting point
+    best_err   = Inf
+    best_start = (0, 0) 
+    for (key, val) in memory[1]
+        if val[1] < best_err
+            best_start = val[2]
+        end
+    end
+
+    # find best solution path by tracing `memory`
+    sol_path[1] = best_start
+    for w in 2:windows
+        prev_pair   = sol_path[w - 1]
+        sol_path[w] = memory[w - 1][prev_pair][2]
+    end
+
+    return best_err
 end
