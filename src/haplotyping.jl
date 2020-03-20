@@ -314,18 +314,22 @@ function phase(
     end
 
     # allocate working arrays
-    phase = [HaplotypeMosaicPair(snps) for i in 1:people]
-    memory   = [Dict{Tuple{Int, Int}, Float64}() for i in 1:(windows - 1)]
+    Tu       = Tuple{Int, Int}
+    Pu       = Tuple{Float64, Tu}
+    phase    = [HaplotypeMosaicPair(snps) for i in 1:people]
+    memory   = [Dict{Tu, Pu}() for i in 1:windows]
     sol_path = Vector{Tuple{Int, Int}}(undef, windows)
-    path_err = [Inf for i in 1:windows]
-    pmeter = Progress(people, 5, "Imputing samples...")
+    pmeter   = Progress(people, 5, "Imputing samples...")
+    # path_err = [Inf for i in 1:windows]
+    # memory   = [Dict{T, Float64}() for i in 1:(windows - 1)]
 
     # loop over each person
     for i in 1:people
         verbose && @info "imputing person $i"
 
         # first find optimal haplotype pair in each window using dynamic programming
-        connect_happairs!(sol_path, memory, path_err, hapset[i], λ = 1.0)
+        connect_happairs2!(sol_path, memory, hapset[i], λ = 1.0)
+        # connect_happairs!(sol_path, memory, path_err, hapset[i], λ = 1.0)
 
         # phase first window 
         push!(phase[i].strand1.start, 1)

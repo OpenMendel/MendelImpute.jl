@@ -127,6 +127,7 @@ function compute_optimal_halotype_set(
 
     # find all haplotypes matching the optimal haplotype pairs
     compute_redundant_haplotypes!(redundant_haplotypes, Hunique, happairs, 1)
+    next!(pmeter)
 
     # resizable working arrays
     cur_range   = Hunique.range[2]
@@ -163,6 +164,7 @@ function compute_optimal_halotype_set(
     N           = zeros(T, people, num_uniq)
     haploimpute!(Xwork, Hwork, M, N, happairs, hapscore)
     compute_redundant_haplotypes!(redundant_haplotypes, Hunique, happairs, windows)
+    next!(pmeter)
 
     return redundant_haplotypes
 end

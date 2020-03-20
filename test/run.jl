@@ -987,7 +987,6 @@ using ElasticArrays
 using StatsBase
 
 # generate happairs in windows
-T = Tuple{Int, Int}
 windows = 5
 haplotype_set = [T[] for i in 1:windows]
 
@@ -995,10 +994,10 @@ Random.seed!(2020)
 for w in 1:windows
     haplotype_set[w] = [(rand(1:10), rand(1:10)) for i in 1:rand(1:10)]
 end
-haplotype_set
+push!(haplotype_set[1], (1, 2))
+sol_path, memory, best_err = connect_happairs(haplotype_set)
 
-sol_path, memory, path_err, best_err = connect_happairs(haplotype_set)
-sol_path, memory, best_err = connect_happairs2(haplotype_set)
+
 
 
 
@@ -1060,8 +1059,9 @@ H = copy(H')
 hapset = compute_optimal_halotype_set(X, H, width = width)
 
 # hapset[1][1]
-@time sol_path, memory, best_err = connect_happairs(hapset[1]);
-# 0.077636 seconds (201 allocations: 676.344 KiB)
+@time sol_path, memory, path_err, best_err = connect_happairs(hapset[1]); # 0.077636 seconds (201 allocations: 676.344 KiB)
+@time sol_path, memory, best_err = connect_happairs2(hapset[1]); # 0.039125 seconds (209 allocations: 1.071 MiB)
+
 
 @time hs, ph = phase(tgtfile, reffile, impute=true, outfile = outfile, width = width);
 
@@ -1076,12 +1076,12 @@ error_rate = sum(X_mendel .!= X_complete) / n / p
 # error = 0.00037152087475149104
 
 # searching only 1 strand's bkpt (w = 800): 
-# 62.271048 seconds (97.64 M allocations: 9.198 GiB, 2.17% gc time)
-# error = 0.0006049417779040046
+# 35.990546 seconds (98.16 M allocations: 9.233 GiB, 3.80% gc time)
+# error = 0.0005958889520022721
 
-# searching both strand's bkpt in 2 different ways (w = 800)
-# 213.153604 seconds (96.96 M allocations: 9.166 GiB, 0.55% gc time)
-# error = 0.00023839108207895484
+# searching both strand's bkpt (w = 800)
+# 167.675135 seconds (98.00 M allocations: 9.224 GiB, 0.75% gc time)
+# error = 0.0002344859414938938
 
 
 
