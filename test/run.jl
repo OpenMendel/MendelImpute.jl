@@ -1060,12 +1060,11 @@ hapset = compute_optimal_halotype_set(X, H, width = width)
 @time sol_path, memory, best_err = connect_happairs(hapset[1]);
 # 0.077636 seconds (201 allocations: 676.344 KiB)
 
-
 @time hs, ph = phase(tgtfile, reffile, impute=true, outfile = outfile, width = width);
 
 # import imputed result and compare with true
-X_complete  = convert_gt(Float32, "./compare6/target.vcf.gz"; as_minorallele=false)
-X_mendel = convert_gt(Float32, outfile, as_minorallele=false)
+X_complete  = convert_gt(Float32, "./compare6/target.vcf.gz"; as_minorallele=false);
+X_mendel = convert_gt(Float32, outfile, as_minorallele=false);
 n, p = size(X_mendel)
 error_rate = sum(X_mendel .!= X_complete) / n / p
 
@@ -1080,6 +1079,16 @@ error_rate = sum(X_mendel .!= X_complete) / n / p
 # searching both strand's bkpt in 2 different ways (w = 800)
 # 213.153604 seconds (96.96 M allocations: 9.166 GiB, 0.55% gc time)
 # error = 0.00023839108207895484
+
+
+
+# different haplopair! strategy:
+# keep best pair only (orignal code): error = 0.00025205907412666857, 187.475166 sec
+# keep all happairs that are equally good: error = 0.0002509940357852883, 183.600139 sec 
+# keep top 10 haplotype pairs: 0.0003010508378301619, 175.682698 sec
+# keep all previous best pairs: error = 0.00023839108207895484, 186.741630 sec
+# keep all previous best pairs and equally good pairs: 0.0002378585629082647, 189.419958 sec
+
 
 using Revise
 using VCFTools

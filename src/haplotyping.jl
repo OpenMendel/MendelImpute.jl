@@ -320,7 +320,7 @@ function phase(
         verbose && @info "imputing person $i"
 
         # first find optimal haplotype pair in each window using dynamic programming
-        connect_happairs!(sol_path, memory, path_err, haplotype_set, 1.0)
+        connect_happairs!(sol_path, memory, path_err, hapset[i], λ = 1.0)
 
         # phase first window 
         push!(phase[i].strand1.start, 1)
