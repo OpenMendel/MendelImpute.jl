@@ -1,9 +1,10 @@
 """
-Helper function to calculate the difference between 2 tuples. 
+Helper function to calculate the difference between 2 tuples, with parallel
+connection or cross-over connections. 
 
 # Inputs 
-- `pair1`
-- `pair2`
+- `pair1`: tuple (a, b) where a, b are integers
+- `pair2`: tuple (c, d) where c, d are integers
 
 # Optional Inputs
 - `λ`: Error each switch contributes. Defaults to 1.0
@@ -14,14 +15,16 @@ Helper function to calculate the difference between 2 tuples.
 - `pair_error((1, 2), (3, 4)) = 2λ`
 """
 function pair_error(pair1::T, pair2::T; λ::Real = 1.0) where T <: Tuple{Int, Int}
-    difference = zero(eltype(λ))
-    if pair1[1] != pair2[1] && pair1[1] != pair2[2]
-        difference += one(eltype(λ))
-    end
-    if pair1[2] != pair2[1] && pair1[2] != pair2[2]
-        difference += one(eltype(λ))
-    end
-    return λ * difference
+    # parallel connections
+    # a b
+    # | |
+    # c d
+    parallel_diff = (pair1[1] != pair2[1]) + (pair1[2] != pair2[2])
+    # a b
+    #  X
+    # c d
+    crossover_diff = (pair1[1] != pair2[2]) + (pair1[2] != pair2[1])
+    return λ * min(parallel_diff, crossover_diff)
 end
 
 """
