@@ -115,7 +115,7 @@ function phase(
     ) where T <: Real
 
     if fast_method
-        return phase_fast()
+        return phase_fast(X, H, hapset = hapset, width = width, verbose = false, flankwidth=flankwidth, fast_method=fast_method)
     end
 
     # declare some constants
