@@ -1,26 +1,9 @@
-testset "unique_haplotypes" begin
-    H = zeros(Int, 1, 9)
-	H[1] = 1
-	H[2] = 2
-	H[3] = 2
-	H[4] = 3
-	H[5] = 2
-	H[6] = 4
-	H[7] = 1
-	H[8] = 4
-	H[9] = 1
-	hapset = unique_haplotypes(H, 128, 'T')
-
-	@test all(hapset.uniqH[1]  .== [1, 2, 4, 6])
-	@test all(hapset.hapmap[1] .== [1, 2, 2, 4, 2, 6, 1, 6, 1])
-end
-
-testset "compute_optimal_halotype_set" begin
+@testset "compute_optimal_halotype_set" begin
 	#import data
 	cd("/Users/biona001/.julia/dev/MendelImpute/data")
 	rawdata = readdlm("AFRped_geno.txt", ',', Float32);
 	people = 664;
-	X = copy(Transpose(rawdata[1:people, 1:(end - 1)]));
+	X = copy(rawdata[1:people, 1:(end - 1)]');
 	function create_hap(x)
 	    n, p = size(x)
 	    h = one(eltype(x))
@@ -63,5 +46,4 @@ testset "compute_optimal_halotype_set" begin
 	@test all(all_col_should_agree[:, 1] .== all_col_should_agree[:, 8])
 	@test all(all_col_should_agree[:, 3] .== all_col_should_agree[:, 4])
 	@test all(all_col_should_agree[:, 2] .== all_col_should_agree[:, 7])
- end
- 
+end

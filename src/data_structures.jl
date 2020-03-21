@@ -20,10 +20,15 @@ HaplotypeMosaicPair(len) = HaplotypeMosaicPair(HaplotypeMosaic(len), HaplotypeMo
 """
 Data structure for keeping track of unique haplotypes in each window. 
 
+- `uniqueindex`: the unique haplotype indices of each window.
+- `hapmap`: information to map every haplotype in each window to the unique one
+- `range`: range of SNPs in each window (may have overlaps in the first 2 due to flanking windows)
+
 Let `w` be the current window, then `uniqueindex[w]` is the unique haplotype indices
-of window `w`. `hapmap[w]` maps every haplotype to its unique haplotype. Once 
-the best haplotype pair (h1, h2) is identified, one can use `hapmap` to 
-generate a set of redundant haplotypes in window `w`. 
+of window `w`. `hapmap[w]` maps every haplotype to its unique haplotype. `range[w]`
+is where the range of SNPs where the unique haplotypes are computed (may have overlaps
+in beginning and end). Once the best haplotype pair (h1, h2) is identified, one can 
+use `hapmap` to generate a set of redundant haplotypes in window `w`. 
 
 # Example:
 
@@ -43,8 +48,9 @@ the set of haplotypes that matches (b, c) is in columns {2, 3, 4, 5}
 struct UniqueHaplotypeMaps
     uniqueindex::Vector{Vector{Int}}
     hapmap::Vector{Vector{Int}}
+    range::Vector{UnitRange}
 end
-UniqueHaplotypeMaps(windows::Int, haps::Int) = UniqueHaplotypeMaps(Vector{Vector{Int}}(undef, windows), [zeros(Int, haps) for i in 1:windows])
+UniqueHaplotypeMaps(windows::Int, haps::Int) = UniqueHaplotypeMaps(Vector{Vector{Int}}(undef, windows), [zeros(Int, haps) for i in 1:windows], [1:0 for i in 1:windows])
 
 """
 Data structure for storing all haplotypes that match the optimal haplotype in each window for a person, keeping track of strand.

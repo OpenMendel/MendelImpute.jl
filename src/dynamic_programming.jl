@@ -1,112 +1,120 @@
+"""
+Helper function to calculate the difference between 2 tuples. 
+
+# Inputs 
+- `pair1`
+- `pair2`
+
+# Optional Inputs
+- `λ`: Error each switch contributes. Defaults to 1.0
+
+# Examples
+- `pair_error((1, 2), (2, 3)) = pair_error((2, 1), (2, 3)) = λ`
+- `pair_error((2, 5), (5, 2)  = 0` 
+- `pair_error((1, 2), (3, 4)) = 2λ`
+"""
+function pair_error(pair1::T, pair2::T; λ::Real = 1.0) where T <: Tuple{Int, Int}
+    difference = zero(eltype(λ))
+    if pair1[1] != pair2[1] && pair1[1] != pair2[2]
+        difference += one(eltype(λ))
+    end
+    if pair1[2] != pair2[1] && pair1[2] != pair2[2]
+        difference += one(eltype(λ))
+    end
+    return λ * difference
+end
 
 """
-By exchanging entries of 2 vectors at the same position, this 
-function minimize the number of breakpoints in both strands, 
-and ruturn that number.
+Finds the optimal sequence of haplotype pairs across all windows 
+such that number of switch points is minimized. 
 
-# Arguments:
-- `n`: Starting position. Flipping will always happen at `n - 1`
-- `seq1`: First sequence
-- `seq2`: Second sequence
-- `flip_idx`: A preallocated vector that will store the index where flipping occurred
-- `intermediates`: vector storing intermediate results (for memoization). `-1` indicates not solved.
+# Inputs
+- `haplotype_set`: A person's possible haplotype pairs in each window. 
 
-# Example 1
-x = [0 1 1 1]
-y = [1 0 0 0]
-We can exchange position 1:
-x = [1 1 1 1]
-y = [0 0 0 0]
-then breakpoint = 0
+# Optional input:
+- `λ`: Error each switch contributes. Defaults to 1.0
 
-# Example 2
-x = [0 1 0 0 1]
-y = [1 0 1 0 0]
-we can exchange position 2:
-x = [0 0 0 0 1]
-y = [1 1 1 0 0]
-then breakpoint = 2 (1 at end of x and another at middle of y)
+# Output:
+- `sol_path`: Optimal sequence of haplotype pairs in each window
+- `memory`: Vector of dictionary storing the optimal error for each haplotype pair in each window
+- `path_err`: Error for each window induced by `sol_path`
+- `best_err`: Osverall error induced by `sol_path`. Equals λ times number of switch points. 
 """
-function binary_flip!(n, seq1, seq2, flip_idx,
-    intermediates::Vector{Int} = [-1 for i in 1:(length(seq1) + 1)]
-    )
-    # quick lookup
-    if intermediates[n] != -1
-        return intermediates[n]
+function connect_happairs(
+    haplotype_set::Vector{Vector{T}};
+    λ::Float64 = 1.0
+    ) where T <: Tuple{Int, Int}
+
+    # allocate working arrays
+    windows  = length(haplotype_set)
+    sol_path = Vector{T}(undef, windows)
+    memory   = [Dict{T, Tuple{Float64, T}}() for i in 1:windows]
+
+    # computational routine
+    best_err = connect_happairs!(sol_path, memory, haplotype_set, λ = λ)
+
+    return sol_path, memory, best_err
+end
+
+"""
+In-place version of `connect_happairs`. 
+
+# Inputs
+- `sol_path`: Optimal sequence of haplotype pairs in each window
+- `memory`: Vector of dictionary storing the optimal error for each haplotype pair in each window
+- `path_err`: Error for each window induced by `sol_path`
+- `haplotype_set`: A vector of vectors. `haplotype_set[1]` stores all pairs of haplotypes in window 1 in a vector, and so on. 
+- `λ`: Error each switch contributes. Defaults to 1.0
+
+# Output
+- `best_err`: Overall error induced by `sol_path`. Equals λ times number of switch points. 
+"""
+function connect_happairs!(
+    sol_path::Vector{T},
+    memory::Vector{Dict{T, P}},
+    haplotype_set::Vector{Vector{T}};
+    λ::Float64 = 1.0,
+    ) where {T <: Tuple{Int, Int}, P <: Tuple{Float64, T}}
+
+    windows = length(haplotype_set)
+    empty!.(memory) # reset storage
+
+    # base case: last window induces no error and connects to nothing
+    for pair in haplotype_set[windows]
+        memory[windows][pair] = (0.0, (0, 0))
     end
 
-    if n > length(seq1)
-        return 0
-    elseif n == 1
-        # only flip bits in previous position
-        return binary_flip!(n + 1, seq1, seq2, flip_idx, intermediates)
-    elseif seq1[n] == seq2[n]
-        # don't flip and only calculate error
-        return binary_flip!(n + 1, seq1, seq2, flip_idx, intermediates) + !(seq1[n] == seq1[n - 1]) + !(seq2[n] == seq2[n - 1])
-    else
-        # calculate error of flip/noflip by recursion
-        yesflip = binary_flip!(n + 1, seq1, seq2, flip_idx, intermediates) + !(seq1[n] == seq2[n - 1]) + !(seq2[n] == seq1[n - 1])
-        noflip  = binary_flip!(n + 1, seq1, seq2, flip_idx, intermediates) + !(seq1[n] == seq1[n - 1]) + !(seq2[n] == seq2[n - 1])
-        # println("n = $n, yesflip = $yesflip, noflip = $noflip, min = $(min(yesflip, noflip))")
-        # store intermediate results for later retrival
-        intermediates[n] = min(yesflip, noflip)
-        if yesflip < noflip
-            # record flipping location, flip 2 sequence at previous location, 
-            flip_idx[n - 1] = true
-            seq1[n - 1], seq2[n - 1] = seq2[n - 1], seq1[n - 1]
-            # println("flipped $(n - 1)!")
+    # search for best haplotype pair in each window bottom-up 
+    for w in Iterators.reverse(1:(windows - 1)), happair in haplotype_set[w]
+        # search all pairs in next window
+        best_err = Inf
+        best_next_pair = (0, 0)
+        for pair in haplotype_set[w + 1]
+            err = pair_error(happair, pair) + memory[w + 1][pair][1]
+            if err < best_err
+                best_err = err
+                best_next_pair = pair
+            end
         end
-        return min(yesflip, noflip)
-    end
-end
-binary_flip!(seq1, seq2, flip) = binary_flip!(2, seq1, seq2, flip) #start at position 2
-
-function has_intersect!(c::BitVector, a::BitVector, b::BitVector)
-    c .= a .& b
-    return any(c)
-end
-
-function set_flip!(
-    n::Int, 
-    vector_set1::Vector{BitVector}, 
-    vector_set2::Vector{BitVector}, 
-    flip_idx::BitVector,
-    intermediates::Vector{Int} = [-1 for i in 1:(length(vector_set1) + 1)],
-    storage::BitVector = falses(length(vector_set1[1]))
-    )
-    # quick lookup
-    if intermediates[n] != -1
-        return intermediates[n]
+        memory[w][happair] = (best_err, best_next_pair)
     end
 
-    if n > length(vector_set1)
-        return 0
-    elseif n == 1
-        # only flip bits in previous position
-        return set_flip!(n + 1, vector_set1, vector_set2, flip_idx, intermediates)
-    elseif vector_set1[n] == vector_set2[n]
-        # don't flip and only calculate error
-        return set_flip!(n + 1, vector_set1, vector_set2, flip_idx, intermediates) + 
-                !has_intersect!(storage, vector_set1[n], vector_set1[n - 1]) +
-                !has_intersect!(storage, vector_set2[n], vector_set2[n - 1])
-    else
-        # calculate error of flip/noflip by recursion
-        yesflip = set_flip!(n + 1, vector_set1, vector_set2, flip_idx, intermediates) + 
-                    !has_intersect!(storage, vector_set1[n], vector_set2[n - 1]) + 
-                    !has_intersect!(storage, vector_set2[n], vector_set1[n - 1])
-        noflip  = set_flip!(n + 1, vector_set1, vector_set2, flip_idx, intermediates) + 
-                    !has_intersect!(storage, vector_set1[n], vector_set1[n - 1]) + 
-                    !has_intersect!(storage, vector_set2[n], vector_set2[n - 1])
-
-        # store intermediate results for later retrival
-        intermediates[n] = min(yesflip, noflip)
-        if yesflip < noflip
-            # record flipping location, flip 2 sequence at previous location, 
-            flip_idx[n - 1] = true
-            vector_set1[n - 1], vector_set2[n - 1] = vector_set2[n - 1], vector_set1[n - 1]
+    # find best starting point
+    best_err   = Inf
+    best_start = (0, 0) 
+    for (key, val) in memory[1]
+        if val[1] < best_err
+            best_start = key
+            best_err   = val[1]
         end
-        return min(yesflip, noflip)
     end
-end
-set_flip!(vector_set1, vector_set2, flip) = set_flip!(2, vector_set1, vector_set2, flip) #start at position 2
 
+    # find best solution path by tracing `memory`
+    sol_path[1] = best_start
+    for w in 2:windows
+        prev_pair   = sol_path[w - 1]
+        sol_path[w] = memory[w - 1][prev_pair][2]
+    end
+
+    return best_err
+end

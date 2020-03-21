@@ -16,7 +16,8 @@ structure for examples.
 function unique_haplotypes(
     H::AbstractMatrix,
     width::Int,
-    trans::Char
+    trans::Char;
+    flankwidth::Int = round(Int, 0.1width)
     )
 
     if trans == 'N'
@@ -31,25 +32,31 @@ function unique_haplotypes(
     windows = floor(Int, p / width)
     hapset  = UniqueHaplotypeMaps(windows, d)
 
-    # find unique haplotypes in first & second window 
-    H_cur_window = view(H, 1:2width, :)
+    # find unique haplotypes in first & second window
+    first_range = 1:(width + flankwidth)
+    H_cur_window = view(H, first_range, :)
     hapset.hapmap[1] = groupslices(H_cur_window, dim)
     hapset.uniqueindex[1] = unique(hapset.hapmap[1])
+    hapset.range[1] = first_range
 
     # record unique haplotypes and mappings window by window (using flanking windows)
     # first  1/3: ((w - 2) * width + 1):((w - 1) * width)
     # middle 1/3: ((w - 1) * width + 1):(      w * width)
     # last   1/3: (      w * width + 1):((w + 1) * width)
-    for w in 2:(windows-1)
-        H_cur_window = view(H, ((w - 2) * width + 1):((w + 1) * width), :)
+    for w in 2:(windows - 1)
+        cur_range = ((w - 1) * width - flankwidth + 1):(w * width + flankwidth)
+        H_cur_window = view(H, cur_range, :)
         hapset.hapmap[w] = groupslices(H_cur_window, dim)
         hapset.uniqueindex[w] = unique(hapset.hapmap[w])
+        hapset.range[w] = cur_range
     end
 
     # find unique haplotype in penultimate & last window
-    H_cur_window = view(H, ((windows - 2) * width + 1):p, :)
+    last_range   = ((windows - 1) * width - flankwidth + 1):p
+    H_cur_window = view(H, last_range, :)
     hapset.hapmap[end] = groupslices(H_cur_window, dim)
     hapset.uniqueindex[end] = unique(hapset.hapmap[end])
+    hapset.range[end] = last_range
 
     return hapset
 end
@@ -73,21 +80,32 @@ redundant haplotypes that matches the optimal haplotypes in each window for pers
 function compute_optimal_halotype_set(
     X::AbstractMatrix{Union{Missing, T}},
     H::AbstractMatrix{T};
-    width::Int    = 128,
+    width::Int = 400,
+    flankwidth::Int = round(Int, 0.1width),
     verbose::Bool = true,
+    prephased::Bool = false,
+    fast_method::Bool = false,
     Xtrue::Union{AbstractMatrix, Nothing} = nothing # for testing
     ) where T <: Real
+
+    if prephased
+        return compute_optimal_halotype_set_prephased(X, H, width=width)
+    end
 
     # define some constants
     snps, people = size(X)
     haplotypes = size(H, 2)
     windows = floor(Int, snps / width)
 
-    # get unique haplotype indices and maps for each window
-    Hunique  = unique_haplotypes(H, width, 'T')
+    # Each person stores a vector of redundant haplotypes matching the optimal one for each window
+    if fast_method
+        redundant_haplotypes = [OptimalHaplotypeSet(windows, haplotypes) for i in 1:people]
+    else
+        redundant_haplotypes = [[Tuple{Int, Int}[] for i in 1:windows] for j in 1:people]
+    end
 
-    # Initialize data structure for redundant haplotypes that matches the optimal one. 
-    optimal_haplotypes = [OptimalHaplotypeSet(windows, haplotypes) for i in 1:people]
+    # get unique haplotype indices and maps for each window
+    Hunique = unique_haplotypes(H, width, 'T', flankwidth = flankwidth)
 
     # for testing
     if isnothing(Xtrue)
@@ -97,28 +115,37 @@ function compute_optimal_halotype_set(
     end
 
     # allocate working arrays
-    happairs    = [Tuple{Int, Int}[] for i in 1:people]
+    happairs    = [Tuple{Int, Int}[] for i in 1:people] # tracks unique haplotype pairs in a window
     hapscore    = zeros(T, people)
-    Hwork       = ElasticArray{T}(H[1:3width, Hunique.uniqueindex[1]]) # array type that allows rescaling last dim 
-    Xwork       = X[1:3width, :]
-    Xwork_float = zeros(T, size(Xwork))
     num_uniq    = length(Hunique.uniqueindex[1])
     M           = zeros(T, num_uniq, num_uniq)
-    N           = ElasticArray{T}(undef, people, num_uniq)
+    N           = ElasticArray{T}(undef, people, num_uniq) # array type that allows rescaling last dim 
 
     # In first window, calculate optimal haplotype pair among unique haplotypes
+    cur_range   = Hunique.range[1]
+    Hwork       = H[cur_range, Hunique.uniqueindex[1]]
+    Xwork       = X[cur_range, :]
+    Xwork_float = zeros(T, size(Xwork))
     haploimpute!(Xwork, Hwork, M, N, happairs, hapscore, Xfloat=Xwork_float, Xtrue=Xtrue_work)
+    pmeter = Progress(windows, 1, "Computing optimal haplotype pairs...")
 
     # find all haplotypes matching the optimal haplotype pairs
-    compute_redundant_haplotypes!(optimal_haplotypes, Hunique, happairs, H, 1)
+    compute_redundant_haplotypes!(redundant_haplotypes, Hunique, happairs, 1, fast_method=fast_method)
+    next!(pmeter)
+
+    # resizable working arrays
+    cur_range   = Hunique.range[2]
+    Hwork       = ElasticArray{T}(H[cur_range, Hunique.uniqueindex[1]]) # array type that allows rescaling last dim 
+    Xwork       = X[cur_range, :]
+    Xwork_float = zeros(T, size(Xwork))
 
     #TODO: make this loop multithreaded 
     # first  1/3: ((w - 2) * width + 1):((w - 1) * width)
     # middle 1/3: ((w - 1) * width + 1):(      w * width)
     # last   1/3: (      w * width + 1):((w + 1) * width)
-    for w in 2:(windows-1)
+    for w in 2:(windows - 1)
         # sync Xwork and Hwork with original data
-        cur_range = ((w - 2) * width + 1):((w + 1) * width) # includes flanking windows
+        cur_range = Hunique.range[w]
         M = resize_and_sync!(Xwork, Hwork, Hunique.uniqueindex[w], cur_range, X, H, M, N)
         isnothing(Xtrue) || copyto!(Xtrue_work, view(Xtrue, cur_range, :)) # for testing
 
@@ -126,82 +153,149 @@ function compute_optimal_halotype_set(
         haploimpute!(Xwork, Hwork, M, N, happairs, hapscore, Xfloat=Xwork_float, Xtrue=Xtrue_work)
 
         # find all haplotypes matching the optimal haplotype pairs
-        compute_redundant_haplotypes!(optimal_haplotypes, Hunique, happairs, H, w)
+        compute_redundant_haplotypes!(redundant_haplotypes, Hunique, happairs, w, fast_method=fast_method)
+    
+        # update progress
+        next!(pmeter)
     end
 
-    # last window
-    last_range = ((windows - 2) * width + 1):snps
-    if mod(length(last_range), width) == 0
-        #resize the typical way if the last window has the same width as previous windows
-        M = resize_and_sync!(Xwork, Hwork, Hunique.uniqueindex[end], last_range, X, H, M, N)
-        haploimpute!(Xwork, Hwork, M, N, happairs, hapscore)
-        compute_redundant_haplotypes!(optimal_haplotypes, Hunique, happairs, H, windows)
-    else
-        #reallocate everything 
-        num_uniq    = length(Hunique.uniqueindex[end])
-        Hwork       = H[last_range, Hunique.uniqueindex[end]]
-        Xwork       = X[last_range, :]
-        M           = zeros(T, num_uniq, num_uniq)
-        N           = zeros(T, people, num_uniq)
-        haploimpute!(Xwork, Hwork, M, N, happairs, hapscore)
-        compute_redundant_haplotypes!(optimal_haplotypes, Hunique, happairs, H, windows)
+    # last window reallocate everything 
+    last_range = Hunique.range[end]
+    num_uniq    = length(Hunique.uniqueindex[end])
+    Hwork       = H[last_range, Hunique.uniqueindex[end]]
+    Xwork       = X[last_range, :]
+    M           = zeros(T, num_uniq, num_uniq)
+    N           = zeros(T, people, num_uniq)
+    haploimpute!(Xwork, Hwork, M, N, happairs, hapscore)
+    compute_redundant_haplotypes!(redundant_haplotypes, Hunique, happairs, windows, fast_method=fast_method)
+    next!(pmeter)
+
+    return redundant_haplotypes
+end
+
+function compute_optimal_halotype_set_prephased(
+    X::AbstractMatrix{Union{Missing, T}},
+    H::AbstractMatrix{T};
+    width::Int    = 400,
+    flankwidth::Int = round(Int, 0.1width),
+    ) where T <: Real
+    
+    # declare some constants
+    snps = size(X, 1)
+    people = Int(size(X, 2) / 2)
+    haplotypes = size(H, 2)
+    windows = floor(Int, snps / width)
+
+    # get unique haplotype indices and maps for current window
+    Hunique = unique_haplotypes(H, width, 'T', flankwidth = flankwidth)
+    hapset  = [OptimalHaplotypeSet(windows, haplotypes) for i in 1:people]
+
+    for w in 1:windows, i in 1:people
+        cur_range = Hunique.range[w]
+        Hi_unique = Hunique.uniqueindex[w]
+        best_err1 = typemax(eltype(H))
+        best_err2 = typemax(eltype(H))
+
+        # loop through 2 genotype strands to find best matching haplotype
+        Xi1 = @view(X[cur_range, 2i - 1])
+        Xi2 = @view(X[cur_range, 2i])
+        Hi1 = 0
+        Hi2 = 0
+        for j in Hi_unique
+            Hi = @view(H[cur_range, j])
+            # strand1
+            err = euclidean_skipmissing(Xi1, Hi)
+            if err < best_err1
+                Hi1 = j
+                best_err1 = err
+            end
+            # strand2
+            err = euclidean_skipmissing(Xi2, Hi)
+            if err < best_err2
+                Hi2 = j
+                best_err2 = err
+            end
+        end
+        
+        # find all haplotypes that matches the unique one 
+        mapping = Hunique.hapmap[w]
+        for j in 1:haplotypes
+            mapping[j] == Hi1 && (hapset[i].strand1[w][j] = true)
+            mapping[j] == Hi2 && (hapset[i].strand2[w][j] = true)
+        end
     end
 
-    return optimal_haplotypes
+    return hapset
+end
+
+function euclidean_skipmissing(
+    x::AbstractVector{U}, 
+    y::AbstractVector{T}
+    ) where U <: Union{T, Missing} where T <: Real
+    s = zero(T)
+    @inbounds @simd for i in eachindex(x)
+        if x[i] !== missing
+            s += (x[i] - y[i])^2
+        end
+    end
+    return s
 end
 
 """
 Records optimal-redundant haplotypes for each window. 
-
-This routine takes up roughly 1/5 of the total computation time.
 """
 function compute_redundant_haplotypes!(
-    optimal_haplotypes::Vector{OptimalHaplotypeSet}, 
+    redundant_haplotypes::Union{Vector{Vector{Vector{T}}}, Vector{OptimalHaplotypeSet}}, 
     Hunique::UniqueHaplotypeMaps, 
-    happairs::Vector{Vector{Tuple{Int, Int}}}, 
-    H::AbstractMatrix,
-    window::Int,
-    )
+    happairs::Vector{Vector{T}}, 
+    window::Int;
+    fast_method::Bool = false
+    ) where T <: Tuple{Int, Int}
     
-    people = length(optimal_haplotypes)
+    people = length(redundant_haplotypes)
 
-    # @inbounds for k in 1:people
-    #     first_happair = happairs[k][1] # choose first haplotype pair
-    #     Hwork_i = first_happair[1]
-    #     Hwork_j = first_happair[2]
-    #     # println("person $k's optimal haplotype pairs are: $((Hwork_i, Hwork_j))")
+    if fast_method
+        @inbounds for k in 1:people, happair in happairs[k]
+            Hi_uniqueidx = happair[1]
+            Hj_uniqueidx = happair[2]
+            # println("person $k's optimal haplotype pairs are: $((Hi_uniqueidx, Hj_uniqueidx))")
 
-    #     H_i = Hunique.uniqueindex[window][Hwork_i]
-    #     H_j = Hunique.uniqueindex[window][Hwork_j]
-    #     # println("person $k's optimal haplotype pairs are located at columns $H_i and $H_j in H")
+            Hi_idx = Hunique.uniqueindex[window][Hi_uniqueidx]
+            Hj_idx = Hunique.uniqueindex[window][Hj_uniqueidx]
+            # println("person $k's optimal haplotype pairs are located at columns $Hi_idx and $Hj_idx in current window of H")
 
-    #     # loop through all haplotypes and find ones that match either of the optimal haplotypes 
-    #     map1 = Hunique.hapmap[window]
-    #     map2 = Hunique.hapmap[window]
-    #     hap1 = optimal_haplotypes[k].strand1[window]
-    #     hap2 = optimal_haplotypes[k].strand2[window]
-    #     for jj in 1:size(H, 2)
-    #         map1[jj] == H_i && (hap1[jj] = true)
-    #         map2[jj] == H_j && (hap2[jj] = true)
-    #     end
-    # end
+            # loop through all haplotypes and find ones that match either of the optimal haplotypes 
+            mapping = Hunique.hapmap[window]
+            redunhaps_bitvec1 = redundant_haplotypes[k].strand1[window]
+            redunhaps_bitvec2 = redundant_haplotypes[k].strand2[window]
+            for jj in 1:length(Hunique.hapmap[1])
+                mapping[jj] == Hi_idx && (redunhaps_bitvec1[jj] = true)
+                mapping[jj] == Hj_idx && (redunhaps_bitvec2[jj] = true)
+            end
+        end
+    else
+        h1_set, h2_set = Int[], Int[]
+        @inbounds for k in 1:people, happair in happairs[k]
+            Hi_uniqueidx = happair[1]
+            Hj_uniqueidx = happair[2]
+            # println("person $k's optimal haplotype pairs are: $((Hi_uniqueidx, Hj_uniqueidx))")
 
-    @inbounds for k in 1:people, happair in happairs[k]
-        Hi_uniqueidx = happair[1]
-        Hj_uniqueidx = happair[2]
-        # println("person $k's optimal haplotype pairs are: $((Hi_uniqueidx, Hj_uniqueidx))")
+            Hi_idx = Hunique.uniqueindex[window][Hi_uniqueidx]
+            Hj_idx = Hunique.uniqueindex[window][Hj_uniqueidx]
+            # println("person $k's optimal haplotype pairs are located at columns $Hi_idx and $Hj_idx in current window of H")
 
-        Hi_idx = Hunique.uniqueindex[window][Hi_uniqueidx]
-        Hj_idx = Hunique.uniqueindex[window][Hj_uniqueidx]
-        # println("person $k's optimal haplotype pairs are located at columns $Hi_idx and $Hj_idx in current window of H")
+            # loop through all haplotypes and find ones that match either of the optimal haplotypes 
+            empty!(h1_set)
+            empty!(h2_set)
+            for (idx, hap) in enumerate(Hunique.hapmap[window])
+                hap == Hi_idx && push!(h1_set, idx)
+                hap == Hj_idx && push!(h2_set, idx)
+            end
 
-        # loop through all haplotypes and find ones that match either of the optimal haplotypes 
-        mapping = Hunique.hapmap[window]
-        redunhaps_bitvec1 = optimal_haplotypes[k].strand1[window]
-        redunhaps_bitvec2 = optimal_haplotypes[k].strand2[window]
-        for jj in 1:size(H, 2)
-            mapping[jj] == Hi_idx && (redunhaps_bitvec1[jj] = true)
-            mapping[jj] == Hj_idx && (redunhaps_bitvec2[jj] = true)
+            # push all possible happair into `redundant_haplotypes` 
+            for h1 in h1_set, h2 in h2_set
+                push!(redundant_haplotypes[k][window], (h1, h2))
+            end
         end
     end
 
@@ -243,10 +337,10 @@ function resize_and_sync!(
     if dd != next_d
         resize!(Hwork, pp        , next_d)
         resize!(N    , size(N, 1), next_d)
-        Mvec = vec(M)
-        resize!(Mvec, next_d^2)
-        Mnew = Base.ReshapedArray(Mvec, (next_d, next_d), ()) # actually resize! makes a copy internally!
-        # Mnew = zeros(eltype(M), next_d, next_d)               # always reallocate entire M
+        Mnew = zeros(eltype(M), next_d, next_d)               # always reallocate entire M
+        # Mvec = vec(M)
+        # resize!(Mvec, next_d^2)
+        # Mnew = Base.ReshapedArray(Mvec, (next_d, next_d), ()) # actually resize! makes a copy internally!
         # Mnew = (next_d < dd ? Base.ReshapedArray(vec(M), (next_d, next_d), ()) : 
         #                       zeros(eltype(M), next_d, next_d))
     else
@@ -349,8 +443,13 @@ end
 """
     haplopair!(happair, hapscore, M, N)
 
-Calculate the best pair of haplotypes in `H` for each individual in `X` using
-sufficient statistics `M` and `N`.
+Calculate the best pair of haplotypes pairs in the filtered haplotype panel
+for each individual in `X` using sufficient statistics `M` and `N`. 
+
+# Note
+The best haplotype pairs are column indices of the filtered haplotype 
+panel, and must be converted back to the indices of the actual haplotype panel
+using `UniqueHaplotypeMaps`. 
 
 # Input
 * `happair`: optimal haplotype pair for each individual.
@@ -710,8 +809,17 @@ function continue_haplotype(
         return (k, l), (breakpt, -1)
     end
 
-    return (k, l), (0, 0)
+    # both strand mismatch
+    breakpt1, errors1 = search_breakpoint(X, H, (i, k), (j, l))
+    breakpt2, errors2 = search_breakpoint(X, H, (i, l), (j, k))
+    if errors1 < errors2
+        return (k, l), breakpt1
+    else
+        return (l, k), breakpt2
+    end
 
+    # width = Int(length(X) / 2)
+    # return (k, l), (width, width)
 end
 
 """
