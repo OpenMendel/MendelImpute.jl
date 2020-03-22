@@ -83,16 +83,16 @@ function connect_happairs!(
     empty!.(memory) # reset storage
 
     # base case: last window induces no error and connects to nothing
-    for pair in haplotype_set[windows]
+    @inbounds @simd for pair in haplotype_set[windows]
         memory[windows][pair] = (0.0, (0, 0))
     end
 
     # search for best haplotype pair in each window bottom-up 
-    for w in Iterators.reverse(1:(windows - 1)), happair in haplotype_set[w]
+    @inbounds for w in Iterators.reverse(1:(windows - 1)), happair in haplotype_set[w]
         # search all pairs in next window
         best_err = Inf
         best_next_pair = (0, 0)
-        for pair in haplotype_set[w + 1]
+        @simd for pair in haplotype_set[w + 1]
             err = pair_error(happair, pair) + memory[w + 1][pair][1]
             if err < best_err
                 best_err = err
@@ -105,7 +105,7 @@ function connect_happairs!(
     # find best starting point
     best_err   = Inf
     best_start = (0, 0) 
-    for (key, val) in memory[1]
+    @inbounds for (key, val) in memory[1]
         if val[1] < best_err
             best_start = key
             best_err   = val[1]
@@ -114,7 +114,7 @@ function connect_happairs!(
 
     # find best solution path by tracing `memory`
     sol_path[1] = best_start
-    for w in 2:windows
+    @inbounds for w in 2:windows
         prev_pair   = sol_path[w - 1]
         sol_path[w] = memory[w - 1][prev_pair][2]
     end

@@ -1001,13 +1001,15 @@ sol_path, memory, best_err = connect_happairs(haplotype_set)
 
 # generate happairs in windows
 windows = 10
+T = Tuple{Int, Int}
 haplotype_set = [T[] for i in 1:windows]
 
-Random.seed!(2020)
+Random.seed!(123)
 for w in 1:windows
     haplotype_set[w] = [(rand(1:10), rand(1:10)) for i in 1:rand(1:10)]
 end
 haplotype_set
+sol_path, memory, best_err = connect_happairs(haplotype_set)
 
 
 
@@ -1169,6 +1171,7 @@ using MendelImpute
 using GeneticVariation
 using Random
 using Profile
+using BenchmarkTools
 
 cd("/Users/biona001/.julia/dev/MendelImpute/simulation")
 tgtfile = "./compare6/target_masked.vcf.gz"
@@ -1182,12 +1185,25 @@ X = copy(X')
 H = copy(H')
 hapset = compute_optimal_halotype_set(X, H, width = width)
 
+T = Tuple{Int, Int}
 windows  = length(hapset[3])
-mymemory = [Dict{Tuple{Int, Int}, Float64}() for i in 1:(windows - 1)]
-    sol_path = Vector{Tuple{Int, Int}}(undef, windows)
-    path_err = [Inf for i in 1:windows]
-@time MendelImpute.connect_happairs!(hapset[3], memory=mymemory, sol_path=sol_path, path_err=path_err);
-# 0.229913 seconds (12 allocations: 672 bytes)
+mymemory = [Dict{Tuple{Int, Int}, Tuple{Float64, T}}() for i in 1:windows]
+sol_path = Vector{Tuple{Int, Int}}(undef, windows)
+path_err = [Inf for i in 1:windows]
+@time MendelImpute.connect_happairs!(sol_path, mymemory, hapset[3]);
+# 0.138682 seconds (6 allocations: 400 bytes)
+
+@benchmark MendelImpute.connect_happairs!(sol_path, mymemory, hapset[3])
+  # memory estimate:  240 bytes
+  # allocs estimate:  2
+  # --------------
+  # minimum time:     108.139 ms (0.00% GC)
+  # median time:      109.708 ms (0.00% GC)
+  # mean time:        110.641 ms (0.00% GC)
+  # maximum time:     123.022 ms (0.00% GC)
+  # --------------
+  # samples:          46
+  # evals/sample:     1
 
 Profile.clear_malloc_data()
 MendelImpute.connect_happairs!(hapset[3], memory=mymemory, sol_path=sol_path, path_err=path_err);
