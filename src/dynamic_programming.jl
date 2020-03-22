@@ -51,12 +51,14 @@ function connect_happairs(
     # allocate working arrays
     windows  = length(haplotype_set)
     sol_path = Vector{T}(undef, windows)
-    memory   = [Dict{T, Tuple{Float64, T}}() for i in 1:windows]
+    next_pair = [Int[] for i in 1:windows]
+    subtree_err = [Float64[] for i in 1:windows]
+    # memory   = [Dict{T, Tuple{Float64, T}}() for i in 1:windows]
 
     # computational routine
-    best_err = connect_happairs!(sol_path, memory, haplotype_set, λ = λ)
+    best_err = connect_happairs!(sol_path, next_pair, subtree_err, haplotype_set, λ = λ)
 
-    return sol_path, memory, best_err
+    return sol_path, next_pair, subtree_err, best_err
 end
 
 """
@@ -74,49 +76,45 @@ In-place version of `connect_happairs`.
 """
 function connect_happairs!(
     sol_path::Vector{T},
-    memory::Vector{Dict{T, P}},
+    next_pair::Vector{Vector{Int}}, 
+    subtree_err::Vector{Vector{Float64}},
     haplotype_set::Vector{Vector{T}};
     λ::Float64 = 1.0,
-    ) where {T <: Tuple{Int, Int}, P <: Tuple{Float64, T}}
+    ) where T <: Tuple{Int, Int}
 
     windows = length(haplotype_set)
-    empty!.(memory) # reset storage
+
+    # reset storage
+    empty!.(next_pair) 
+    empty!.(subtree_err)
 
     # base case: last window induces no error and connects to nothing
-    @inbounds @simd for pair in haplotype_set[windows]
-        memory[windows][pair] = (0.0, (0, 0))
+    @inbounds for pair in haplotype_set[windows]
+        push!(next_pair[windows], 0)
+        push!(subtree_err[windows], 0.0)
     end
 
     # search for best haplotype pair in each window bottom-up 
     @inbounds for w in Iterators.reverse(1:(windows - 1)), happair in haplotype_set[w]
         # search all pairs in next window
         best_err = Inf
-        best_next_pair = (0, 0)
-        @simd for pair in haplotype_set[w + 1]
-            err = pair_error(happair, pair) + memory[w + 1][pair][1]
+        best_next_pair = 0
+        for (i, pair) in enumerate(haplotype_set[w + 1])
+            err = pair_error(happair, pair) + subtree_err[w + 1][i]
             if err < best_err
                 best_err = err
-                best_next_pair = pair
+                best_next_pair = i
             end
         end
-        memory[w][happair] = (best_err, best_next_pair)
+        push!(subtree_err[w], best_err)
+        push!(next_pair[w], best_next_pair)
     end
 
-    # find best starting point
-    best_err   = Inf
-    best_start = (0, 0) 
-    @inbounds for (key, val) in memory[1]
-        if val[1] < best_err
-            best_start = key
-            best_err   = val[1]
-        end
-    end
-
-    # find best solution path by tracing `memory`
-    sol_path[1] = best_start
-    @inbounds for w in 2:windows
-        prev_pair   = sol_path[w - 1]
-        sol_path[w] = memory[w - 1][prev_pair][2]
+    # find best solution path by forward-tracing
+    best_err, cur_idx = findmin(subtree_err[1])
+    @inbounds for w in 1:windows
+        sol_path[w] = haplotype_set[w][cur_idx]
+        cur_idx = next_pair[w][cur_idx]
     end
 
     return best_err
