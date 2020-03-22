@@ -867,7 +867,7 @@ X = copy(X')
 H = copy(H')
 
 width = 400
-hapset = compute_optimal_halotype_set_prephased(X, H, width=width)
+hapset = compute_optimal_halotype_set(X, H, width=width)
 
 
 
@@ -971,7 +971,8 @@ push!(haplotype_set[4], (8, 6))
 push!(haplotype_set[4], (8, 8))
 haplotype_set
 
-sol_path, memory, best_err = connect_happairs(haplotype_set)
+sol_path, memory, path_err, best_err = connect_happairs(haplotype_set)
+sol_path, memory, best_err = connect_happairs2(haplotype_set)
 
 
 
@@ -986,7 +987,6 @@ using ElasticArrays
 using StatsBase
 
 # generate happairs in windows
-T = Tuple{Int, Int}
 windows = 5
 haplotype_set = [T[] for i in 1:windows]
 
@@ -994,8 +994,21 @@ Random.seed!(2020)
 for w in 1:windows
     haplotype_set[w] = [(rand(1:10), rand(1:10)) for i in 1:rand(1:10)]
 end
-haplotype_set
+push!(haplotype_set[1], (1, 2))
+sol_path, memory, best_err = connect_happairs(haplotype_set)
 
+
+
+# generate happairs in windows
+windows = 10
+T = Tuple{Int, Int}
+haplotype_set = [T[] for i in 1:windows]
+
+Random.seed!(123)
+for w in 1:windows
+    haplotype_set[w] = [(rand(1:10), rand(1:10)) for i in 1:rand(1:10)]
+end
+haplotype_set
 sol_path, memory, best_err = connect_happairs(haplotype_set)
 
 
@@ -1010,4 +1023,268 @@ for w in 1:windows
 end
 haplotype_set
 
-sol_path, memory, best_err = connect_happairs(haplotype_set)
+sol_path1, memory, path_err, best_err = connect_happairs(haplotype_set)#636.229 ms, 61.76 MiB
+sol_path2, memory, best_err = connect_happairs2(haplotype_set) #333.806 ms, 95.85 MiB
+sum(sol_path1 .!= sol_path2) # 89 places different
+
+# vector of sets vs vector of vector of tuples
+using BenchmarkTools
+n = 1000
+T = Tuple{Int, Int}
+@benchmark x = [Set{T}() for i in 1:n] # 4.291 ms, 617.44 KiB
+@benchmark y = [T[] for i in 1:n]      # 72.620 μs, 86.19 KiB
+@benchmark push!($x[1], (1, 2)) # 11.392 ns, 0 bytes
+@benchmark push!($y[1], (1, 2)) # 15.803 ns, 0 bytes
+
+
+function test_push(x)
+    for i in 1:1000
+        push!(x[rand(1:1000)], (rand(1:100000), rand(1:100000)))
+    end
+    return x
+end
+x = [Set{T}() for i in 1:n]
+y = [T[] for i in 1:n]
+@benchmark test_push(x) # 205.370 μs
+@benchmark test_push(y) # 47.175 μs
+
+
+
+
+using Revise
+using VCFTools
+using MendelImpute
+using GeneticVariation
+using Random
+cd("/Users/biona001/.julia/dev/MendelImpute/simulation")
+
+# impute 
+tgtfile = "./compare6/target_masked.vcf.gz"
+reffile = "./compare6/haplo_ref.vcf"
+outfile = "./compare6/imputed_target.vcf.gz"
+width   = 800
+
+H = convert_ht(Float64, reffile)
+X = convert_gt(Float64, tgtfile)
+X = copy(X')
+H = copy(H')
+hapset = compute_optimal_halotype_set(X, H, width = width)
+
+# hapset[1][1]
+@time sol_path, memory, path_err, best_err = connect_happairs(hapset[1]); # 0.077636 seconds (201 allocations: 676.344 KiB)
+@time sol_path, memory, best_err = connect_happairs2(hapset[1]); # 0.039125 seconds (209 allocations: 1.071 MiB)
+
+
+@time hs, ph = phase(tgtfile, reffile, impute=true, outfile = outfile, width = width);
+
+# import imputed result and compare with true
+X_complete  = convert_gt(Float32, "./compare6/target.vcf.gz"; as_minorallele=false);
+X_mendel = convert_gt(Float32, outfile, as_minorallele=false);
+n, p = size(X_mendel)
+error_rate = sum(X_mendel .!= X_complete) / n / p
+
+# not searching breakpoints (w = 400):
+# 3462.416399 seconds (77.81 G allocations: 3.402 TiB, 12.66% gc time)
+# error = 0.00037152087475149104
+
+# searching only 1 strand's bkpt (w = 800): 
+# 35.990546 seconds (98.16 M allocations: 9.233 GiB, 3.80% gc time)
+# error = 0.0005958889520022721
+
+# searching both strand's bkpt (w = 800)
+# 167.675135 seconds (98.00 M allocations: 9.224 GiB, 0.75% gc time)
+# error = 0.0002344859414938938
+
+
+
+# different haplopair! strategy:
+# keep best pair only (orignal code): error = 0.00025205907412666857, 187.475166 sec
+# keep all happairs that are equally good: error = 0.0002509940357852883, 183.600139 sec 
+# keep top 10 haplotype pairs: 0.0003010508378301619, 175.682698 sec
+# keep all previous best pairs: error = 0.00023839108207895484, 186.741630 sec
+# keep all previous best pairs and equally good pairs: 0.0002378585629082647, 189.419958 sec
+
+
+using Revise
+using VCFTools
+using MendelImpute
+using GeneticVariation
+using Random
+cd("/Users/biona001/.julia/dev/MendelImpute/simulation")
+
+# impute 
+tgtfile = "./compare6/target_masked.vcf.gz"
+reffile = "./compare6/haplo_ref.vcf"
+outfile = "./compare6/imputed_target.vcf.gz"
+width   = 800
+
+@time hs, ph = phase(tgtfile, reffile, impute=true, outfile = outfile, width = width);
+
+# import imputed result and compare with true
+X_complete  = convert_gt(Float32, "./compare6/target.vcf.gz"; as_minorallele=false);
+X_mendel = convert_gt(Float32, outfile, as_minorallele=false);
+n, p = size(X_mendel);
+error_rate = sum(X_mendel .!= X_complete) / n / p
+
+# print one person's error in each window
+windows = floor(Int, p / width)
+person = 3
+for w in 1:windows
+    win_range = ((w - 1) * width + 1):(w * width)
+    error_rate = sum(X_complete[person, win_range] .!= X_mendel[person, win_range]) / length(win_range)
+    println("person $person window $w = $win_range has error = $error_rate")
+end
+tot_error = sum(X_complete[person, :] .!= X_mendel[person, :]) / p
+
+# calculate error for 1 window in 1 person skipmissing
+x = X[5601:6400, 1]
+h1 = H[5601:6400, 1165]
+h2 = H[5601:6400, 542]
+function run()
+    errors = 0
+    for pos in 1:n
+        if !ismissing(x[pos])
+            errors += x[pos] ≠ h1[pos] + h2[pos]
+        end
+    end
+    println(errors)
+end
+run()
+
+# print error for everybody
+for person in 1:people
+    error_rate = sum(X_complete[person, :] .!= X_mendel[person, :]) / p
+    println("person $person error = $error_rate")
+end
+
+
+
+
+######## try to make dynamic programming efficient
+
+# profile mamory usage
+julia --track-allocation=user
+
+using Revise
+using VCFTools
+using MendelImpute
+using GeneticVariation
+using Random
+using Profile
+using BenchmarkTools
+
+cd("/Users/biona001/.julia/dev/MendelImpute/simulation")
+tgtfile = "./compare6/target_masked.vcf.gz"
+reffile = "./compare6/haplo_ref.vcf"
+outfile = "./compare6/imputed_target.vcf.gz"
+width   = 800
+
+H = convert_ht(Float64, reffile)
+X = convert_gt(Float64, tgtfile)
+X = copy(X')
+H = copy(H')
+hapset = compute_optimal_halotype_set(X, H, width = width)
+
+T = Tuple{Int, Int}
+windows  = length(hapset[3])
+mymemory = [Dict{Tuple{Int, Int}, Tuple{Float64, T}}() for i in 1:windows]
+sol_path = Vector{Tuple{Int, Int}}(undef, windows)
+path_err = [Inf for i in 1:windows]
+@time MendelImpute.connect_happairs!(sol_path, mymemory, hapset[3]);
+# 0.138682 seconds (6 allocations: 400 bytes)
+
+@benchmark MendelImpute.connect_happairs!(sol_path, mymemory, hapset[3])
+  # memory estimate:  240 bytes
+  # allocs estimate:  2
+  # --------------
+  # minimum time:     108.139 ms (0.00% GC)
+  # median time:      109.708 ms (0.00% GC)
+  # mean time:        110.641 ms (0.00% GC)
+  # maximum time:     123.022 ms (0.00% GC)
+  # --------------
+  # samples:          46
+  # evals/sample:     1
+
+Profile.clear_malloc_data()
+MendelImpute.connect_happairs!(hapset[3], memory=mymemory, sol_path=sol_path, path_err=path_err);
+
+
+
+# test if adding/looking up dictionaries is efficient
+function mytest()
+    mydict = [Dict{Tuple{Int, Int}, Float64}() for i in 1:length(hapset[3])]
+    
+    my_arbitrary_sum = 0.0
+    for i in 1:length(hapset[3])
+        # add to dictionaries
+        num = length(hapset[3][i])
+        for n in 1:num
+            mydict[i][(rand(1:100), rand(1:100))] = rand() # add arbitrary pair
+        end
+
+        # lookup a bunch of times
+        for n in 1:num
+            pair = (rand(1:100), rand(1:100))
+            if haskey(mydict[i], pair)
+                my_arbitrary_sum += pair[1] + pair[2]
+            end
+        end
+    end
+
+    return mydict, my_arbitrary_sum
+end
+mydict, my_arbitrary_sum = mytest()
+@benchmark mytest() # 2.728 ms, 2.58 MiB
+
+
+
+# profile mamory usage
+julia --track-allocation=user
+
+using Revise
+using VCFTools
+using MendelImpute
+using GeneticVariation
+using BenchmarkTools
+using Random
+using Profile
+
+cd("/Users/biona001/.julia/dev/MendelImpute/simulation")
+tgtfile = "./compare3/target_masked.vcf.gz"
+reffile = "./compare3/haplo_ref.vcf.gz"
+outfile = "./compare3/imputed_target.vcf.gz"
+width   = 400
+
+@time hs, ph = phase(tgtfile, reffile, impute=true, outfile = outfile, width = width);
+
+Profile.clear_malloc_data()
+hs, ph = phase(tgtfile, reffile, impute=true, outfile = outfile, width = width);
+
+
+
+
+
+using Revise
+using VCFTools
+using MendelImpute
+using GeneticVariation
+using Random
+using Profile
+
+cd("/Users/biona001/.julia/dev/MendelImpute/simulation")
+tgtfile = "./compare6/target_masked.vcf.gz"
+reffile = "./compare6/haplo_ref.vcf"
+outfile = "./compare6/imputed_target.vcf.gz"
+width   = 800
+
+H = convert_ht(Float64, reffile)
+X = convert_gt(Float64, tgtfile)
+X = copy(X')
+H = copy(H')
+hapset = compute_optimal_halotype_set(X, H, width = width);
+
+@time ph = phase(X, H, hapset=hapset, width=width);
+# 170.842336 seconds (30.75 k allocations: 14.574 MiB, 0.09% gc time)
+# total = 2915200 pairs of integers = 46MB, so above memory usage is reasonable
+
+@time hs, ph = phase(tgtfile, reffile, impute=true, outfile = outfile, width = width);
