@@ -1011,6 +1011,17 @@ end
 haplotype_set
 sol_path, memory, best_err = connect_happairs(haplotype_set)
 
+# try another 10window test
+windows = 10
+T = Tuple{Int, Int}
+haplotype_set = [T[] for i in 1:windows]
+Random.seed!(321)
+for w in 1:windows
+    haplotype_set[w] = [(rand(1:10), rand(1:10)) for i in 1:rand(1:10)]
+end
+haplotype_set
+sol_path, memory, best_err = connect_happairs(haplotype_set)
+
 
 
 # generate happairs in windows
