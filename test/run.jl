@@ -1283,7 +1283,6 @@ H = copy(H')
 hapset = compute_optimal_halotype_set(X, H, width = width);
 
 @time ph = phase(X, H, hapset=hapset, width=width);
-# 170.842336 seconds (30.75 k allocations: 14.574 MiB, 0.09% gc time)
-# total = 2915200 pairs of integers = 46MB, so above memory usage is reasonable
+# 128.425430 seconds (1.34 M allocations: 69.787 MiB)
 
 @time hs, ph = phase(tgtfile, reffile, impute=true, outfile = outfile, width = width);
