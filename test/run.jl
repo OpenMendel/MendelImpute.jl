@@ -1008,7 +1008,7 @@ for w in 1:windows
     haplotype_set[w] = [(rand(1:10), rand(1:10)) for i in 1:rand(1:10)]
 end
 haplotype_set
-sol_path, memory, best_err = connect_happairs(haplotype_set)
+sol_path, next_pair, subtree_err, best_err = connect_happairs(haplotype_set)
 
 
 
