@@ -42,7 +42,7 @@ function phase(
     if prephased
         ph = phase_prephased(X, H, hapset=hs, width=width, flankwidth=flankwidth)
     elseif fast_method
-        ph = phase_fast(X, H, hapset = hs, width = width, verbose = false, flankwidth=flankwidth, fast_method=fast_method)
+        ph = phase_fast(X, H, hapset = hs, width = width, verbose = false, flankwidth=flankwidth)
     else
         ph = phase(X, H, hapset = hs, width = width, verbose = false, flankwidth=flankwidth, fast_method=fast_method)
     end
@@ -115,7 +115,7 @@ function phase(
     ) where T <: Real
 
     if fast_method
-        return phase_fast(X, H, hapset = hapset, width = width, verbose = false, flankwidth=flankwidth, fast_method=fast_method)
+        return phase_fast(X, H, hapset = hapset, width = width, verbose = false, flankwidth=flankwidth)
     end
 
     # declare some constants
@@ -196,7 +196,6 @@ function phase_fast(
     flankwidth::Int = round(Int, 0.1width),
     verbose::Bool = true,
     Xtrue::Union{AbstractMatrix, Nothing} = nothing, # for testing
-    fast_method::Bool = false
     ) where T <: Real
 
     # declare some constants
@@ -206,7 +205,7 @@ function phase_fast(
 
     # compute redundant haplotype sets using least squares criteria
     if isnothing(hapset)
-        hapset = compute_optimal_halotype_set(X, H, width=width, verbose=verbose, prephased=false, Xtrue=Xtrue, fast_method=fast_method)
+        hapset = compute_optimal_halotype_set(X, H, width=width, verbose=verbose, prephased=false, Xtrue=Xtrue, fast_method=true)
     end
 
     # allocate working arrays
@@ -297,6 +296,7 @@ function phase_fast(
     # end
 
     # phase window 1
+    pmeter = Progress(people, 1, "Merging breakpoints...")
     for i in 1:people
         hap1 = findfirst(hapset[i].strand1[1]) :: Int64
         hap2 = findfirst(hapset[i].strand2[1]) :: Int64
@@ -305,9 +305,9 @@ function phase_fast(
         push!(phase[i].strand2.start, 1)
         push!(phase[i].strand2.haplotypelabel, hap2)
     end
+    next!(pmeter)
 
     # find optimal break points and record info to phase. 
-    pmeter = Progress(people, 1, "Merging breakpoints...")
     strand1_intersect = chain_next[1]
     strand2_intersect = chain_next[2]
     @inbounds for w in 2:windows
@@ -315,7 +315,7 @@ function phase_fast(
         for i in 1:people
             strand1_intersect .= hapset[i].strand1[w - 1] .& hapset[i].strand1[w]
             strand2_intersect .= hapset[i].strand2[w - 1] .& hapset[i].strand2[w]
-            if sum(strand1_intersect) == 0 && sum(strand2_intersect) == 0 && !fast_method
+            if sum(strand1_intersect) == 0 && sum(strand2_intersect) == 0
                 Xi = view(X, ((w - 2) * width + 1):(w * width), i)
                 s1_prev = phase[i].strand1.haplotypelabel[end]
                 s2_prev = phase[i].strand2.haplotypelabel[end]
@@ -369,8 +369,8 @@ function phase_fast(
                     push!(phase[i].strand2.haplotypelabel, best_s2_next)
                 end
             end
-            next!(pmeter) #update progress
         end
+        next!(pmeter) #update progress
     end
 
     return phase 

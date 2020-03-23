@@ -24,7 +24,7 @@ function pair_error(pair1::T, pair2::T; λ::Real = 1.0) where T <: Tuple{Int, In
     #  X
     # c d
     crossover_diff = (pair1[1] != pair2[2]) + (pair1[2] != pair2[1])
-    return λ * min(parallel_diff, crossover_diff)
+    return λ * abs2(min(parallel_diff, crossover_diff))
 end
 
 """
