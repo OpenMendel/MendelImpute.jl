@@ -971,8 +971,7 @@ push!(haplotype_set[4], (8, 6))
 push!(haplotype_set[4], (8, 8))
 haplotype_set
 
-sol_path, memory, path_err, best_err = connect_happairs(haplotype_set)
-sol_path, memory, best_err = connect_happairs2(haplotype_set)
+sol_path, next_pair, subtree_err, best_err = connect_happairs(haplotype_set)
 
 
 
@@ -987,6 +986,7 @@ using ElasticArrays
 using StatsBase
 
 # generate happairs in windows
+T = Tuple{Int, Int}
 windows = 5
 haplotype_set = [T[] for i in 1:windows]
 
@@ -994,8 +994,7 @@ Random.seed!(2020)
 for w in 1:windows
     haplotype_set[w] = [(rand(1:10), rand(1:10)) for i in 1:rand(1:10)]
 end
-push!(haplotype_set[1], (1, 2))
-sol_path, memory, best_err = connect_happairs(haplotype_set)
+sol_path, next_pair, subtree_err, best_err = connect_happairs(haplotype_set)
 
 
 
@@ -1009,7 +1008,7 @@ for w in 1:windows
     haplotype_set[w] = [(rand(1:10), rand(1:10)) for i in 1:rand(1:10)]
 end
 haplotype_set
-sol_path, memory, best_err = connect_happairs(haplotype_set)
+sol_path, next_pair, subtree_err, best_err = connect_happairs(haplotype_set)
 
 # try another 10window test
 windows = 10
@@ -1198,23 +1197,23 @@ hapset = compute_optimal_halotype_set(X, H, width = width)
 
 T = Tuple{Int, Int}
 windows  = length(hapset[3])
-mymemory = [Dict{Tuple{Int, Int}, Tuple{Float64, T}}() for i in 1:windows]
 sol_path = Vector{Tuple{Int, Int}}(undef, windows)
-path_err = [Inf for i in 1:windows]
-@time MendelImpute.connect_happairs!(sol_path, mymemory, hapset[3]);
-# 0.138682 seconds (6 allocations: 400 bytes)
+next_pair = [Int[] for i in 1:windows]
+subtree_err = [Float64[] for i in 1:windows]
+@time MendelImpute.connect_happairs!(sol_path, next_pair, subtree_err, hapset[3]);
+# 0.019480 seconds (7 allocations: 624 bytes)
 
-@benchmark MendelImpute.connect_happairs!(sol_path, mymemory, hapset[3])
-  # memory estimate:  240 bytes
-  # allocs estimate:  2
-  # --------------
-  # minimum time:     108.139 ms (0.00% GC)
-  # median time:      109.708 ms (0.00% GC)
-  # mean time:        110.641 ms (0.00% GC)
-  # maximum time:     123.022 ms (0.00% GC)
-  # --------------
-  # samples:          46
-  # evals/sample:     1
+@benchmark MendelImpute.connect_happairs!(sol_path, next_pair, subtree_err, hapset[3])
+#   memory estimate:  464 bytes
+#   allocs estimate:  3
+#   --------------
+#   minimum time:     11.387 ms (0.00% GC)
+#   median time:      12.320 ms (0.00% GC)
+#   mean time:        12.805 ms (0.00% GC)
+#   maximum time:     28.351 ms (0.00% GC)
+#   --------------
+#   samples:          391
+#   evals/sample:     1
 
 Profile.clear_malloc_data()
 MendelImpute.connect_happairs!(hapset[3], memory=mymemory, sol_path=sol_path, path_err=path_err);
@@ -1295,7 +1294,6 @@ H = copy(H')
 hapset = compute_optimal_halotype_set(X, H, width = width);
 
 @time ph = phase(X, H, hapset=hapset, width=width);
-# 170.842336 seconds (30.75 k allocations: 14.574 MiB, 0.09% gc time)
-# total = 2915200 pairs of integers = 46MB, so above memory usage is reasonable
+# 128.425430 seconds (1.34 M allocations: 69.787 MiB)
 
 @time hs, ph = phase(tgtfile, reffile, impute=true, outfile = outfile, width = width);

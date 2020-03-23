@@ -115,7 +115,7 @@ function phase(
     ) where T <: Real
 
     if fast_method
-        return phase_fast(X, H, hapset = hapset, width = width, verbose = false, flankwidth=flankwidth, fast_method=fast_method)
+        return phase_fast(X, H, hapset = hapset, width = width, verbose = false, flankwidth=flankwidth)
     end
 
     # declare some constants
@@ -132,8 +132,9 @@ function phase(
     Tu       = Tuple{Int, Int}
     Pu       = Tuple{Float64, Tu}
     phase    = [HaplotypeMosaicPair(snps) for i in 1:people]
-    memory   = [Dict{Tu, Pu}() for i in 1:windows]
     sol_path = Vector{Tuple{Int, Int}}(undef, windows)
+    nxt_pair = [Int[] for i in 1:windows]
+    tree_err = [Float64[] for i in 1:windows]
     pmeter   = Progress(people, 5, "Imputing samples...")
 
     # loop over each person
@@ -141,7 +142,7 @@ function phase(
         verbose && @info "imputing person $i"
 
         # first find optimal haplotype pair in each window using dynamic programming
-        connect_happairs!(sol_path, memory, hapset[i], λ = 1.0)
+        connect_happairs!(sol_path, nxt_pair, tree_err, hapset[i], λ = 1.0)
 
         # phase first window 
         push!(phase[i].strand1.start, 1)
@@ -204,7 +205,7 @@ function phase_fast(
 
     # compute redundant haplotype sets using least squares criteria
     if isnothing(hapset)
-        hapset = compute_optimal_halotype_set(X, H, width=width, verbose=verbose, prephased=false, Xtrue=Xtrue, fast_method=fast_method)
+        hapset = compute_optimal_halotype_set(X, H, width=width, verbose=verbose, prephased=false, Xtrue=Xtrue, fast_method=true)
     end
 
     # allocate working arrays
@@ -282,6 +283,17 @@ function phase_fast(
             hapset[i].strand2[ww] .= haplo_chain[2][i]
         end
     end
+
+    # phase without searching for breakpoints
+    # for w in 1:windows, i in 1:people
+    #     hap1 = findfirst(hapset[i].strand1[w]) :: Int64
+    #     hap2 = findfirst(hapset[i].strand2[w]) :: Int64
+    #     cur_start = (w - 1) * width + 1
+    #     push!(phase[i].strand1.start, cur_start)
+    #     push!(phase[i].strand1.haplotypelabel, hap1)
+    #     push!(phase[i].strand2.start, cur_start)
+    #     push!(phase[i].strand2.haplotypelabel, hap2)
+    # end
 
     # phase window 1
     pmeter = Progress(windows, 1, "Merging breakpoints...")
