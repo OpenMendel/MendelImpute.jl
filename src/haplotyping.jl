@@ -23,19 +23,17 @@ function phase(
     flankwidth::Int = round(Int, 0.1width),
     fast_method::Bool = false
     )
-    @info "Importing data..."
-
-    # convert vcf files to numeric matrices (need a routine so it does this transposed)
-    H = convert_ht(Float32, reffile)
     if prephased
-        X = convert_ht(Float32, tgtfile, has_missing=true)
-    else
-        X = convert_gt(Float32, tgtfile)
+        error("currently not supporting pre-phased option. Please set prephase = false and try again.")
+        # X = convert_ht(Float32, tgtfile, has_missing=true)        
     end
 
+    # convert vcf files to numeric matrices
+    @info "Importing data..."
+    X = convert_gt(Float32, tgtfile, trans=true)
+    H = convert_ht(Float32, reffile, trans=true)
+
     # compute redundant haplotype sets. 
-    X = copy(X')
-    H = copy(H')
     hs = compute_optimal_halotype_set(X, H, width = width, prephased = prephased, flankwidth=flankwidth, fast_method=fast_method)
 
     # phasing (haplotyping)
@@ -44,7 +42,7 @@ function phase(
     elseif fast_method
         ph = phase_fast(X, H, hapset = hs, width = width, verbose = false, flankwidth=flankwidth)
     else
-        ph = phase(X, H, hapset = hs, width = width, verbose = false, flankwidth=flankwidth, fast_method=fast_method)
+        ph = phase(X, H, hapset = hs, width = width, verbose = false, flankwidth=flankwidth, fast_method=false)
     end
 
     if impute

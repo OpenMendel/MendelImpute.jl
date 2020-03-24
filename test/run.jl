@@ -1189,10 +1189,8 @@ reffile = "./compare6/haplo_ref.vcf"
 outfile = "./compare6/imputed_target.vcf.gz"
 width   = 800
 
-H = convert_ht(Float64, reffile)
-X = convert_gt(Float64, tgtfile)
-X = copy(X')
-H = copy(H')
+H = convert_ht(Float64, reffile, trans=true)
+X = convert_gt(Float64, tgtfile, trans=true)
 hapset = compute_optimal_halotype_set(X, H, width = width)
 
 T = Tuple{Int, Int}
@@ -1287,10 +1285,8 @@ reffile = "./compare6/haplo_ref.vcf"
 outfile = "./compare6/imputed_target.vcf.gz"
 width   = 800
 
-H = convert_ht(Float64, reffile)
-X = convert_gt(Float64, tgtfile)
-X = copy(X')
-H = copy(H')
+H = convert_ht(Float64, reffile, trans=true)
+X = convert_gt(Float64, tgtfile, trans=true)
 hapset = compute_optimal_halotype_set(X, H, width = width);
 
 @time ph = phase(X, H, hapset=hapset, width=width);
