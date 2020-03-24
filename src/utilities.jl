@@ -899,12 +899,12 @@ function search_breakpoint(
                 errors += X[pos] ≠ H[pos, s1[2]] + H[pos, s2[2]]
             end
         end
-        if errors < err_optim
+        if errors :: Int < err_optim
             err_optim = errors
             bkpts_optim = (bkpt1, 0)
 
             # quick return if perfect match
-            err_optim == 0 && return bkpts_optim, err_optim
+            err_optim == 0 && return bkpts_optim, err_optim :: Int
         end
 
         # extend haplotype H[:, s2[1]] position by position
@@ -912,7 +912,7 @@ function search_breakpoint(
             if !ismissing(X[bkpt2])
                 errors -= X[bkpt2] ≠ H[bkpt2, s1[1]] + H[bkpt2, s2[2]]
                 errors += X[bkpt2] ≠ H[bkpt2, s1[1]] + H[bkpt2, s2[1]]
-                if errors < err_optim
+                if errors :: Int < err_optim
                     err_optim = errors
                     bkpts_optim = (bkpt1, bkpt2)
                 end
@@ -922,15 +922,15 @@ function search_breakpoint(
             if !ismissing(X[bkpt2])
                 errors -= X[bkpt2] ≠ H[bkpt2, s1[2]] + H[bkpt2, s2[2]]
                 errors += X[bkpt2] ≠ H[bkpt2, s1[2]] + H[bkpt2, s2[1]]
-                if errors < err_optim
+                if errors :: Int < err_optim
                     err_optim = errors
                     bkpts_optim = (bkpt1, bkpt2)
                     # quick return if perfect match
-                    err_optim == 0 && return bkpts_optim, err_optim
+                    err_optim == 0 && return bkpts_optim, err_optim :: Int
                 end
             end
         end
     end
 
-    return bkpts_optim, err_optim
+    return bkpts_optim, err_optim :: Int
 end
