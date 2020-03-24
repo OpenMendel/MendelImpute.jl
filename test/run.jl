@@ -1412,6 +1412,7 @@ Hi = @view(H[1:2width, :])
 @code_warntype search_breakpoint(Xi, Hi, (1, 3), (4, 5))
 
 @time search_breakpoint(Xi, Hi, (1, 3), (4, 5)) # 0.018376 seconds (7 allocations: 256 bytes)
+@time search_breakpoint(Xi, Hi, 1, (4, 5))      # 0.000036 seconds (6 allocations: 224 bytes)
 
 @benchmark search_breakpoint(Xi, Hi, (1, 3), (4, 5)) # 11.500 ms, 32 bytes, 1 alloc
 

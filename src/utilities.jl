@@ -828,8 +828,6 @@ end
 Find the optimal break point between s2[1] and s2[2] in configuration
 s1 | s2[1]
 s1 | s2[2]
-
-TODO: there is type instability with this function (called in unit tests)
 """
 function search_breakpoint(
     X::AbstractVector,
@@ -856,7 +854,7 @@ function search_breakpoint(
         if !ismissing(X[bkpt]) && H[bkpt, s2[1]] ≠ H[bkpt, s2[2]]
             errors -= X[bkpt] ≠ H[bkpt, s1] + H[bkpt, s2[2]]
             errors += X[bkpt] ≠ H[bkpt, s1] + H[bkpt, s2[1]]
-            if errors < err_optim
+            if errors :: Int < err_optim
                 bkpt_optim, err_optim = bkpt, errors
                 # quick return if perfect match
                 err_optim == 0 && return bkpt_optim, err_optim :: Int
