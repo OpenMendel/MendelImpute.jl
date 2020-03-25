@@ -130,55 +130,56 @@ function phase(
     Tu       = Tuple{Int, Int}
     Pu       = Tuple{Float64, Tu}
     phase    = [HaplotypeMosaicPair(snps) for i in 1:people]
-    sol_path = Vector{Tuple{Int, Int}}(undef, windows)
-    nxt_pair = [Int[] for i in 1:windows]
-    tree_err = [Float64[] for i in 1:windows]
+    sol_path = [Vector{Tuple{Int, Int}}(undef, windows) for i in 1:Threads.nthreads()]
+    nxt_pair = [[Int[] for i in 1:windows] for i in 1:Threads.nthreads()]
+    tree_err = [[Float64[] for i in 1:windows] for i in 1:Threads.nthreads()]
     pmeter   = Progress(people, 5, "Imputing samples...")
 
     # loop over each person
-    for i in 1:people
+    Threads.@threads for i in 1:people
         verbose && @info "imputing person $i"
 
         # first find optimal haplotype pair in each window using dynamic programming
-        connect_happairs!(sol_path, nxt_pair, tree_err, hapset[i], λ = 1.0)
+        id = Threads.threadid()
+        connect_happairs!(sol_path[id], nxt_pair[id], tree_err[id], hapset[i], λ = 1.0)
 
         # phase first window 
         push!(phase[i].strand1.start, 1)
-        push!(phase[i].strand1.haplotypelabel, sol_path[1][1])
+        push!(phase[i].strand1.haplotypelabel, sol_path[id][1][1])
         push!(phase[i].strand2.start, 1)
-        push!(phase[i].strand2.haplotypelabel, sol_path[1][2])
+        push!(phase[i].strand2.haplotypelabel, sol_path[id][1][2])
 
         # phase middle windows
         for w in 2:(windows - 1)
             Xwi = view(X, ((w - 2) * width + 1):(w * width), i)
             Hw  = view(H, ((w - 2) * width + 1):(w * width), :)
-            sol_path[w], bkpts = continue_haplotype(Xwi, Hw, sol_path[w - 1], sol_path[w])
+            sol_path[id][w], bkpts = continue_haplotype(Xwi, Hw, sol_path[id][w - 1], sol_path[id][w])
 
             # strand 1
             if bkpts[1] > -1 && bkpts[1] < 2width
                 push!(phase[i].strand1.start, (w - 2) * width + 1 + bkpts[1])
-                push!(phase[i].strand1.haplotypelabel, sol_path[w][1])
+                push!(phase[i].strand1.haplotypelabel, sol_path[id][w][1])
             end
             # strand 2
             if bkpts[2] > -1 && bkpts[2] < 2width
                 push!(phase[i].strand2.start, (w - 2) * width + 1 + bkpts[2])
-                push!(phase[i].strand2.haplotypelabel, sol_path[w][2])
+                push!(phase[i].strand2.haplotypelabel, sol_path[id][w][2])
             end
         end
 
         # phase last window
         Xwi = view(X, ((windows - 2) * width + 1):snps, i)
         Hw  = view(H, ((windows - 2) * width + 1):snps, :)
-        sol_path[windows], bkpts = continue_haplotype(Xwi, Hw, sol_path[windows - 1], sol_path[windows])
+        sol_path[id][windows], bkpts = continue_haplotype(Xwi, Hw, sol_path[id][windows - 1], sol_path[id][windows])
         # strand 1
         if bkpts[1] > -1 && bkpts[1] < 2width
             push!(phase[i].strand1.start, (windows - 2) * width + 1 + bkpts[1])
-            push!(phase[i].strand1.haplotypelabel, sol_path[windows][1])
+            push!(phase[i].strand1.haplotypelabel, sol_path[id][windows][1])
         end
         # strand 2
         if bkpts[2] > -1 && bkpts[2] < 2width
             push!(phase[i].strand2.start, (windows - 2) * width + 1 + bkpts[2])
-            push!(phase[i].strand2.haplotypelabel, sol_path[windows][2])
+            push!(phase[i].strand2.haplotypelabel, sol_path[id][windows][2])
         end
         next!(pmeter) #update progress
     end

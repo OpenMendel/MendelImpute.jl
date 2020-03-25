@@ -1074,10 +1074,8 @@ reffile = "./compare6/haplo_ref.vcf"
 outfile = "./compare6/imputed_target.vcf.gz"
 width   = 800
 
-H = convert_ht(Float64, reffile)
-X = convert_gt(Float64, tgtfile)
-X = copy(X')
-H = copy(H')
+H = convert_ht(Float64, reffile, trans=true)
+X = convert_gt(Float64, tgtfile, trans=true)
 hapset = compute_optimal_halotype_set(X, H, width = width)
 
 # hapset[1][1]
@@ -1088,8 +1086,8 @@ hapset = compute_optimal_halotype_set(X, H, width = width)
 @time hs, ph = phase(tgtfile, reffile, impute=true, outfile = outfile, width = width);
 
 # import imputed result and compare with true
-X_complete  = convert_gt(Float32, "./compare6/target.vcf.gz"; as_minorallele=false);
-X_mendel = convert_gt(Float32, outfile, as_minorallele=false);
+X_complete  = convert_gt(Float32, "./compare6/target.vcf.gz");
+X_mendel = convert_gt(Float32, outfile);
 n, p = size(X_mendel)
 error_rate = sum(X_mendel .!= X_complete) / n / p
 
