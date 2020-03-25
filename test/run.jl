@@ -1312,15 +1312,12 @@ outfile = "./compare3/imputed_target.vcf.gz"
 width   = 800
 
 @time hs, ph = phase(tgtfile, reffile, impute=true, outfile = outfile, width = width);
-# overall: 20.296724 seconds (478.56 M allocations: 7.610 GiB, 5.71% gc time)
+# overall: 4.610923 seconds (5.37 M allocations: 517.820 MiB, 1.34% gc time)
 
-
-@time H = convert_ht(Float64, reffile, trans=true); # 0.271169 seconds (3.07 M allocations: 285.923 MiB, 15.66% gc time)
-@time X = convert_gt(Float64, tgtfile, trans=true); # 0.081043 seconds (1.26 M allocations: 114.565 MiB)
-
+@time H = convert_ht(Float32, reffile, trans=true); # 0.271169 seconds (3.07 M allocations: 285.923 MiB, 15.66% gc time)
+@time X = convert_gt(Float32, tgtfile, trans=true); # 0.081043 seconds (1.26 M allocations: 114.565 MiB)
 @time hapset = compute_optimal_halotype_set(X, H, width = width); # 0.318205 seconds (16.74 k allocations: 56.280 MiB)
-@time ph = phase(X, H, hapset = hapset, width = width); # 20.627017 seconds (471.69 M allocations: 7.029 GiB, 5.66% gc time)
-
+@time ph = phase(X, H, hapset = hapset, width = width); # 4.097682 seconds (1.93 k allocations: 118.406 KiB)
 @time write_test(ph, H) # 0.256324 seconds (941.18 k allocations: 99.117 MiB, 7.53% gc time)
 
 function write_test(ph, H)
@@ -1380,9 +1377,10 @@ width   = 800
 @time X = convert_gt(Float64, tgtfile, trans=true); # 0.081043 seconds (1.26 M allocations: 114.565 MiB)
 
 @time hapset = compute_optimal_halotype_set(X, H, width = width); # 0.318205 seconds (16.74 k allocations: 56.280 MiB)
-@time ph = phase(X, H, hapset = hapset, width = width); # 20.627017 seconds (471.69 M allocations: 7.029 GiB, 5.66% gc time)
+@time ph = phase(X, H, hapset = hapset, width = width); # 3.662491 seconds (1.93 k allocations: 118.406 KiB)
+
 Profile.clear_malloc_data()
-ph = phase(X, H, hapset = hapset, width = width); # 20.627017 seconds (471.69 M allocations: 7.029 GiB, 5.66% gc time)
+ph = phase(X, H, hapset = hapset, width = width); # 3.662491 seconds (1.93 k allocations: 118.406 KiB)
 
 
 
@@ -1410,6 +1408,7 @@ width   = 800
 Xi = @view(X[1:2width, 1])
 Hi = @view(H[1:2width, :])
 @code_warntype search_breakpoint(Xi, Hi, (1, 3), (4, 5))
+@code_warntype search_breakpoint(Xi, Hi, 1, (4, 5))
 
 @time search_breakpoint(Xi, Hi, (1, 3), (4, 5)) # 0.018376 seconds (7 allocations: 256 bytes)
 @time search_breakpoint(Xi, Hi, 1, (4, 5))      # 0.000036 seconds (6 allocations: 224 bytes)
@@ -1434,3 +1433,68 @@ function change_tuples()
 end
 
 @time change_tuples()
+
+
+
+
+
+
+using Revise
+using VCFTools
+using MendelImpute
+using GeneticVariation
+using Random
+using Profile
+
+cd("/Users/biona001/.julia/dev/MendelImpute/simulation")
+tgtfile = "target_masked.vcf.gz"
+reffile = "haplo_ref.vcf.gz"
+outfile = "imputed_target.vcf.gz"
+width   = 400
+
+
+# overall
+@time hs, ph = phase(tgtfile, reffile, impute=true, outfile = outfile, width = width);
+# 112.814546 seconds (368.18 M allocations: 34.114 GiB, 4.32% gc time)
+
+@time H = convert_ht(Float32, reffile, trans=true); # 6.059539 seconds (72.59 M allocations: 6.348 GiB, 20.53% gc time)
+@time X = convert_gt(Float32, tgtfile, trans=true); # 9.631285 seconds (144.39 M allocations: 12.666 GiB, 18.29% gc time)
+@time hapset = compute_optimal_halotype_set(X, H, width = width); # 11.368949 seconds (3.23 M allocations: 1.821 GiB, 3.89% gc time)
+@time ph = phase(X, H, hapset=hapset, width=width); # 58.875168 seconds (223.08 k allocations: 36.773 MiB, 0.01% gc time)
+@time write_test(ph, H) # 19.748824 seconds (108.38 M allocations: 12.022 GiB, 8.37% gc time)
+
+
+function write_test(ph, H)
+    reader = VCF.Reader(openvcf(tgtfile, "r"))
+    writer = VCF.Writer(openvcf(outfile, "w"), header(reader))
+
+    # loop over each record
+    for (i, record) in enumerate(reader)
+        gtkey = VCF.findgenokey(record, "GT")
+        if !isnothing(gtkey) 
+            # loop over samples
+            for (j, geno) in enumerate(record.genotype)
+                # if missing = '.' = 0x2e
+                if record.data[geno[gtkey][1]] == 0x2e
+                    #find where snp is located in phase
+                    hap1_position = searchsortedlast(ph[j].strand1.start, i)
+                    hap2_position = searchsortedlast(ph[j].strand2.start, i)
+
+                    #find the correct haplotypes 
+                    hap1 = ph[j].strand1.haplotypelabel[hap1_position]
+                    hap2 = ph[j].strand2.haplotypelabel[hap2_position]
+
+                    # save actual allele to data. "0" (REF) => 0x30, "1" (ALT) => 0x31
+                    a1, a2 = convert(Bool, H[i, hap1]), convert(Bool, H[i, hap2])
+                    record.data[geno[gtkey][1]] = ifelse(a1, 0x31, 0x30)
+                    record.data[geno[gtkey][2]] = 0x7c # phased data has separator '|'
+                    record.data[geno[gtkey][3]] = ifelse(a2, 0x31, 0x30)
+                end
+            end
+        end
+        write(writer, record)
+    end
+
+    # close 
+    flush(writer); close(reader); close(writer)
+end
