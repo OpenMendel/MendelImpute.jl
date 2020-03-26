@@ -1549,3 +1549,10 @@ compress_vcf_to_gz(tgtfile)
 Xgz = convert_gt(Float64, tgtfile * ".gz")
 all(skipmissing(X .== Xgz))
 
+compress_vcf_to_gz("unphase.target_masked.vcf")
+compress_vcf_to_gz("unphase.target_masked.vcf")
+
+
+
+X = convert_gt(Float64, "unphase.target_masked.vcf.gz")
+X2 = convert_gt(Float64, "unphase2.target_masked.vcf.gz")

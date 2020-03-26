@@ -352,34 +352,3 @@ function unphase(
     flush(writer); close(reader); close(writer)
     return nothing
 end
-
-"""
-Given an uncompressed VCF file (file ending in .vcf), outputs a compressed file
-(ending in .vcf.gz). 
-"""
-function compress_vcf_to_gz(
-    tgtfile::AbstractString;
-    outfile::AbstractString = tgtfile * ".gz"
-    )
-
-    if !endswith(tgtfile, ".vcf")
-        error("Input file $tgtfile does not end with '.vcf'! ")
-    end
-
-    # create VCF reader and writer
-    reader = VCF.Reader(openvcf(tgtfile, "r"))
-    writer = VCF.Writer(openvcf(outfile, "w"), header(reader))
-    pmeter = Progress(nrecords(tgtfile), 1, "Creating $outfile...")
-
-    # loop over each record (snp)
-    for (i, record) in enumerate(reader)
-        write(writer, record)
-        next!(pmeter) #update progress
-    end
-
-    # close 
-    flush(writer); close(reader); close(writer)
-    return nothing
-end
-
-
