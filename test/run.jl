@@ -1541,6 +1541,11 @@ using Profile
 cd("/Users/biona001/.julia/dev/MendelImpute/simulation")
 tgtfile = "target_masked.vcf"
 unphase(tgtfile)
+X = convert_gt(Float64, tgtfile)
+X_unphase = convert_gt(Float64, "unphase." * tgtfile)
+all(skipmissing(X .== X_unphase))
 
-
+compress_vcf_to_gz(tgtfile)
+Xgz = convert_gt(Float64, tgtfile * ".gz")
+all(skipmissing(X .== Xgz))
 
