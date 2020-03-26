@@ -28,9 +28,12 @@ function phase(
     end
 
     # convert vcf files to numeric matrices
-    @info "Importing data..."
+    pmeter = Progress(3, 1, "Importing genotype and haplotype files...")
+    next!(pmeter)
     X = convert_gt(Float32, tgtfile, trans=true)
+    next!(pmeter)
     H = convert_ht(Float32, reffile, trans=true)
+    next!(pmeter)
 
     # compute redundant haplotype sets. 
     hs = compute_optimal_halotype_set(X, H, width = width, prephased = prephased, flankwidth=flankwidth, fast_method=fast_method)

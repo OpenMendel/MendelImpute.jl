@@ -1452,7 +1452,7 @@ width   = 400
 
 
 # overall
-@time hs, ph = phase(tgtfile, reffile, impute=true, outfile = outfile, width = width);
+@time hs, ph = phase(tgtfile, reffile, outfile = outfile, width = width);
 # 112.814546 seconds (368.18 M allocations: 34.114 GiB, 4.32% gc time)
 
 @time H = convert_ht(Float32, reffile, trans=true); # 6.059539 seconds (72.59 M allocations: 6.348 GiB, 20.53% gc time)
