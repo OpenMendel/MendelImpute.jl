@@ -311,36 +311,41 @@ function simulate_phased_genotypes(
     return X, hap_mosaics, hap_mosaic_range
 end
 
-# choose 2 haplotypes block by block
-# function simulate_genotypes2(
-#     H::BitArray{2}; 
-#     people::Int = size(H, 2),
-#     block_length::Int64=1447
-#     )
-    
-#     p, d = size(H)
-#     X = zeros(Int, p, people)
-#     blocks = Int(ceil(p / block_length))
+function unphase(
+    tgtfile::AbstractString;
+    outfile::AbstractString = "unphase." * tgtfile
+    )
 
-#     # for each block, sample 2 ` with replacement from the pool of haplotypes
-#     for b in 1:(blocks - 1), i in 1:people
-#         hap1 = rand(1:d)
-#         hap2 = rand(1:d)
-#         block_start = (b - 1) * block_length
-#         for j in 1:block_length
-#             X[block_start + j, i] = H[block_start + j, hap1] + H[block_start + j, hap2]
-#         end
-#     end
+    # create VCF reader and writer
+    reader = VCF.Reader(openvcf(tgtfile, "r"))
+    writer = VCF.Writer(openvcf(outfile, "w"), header(reader))
+    pmeter = Progress(nrecords(tgtfile), 1, "Creating $outfile...")
 
-#     # treat last block separately
-#     for i in 1:people
-#         hap1 = rand(1:d)
-#         hap2 = rand(1:d)
-#         block_start = (blocks - 1) * block_length
-#         for j in 1:(p - block_start)
-#             X[block_start + j, i] = H[block_start + j, hap1] + H[block_start + j, hap2]
-#         end
-#     end
+    # loop over each record (snp)
+    for (i, record) in enumerate(reader)
+        gtkey = VCF.findgenokey(record, "GT")
+        if !isnothing(gtkey) 
+            # loop over samples
+            for (j, geno) in enumerate(record.genotype)
+                # unphased data has separator '/'
+                record.data[geno[gtkey][2]] = 0x2f 
 
-#     return X
-# end
+                # change heterozygotes to 1/0
+                a1 = record.data[geno[gtkey][1]]
+                a2 = record.data[geno[gtkey][3]]
+                if (a1 == 0x30 && a2 != 0x30) || (a1 != 0x30 && a2 == 0x30)
+                    #"0" (REF) => 0x30, "1" (ALT) => 0x31
+                    record.data[geno[gtkey][1]] = 0x31
+                    record.data[geno[gtkey][3]] = 0x30
+                end
+            end
+        end
+        write(writer, record)
+        next!(pmeter) #update progress
+    end
+
+    # close 
+    flush(writer); close(reader); close(writer)
+    return nothing
+end
+

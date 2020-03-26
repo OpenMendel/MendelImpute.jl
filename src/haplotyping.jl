@@ -54,7 +54,6 @@ function phase(
 
     # loop over each record (snp)
     snps, people = size(X, 1), size(X, 2)
-    cur_snp = [(ones(snps), ones(snps)) for i in 1:people]
     for (i, record) in enumerate(reader)
         gtkey = VCF.findgenokey(record, "GT")
         if !isnothing(gtkey) 
@@ -77,9 +76,6 @@ function phase(
                     record.data[geno[gtkey][3]] = ifelse(a2, 0x31, 0x30)
                 end
             end
-
-            # update snp position
-            cur_snp[j]
         end
         write(writer, record)
         next!(pmeter) #update progress

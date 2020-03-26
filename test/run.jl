@@ -1522,3 +1522,25 @@ function write_test2(ph, H)
     flush(writer); close(reader); close(writer)
 end
 
+
+
+# phase genotype data with beagle 4.1
+java -Xss5m -Xmx10g -jar beagle.27Jan18.7e1.jar gt=../AFRped_tgtunphased.vcf ref=../AFRped_ref.vcf niterations=0 out=AFRped_tgtphased
+
+
+
+
+
+using Revise
+using VCFTools
+using MendelImpute
+using GeneticVariation
+using Random
+using Profile
+
+cd("/Users/biona001/.julia/dev/MendelImpute/simulation")
+tgtfile = "target_masked.vcf"
+unphase(tgtfile)
+
+
+
