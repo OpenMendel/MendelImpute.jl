@@ -1460,7 +1460,7 @@ width   = 400
 @time hapset = compute_optimal_halotype_set(X, H, width = width); # 11.368949 seconds (3.23 M allocations: 1.821 GiB, 3.89% gc time)
 @time ph = phase(X, H, hapset=hapset, width=width); # 58.875168 seconds (223.08 k allocations: 36.773 MiB, 0.01% gc time)
 @time write_test(ph, H) # 19.748824 seconds (108.38 M allocations: 12.022 GiB, 8.37% gc time)
-
+@time write_test2(ph, H) # 19.439188 seconds (108.38 M allocations: 12.022 GiB, 8.27% gc time)
 
 function write_test(ph, H)
     reader = VCF.Reader(openvcf(tgtfile, "r"))
@@ -1496,3 +1496,29 @@ function write_test(ph, H)
     # close 
     flush(writer); close(reader); close(writer)
 end
+
+function write_test2(ph, H)
+    reader = VCF.Reader(openvcf(tgtfile, "r"))
+    writer = VCF.Writer(openvcf(outfile, "w"), header(reader))
+
+    # loop over each record
+    for (i, record) in enumerate(reader)
+        gtkey = VCF.findgenokey(record, "GT")
+        if !isnothing(gtkey) 
+            # loop over samples
+            for (j, geno) in enumerate(record.genotype)
+                # if missing = '.' = 0x2e
+                if record.data[geno[gtkey][1]] == 0x2e
+                    record.data[geno[gtkey][1]] = 0x31
+                    record.data[geno[gtkey][2]] = 0x7c # phased data has separator '|'
+                    record.data[geno[gtkey][3]] = 0x31
+                end
+            end
+        end
+        write(writer, record)
+    end
+
+    # close 
+    flush(writer); close(reader); close(writer)
+end
+

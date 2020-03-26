@@ -16,12 +16,11 @@ imputation after phasing and window width is 700.
 function phase(
     tgtfile::AbstractString,
     reffile::AbstractString;
-    impute::Bool = true,
-    prephased::Bool=false,
     outfile::AbstractString = "imputed." * tgtfile,
     width::Int = 400,
     flankwidth::Int = round(Int, 0.1width),
-    fast_method::Bool = false
+    fast_method::Bool = false,
+    prephased::Bool=false,
     )
     if prephased
         error("currently not supporting pre-phased option. Please set prephase = false and try again.")
@@ -45,46 +44,46 @@ function phase(
         ph = phase(X, H, hapset = hs, width = width, verbose = false, flankwidth=flankwidth, fast_method=false)
     end
 
-    if impute
-        # imputation without changing known entries
-        # impute2!(X, H, ph)
+    # create VCF reader and writer
+    reader = VCF.Reader(openvcf(tgtfile, "r"))
+    writer = VCF.Writer(openvcf(outfile, "w"), header(reader))
+    pmeter = Progress(nrecords(tgtfile), 1, "Writing to file...")
 
-        # create VCF reader and writer
-        reader = VCF.Reader(openvcf(tgtfile, "r"))
-        writer = VCF.Writer(openvcf(outfile, "w"), header(reader))
-        pmeter = Progress(nrecords(tgtfile), 1, "Writing to file...")
+    # loop over each record (snp)
+    snps, people = size(X, 1), size(X, 2)
+    cur_snp = [(ones(snps), ones(snps)) for i in 1:people]
+    for (i, record) in enumerate(reader)
+        gtkey = VCF.findgenokey(record, "GT")
+        if !isnothing(gtkey) 
+            # loop over samples
+            for (j, geno) in enumerate(record.genotype)
+                # if missing = '.' = 0x2e
+                if record.data[geno[gtkey][1]] == 0x2e
+                    #find where snp is located in phase
+                    hap1_position = searchsortedlast(ph[j].strand1.start, i)
+                    hap2_position = searchsortedlast(ph[j].strand2.start, i)
 
-        # loop over each record
-        for (i, record) in enumerate(reader)
-            gtkey = VCF.findgenokey(record, "GT")
-            if !isnothing(gtkey) 
-                # loop over samples
-                for (j, geno) in enumerate(record.genotype)
-                    # if missing = '.' = 0x2e
-                    if record.data[geno[gtkey][1]] == 0x2e
-                        #find where snp is located in phase
-                        hap1_position = searchsortedlast(ph[j].strand1.start, i)
-                        hap2_position = searchsortedlast(ph[j].strand2.start, i)
+                    #find the correct haplotypes 
+                    hap1 = ph[j].strand1.haplotypelabel[hap1_position]
+                    hap2 = ph[j].strand2.haplotypelabel[hap2_position]
 
-                        #find the correct haplotypes 
-                        hap1 = ph[j].strand1.haplotypelabel[hap1_position]
-                        hap2 = ph[j].strand2.haplotypelabel[hap2_position]
-
-                        # save actual allele to data. "0" (REF) => 0x30, "1" (ALT) => 0x31
-                        a1, a2 = convert(Bool, H[i, hap1]), convert(Bool, H[i, hap2])
-                        record.data[geno[gtkey][1]] = ifelse(a1, 0x31, 0x30)
-                        record.data[geno[gtkey][2]] = 0x7c # phased data has separator '|'
-                        record.data[geno[gtkey][3]] = ifelse(a2, 0x31, 0x30)
-                    end
+                    # save actual allele to data. "0" (REF) => 0x30, "1" (ALT) => 0x31
+                    a1, a2 = convert(Bool, H[i, hap1]), convert(Bool, H[i, hap2])
+                    record.data[geno[gtkey][1]] = ifelse(a1, 0x31, 0x30)
+                    record.data[geno[gtkey][2]] = 0x7c # phased data has separator '|'
+                    record.data[geno[gtkey][3]] = ifelse(a2, 0x31, 0x30)
                 end
             end
-            write(writer, record)
-            next!(pmeter) #update progress
-        end
 
-        # close 
-        flush(writer); close(reader); close(writer)
+            # update snp position
+            cur_snp[j]
+        end
+        write(writer, record)
+        next!(pmeter) #update progress
     end
+
+    # close 
+    flush(writer); close(reader); close(writer)
 
     return hs, ph
 end
@@ -419,7 +418,7 @@ function impute2!(
 
     p, n = size(X)
 
-    @inbounds for person in 1:n, snp in 1:p
+    @inbounds for snp in 1:p, person in 1:n
         if ismissing(X[snp, person])
             #find where snp is located in phase
             hap1_position = searchsortedlast(phase[person].strand1.start, snp)

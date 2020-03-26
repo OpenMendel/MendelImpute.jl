@@ -228,10 +228,11 @@ function compute_optimal_halotype_set_prephased(
     return hapset
 end
 
+# TODO: possible type instability
 function euclidean_skipmissing(
     x::AbstractVector{U}, 
     y::AbstractVector{T}
-    ) where U <: Union{T, Missing} where T <: Real
+    ) where {T <: Real, U <: Union{T, Missing}}
     s = zero(T)
     @inbounds @simd for i in eachindex(x)
         if x[i] !== missing
@@ -722,6 +723,7 @@ function choose_happair!(
     n = size(X, 2)
     d = size(H, 2)
     p == size(H, 1) || error("Dimension mismatch: size(X, 1) = $p but size(H, 1) = $(size(H, 1))")
+    U = promote_type(eltype(X), eltype(H))
 
     # loop over each person's genotype
     best_happair = Tuple{Int, Int}[]
@@ -731,17 +733,17 @@ function choose_happair!(
         for happair in happairs[j]
             # compute errors for each pair based on observed entries
             h1, h2 = happair[1], happair[2]
-            err = zero(promote_type(eltype(X), eltype(H)))
+            err = zero(U)
             @inbounds @simd for i in 1:p
                 if X[i, j] !== missing 
                     err += (X[i, j] - H[i, h1] - H[i, h2])^2
                 end
             end
-            if err < best_error
+            if err :: U < best_error
                 best_error = err
                 empty!(best_happair)
                 push!(best_happair, happair)
-            elseif err == best_error
+            elseif err :: U == best_error
                 push!(best_happair, happair)
             end
         end
