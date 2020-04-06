@@ -276,26 +276,32 @@ function compute_redundant_haplotypes!(
         end
     else
         h1_set, h2_set = Int[], Int[]
-        @inbounds for k in 1:people, happair in happairs[k]
-            Hi_uniqueidx = happair[1]
-            Hj_uniqueidx = happair[2]
-            # println("person $k's optimal haplotype pairs are: $((Hi_uniqueidx, Hj_uniqueidx))")
+        @inbounds for k in 1:people
+            for happair in happairs[k]
+                Hi_uniqueidx = happair[1]
+                Hj_uniqueidx = happair[2]
+                # println("person $k's optimal haplotype pairs are: $((Hi_uniqueidx, Hj_uniqueidx))")
 
-            Hi_idx = Hunique.uniqueindex[window][Hi_uniqueidx]
-            Hj_idx = Hunique.uniqueindex[window][Hj_uniqueidx]
-            # println("person $k's optimal haplotype pairs are located at columns $Hi_idx and $Hj_idx in current window of H")
+                Hi_idx = Hunique.uniqueindex[window][Hi_uniqueidx]
+                Hj_idx = Hunique.uniqueindex[window][Hj_uniqueidx]
+                # println("person $k's optimal haplotype pairs are located at columns $Hi_idx and $Hj_idx in current window of H")
 
-            # loop through all haplotypes and find ones that match either of the optimal haplotypes 
-            empty!(h1_set)
-            empty!(h2_set)
-            for (idx, hap) in enumerate(Hunique.hapmap[window])
-                hap == Hi_idx && push!(h1_set, idx)
-                hap == Hj_idx && push!(h2_set, idx)
+                # loop through all haplotypes and find ones that match either of the optimal haplotypes 
+                empty!(h1_set)
+                empty!(h2_set)
+                for (idx, hap) in enumerate(Hunique.hapmap[window])
+                    hap == Hi_idx && push!(h1_set, idx)
+                    hap == Hj_idx && push!(h2_set, idx)
+                end
+
+                # push all possible happair into `redundant_haplotypes` 
+                for h1 in h1_set, h2 in h2_set
+                    push!(redundant_haplotypes[k][window], (h1, h2))
+                end
             end
-
-            # push all possible happair into `redundant_haplotypes` 
-            for h1 in h1_set, h2 in h2_set
-                push!(redundant_haplotypes[k][window], (h1, h2))
+            if length(redundant_haplotypes[k][window]) > 1000
+                shuffle!(redundant_haplotypes[k][window])
+                resize!(redundant_haplotypes[k][window], 1000)
             end
         end
     end
