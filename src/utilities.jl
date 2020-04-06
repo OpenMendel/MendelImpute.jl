@@ -299,6 +299,7 @@ function compute_redundant_haplotypes!(
                     push!(redundant_haplotypes[k][window], (h1, h2))
                 end
             end
+            # reduce search space for dynamic programming later
             if length(redundant_haplotypes[k][window]) > 1000
                 shuffle!(redundant_haplotypes[k][window])
                 resize!(redundant_haplotypes[k][window], 1000)
