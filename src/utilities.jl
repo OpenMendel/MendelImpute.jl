@@ -79,7 +79,7 @@ redundant haplotypes that matches the optimal haplotypes in each window for pers
 """
 function compute_optimal_halotype_set(
     X::AbstractMatrix{Union{Missing, T}},
-    H::AbstractMatrix{T};
+    H::AbstractMatrix;
     width::Int = 400,
     flankwidth::Int = round(Int, 0.1width),
     verbose::Bool = true,
@@ -120,14 +120,14 @@ function compute_optimal_halotype_set(
     num_uniq    = length(Hunique.uniqueindex[1])
     M           = zeros(T, num_uniq, num_uniq)
     N           = ElasticArray{T}(undef, people, num_uniq) # array type that allows rescaling last dim 
+    pmeter      = Progress(windows, 5, "Computing optimal haplotype pairs...")
 
     # In first window, calculate optimal haplotype pair among unique haplotypes
     cur_range   = Hunique.range[1]
-    Hwork       = H[cur_range, Hunique.uniqueindex[1]]
+    Hwork       = convert(Matrix{T}, @view(H[cur_range, Hunique.uniqueindex[1]]))
     Xwork       = X[cur_range, :]
     Xwork_float = zeros(T, size(Xwork))
     haploimpute!(Xwork, Hwork, M, N, happairs, hapscore, Xfloat=Xwork_float, Xtrue=Xtrue_work)
-    pmeter = Progress(windows, 1, "Computing optimal haplotype pairs...")
 
     # find all haplotypes matching the optimal haplotype pairs
     compute_redundant_haplotypes!(redundant_haplotypes, Hunique, happairs, 1, fast_method=fast_method)
@@ -135,7 +135,7 @@ function compute_optimal_halotype_set(
 
     # resizable working arrays
     cur_range   = Hunique.range[2]
-    Hwork       = ElasticArray{T}(H[cur_range, Hunique.uniqueindex[1]]) # array type that allows rescaling last dim 
+    Hwork       = ElasticArray{T}(@view(H[cur_range, Hunique.uniqueindex[2]]))
     Xwork       = X[cur_range, :]
     Xwork_float = zeros(T, size(Xwork))
 
@@ -160,9 +160,9 @@ function compute_optimal_halotype_set(
     end
 
     # last window reallocate everything 
-    last_range = Hunique.range[end]
+    last_range  = Hunique.range[end]
     num_uniq    = length(Hunique.uniqueindex[end])
-    Hwork       = H[last_range, Hunique.uniqueindex[end]]
+    Hwork       = convert(Matrix{T}, @view(H[last_range, Hunique.uniqueindex[end]]))
     Xwork       = X[last_range, :]
     M           = zeros(T, num_uniq, num_uniq)
     N           = zeros(T, people, num_uniq)
@@ -173,60 +173,60 @@ function compute_optimal_halotype_set(
     return redundant_haplotypes
 end
 
-function compute_optimal_halotype_set_prephased(
-    X::AbstractMatrix{Union{Missing, T}},
-    H::AbstractMatrix{T};
-    width::Int    = 400,
-    flankwidth::Int = round(Int, 0.1width),
-    ) where T <: Real
+# function compute_optimal_halotype_set_prephased(
+#     X::AbstractMatrix{Union{Missing, T}},
+#     H::AbstractMatrix;
+#     width::Int    = 400,
+#     flankwidth::Int = round(Int, 0.1width),
+#     ) where T <: Real
     
-    # declare some constants
-    snps = size(X, 1)
-    people = Int(size(X, 2) / 2)
-    haplotypes = size(H, 2)
-    windows = floor(Int, snps / width)
+#     # declare some constants
+#     snps = size(X, 1)
+#     people = Int(size(X, 2) / 2)
+#     haplotypes = size(H, 2)
+#     windows = floor(Int, snps / width)
 
-    # get unique haplotype indices and maps for current window
-    Hunique = unique_haplotypes(H, width, 'T', flankwidth = flankwidth)
-    hapset  = [OptimalHaplotypeSet(windows, haplotypes) for i in 1:people]
+#     # get unique haplotype indices and maps for current window
+#     Hunique = unique_haplotypes(H, width, 'T', flankwidth = flankwidth)
+#     hapset  = [OptimalHaplotypeSet(windows, haplotypes) for i in 1:people]
 
-    for w in 1:windows, i in 1:people
-        cur_range = Hunique.range[w]
-        Hi_unique = Hunique.uniqueindex[w]
-        best_err1 = typemax(eltype(H))
-        best_err2 = typemax(eltype(H))
+#     for w in 1:windows, i in 1:people
+#         cur_range = Hunique.range[w]
+#         Hi_unique = Hunique.uniqueindex[w]
+#         best_err1 = typemax(eltype(H))
+#         best_err2 = typemax(eltype(H))
 
-        # loop through 2 genotype strands to find best matching haplotype
-        Xi1 = @view(X[cur_range, 2i - 1])
-        Xi2 = @view(X[cur_range, 2i])
-        Hi1 = 0
-        Hi2 = 0
-        for j in Hi_unique
-            Hi = @view(H[cur_range, j])
-            # strand1
-            err = euclidean_skipmissing(Xi1, Hi)
-            if err < best_err1
-                Hi1 = j
-                best_err1 = err
-            end
-            # strand2
-            err = euclidean_skipmissing(Xi2, Hi)
-            if err < best_err2
-                Hi2 = j
-                best_err2 = err
-            end
-        end
+#         # loop through 2 genotype strands to find best matching haplotype
+#         Xi1 = @view(X[cur_range, 2i - 1])
+#         Xi2 = @view(X[cur_range, 2i])
+#         Hi1 = 0
+#         Hi2 = 0
+#         for j in Hi_unique
+#             Hi = @view(H[cur_range, j])
+#             # strand1
+#             err = euclidean_skipmissing(Xi1, Hi)
+#             if err < best_err1
+#                 Hi1 = j
+#                 best_err1 = err
+#             end
+#             # strand2
+#             err = euclidean_skipmissing(Xi2, Hi)
+#             if err < best_err2
+#                 Hi2 = j
+#                 best_err2 = err
+#             end
+#         end
         
-        # find all haplotypes that matches the unique one 
-        mapping = Hunique.hapmap[w]
-        for j in 1:haplotypes
-            mapping[j] == Hi1 && (hapset[i].strand1[w][j] = true)
-            mapping[j] == Hi2 && (hapset[i].strand2[w][j] = true)
-        end
-    end
+#         # find all haplotypes that matches the unique one 
+#         mapping = Hunique.hapmap[w]
+#         for j in 1:haplotypes
+#             mapping[j] == Hi1 && (hapset[i].strand1[w][j] = true)
+#             mapping[j] == Hi2 && (hapset[i].strand2[w][j] = true)
+#         end
+#     end
 
-    return hapset
-end
+#     return hapset
+# end
 
 # TODO: possible type instability
 function euclidean_skipmissing(
@@ -337,25 +337,20 @@ function resize_and_sync!(
     M::AbstractMatrix,
     N::ElasticArray,
     )
+    next_d = length(Hnext) # size of next dimension
 
-    pp, dd = size(Hwork)
-    next_d = length(Hnext)
-
-    # resize working arrays
-    if dd != next_d
-        resize!(Hwork, pp        , next_d)
-        resize!(N    , size(N, 1), next_d)
-        Mnew = zeros(eltype(M), next_d, next_d)               # always reallocate entire M
-        # Mvec = vec(M)
-        # resize!(Mvec, next_d^2)
-        # Mnew = Base.ReshapedArray(Mvec, (next_d, next_d), ()) # actually resize! makes a copy internally!
-        # Mnew = (next_d < dd ? Base.ReshapedArray(vec(M), (next_d, next_d), ()) : 
-        #                       zeros(eltype(M), next_d, next_d))
+    # resize working arrays M and N
+    if size(M, 1) != next_d
+        resize!(N, size(N, 1), next_d)
+        Mnew = zeros(eltype(M), next_d, next_d)
     else
         Mnew = M
     end
 
     # sync Xwork and Hwork with original data
+    if size(Hwork, 2) != next_d
+        resize!(Hwork, size(Hwork, 1), next_d)
+    end
     copyto!(Xwork, view(X, window, :))
     copyto!(Hwork, view(H, window, Hnext))
 

@@ -22,25 +22,18 @@ function phase(
     fast_method::Bool = false,
     prephased::Bool=false,
     )
-    if prephased
-        error("currently not supporting pre-phased option. Please set prephase = false and try again.")
-        # X = convert_ht(Float32, tgtfile, has_missing=true)        
-    end
 
     # convert vcf files to numeric matrices
-    pmeter = Progress(3, 1, "Importing genotype and haplotype files...")
-    next!(pmeter)
-    X = convert_gt(Float32, tgtfile, trans=true)
-    next!(pmeter)
-    H = convert_ht(Float32, reffile, trans=true)
-    next!(pmeter)
+    X = convert_gt(Float32, tgtfile, trans=true, msg="Importing genotype file...")
+    H = convert_ht(Bool, reffile, trans=true, msg="Importing reference haplotype files...")
 
     # compute redundant haplotype sets. 
     hs = compute_optimal_halotype_set(X, H, width = width, prephased = prephased, flankwidth=flankwidth, fast_method=fast_method)
 
     # phasing (haplotyping)
     if prephased
-        ph = phase_prephased(X, H, hapset=hs, width=width, flankwidth=flankwidth)
+        error("currently not supporting pre-phased option. Please set prephase = false and try again.")
+        # ph = phase_prephased(X, H, hapset=hs, width=width, flankwidth=flankwidth)
     elseif fast_method
         ph = phase_fast(X, H, hapset = hs, width = width, verbose = false, flankwidth=flankwidth)
     else
@@ -101,7 +94,7 @@ by sliding windows.
 """
 function phase(
     X::AbstractMatrix{Union{Missing, T}},
-    H::AbstractMatrix{T};
+    H::AbstractMatrix;
     hapset::Union{Vector{Vector{Vector{Tuple{Int, Int}}}}, Nothing} = nothing,
     width::Int = 400,
     flankwidth::Int = round(Int, 0.1width),
@@ -187,7 +180,7 @@ end
 
 function phase_fast(
     X::AbstractMatrix{Union{Missing, T}},
-    H::AbstractMatrix{T};
+    H::AbstractMatrix;
     hapset::Union{Vector{OptimalHaplotypeSet}, Nothing} = nothing,
     width::Int    = 400,
     flankwidth::Int = round(Int, 0.1width),
@@ -303,7 +296,7 @@ function phase_fast(
     end
 
     # find optimal break points and record info to phase. 
-    pmeter = Progress(people, 1, "Merging breakpoints...")
+    pmeter = Progress(people, 5, "Merging breakpoints...")
     strand1_intersect = [copy(chain_next[1]) for i in 1:Threads.nthreads()]
     strand2_intersect = [copy(chain_next[2]) for i in 1:Threads.nthreads()]
     Threads.@threads for i in 1:people
