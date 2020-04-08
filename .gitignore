@@ -8,7 +8,6 @@ biona001@hoffman2.idre.ucla.edu
 # don't track real data
 AFRped_geno.txt
 GBR_data.csv
-data/
 
 # don't track simulations 
 *.vcf
@@ -17,4 +16,4 @@ data/
 *.m3vcf.gz
 *.info
 *.log
-
+*.jar
