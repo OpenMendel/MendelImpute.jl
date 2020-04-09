@@ -1556,3 +1556,19 @@ compress_vcf_to_gz("unphase.target_masked.vcf")
 
 X = convert_gt(Float64, "unphase.target_masked.vcf.gz")
 X2 = convert_gt(Float64, "unphase2.target_masked.vcf.gz")
+
+
+
+
+# test if "GT" is allocating a ton
+function test()
+    s = 0
+    for i in 1:100000
+        s += get("GT")
+    end
+    return s
+end
+
+get(s) = (s == "GT" ? true : false)
+
+@time test()

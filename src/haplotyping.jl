@@ -1,5 +1,5 @@
 """
-    phase(tgtfile, reffile, outfile; impute = true, width = 1200)
+    phase(tgtfile, reffile; [outfile], [width], [flankwidth], [fast_method])
 
 Phasing (haplotying) of `tgtfile` from a pool of haplotypes `reffile`
 by sliding windows and saves result in `outfile`. 
@@ -7,7 +7,9 @@ by sliding windows and saves result in `outfile`.
 # Input
 - `reffile`: VCF file with reference genotype (GT) data
 - `tgtfile`: VCF file with target genotype (GT) data
-- `outfile`: the prefix for output filenames. Will not be generated if `impute` is false
+
+# Optional Inputs
+- `outfile`: output filename. Output genotypes will be phased with no missing data.
 - `width`  : number of SNPs (markers) in each sliding window. 
 - `flankwidth`: Number of SNPs flanking the sliding window (defaults to 10% of `width`)
 - `fast_method`: If `true`, will use window-by-window intersection for phasing. If `false`, phasing uses dynamic progrmaming. 
@@ -27,7 +29,7 @@ function phase(
     people = nsamples(tgtfile)
     haplotypes = 2nsamples(reffile)
     windows = floor(Int, snps / width)
-    chunks = ceil(Int, snps / 1e5) # max 100k snps per chunk
+    chunks = ceil(Int, snps / 10000) # max 100k snps per chunk
     snps_per_chunk = ceil(Int, snps / chunks)
     ph = [HaplotypeMosaicPair(snps) for i in 1:people] # phase information
 
@@ -41,7 +43,7 @@ function phase(
 
         # phase chunk by chunk
         for chunk in 1:(chunks - 1)
-            @info "Running chunk $chunk / $chunks"
+            println("Running chunk $chunk / $chunks")
 
             # copy current chunk's sample data into X and reference panels into H
             copy_gt_trans!(X, Xreader, msg = "Importing genotype file...")
@@ -61,7 +63,7 @@ function phase(
     end
 
     # phase last chunk
-    @info "Running chunk $chunks / $chunks"
+    println("Running chunk $chunks / $chunks")
     remaining_snps = snps - ((chunks - 1) * snps_per_chunk)
     X = Matrix{Union{Float32, Missing}}(undef, remaining_snps, people)
     H = BitArray{2}(undef, remaining_snps, haplotypes)
@@ -80,38 +82,84 @@ function phase(
     end
     close(Xreader); close(Hreader)
 
-    # create VCF reader and writer
-    reader = VCF.Reader(openvcf(tgtfile, "r"))
-    writer = VCF.Writer(openvcf(outfile, "w"), header(reader))
-    pmeter = Progress(nrecords(tgtfile), 1, "Writing to file...")
+    # write phase information to outfile
+    reader  = VCF.Reader(openvcf(tgtfile, "r"))
+    writer  = VCF.Writer(openvcf(outfile, "w"), header(reader))
+    pmeter  = Progress(nrecords(tgtfile), 5, "Writing to file...")
+    if chunks > 1
+        # reassign and update H chunk by chunk
+        Hreader = VCF.Reader(openvcf(reffile, "r"))
+        H = BitArray{2}(undef, snps_per_chunk, haplotypes)
+        copy_ht_trans!(H, Hreader)
+        record_counter = chunk_counter = 1
+        for (i, record) in enumerate(reader)
+            gtkey = VCF.findgenokey(record, "GT")
+            if !isnothing(gtkey) 
+                # loop over samples
+                for (j, geno) in enumerate(record.genotype)
+                    # if missing = '.' = 0x2e
+                    if record.data[geno[gtkey][1]] == 0x2e
+                        #find where snp is located in phase
+                        hap1_position = searchsortedlast(ph[j].strand1.start, i)
+                        hap2_position = searchsortedlast(ph[j].strand2.start, i)
 
-    # loop over each record (snp)
-    snps, people = size(X, 1), size(X, 2)
-    for (i, record) in enumerate(reader)
-        gtkey = VCF.findgenokey(record, "GT")
-        if !isnothing(gtkey) 
-            # loop over samples
-            for (j, geno) in enumerate(record.genotype)
-                # if missing = '.' = 0x2e
-                if record.data[geno[gtkey][1]] == 0x2e
-                    #find where snp is located in phase
-                    hap1_position = searchsortedlast(ph[j].strand1.start, i)
-                    hap2_position = searchsortedlast(ph[j].strand2.start, i)
+                        #find the correct haplotypes 
+                        hap1 = ph[j].strand1.haplotypelabel[hap1_position]
+                        hap2 = ph[j].strand2.haplotypelabel[hap2_position]
 
-                    #find the correct haplotypes 
-                    hap1 = ph[j].strand1.haplotypelabel[hap1_position]
-                    hap2 = ph[j].strand2.haplotypelabel[hap2_position]
-
-                    # save actual allele to data. "0" (REF) => 0x30, "1" (ALT) => 0x31
-                    a1, a2 = convert(Bool, H[i, hap1]), convert(Bool, H[i, hap2])
-                    record.data[geno[gtkey][1]] = ifelse(a1, 0x31, 0x30)
-                    record.data[geno[gtkey][2]] = 0x7c # phased data has separator '|'
-                    record.data[geno[gtkey][3]] = ifelse(a2, 0x31, 0x30)
+                        # save actual allele to data. "0" (REF) => 0x30, "1" (ALT) => 0x31
+                        row = i - (chunk_counter - 1) * snps_per_chunk
+                        a1, a2 = H[row, hap1], H[row, hap2]
+                        record.data[geno[gtkey][1]] = ifelse(a1, 0x31, 0x30)
+                        record.data[geno[gtkey][2]] = 0x7c # phased data has separator '|'
+                        record.data[geno[gtkey][3]] = ifelse(a2, 0x31, 0x30)
+                    end
                 end
             end
+
+            write(writer, record)
+
+            # move to next chunk if we reached the end of current chunk 
+            record_counter += 1
+            if record_counter > snps_per_chunk
+                chunk_counter += 1
+                record_counter = 1
+                chunk_counter == chunks && (H = BitArray{2}(undef, remaining_snps, haplotypes)) #resize H
+                copy_ht_trans!(H, Hreader)
+            end
+
+            # update progress
+            next!(pmeter) 
         end
-        write(writer, record)
-        next!(pmeter) #update progress
+        close(Hreader)
+    else
+        # loop over each record (snp)
+        for (i, record) in enumerate(reader)
+            gtkey = VCF.findgenokey(record, "GT")
+            if !isnothing(gtkey) 
+                # loop over samples
+                for (j, geno) in enumerate(record.genotype)
+                    # if missing = '.' = 0x2e
+                    if record.data[geno[gtkey][1]] == 0x2e
+                        #find where snp is located in phase
+                        hap1_position = searchsortedlast(ph[j].strand1.start, i)
+                        hap2_position = searchsortedlast(ph[j].strand2.start, i)
+
+                        #find the correct haplotypes 
+                        hap1 = ph[j].strand1.haplotypelabel[hap1_position]
+                        hap2 = ph[j].strand2.haplotypelabel[hap2_position]
+
+                        # save actual allele to data. "0" (REF) => 0x30, "1" (ALT) => 0x31
+                        a1, a2 = H[i, hap1], H[i, hap2]
+                        record.data[geno[gtkey][1]] = ifelse(a1, 0x31, 0x30)
+                        record.data[geno[gtkey][2]] = 0x7c # phased data has separator '|'
+                        record.data[geno[gtkey][3]] = ifelse(a2, 0x31, 0x30)
+                    end
+                end
+            end
+            write(writer, record)
+            next!(pmeter) #update progress
+        end
     end
 
     # close 
