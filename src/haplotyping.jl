@@ -2,16 +2,15 @@
     phase(tgtfile, reffile, outfile; impute = true, width = 1200)
 
 Phasing (haplotying) of `tgtfile` from a pool of haplotypes `reffile`
-by sliding windows and saves result in `outfile`. By default, we will perform
-imputation after phasing and window width is 700.
-
+by sliding windows and saves result in `outfile`. 
 
 # Input
 - `reffile`: VCF file with reference genotype (GT) data
 - `tgtfile`: VCF file with target genotype (GT) data
-- `impute` : true = imputes missing genotypes with phase information.
 - `outfile`: the prefix for output filenames. Will not be generated if `impute` is false
 - `width`  : number of SNPs (markers) in each sliding window. 
+- `flankwidth`: Number of SNPs flanking the sliding window (defaults to 10% of `width`)
+- `fast_method`: If `true`, will use window-by-window intersection for phasing. If `false`, phasing uses dynamic progrmaming. 
 """
 function phase(
     tgtfile::AbstractString,
@@ -20,25 +19,66 @@ function phase(
     width::Int = 400,
     flankwidth::Int = round(Int, 0.1width),
     fast_method::Bool = false,
-    prephased::Bool=false,
     )
 
+    # declare some constants
+    snps, H_snps = nrecords(tgtfile), nrecords(reffile)
+    snps == H_snps || error("Number of SNPs in X = $snps does not equal SNPs in H = $H_snps. Run conformgt in VCFTools first.")
+    people = nsamples(tgtfile)
+    haplotypes = 2nsamples(reffile)
+    windows = floor(Int, snps / width)
+    chunks = ceil(Int, snps / 1e5) # max 100k snps per chunk
+    snps_per_chunk = ceil(Int, snps / chunks)
+    ph = [HaplotypeMosaicPair(snps) for i in 1:people] # phase information
+
     # convert vcf files to numeric matrices
-    X = convert_gt(Float32, tgtfile, trans=true, msg="Importing genotype file...")
-    H = convert_ht(Bool, reffile, trans=true, msg="Importing reference haplotype files...")
+    Xreader = VCF.Reader(openvcf(tgtfile, "r"))
+    Hreader = VCF.Reader(openvcf(reffile, "r"))
 
-    # compute redundant haplotype sets. 
-    hs = compute_optimal_halotype_set(X, H, width = width, prephased = prephased, flankwidth=flankwidth, fast_method=fast_method)
+    if chunks > 1
+        X = Matrix{Union{Float32, Missing}}(undef, snps_per_chunk, people)
+        H = BitArray{2}(undef, snps_per_chunk, haplotypes)
 
-    # phasing (haplotyping)
-    if prephased
-        error("currently not supporting pre-phased option. Please set prephase = false and try again.")
-        # ph = phase_prephased(X, H, hapset=hs, width=width, flankwidth=flankwidth)
-    elseif fast_method
-        ph = phase_fast(X, H, hapset = hs, width = width, verbose = false, flankwidth=flankwidth)
-    else
-        ph = phase(X, H, hapset = hs, width = width, verbose = false, flankwidth=flankwidth, fast_method=false)
+        # phase chunk by chunk
+        for chunk in 1:(chunks - 1)
+            @info "Running chunk $chunk / $chunks"
+
+            # copy current chunk's sample data into X and reference panels into H
+            copy_gt_trans!(X, Xreader, msg = "Importing genotype file...")
+            copy_ht_trans!(H, Hreader, msg = "Importing reference haplotype files...")
+            
+            # compute redundant haplotype sets
+            hs = compute_optimal_halotype_set(X, H, width=width, flankwidth=flankwidth, fast_method=fast_method)
+
+            # phase (haplotyping) current chunk
+            offset = (chunk - 1) * snps_per_chunk
+            if fast_method
+                phase_fast!(ph, X, H, hs, width=width, flankwidth=flankwidth, chunk_offset=offset)
+            else
+                phase!(ph, X, H, hs, width=width, flankwidth=flankwidth, chunk_offset=offset)
+            end
+        end
     end
+
+    # phase last chunk
+    @info "Running chunk $chunks / $chunks"
+    remaining_snps = snps - ((chunks - 1) * snps_per_chunk)
+    X = Matrix{Union{Float32, Missing}}(undef, remaining_snps, people)
+    H = BitArray{2}(undef, remaining_snps, haplotypes)
+    copy_gt_trans!(X, Xreader, msg = "Importing genotype file...")
+    copy_ht_trans!(H, Hreader, msg = "Importing reference haplotype files...")
+    
+    # compute redundant haplotype sets
+    hs = compute_optimal_halotype_set(X, H, width = width, flankwidth=flankwidth, fast_method=fast_method)
+
+    # phase (haplotyping) current chunk
+    offset = (chunks - 1) * snps_per_chunk
+    if fast_method
+        phase_fast!(ph, X, H, hs, width=width, flankwidth=flankwidth, chunk_offset=offset)
+    else
+        phase!(ph, X, H, hs, width=width, flankwidth=flankwidth, chunk_offset=offset)
+    end
+    close(Xreader); close(Hreader)
 
     # create VCF reader and writer
     reader = VCF.Reader(openvcf(tgtfile, "r"))
@@ -84,7 +124,7 @@ end
     phase(X, H, width=400, verbose=true)
 
 Phasing (haplotying) of genotype matrix `X` from a pool of haplotypes `H`
-by sliding windows.
+by dynamic programming. A precomputed, window-by-window haplotype pairs is assumed. 
 
 # Input
 * `X`: `p x n` matrix with missing values. Each column is genotypes of an individual.
@@ -92,35 +132,20 @@ by sliding windows.
 * `width`: width of the sliding window.
 * `verbose`: display algorithmic information.
 """
-function phase(
+function phase!(
+    ph::Vector{HaplotypeMosaicPair},
     X::AbstractMatrix{Union{Missing, T}},
-    H::AbstractMatrix;
-    hapset::Union{Vector{Vector{Vector{Tuple{Int, Int}}}}, Nothing} = nothing,
+    H::AbstractMatrix,
+    hapset::Vector{Vector{Vector{Tuple{Int, Int}}}};
     width::Int = 400,
     flankwidth::Int = round(Int, 0.1width),
-    verbose::Bool = false,
+    chunk_offset::Int = 0,
     Xtrue::Union{AbstractMatrix, Nothing} = nothing, # for testing
-    fast_method::Bool = false
     ) where T <: Real
-
-    if fast_method
-        return phase_fast(X, H, hapset = hapset, width = width, verbose = false, flankwidth=flankwidth)
-    end
-
-    # declare some constants
-    snps, people = size(X)
-    haplotypes = size(H, 2)
-    windows = floor(Int, snps / width)
-
-    # compute redundant haplotype sets using least squares criteria
-    if isnothing(hapset)
-        hapset = compute_optimal_halotype_set(X, H, width=width, verbose=verbose, prephased=false, Xtrue=Xtrue, fast_method=false)
-    end
 
     # allocate working arrays
     Tu       = Tuple{Int, Int}
     Pu       = Tuple{Float64, Tu}
-    phase    = [HaplotypeMosaicPair(snps) for i in 1:people]
     sol_path = [Vector{Tuple{Int, Int}}(undef, windows) for i in 1:Threads.nthreads()]
     nxt_pair = [[Int[] for i in 1:windows] for i in 1:Threads.nthreads()]
     tree_err = [[Float64[] for i in 1:windows] for i in 1:Threads.nthreads()]
@@ -135,10 +160,10 @@ function phase(
         connect_happairs!(sol_path[id], nxt_pair[id], tree_err[id], hapset[i], λ = 1.0)
 
         # phase first window 
-        push!(phase[i].strand1.start, 1)
-        push!(phase[i].strand1.haplotypelabel, sol_path[id][1][1])
-        push!(phase[i].strand2.start, 1)
-        push!(phase[i].strand2.haplotypelabel, sol_path[id][1][2])
+        push!(ph[i].strand1.start, 1)
+        push!(ph[i].strand1.haplotypelabel, sol_path[id][1][1])
+        push!(ph[i].strand2.start, 1)
+        push!(ph[i].strand2.haplotypelabel, sol_path[id][1][2])
 
         # phase middle windows
         for w in 2:(windows - 1)
@@ -148,13 +173,13 @@ function phase(
 
             # strand 1
             if bkpts[1] > -1 && bkpts[1] < 2width
-                push!(phase[i].strand1.start, (w - 2) * width + 1 + bkpts[1])
-                push!(phase[i].strand1.haplotypelabel, sol_path[id][w][1])
+                push!(ph[i].strand1.start, chunk_offset + (w - 2) * width + 1 + bkpts[1])
+                push!(ph[i].strand1.haplotypelabel, sol_path[id][w][1])
             end
             # strand 2
             if bkpts[2] > -1 && bkpts[2] < 2width
-                push!(phase[i].strand2.start, (w - 2) * width + 1 + bkpts[2])
-                push!(phase[i].strand2.haplotypelabel, sol_path[id][w][2])
+                push!(ph[i].strand2.start, chunk_offset + (w - 2) * width + 1 + bkpts[2])
+                push!(ph[i].strand2.haplotypelabel, sol_path[id][w][2])
             end
         end
 
@@ -164,27 +189,26 @@ function phase(
         sol_path[id][windows], bkpts = continue_haplotype(Xwi, Hw, sol_path[id][windows - 1], sol_path[id][windows])
         # strand 1
         if bkpts[1] > -1 && bkpts[1] < 2width
-            push!(phase[i].strand1.start, (windows - 2) * width + 1 + bkpts[1])
-            push!(phase[i].strand1.haplotypelabel, sol_path[id][windows][1])
+            push!(ph[i].strand1.start, chunk_offset + (windows - 2) * width + 1 + bkpts[1])
+            push!(ph[i].strand1.haplotypelabel, sol_path[id][windows][1])
         end
         # strand 2
         if bkpts[2] > -1 && bkpts[2] < 2width
-            push!(phase[i].strand2.start, (windows - 2) * width + 1 + bkpts[2])
-            push!(phase[i].strand2.haplotypelabel, sol_path[id][windows][2])
+            push!(ph[i].strand2.start, chunk_offset + (windows - 2) * width + 1 + bkpts[2])
+            push!(ph[i].strand2.haplotypelabel, sol_path[id][windows][2])
         end
         next!(pmeter) #update progress
     end
-
-    return phase 
 end
 
-function phase_fast(
+function phase_fast!(
+    ph::Vector{HaplotypeMosaicPair},
     X::AbstractMatrix{Union{Missing, T}},
-    H::AbstractMatrix;
-    hapset::Union{Vector{OptimalHaplotypeSet}, Nothing} = nothing,
-    width::Int    = 400,
+    H::AbstractMatrix,
+    hapset::Vector{OptimalHaplotypeSet};
+    width::Int = 400,
     flankwidth::Int = round(Int, 0.1width),
-    verbose::Bool = true,
+    chunk_offset::Int = 0,
     Xtrue::Union{AbstractMatrix, Nothing} = nothing, # for testing
     ) where T <: Real
 
@@ -193,20 +217,12 @@ function phase_fast(
     haplotypes = size(H, 2)
     windows = floor(Int, snps / width)
 
-    # compute redundant haplotype sets using least squares criteria
-    if isnothing(hapset)
-        hapset = compute_optimal_halotype_set(X, H, width=width, verbose=verbose, prephased=false, Xtrue=Xtrue, fast_method=true)
-    end
-
     # allocate working arrays
-    phase = [HaplotypeMosaicPair(snps) for i in 1:people]
     haplo_chain = ([copy(hapset[i].strand1[1]) for i in 1:people], [copy(hapset[i].strand2[1]) for i in 1:people])
     chain_next  = (BitVector(undef, haplotypes), BitVector(undef, haplotypes))
     window_span = (ones(Int, people), ones(Int, people))
     pmeter      = Progress(people, 1, "Intersecting haplotypes...")
 
-    # TODO: parallel computing
-    # second pass to phase and merge breakpoints
     # begin intersecting haplotypes window by window
     @inbounds for i in 1:people
         for w in 2:windows
@@ -274,25 +290,14 @@ function phase_fast(
         end
     end
 
-    # phase without searching for breakpoints
-    # for w in 1:windows, i in 1:people
-    #     hap1 = findfirst(hapset[i].strand1[w]) :: Int64
-    #     hap2 = findfirst(hapset[i].strand2[w]) :: Int64
-    #     cur_start = (w - 1) * width + 1
-    #     push!(phase[i].strand1.start, cur_start)
-    #     push!(phase[i].strand1.haplotypelabel, hap1)
-    #     push!(phase[i].strand2.start, cur_start)
-    #     push!(phase[i].strand2.haplotypelabel, hap2)
-    # end
-
     # phase window 1
     for i in 1:people
         hap1 = findfirst(hapset[i].strand1[1]) :: Int64
         hap2 = findfirst(hapset[i].strand2[1]) :: Int64
-        push!(phase[i].strand1.start, 1)
-        push!(phase[i].strand1.haplotypelabel, hap1)
-        push!(phase[i].strand2.start, 1)
-        push!(phase[i].strand2.haplotypelabel, hap2)
+        push!(ph[i].strand1.start, 1 + chunk_offset)
+        push!(ph[i].strand1.haplotypelabel, hap1)
+        push!(ph[i].strand2.start, 1 + chunk_offset)
+        push!(ph[i].strand2.haplotypelabel, hap2)
     end
 
     # find optimal break points and record info to phase. 
@@ -308,21 +313,21 @@ function phase_fast(
             strand2_intersect[id] .= hapset[i].strand2[w - 1] .& hapset[i].strand2[w]
             # double haplotype switch
             if sum(strand1_intersect[id]) == sum(strand2_intersect[id]) == 0
-                s1_prev = phase[i].strand1.haplotypelabel[end]
-                s2_prev = phase[i].strand2.haplotypelabel[end]
+                s1_prev = ph[i].strand1.haplotypelabel[end]
+                s2_prev = ph[i].strand2.haplotypelabel[end]
                 # search breakpoints when choosing first pair
                 s1_next = findfirst(hapset[i].strand1[w]) :: Int64
                 s2_next = findfirst(hapset[i].strand2[w]) :: Int64
                 bkpt, err_optim = search_breakpoint(Xi, Hi, (s1_prev, s1_next), (s2_prev, s2_next))
                 # record info into phase
-                push!(phase[i].strand1.start, (w - 2) * width + 1 + bkpt[1])
-                push!(phase[i].strand2.start, (w - 2) * width + 1 + bkpt[2])
-                push!(phase[i].strand1.haplotypelabel, s1_next)
-                push!(phase[i].strand2.haplotypelabel, s2_next)
+                push!(ph[i].strand1.start, chunk_offset + (w - 2) * width + 1 + bkpt[1])
+                push!(ph[i].strand2.start, chunk_offset + (w - 2) * width + 1 + bkpt[2])
+                push!(ph[i].strand1.haplotypelabel, s1_next)
+                push!(ph[i].strand2.haplotypelabel, s2_next)
             # single haplotype switch
             elseif sum(strand1_intersect[id]) == 0
                 # search breakpoints among all possible haplotypes
-                s1_prev = phase[i].strand1.haplotypelabel[end]
+                s1_prev = ph[i].strand1.haplotypelabel[end]
                 s1_win_next = findall(hapset[i].strand1[w])
                 s2_win_next = findall(hapset[i].strand2[w])
                 best_bktp = 0
@@ -335,12 +340,12 @@ function phase_fast(
                     end
                 end
                 # record info into phase
-                push!(phase[i].strand1.start, (w - 2) * width + 1 + best_bktp)
-                push!(phase[i].strand1.haplotypelabel, best_s1_next)
+                push!(ph[i].strand1.start, chunk_offset + (w - 2) * width + 1 + best_bktp)
+                push!(ph[i].strand1.haplotypelabel, best_s1_next)
             # single haplotype switch
             elseif sum(strand2_intersect[id]) == 0
                 # search breakpoints among all possible haplotypes
-                s2_prev = phase[i].strand2.haplotypelabel[end]
+                s2_prev = ph[i].strand2.haplotypelabel[end]
                 s2_win_next = findall(hapset[i].strand2[w])
                 s1_win_next = findall(hapset[i].strand1[w])
                 best_bktp = 0
@@ -353,14 +358,12 @@ function phase_fast(
                     end
                 end
                 # record info into phase
-                push!(phase[i].strand2.start, (w - 2) * width + 1 + best_bktp)
-                push!(phase[i].strand2.haplotypelabel, best_s2_next)
+                push!(ph[i].strand2.start, chunk_offset + (w - 2) * width + 1 + best_bktp)
+                push!(ph[i].strand2.haplotypelabel, best_s2_next)
             end
         end
         next!(pmeter) #update progress
     end
-
-    return phase 
 end
 
 """

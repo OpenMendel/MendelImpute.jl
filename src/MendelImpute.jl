@@ -14,15 +14,18 @@ module MendelImpute
     using ProgressMeter
 
     export continue_haplotype, haplopair!, haplopair, haploimpute!
-    export impute!, impute2!, phase, search_breakpoint, unique_haplotypes
+    export impute!, impute2!, search_breakpoint, unique_haplotypes
     export unique_haplotype_idx
     export compute_redundant_haplotypes!, redundant_haplotypes
     export HaplotypeMosaicPair, HaplotypeMosaic, UniqueHaplotypeMaps
     export simulate_genotypes2
-    export phase_prephased
     export compute_optimal_halotype_set_prephased
     export simulate_phased_genotypes
     export connect_happairs
+    export phase!, phase_fast!
+
+    # main functions that users are exposed to
+    export phase
 
     export OptimalHaplotypeSet, compute_optimal_halotype_set
     export make_refvcf_file, make_tgtvcf_file
