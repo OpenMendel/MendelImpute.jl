@@ -191,6 +191,11 @@ function phase!(
     Xtrue::Union{AbstractMatrix, Nothing} = nothing, # for testing
     ) where T <: Real
 
+    # declare some constants
+    snps, people = size(X)
+    haplotypes = size(H, 2)
+    windows = floor(Int, snps / width)
+
     # allocate working arrays
     Tu       = Tuple{Int, Int}
     Pu       = Tuple{Float64, Tu}
@@ -201,8 +206,6 @@ function phase!(
 
     # loop over each person
     Threads.@threads for i in 1:people
-        verbose && @info "imputing person $i"
-
         # first find optimal haplotype pair in each window using dynamic programming
         id = Threads.threadid()
         connect_happairs!(sol_path[id], nxt_pair[id], tree_err[id], hapset[i], λ = 1.0)
