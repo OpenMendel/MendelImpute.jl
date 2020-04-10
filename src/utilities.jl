@@ -936,3 +936,18 @@ function search_breakpoint(
 
     return bkpts_optim, err_optim :: Int
 end
+
+"""
+    chunk_size(people, haplotypes)
+
+Figures out how many SNPs can be loaded into memory (capped at 2/3 total RAM) 
+at once, given the data size. Assumes genotype data are Float32 (4 byte per entry) 
+and haplotype panels are BitArrays (1 bit per entry).
+"""
+function chunk_size(people::Int, haplotypes::Int)
+    system_memory_gb = Sys.total_memory() / 2^30
+    system_memory_bits = 8000000000 * system_memory_gb
+    system_memory_bits *= round(Int, 2 / 3) # use 2/3 of memory for genotype and haplotype matrix per chunk
+    max_chunk_size = round(Int, system_memory_bits / (haplotypes + 32people))
+    return max_chunk_size
+end

@@ -28,10 +28,11 @@ function phase(
     snps == H_snps || error("Number of SNPs in X = $snps does not equal SNPs in H = $H_snps. Run conformgt in VCFTools first.")
     people = nsamples(tgtfile)
     haplotypes = 2nsamples(reffile)
-    windows = floor(Int, snps / width)
-    chunks = ceil(Int, snps / 10000) # max 100k snps per chunk
-    snps_per_chunk = ceil(Int, snps / chunks)
     ph = [HaplotypeMosaicPair(snps) for i in 1:people] # phase information
+
+    # decide how to partition the data based on available memory 
+    snps_per_chunk = chunk_size(people, haplotypes)
+    chunks = ceil(Int, snps / snps_per_chunk)
 
     # convert vcf files to numeric matrices
     Xreader = VCF.Reader(openvcf(tgtfile, "r"))
@@ -211,9 +212,9 @@ function phase!(
         connect_happairs!(sol_path[id], nxt_pair[id], tree_err[id], hapset[i], λ = 1.0)
 
         # phase first window 
-        push!(ph[i].strand1.start, 1)
+        push!(ph[i].strand1.start, 1 + chunk_offset)
         push!(ph[i].strand1.haplotypelabel, sol_path[id][1][1])
-        push!(ph[i].strand2.start, 1)
+        push!(ph[i].strand2.start, 1 + chunk_offset)
         push!(ph[i].strand2.haplotypelabel, sol_path[id][1][2])
 
         # phase middle windows
