@@ -34,7 +34,7 @@ function phase(
     snps_per_chunk = chunk_size(people, haplotypes)
     chunks = ceil(Int, snps / snps_per_chunk)
 
-    # convert vcf files to numeric matrices
+    # setup reader to convert vcf files to numeric matrices
     Xreader = VCF.Reader(openvcf(tgtfile, "r"))
     Hreader = VCF.Reader(openvcf(reffile, "r"))
 
@@ -63,7 +63,7 @@ function phase(
         end
     end
 
-    # phase last chunk
+    # sync data to phase last (possibly only) chunk
     println("Running chunk $chunks / $chunks")
     remaining_snps = snps - ((chunks - 1) * snps_per_chunk)
     X = Matrix{Union{Float32, Missing}}(undef, remaining_snps, people)
@@ -416,66 +416,4 @@ function phase_fast!(
         end
         next!(pmeter) #update progress
     end
-end
-
-"""
-    impute!(X, H, phase)
-
-Imputes `X` completely using segments of haplotypes `H` where segments are stored in `phase`. 
-Non-missing entries in `X` can be different after imputation. 
-"""
-function impute!(
-    X::AbstractMatrix,
-    H::AbstractMatrix,
-    phase::Vector{HaplotypeMosaicPair}
-    )
-
-    fill!(X, 0)
-    # loop over individuals
-    for i in 1:size(X, 2)
-        for s in 1:(length(phase[i].strand1.start) - 1)
-            idx = phase[i].strand1.start[s]:(phase[i].strand1.start[s + 1] - 1)
-            X[idx, i] = H[idx, phase[i].strand1.haplotypelabel[s]]
-        end
-        idx = phase[i].strand1.start[end]:phase[i].strand1.length
-        X[idx, i] = H[idx, phase[i].strand1.haplotypelabel[end]]
-        for s in 1:(length(phase[i].strand2.start) - 1)
-            idx = phase[i].strand2.start[s]:(phase[i].strand2.start[s + 1] - 1)
-            X[idx, i] += H[idx, phase[i].strand2.haplotypelabel[s]]
-        end
-        idx = phase[i].strand2.start[end]:phase[i].strand2.length
-        X[idx, i] += H[idx, phase[i].strand2.haplotypelabel[end]]
-    end
-end
-
-"""
-    impute2!(X, H, phase)
-
-Imputes missing entries of `X` using corresponding haplotypes `H` via `phase` information. 
-Non-missing entries in `X` will not change. 
-"""
-function impute2!(
-    X::AbstractMatrix,
-    H::AbstractMatrix,
-    phase::Vector{HaplotypeMosaicPair}
-    )
-
-    p, n = size(X)
-
-    @inbounds for snp in 1:p, person in 1:n
-        if ismissing(X[snp, person])
-            #find where snp is located in phase
-            hap1_position = searchsortedlast(phase[person].strand1.start, snp)
-            hap2_position = searchsortedlast(phase[person].strand2.start, snp)
-
-            #find the correct haplotypes 
-            hap1 = phase[person].strand1.haplotypelabel[hap1_position]
-            hap2 = phase[person].strand2.haplotypelabel[hap2_position]
-
-            # imputation step 
-            X[snp, person] = H[snp, hap1] + H[snp, hap2]
-        end
-    end
-
-    return nothing
 end
