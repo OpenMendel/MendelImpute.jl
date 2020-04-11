@@ -19,10 +19,10 @@ module MendelImpute
     export compute_redundant_haplotypes!, redundant_haplotypes
     export HaplotypeMosaicPair, HaplotypeMosaic, UniqueHaplotypeMaps
     export simulate_genotypes2
-    export compute_optimal_halotype_set_prephased
+    export compute_optimal_halotype_pair
     export simulate_phased_genotypes
     export connect_happairs
-    export phase!, phase_fast!
+    export phase!, phase_fast!, phase_unique_only!
 
     # main functions that users are exposed to
     export phase

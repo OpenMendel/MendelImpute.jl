@@ -21,6 +21,7 @@ function phase(
     width::Int = 400,
     flankwidth::Int = round(Int, 0.1width),
     fast_method::Bool = false,
+    unique_only::Bool = false
     )
 
     # declare some constants
@@ -72,11 +73,17 @@ function phase(
     copy_ht_trans!(H, Hreader, msg = "Importing reference haplotype files...")
     
     # compute redundant haplotype sets
-    hs = compute_optimal_halotype_set(X, H, width = width, flankwidth=flankwidth, fast_method=fast_method)
+    if unique_only
+        hs = compute_optimal_halotype_pair(X, H, width = width, flankwidth=flankwidth)
+    else
+        hs = compute_optimal_halotype_set(X, H, width = width, flankwidth=flankwidth, fast_method=fast_method)
+    end
 
     # phase (haplotyping) current chunk
     offset = (chunks - 1) * snps_per_chunk
-    if fast_method
+    if unique_only
+        phase_unique_only!(ph, X, H, hs, width=width, flankwidth=flankwidth, chunk_offset=offset)
+    elseif fast_method
         phase_fast!(ph, X, H, hs, width=width, flankwidth=flankwidth, chunk_offset=offset)
     else
         phase!(ph, X, H, hs, width=width, flankwidth=flankwidth, chunk_offset=offset)
@@ -199,7 +206,6 @@ function phase!(
 
     # allocate working arrays
     Tu       = Tuple{Int, Int}
-    Pu       = Tuple{Float64, Tu}
     sol_path = [Vector{Tuple{Int, Int}}(undef, windows) for i in 1:Threads.nthreads()]
     nxt_pair = [[Int[] for i in 1:windows] for i in 1:Threads.nthreads()]
     tree_err = [[Float64[] for i in 1:windows] for i in 1:Threads.nthreads()]
@@ -415,5 +421,82 @@ function phase_fast!(
             end
         end
         next!(pmeter) #update progress
+    end
+end
+
+
+
+"""
+    phase_dp_fast!(X, H, width=400, verbose=true)
+
+Phasing (haplotying) of genotype matrix `X` from a pool of haplotypes `H`
+by dynamic programming. A precomputed, window-by-window haplotype pairs is assumed. 
+
+# Input
+* `X`: `p x n` matrix with missing values. Each column is genotypes of an individual.
+* `H`: `p x d` haplotype matrix. Each column is a haplotype.
+* `width`: width of the sliding window.
+* `verbose`: display algorithmic information.
+"""
+function phase_unique_only!(
+    ph::Vector{HaplotypeMosaicPair},
+    X::AbstractMatrix{Union{Missing, T}},
+    H::AbstractMatrix,
+    hapset::Vector{Vector{Tuple{Int, Int}}};
+    width::Int = 400,
+    flankwidth::Int = round(Int, 0.1width),
+    chunk_offset::Int = 0,
+    Xtrue::Union{AbstractMatrix, Nothing} = nothing, # for testing
+    ) where T <: Real
+
+    # declare some constants
+    snps, people = size(X)
+    haplotypes = size(H, 2)
+    windows = floor(Int, snps / width)
+    pmeter = Progress(people, 5, "Imputing samples...")
+
+    # loop over each person
+    Threads.@threads for i in 1:people
+        # phase first window 
+        push!(ph[i].strand1.start, 1 + chunk_offset)
+        push!(ph[i].strand1.haplotypelabel, hapset[i][1][1])
+        push!(ph[i].strand2.start, 1 + chunk_offset)
+        push!(ph[i].strand2.haplotypelabel, hapset[i][1][2])
+
+        # phase middle windows
+        for w in 2:(windows - 1)
+            Xwi = view(X, ((w - 2) * width + 1):(w * width), i)
+            Hw  = view(H, ((w - 2) * width + 1):(w * width), :)
+            hapset[i][w], bkpts = continue_haplotype(Xwi, Hw, hapset[i][w - 1], hapset[i][w])
+
+            # strand 1
+            if bkpts[1] > -1 && bkpts[1] < 2width
+                push!(ph[i].strand1.start, chunk_offset + (w - 2) * width + 1 + bkpts[1])
+                push!(ph[i].strand1.haplotypelabel, hapset[i][w][1])
+            end
+            # strand 2
+            if bkpts[2] > -1 && bkpts[2] < 2width
+                push!(ph[i].strand2.start, chunk_offset + (w - 2) * width + 1 + bkpts[2])
+                push!(ph[i].strand2.haplotypelabel, hapset[i][w][2])
+            end
+        end
+
+        # phase last window
+        Xwi = view(X, ((windows - 2) * width + 1):snps, i)
+        Hw  = view(H, ((windows - 2) * width + 1):snps, :)
+        hapset[i][windows], bkpts = continue_haplotype(Xwi, Hw, hapset[i][windows - 1], hapset[i][windows])
+        # strand 1
+        if bkpts[1] > -1 && bkpts[1] < 2width
+            push!(ph[i].strand1.start, chunk_offset + (windows - 2) * width + 1 + bkpts[1])
+            push!(ph[i].strand1.haplotypelabel, hapset[i][windows][1])
+        end
+        # strand 2
+        if bkpts[2] > -1 && bkpts[2] < 2width
+            push!(ph[i].strand2.start, chunk_offset + (windows - 2) * width + 1 + bkpts[2])
+            push!(ph[i].strand2.haplotypelabel, hapset[i][windows][2])
+        end
+
+        # update progress
+        next!(pmeter) 
     end
 end

@@ -1077,6 +1077,7 @@ width   = 800
 H = convert_ht(Float64, reffile, trans=true)
 X = convert_gt(Float64, tgtfile, trans=true)
 hapset = compute_optimal_halotype_set(X, H, width = width)
+happair = compute_optimal_halotype_pair(X, H, width = width)
 
 # hapset[1][1]
 @time sol_path, memory, path_err, best_err = connect_happairs(hapset[1]); # 0.077636 seconds (201 allocations: 676.344 KiB)
