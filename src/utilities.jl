@@ -190,7 +190,7 @@ function compute_optimal_halotype_pair(
     # In first window, calculate optimal haplotype pair among unique haplotypes
     cur_range   = Hunique.range[1]
     Hwork_tmp   = convert(Matrix{T}, @view(H[cur_range, Hunique.uniqueindex[1]]))
-    Xwork_tmp   = X[cur_range, :]
+    Xwork_tmp   = @view(X[cur_range, :])
     haploimpute!(Xwork_tmp, Hwork_tmp, M, N, happairs, hapscore)
 
     # store window 1's optimal happairs
@@ -206,7 +206,7 @@ function compute_optimal_halotype_pair(
     # resizable working arrays
     cur_range   = Hunique.range[2]
     Hwork       = ElasticArray{T}(@view(H[cur_range, Hunique.uniqueindex[2]]))
-    Xwork       = X[cur_range, :]
+    Xwork       = @view(X[cur_range, :])
     Xwork_float = zeros(T, size(Xwork))
 
     #TODO: make this loop multithreaded 
@@ -215,7 +215,10 @@ function compute_optimal_halotype_pair(
     # last   1/3: (      w * width + 1):((w + 1) * width)
     for w in 2:(windows - 1)
         # sync Xwork and Hwork with original data
-        M = resize_and_sync!(Xwork, Hwork, Hunique.uniqueindex[w], Hunique.range[w], X, H, M, N)
+        next_dim = length(Hunique.uniqueindex[w])
+        Xwork = view(X, Hunique.range[w], :)
+        size(M, 1) != next_dim && (M = zeros(T, next_dim, next_dim)) # M must be reallocated since Julia can't resize matrix
+        resize_and_sync!(Hwork, N, Hunique.uniqueindex[w], Hunique.range[w], H)
 
         # Calculate optimal haplotype pair among unique haplotypes
         haploimpute!(Xwork, Hwork, M, N, happairs, hapscore, Xfloat=Xwork_float)
@@ -235,7 +238,7 @@ function compute_optimal_halotype_pair(
     last_range  = Hunique.range[end]
     num_uniq    = length(Hunique.uniqueindex[end])
     Hwork       = convert(Matrix{T}, @view(H[last_range, Hunique.uniqueindex[end]]))
-    Xwork       = X[last_range, :]
+    Xwork       = @view(X[last_range, :])
     M           = zeros(T, num_uniq, num_uniq)
     N           = zeros(T, people, num_uniq)
     haploimpute!(Xwork, Hwork, M, N, happairs, hapscore)
