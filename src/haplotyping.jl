@@ -212,6 +212,9 @@ function phase!(
     pmeter   = Progress(people, 5, "Imputing samples...")
 
     # loop over each person
+    # first  1/3: ((w - 2) * width + 1):((w - 1) * width)
+    # middle 1/3: ((w - 1) * width + 1):(      w * width)
+    # last   1/3: (      w * width + 1):((w + 1) * width)
     Threads.@threads for i in 1:people
         # first find optimal haplotype pair in each window using dynamic programming
         id = Threads.threadid()
@@ -376,7 +379,10 @@ function phase_fast!(
         push!(ph[i].strand2.haplotypelabel, hap2)
     end
 
-    # find optimal break points and record info to phase. 
+    # find optimal break points and record info to phase
+    # first  1/3: ((w - 2) * width + 1):((w - 1) * width)
+    # middle 1/3: ((w - 1) * width + 1):(      w * width)
+    # last   1/3: (      w * width + 1):((w + 1) * width)
     pmeter = Progress(people, 5, "Merging breakpoints...")
     strand1_intersect = [copy(chain_next[1]) for i in 1:Threads.nthreads()]
     strand2_intersect = [copy(chain_next[2]) for i in 1:Threads.nthreads()]
@@ -474,6 +480,9 @@ function phase_unique_only!(
     pmeter = Progress(people, 5, "Imputing samples...")
 
     # loop over each person
+    # first  1/3: ((w - 2) * width + 1):((w - 1) * width)
+    # middle 1/3: ((w - 1) * width + 1):(      w * width)
+    # last   1/3: (      w * width + 1):((w + 1) * width)
     Threads.@threads for i in 1:people
         # phase first window 
         push!(ph[i].strand1.start, 1 + chunk_offset)

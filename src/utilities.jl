@@ -136,9 +136,7 @@ function compute_optimal_halotype_set(
     happairs = [[Tuple{Int, Int}[] for i in 1:people] for _ in 1:threads]
     hapscore = [zeros(T, people) for _ in 1:threads]
 
-    # first  1/3: ((w - 2) * width + 1):((w - 1) * width)
-    # middle 1/3: ((w - 1) * width + 1):(      w * width)
-    # last   1/3: (      w * width + 1):((w + 1) * width)
+    # loop through each window
     Threads.@threads for w in 2:(windows - 1)
         id = Threads.threadid()
 
@@ -204,13 +202,10 @@ function compute_optimal_halotype_pair(
     Hwork_tmp   = convert(Matrix{T}, @view(H[cur_range, Hunique.uniqueindex[1]]))
     Xwork_tmp   = @view(X[cur_range, :])
     haploimpute!(Xwork_tmp, Hwork_tmp, M, N, happairs, hapscore)
-
-    # store window 1's optimal happairs
     for k in 1:people
         Hi_uniqueidx, Hj_uniqueidx = happairs[k][1]
         Hi_idx = Hunique.uniqueindex[1][Hi_uniqueidx]
         Hj_idx = Hunique.uniqueindex[1][Hj_uniqueidx]
-
         optimal_happairs[k][1] = (Hi_idx, Hj_idx)
     end
     next!(pmeter)
@@ -234,9 +229,7 @@ function compute_optimal_halotype_pair(
     happairs = [[Tuple{Int, Int}[] for i in 1:people] for _ in 1:threads]
     hapscore = [zeros(T, people) for _ in 1:threads]
 
-    # first  1/3: ((w - 2) * width + 1):((w - 1) * width)
-    # middle 1/3: ((w - 1) * width + 1):(      w * width)
-    # last   1/3: (      w * width + 1):((w + 1) * width)
+    # loop through each window
     Threads.@threads for w in 2:(windows - 1)
         id = Threads.threadid()
 
