@@ -121,6 +121,7 @@ function compute_optimal_halotype_set(
     threads = Threads.nthreads()
     M = Vector{Matrix{T}}(undef, threads)
     N = Vector{ElasticArray{T}}(undef, threads)
+    Xwork       = Vector{AbstractMatrix{Union{T, Missing}}}(undef, threads)
     Xwork_float = Vector{Matrix{T}}(undef, threads)
     Hwork_float = Vector{ElasticArray{T}}(undef, threads)
     for id in 1:threads 
@@ -143,16 +144,16 @@ function compute_optimal_halotype_set(
 
         # sync working arrays with current window's data
         next_dim = length(Hunique.uniqueindex[w])
-        Xwork = view(X, Hunique.range[w], :)
+        Xwork[id] = view(X, Hunique.range[w], :)
         size(M[id], 1) != next_dim && (M[id] = zeros(T, next_dim, next_dim)) # Julia can't resize matrix, at least not till 2.0
         resize_and_sync!(Hwork_float[id], N[id], Hunique.uniqueindex[w], Hunique.range[w], H)
 
         # Calculate optimal haplotype pair among unique haplotypes
-        haploimpute!(Xwork, Hwork_float[id], M[id], N[id], happairs[id], hapscore[id], Xfloat=Xwork_float[id])
+        haploimpute!(Xwork[id], Hwork_float[id], M[id], N[id], happairs[id], hapscore[id], Xfloat=Xwork_float[id])
 
         # find all haplotypes matching the optimal haplotype pairs
         compute_redundant_haplotypes!(redundant_haplotypes, Hunique, happairs[id], w, fast_method=fast_method)
-    
+
         # update progress
         next!(pmeter)
     end
@@ -342,7 +343,6 @@ function compute_redundant_haplotypes!(
     happairs::Vector{Vector{T}}, 
     window::Int;
     fast_method::Bool = false,
-    dp_fast::Bool = false
     ) where T <: Tuple{Int, Int}
     
     people = length(redundant_haplotypes)
