@@ -106,7 +106,7 @@ function compute_optimal_halotype_set(
     hapscore    = zeros(T, people)
     num_uniq    = length(Hunique.uniqueindex[1])
     M           = zeros(T, num_uniq, num_uniq)
-    N           = ElasticArray{T}(undef, people, num_uniq) # array type that allows rescaling last dim 
+    N           = zeros(T, people, num_uniq)
     pmeter      = Progress(windows, 5, "Computing optimal haplotype pairs...")
 
     # In first window, calculate optimal haplotype pair among unique haplotypes
@@ -215,33 +215,48 @@ function compute_optimal_halotype_pair(
     end
     next!(pmeter)
 
-    # resizable working arrays
-    cur_range   = Hunique.range[2]
-    Hwork       = ElasticArray{T}(@view(H[cur_range, Hunique.uniqueindex[2]]))
-    Xwork       = @view(X[cur_range, :]) 
-    Xwork_float = zeros(T, size(Xwork))
+    # new resizable working arrays for remaining windows since window 1's size may be different
+    threads = Threads.nthreads()
+    M = Vector{Matrix{T}}(undef, threads)
+    N = Vector{ElasticArray{T}}(undef, threads)
+    Xwork       = Vector{AbstractMatrix{Union{T, Missing}}}(undef, threads)
+    Xwork_float = Vector{Matrix{T}}(undef, threads)
+    Hwork_float = Vector{ElasticArray{T}}(undef, threads)
+    for id in 1:threads 
+        win = id + 1 #avoid window 1
+        cur_range = Hunique.range[win]
+        num_uniq  = length(cur_range)
+        Hwork_float[id] = ElasticArray{T}(@view(H[cur_range, Hunique.uniqueindex[win]]))
+        Xwork_float[id] = zeros(T, num_uniq, people)
+        M[id] = zeros(T, num_uniq, num_uniq)
+        N[id] = ElasticArray{T}(undef, people, num_uniq)
+    end
+    happairs = [[Tuple{Int, Int}[] for i in 1:people] for _ in 1:threads]
+    hapscore = [zeros(T, people) for _ in 1:threads]
 
-    #TODO: make this loop multithreaded 
     # first  1/3: ((w - 2) * width + 1):((w - 1) * width)
     # middle 1/3: ((w - 1) * width + 1):(      w * width)
     # last   1/3: (      w * width + 1):((w + 1) * width)
-    for w in 2:(windows - 1)
-        # sync Xwork and Hwork with original data
+    Threads.@threads for w in 2:(windows - 1)
+        id = Threads.threadid()
+
+        # sync working arrays with current window's data
         next_dim = length(Hunique.uniqueindex[w])
-        Xwork = view(X, Hunique.range[w], :)
-        size(M, 1) != next_dim && (M = zeros(T, next_dim, next_dim)) # M must be reallocated since Julia can't resize matrix
-        resize_and_sync!(Hwork, N, Hunique.uniqueindex[w], Hunique.range[w], H)
+        Xwork[id] = view(X, Hunique.range[w], :)
+        size(M[id], 1) != next_dim && (M[id] = zeros(T, next_dim, next_dim)) # Julia can't resize matrix, at least not till 2.0
+        resize_and_sync!(Hwork_float[id], N[id], Hunique.uniqueindex[w], Hunique.range[w], H)
 
         # Calculate optimal haplotype pair among unique haplotypes
-        haploimpute!(Xwork, Hwork, M, N, happairs, hapscore, Xfloat=Xwork_float)
+        haploimpute!(Xwork[id], Hwork_float[id], M[id], N[id], happairs[id], hapscore[id], Xfloat=Xwork_float[id])
 
         # store current window's optimal happairs
         for k in 1:people
-            Hi_uniqueidx, Hj_uniqueidx = happairs[k][1]
+            Hi_uniqueidx, Hj_uniqueidx = happairs[id][k][1]
             Hi_idx = Hunique.uniqueindex[w][Hi_uniqueidx]
             Hj_idx = Hunique.uniqueindex[w][Hj_uniqueidx]
             optimal_happairs[k][w] = (Hi_idx, Hj_idx)
         end
+
         # update progress
         next!(pmeter)
     end
@@ -249,13 +264,13 @@ function compute_optimal_halotype_pair(
     # last window reallocate everything 
     last_range  = Hunique.range[end]
     num_uniq    = length(Hunique.uniqueindex[end])
-    Hwork       = convert(Matrix{T}, @view(H[last_range, Hunique.uniqueindex[end]]))
+    Hwork_float = convert(Matrix{T}, @view(H[last_range, Hunique.uniqueindex[end]]))
     Xwork       = @view(X[last_range, :])
     M           = zeros(T, num_uniq, num_uniq)
     N           = zeros(T, people, num_uniq)
-    haploimpute!(Xwork, Hwork, M, N, happairs, hapscore)
+    haploimpute!(Xwork, Hwork_float, M, N, happairs[1], hapscore[1])
     for k in 1:people
-        Hi_uniqueidx, Hj_uniqueidx = happairs[k][1]
+        Hi_uniqueidx, Hj_uniqueidx = happairs[1][k][1]
         Hi_idx = Hunique.uniqueindex[windows][Hi_uniqueidx]
         Hj_idx = Hunique.uniqueindex[windows][Hj_uniqueidx]
         optimal_happairs[k][windows] = (Hi_idx, Hj_idx)
