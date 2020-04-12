@@ -1573,3 +1573,79 @@ end
 get(s) = (s == "GT" ? true : false)
 
 @time test()
+
+
+
+
+
+
+
+# speedup search for best happair
+
+using Revise
+using BenchmarkTools
+using MendelImpute
+using Random
+using LinearAlgebra
+using LoopVectorization
+
+Random.seed!(123)
+n = 500   # number of individuals
+p = 400   # number of SNPs in current window
+d = 4000  # number of (unique) reference haplotypes
+H = convert(Matrix{Float32}, rand(0:1, p, d))
+X = convert(Matrix{Float32}, rand(0:2, p, n))
+M = Transpose(H) * H
+for j in 1:d, i in 1:(j - 1) # off-diagonal
+    M[i, j] = 2M[i, j] + M[i, i] + M[j, j]
+end
+for j in 1:d # diagonal
+    M[j, j] *= 4
+end
+N = Transpose(X) * H
+for I in eachindex(N)
+    N[I] *= 2
+end
+happairs = [Tuple{Int, Int}[] for i in 1:n]
+hapscore = zeros(eltype(N), n)
+
+function haplopair_test!(
+    happairs::Vector{Vector{Tuple{Int, Int}}},
+    hapmin::Vector,
+    M::AbstractMatrix{T},
+    N::AbstractMatrix{T},
+    interval::T = convert(T, 3)
+    ) where T <: Real
+
+    n, d = size(N)
+    fill!(hapmin, typemax(eltype(hapmin)))
+    empty!.(happairs)
+
+    @inbounds for k in 1:d, j in 1:k
+        # loop over individuals
+        @simd for i in 1:n
+            score = M[j, k] - N[i, j] - N[i, k]
+            # keep all previous best pairs
+            if score < hapmin[i]
+                push!(happairs[i], (j, k))
+                hapmin[i] = score
+            end
+        end
+    end
+
+    return nothing
+end
+
+Threads.nthreads()
+@time haplopair_test!(happairs, hapscore, M, N)
+happairs
+
+
+# single thread original code
+@benchmark haplopair_test!(happairs, hapscore, M, N) # 4.894 s, 4.06 KiB, 1 alloc 
+
+# 4 threads, parallelizing by sample
+@benchmark haplopair_test!(happairs, hapscore, M, N) # 3.891 s, 6.92 KiB, 31 alloc 
+
+
+

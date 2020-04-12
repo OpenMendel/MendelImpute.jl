@@ -83,14 +83,8 @@ function compute_optimal_halotype_set(
     width::Int = 400,
     flankwidth::Int = round(Int, 0.1width),
     verbose::Bool = true,
-    prephased::Bool = false,
     fast_method::Bool = false,
-    Xtrue::Union{AbstractMatrix, Nothing} = nothing # for testing
     ) where T <: Real
-
-    if prephased
-        return compute_optimal_halotype_set_prephased(X, H, width=width)
-    end
 
     # define some constants
     snps, people = size(X)
@@ -107,13 +101,6 @@ function compute_optimal_halotype_set(
     # get unique haplotype indices and maps for each window
     Hunique = unique_haplotypes(H, width, 'T', flankwidth = flankwidth)
 
-    # for testing
-    if isnothing(Xtrue)
-        Xtrue_work = nothing
-    else
-        Xtrue_work = Xtrue[1:width, :]
-    end
-
     # allocate working arrays
     happairs    = [Tuple{Int, Int}[] for i in 1:people] # tracks unique haplotype pairs in a window
     hapscore    = zeros(T, people)
@@ -125,8 +112,8 @@ function compute_optimal_halotype_set(
     # In first window, calculate optimal haplotype pair among unique haplotypes
     cur_range   = Hunique.range[1]
     Hwork_tmp   = convert(Matrix{T}, @view(H[cur_range, Hunique.uniqueindex[1]]))
-    Xwork_tmp   = X[cur_range, :]
-    haploimpute!(Xwork_tmp, Hwork_tmp, M, N, happairs, hapscore, Xtrue=Xtrue_work)
+    Xwork_tmp   = @view(X[cur_range, :])
+    haploimpute!(Xwork_tmp, Hwork_tmp, M, N, happairs, hapscore)
 
     # find all haplotypes matching the optimal haplotype pairs
     compute_redundant_haplotypes!(redundant_haplotypes, Hunique, happairs, 1, fast_method=fast_method)
@@ -135,7 +122,7 @@ function compute_optimal_halotype_set(
     # resizable working arrays (need new ones since window 1's size is different)
     cur_range   = Hunique.range[2]
     Hwork       = ElasticArray{T}(@view(H[cur_range, Hunique.uniqueindex[2]]))
-    Xwork       = X[cur_range, :]
+    Xwork       = @view(X[cur_range, :])
     Xwork_float = zeros(T, size(Xwork))
 
     #TODO: make this loop multithreaded 
@@ -143,13 +130,14 @@ function compute_optimal_halotype_set(
     # middle 1/3: ((w - 1) * width + 1):(      w * width)
     # last   1/3: (      w * width + 1):((w + 1) * width)
     for w in 2:(windows - 1)
-        # sync Xwork and Hwork with original data
-        cur_range = Hunique.range[w]
-        M = resize_and_sync!(Xwork, Hwork, Hunique.uniqueindex[w], cur_range, X, H, M, N)
-        isnothing(Xtrue) || copyto!(Xtrue_work, view(Xtrue, cur_range, :)) # for testing
+        # sync working arrays with current window's data
+        next_dim = length(Hunique.uniqueindex[w])
+        Xwork = view(X, Hunique.range[w], :)
+        size(M, 1) != next_dim && (M = zeros(T, next_dim, next_dim)) # M must be reallocated since Julia can't resize matrix
+        resize_and_sync!(Hwork, N, Hunique.uniqueindex[w], Hunique.range[w], H)
 
         # Calculate optimal haplotype pair among unique haplotypes
-        haploimpute!(Xwork, Hwork, M, N, happairs, hapscore, Xfloat=Xwork_float, Xtrue=Xtrue_work)
+        haploimpute!(Xwork, Hwork, M, N, happairs, hapscore, Xfloat=Xwork_float)
 
         # find all haplotypes matching the optimal haplotype pairs
         compute_redundant_haplotypes!(redundant_haplotypes, Hunique, happairs, w, fast_method=fast_method)
@@ -162,7 +150,7 @@ function compute_optimal_halotype_set(
     last_range  = Hunique.range[end]
     num_uniq    = length(Hunique.uniqueindex[end])
     Hwork       = convert(Matrix{T}, @view(H[last_range, Hunique.uniqueindex[end]]))
-    Xwork       = X[last_range, :]
+    Xwork       = @view(X[last_range, :])
     M           = zeros(T, num_uniq, num_uniq)
     N           = zeros(T, people, num_uniq)
     haploimpute!(Xwork, Hwork, M, N, happairs, hapscore)
@@ -400,50 +388,32 @@ function compute_redundant_haplotypes!(
 end
 
 """
-    resize_and_sync!(X, H, M, N, Xwork, Hwork, Hnext, window)
+    resize_and_sync!(Hwork, next_d, window, H, N)
 
-Up/downsizes the dimension of `Hwork`, `M`, and `N` and copies relevant information into `Xwork` and `Hwork`. 
+Up/downsizes the dimension of `Hwork` and `N`, and copies relevant information into `Hwork`. 
 
 # Inputs
-* `Xwork`: Worker matrix storing X[window, :]. 
 * `Hwork`: Haplotype matrix in the current window containing only unique haplotypes. Must add/subtract columns. 
-* `Hnext`: The unique haplotype indices of the next haplotype window. 
-* `window`: Indices of current window. 
-* `X`: Full genotype matrix. Each column is a person's haplotype
-* `H`: Full haplotype reference panel. Each column is a haplotype
-* `M`: Square matrix used in the computational routine. Must be resized in both dimension. 
 * `N`: Matrix used in the computational routine. Must add/subtract columns. 
-
-TODO: check how ReshapedArray cause type instability and if it is significant overhead
+* `next_d`: Number of unique haplotypes in next window. 
+* `window`: Indices of current window. 
+* `H`: Full haplotype reference panel. Each column is a haplotype
 """
 function resize_and_sync!(
-    Xwork::AbstractMatrix,
     Hwork::ElasticArray,
+    N::ElasticArray,
     Hnext::Vector{Int},
     window::UnitRange{Int},
-    X::AbstractMatrix,
     H::AbstractMatrix,
-    M::AbstractMatrix,
-    N::ElasticArray,
     )
-    next_d = length(Hnext) # size of next dimension
-
-    # resize working arrays M and N
-    if size(M, 1) != next_d
+    next_d = length(Hnext)
+    if size(N, 1) != next_d
         resize!(N, size(N, 1), next_d)
-        Mnew = zeros(eltype(M), next_d, next_d)
-    else
-        Mnew = M
     end
-
-    # sync Xwork and Hwork with original data
     if size(Hwork, 2) != next_d
         resize!(Hwork, size(Hwork, 1), next_d)
     end
-    copyto!(Xwork, view(X, window, :))
     copyto!(Hwork, view(H, window, Hnext))
-
-    return Mnew
 end
 
 """
@@ -1036,8 +1006,8 @@ and haplotype panels are BitArrays (1 bit per entry).
 function chunk_size(people::Int, haplotypes::Int)
     system_memory_gb = Sys.total_memory() / 2^30
     system_memory_bits = 8000000000 * system_memory_gb
-    system_memory_bits *= round(Int, 2 / 3) # use 2/3 of memory for genotype and haplotype matrix per chunk
-    max_chunk_size = round(Int, system_memory_bits / (haplotypes + 32people))
+    usable_bits = round(Int, system_memory_bits * 2 / 3) # use 2/3 of memory for genotype and haplotype matrix per chunk
+    max_chunk_size = round(Int, usable_bits / (haplotypes + 32people))
     return max_chunk_size
 end
 

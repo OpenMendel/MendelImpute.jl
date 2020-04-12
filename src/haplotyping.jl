@@ -223,6 +223,22 @@ function phase!(
         push!(ph[i].strand2.start, 1 + chunk_offset)
         push!(ph[i].strand2.haplotypelabel, sol_path[id][1][2])
 
+        # don't search breakpoints
+        # for w in 2:windows
+        #     u, j = sol_path[id][w - 1] # haplotype pair in previous window
+        #     k, l = sol_path[id][w]     # haplotype pair in current window
+
+        #     # switch current window's pair order if 1 or 2 haplotype match
+        #     if (u == l && j == k) || (j == k && u ≠ l) || (u == l && j ≠ k)
+        #         k, l = l, k 
+        #     end
+
+        #     push!(ph[i].strand1.start, chunk_offset + (w - 1) * width + 1)
+        #     push!(ph[i].strand1.haplotypelabel, k)
+        #     push!(ph[i].strand2.start, chunk_offset + (w - 1) * width + 1)
+        #     push!(ph[i].strand2.haplotypelabel, l)
+        # end
+
         # phase middle windows
         for w in 2:(windows - 1)
             Xwi = view(X, ((w - 2) * width + 1):(w * width), i)
@@ -255,7 +271,9 @@ function phase!(
             push!(ph[i].strand2.start, chunk_offset + (windows - 2) * width + 1 + bkpts[2])
             push!(ph[i].strand2.haplotypelabel, sol_path[id][windows][2])
         end
-        next!(pmeter) #update progress
+
+        # update progress
+        next!(pmeter)
     end
 end
 
@@ -456,7 +474,7 @@ function phase_unique_only!(
     pmeter = Progress(people, 5, "Imputing samples...")
 
     # loop over each person
-    for i in 1:people
+    Threads.@threads for i in 1:people
         # phase first window 
         push!(ph[i].strand1.start, 1 + chunk_offset)
         push!(ph[i].strand1.haplotypelabel, hapset[i][1][1]) # i'th person, 1st window, 1 haplotype
@@ -479,7 +497,7 @@ function phase_unique_only!(
             push!(ph[i].strand2.haplotypelabel, l)
         end
 
-        # # phase middle windows
+        # phase middle windows
         # for w in 2:(windows - 1)
         #     Xwi = view(X, ((w - 2) * width + 1):(w * width), i)
         #     Hw  = view(H, ((w - 2) * width + 1):(w * width), :)
