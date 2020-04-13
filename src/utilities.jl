@@ -902,7 +902,7 @@ function continue_haplotype(
         return (l, k), breakpt2
     end
 
-    # width = Int(length(X) / 2)
+    # width = round(Int, length(X) / 2) # must use round since last window width might not be integer
     # return (k, l), (width, width)
 end
 
