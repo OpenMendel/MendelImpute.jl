@@ -26,7 +26,7 @@ function make_refvcf_file(
 
     # first write minimal meta information
     io = openvcf(vcffilename, "w")
-    write(io, "##fileformat=VCFv4.3\n")
+    write(io, "##fileformat=VCFv4.2\n")
     write(io, "##source=MendelImpute\n")
     write(io, "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n")
 
@@ -46,6 +46,30 @@ function make_refvcf_file(
         write(io, "\n")
     end
     close(io)
+end
+
+"""
+    extract_marker_info(vcffile)
+
+Extracts each marker's basic info (CHROM, POS, ID, REF, ALT) and return in separate vectors.
+"""
+function extract_marker_info(vcffile::String)
+    reader = VCF.Reader(openvcf(vcffile))
+    p = nrecords(vcffile)
+
+    marker_chr = Vector{String}(undef, p)
+    marker_pos = zeros(p)
+    marker_ID  = Vector{Vector{String}}(undef, p)
+    marker_REF = Vector{String}(undef, p)
+    marker_ALT = Vector{Vector{String}}(undef, p)
+    for (i, record) in enumerate(reader)
+        marker_chr[i] = VCF.chrom(record)
+        marker_pos[i] = VCF.pos(record)
+        marker_ID[i]  = VCF.id(record)
+        marker_REF[i] = VCF.ref(record)
+        marker_ALT[i] = VCF.alt(record)
+    end
+    return marker_chrom, marker_pos, marker_ID, marker_REF, marker_ALT
 end
 
 """
@@ -81,7 +105,7 @@ function make_tgtvcf_file(
 
     # first write minimal meta information
     io = openvcf(vcffilename, "w")    
-    write(io, "##fileformat=VCFv4.3\n")
+    write(io, "##fileformat=VCFv4.2\n")
     write(io, "##source=MendelImpute\n")
     write(io, "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n")
 
@@ -185,16 +209,20 @@ end
 """
     simulate_genotypes(H; block_length)
 
-Simulates a genotype matrix `X` from a pool of haplotypes `H`. Each person's
-genotype are divided into contiguous segments, and 2 haplotypes are randomly
-chosen from a pool of haplotypes `H` to form the genotype in that segment. 
+Simulates a genotype matrix `X` from a pool of haplotypes `H`. 
+
+Each person's 2 haplotypes are divided into contiguous segments, and a haplotype
+are randomly chosen from a pool of haplotypes `H` to form that segment. At most
+1 cross-over will occur within a window, and no crossing can occur in first or 
+last window. 
 
 # Arguments:
 - `H`: `p x d` haplotype matrix. Each column is a haplotype. 
-- `people`: number of samples
-- `T`: Type of output matrix. 
+- `people`: number of samples.
+- `T`: Type of output matrix, default `Float32`.
 - `min_cross_over`: Minimum number of breakpoints for each person's genotype. 
 - `max_cross_over`: Maximum number of breakpoints for each person's genotype. 
+- `width`: Number of SNPs in a window. 
 
 # Output:
 * `X`: `p x people` genotype matrix. Each column is a person's genotype. 
@@ -202,9 +230,11 @@ chosen from a pool of haplotypes `H` to form the genotype in that segment.
 function simulate_genotypes(
     H::AbstractMatrix,
     people::Int;
-    T::Type = Int,
+    T::Type = Float32,
     min_cross_over::Int64=1,
     max_cross_over::Int64=5,
+    unphase::Bool = false,
+    width::Int = 400
     )
     
     p, d = size(H)
@@ -214,7 +244,7 @@ function simulate_genotypes(
     # loop through each person
     segments = UnitRange{Int64}[]
     sizehint!(segments, max_cross_over)
-    for i in 1:people
+    for i in 1:people, strand in 1:2
         # simulate cross overs. no crossovers in first/last windows and 2 crossover cannot occur within 1 window
         cross_overs = rand(min_cross_over:max_cross_over)
         cross_over_location = collect(1:cross_overs)
@@ -224,7 +254,7 @@ function simulate_genotypes(
             cross_overs == 1 && break
             minimum(diff(cross_over_location)) > width && break
         end
-        #create various segments vased on cross over points
+        #create various segments (i.e. ranges) based on cross over points
         empty!(segments)
         push!(segments, 1:cross_over_location[1])
         for j in 1:(length(cross_over_location) - 1)
@@ -233,8 +263,7 @@ function simulate_genotypes(
         push!(segments, (cross_over_location[end] + 1):p)
         # fill X with sum of 2 randomly chosen haplotypes in each segment
         for cur_range in segments
-            h1, h2 = rand(1:d), rand(1:d)
-            X[cur_range, i] .= convert.(T, H[cur_range, h1] .+ H[cur_range, h2])
+            X[cur_range, i] .+= convert.(T, H[cur_range, rand(1:d)])
         end
     end
     return X
