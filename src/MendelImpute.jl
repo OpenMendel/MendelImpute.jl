@@ -31,6 +31,7 @@ module MendelImpute
     export make_refvcf_file, make_tgtvcf_file
     export simulate_uniform_haplotypes, simulate_markov_haplotypes, simulate_genotypes
     export unphase, compress_vcf_to_gz
+    export extract_marker_info
 
     include("data_structures.jl")
     include("haplotyping.jl")

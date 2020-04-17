@@ -713,13 +713,13 @@ using BenchmarkTools
 using Random
 using ElasticArrays
 
-p = 1000
+p = 10000
 d = 250
 
 Random.seed!(2019)
 
 H = simulate_markov_haplotypes(p, d)
-X = simulate_genotypes(H, people = 100)
+X = simulate_genotypes(H, 100)
 
 count(iszero, H) #124388
 count(isone, H) #125612
@@ -1648,4 +1648,17 @@ happairs
 @benchmark haplopair_test!(happairs, hapscore, M, N) # 3.891 s, 6.92 KiB, 31 alloc 
 
 
+
+
+
+using Revise
+using GeneticVariation
+using Random
+using VCFTools
+using BenchmarkTools
+using MendelImpute
+
+cd("/Users/biona001/.julia/dev/VCFTools/test")
+vcffile = "test.08Jun17.d8b.vcf"
+marker_chrom, marker_pos, marker_ID, marker_REF, marker_ALT = extract_marker_info(vcffile)
 
