@@ -33,10 +33,14 @@ module MendelImpute
     export unphase, compress_vcf_to_gz
     export extract_marker_info
 
+    # imputation
+    export impute_typed_only
+
     include("data_structures.jl")
     include("haplotyping.jl")
     include("utilities.jl")
     include("simulate_utilities.jl")
     include("dynamic_programming.jl")
+    include("impute.jl")
 
 end # module
