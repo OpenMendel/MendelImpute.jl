@@ -10,7 +10,10 @@ by sliding windows and saves result in `outfile`.
 
 # Optional Inputs
 - `outfile`: output filename. Output genotypes will be phased with no missing data.
-- `width`  : number of SNPs (markers) in each sliding window. 
+- `impute`: If `true`, untyped SNPs will be imputed, otherwise only missing snps in `tgtfile` will be imputed. 
+- `chrom`: chromosome name, must be identical in target and reference files
+- `reffile_aligned`: phased reference file with number of snps matching `tgtfile`. 
+- `width`: number of SNPs (markers) in each sliding window. 
 - `flankwidth`: Number of SNPs flanking the sliding window (defaults to 10% of `width`)
 - `fast_method`: If `true`, will use window-by-window intersection for phasing. If `false`, phasing uses dynamic progrmaming. 
 """
@@ -18,17 +21,26 @@ function phase(
     tgtfile::AbstractString,
     reffile::AbstractString;
     outfile::AbstractString = "imputed." * tgtfile,
+    impute::Bool = false,
+    chrom::AbstractString = "22", # TODO change this to whatever chrom is in tgt/ref file
+    reffile_aligned::AbstractString = reffile,
     width::Int = 400,
     flankwidth::Int = round(Int, 0.1width),
     fast_method::Bool = false,
     unique_only::Bool = false
     )
 
+    # if target and ref file not aligned, create aligned ref file where size(align_ref, 1) == size(tgt, 1)
+    tgt_snps, ref_snps = nrecords(tgtfile), nrecords(reffile)
+    if tgt_snps < ref_snps
+        conformgt_by_pos(reffile, tgtfile, "aligned", chrom, 1:typemax(Int))
+        rm("aligned.tgt.vcf.gz", force=true) # only keep aligned ref file. TODO: what if aligned.tgt has snps filtered out?
+        reffile_aligned = "aligned.ref.vcf.gz"
+    end
+
     # declare some constants
-    snps, H_snps = nrecords(tgtfile), nrecords(reffile)
-    snps == H_snps || error("Number of SNPs in X = $snps does not equal SNPs in H = $H_snps. Run conformgt in VCFTools first.")
     people = nsamples(tgtfile)
-    haplotypes = 2nsamples(reffile)
+    haplotypes = 2nsamples(reffile_aligned)
     ph = [HaplotypeMosaicPair(snps) for i in 1:people] # phase information
 
     # decide how to partition the data based on available memory 
@@ -37,7 +49,7 @@ function phase(
 
     # setup reader to convert vcf files to numeric matrices
     Xreader = VCF.Reader(openvcf(tgtfile, "r"))
-    Hreader = VCF.Reader(openvcf(reffile, "r"))
+    Hreader = VCF.Reader(openvcf(reffile_aligned, "r"))
 
     # automatic chunking if too many snps
     if chunks > 1
@@ -92,8 +104,12 @@ function phase(
     end
 
     # impute
-    impute_typed_only(tgtfile, reffile, outfile, ph, H, chunks, snps_per_chunk)
-    
+    if impute
+        impute_untyped(tgtfile, reffile, outfile, ph, H, chunks, snps_per_chunk)
+    else
+        impute_typed_only(tgtfile, reffile, outfile, ph, H, chunks, snps_per_chunk)
+    end
+
     return hs, ph
 end
 

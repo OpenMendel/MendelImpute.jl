@@ -115,7 +115,6 @@ function impute_untyped(
     H::AbstractMatrix,
     chunks::Int,
     snps_per_chunk::Int,
-    haplotypes::Int,
     )
 
     # convert phase's starting position from matrix index to marker position
@@ -127,6 +126,7 @@ function impute_untyped(
     tgt_record = read(tgt_reader)
     writer = VCF.Writer(openvcf(outfile, "w"), header(ref_reader))
     pmeter = Progress(size(H, 1), 5, "Writing to file...")
+    haplotypes = size(H, 2)
 
     if chunks > 1
         # TODO
