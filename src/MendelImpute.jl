@@ -35,6 +35,7 @@ module MendelImpute
 
     # imputation
     export impute_typed_only
+    export update_marker_position!
 
     include("data_structures.jl")
     include("haplotyping.jl")

@@ -92,7 +92,7 @@ function phase(
     end
 
     # impute
-    impute_typed_only(tgtfile, reffile, outfile, ph, H, chunks, snps_per_chunk, haplotypes)
+    impute_typed_only(tgtfile, reffile, outfile, ph, H, chunks, snps_per_chunk)
     
     return hs, ph
 end
