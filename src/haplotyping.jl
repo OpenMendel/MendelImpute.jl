@@ -107,9 +107,9 @@ function phase(
 
     # impute
     if impute
-        impute_untyped(tgtfile, reffile_aligned, outfile, ph, H, chunks, snps_per_chunk, remaining_snps)
+        impute_untyped(tgtfile, reffile, outfile, ph, H, chunks, snps_per_chunk, remaining_snps)
     else
-        impute_typed_only(tgtfile, reffile, outfile, ph, H, chunks, snps_per_chunk, remaining_snps)
+        impute_typed_only(tgtfile, reffile_aligned, outfile, ph, H, chunks, snps_per_chunk, remaining_snps)
     end
 
     return hs, ph
