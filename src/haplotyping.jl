@@ -2,7 +2,8 @@
     phase(tgtfile, reffile; [outfile], [width], [flankwidth], [fast_method])
 
 Phasing (haplotying) of `tgtfile` from a pool of haplotypes `reffile`
-by sliding windows and saves result in `outfile`. 
+by sliding windows and saves result in `outfile`. Will also create an aligned 
+reference `aligned.ref.vcf.gz` file matching `tgtfile` position by position. 
 
 # Input
 - `reffile`: VCF file with reference genotype (GT) data
@@ -31,7 +32,8 @@ function phase(
     )
 
     # if target and ref file not aligned, create aligned ref file where size(align_ref, 1) == size(tgt, 1)
-    tgt_snps, ref_snps = nrecords(tgtfile), nrecords(reffile)
+    tgt_snps, ref_snps = nrecords(tgtfile), nrecords(reffile_aligned)
+    tgt_snps > ref_snps && error("Target file contains more SNPs than refrence file!")
     if tgt_snps < ref_snps
         conformgt_by_pos(reffile, tgtfile, "aligned", chrom, 1:typemax(Int))
         rm("aligned.tgt.vcf.gz", force=true) # only keep aligned ref file. TODO: what if aligned.tgt has snps filtered out?
@@ -41,11 +43,11 @@ function phase(
     # declare some constants
     people = nsamples(tgtfile)
     haplotypes = 2nsamples(reffile_aligned)
-    ph = [HaplotypeMosaicPair(snps) for i in 1:people] # phase information
+    ph = [HaplotypeMosaicPair(tgt_snps) for i in 1:people] # phase information
 
     # decide how to partition the data based on available memory 
     snps_per_chunk = chunk_size(people, haplotypes)
-    chunks = ceil(Int, snps / snps_per_chunk)
+    chunks = ceil(Int, tgt_snps / snps_per_chunk)
 
     # setup reader to convert vcf files to numeric matrices
     Xreader = VCF.Reader(openvcf(tgtfile, "r"))
@@ -79,7 +81,7 @@ function phase(
 
     # sync data to phase last (possibly only) chunk
     println("Running chunk $chunks / $chunks")
-    remaining_snps = snps - ((chunks - 1) * snps_per_chunk)
+    remaining_snps = tgt_snps - ((chunks - 1) * snps_per_chunk)
     X = Matrix{Union{Float32, Missing}}(undef, remaining_snps, people)
     H = BitArray{2}(undef, remaining_snps, haplotypes)
     copy_gt_trans!(X, Xreader, msg = "Importing genotype file...")
