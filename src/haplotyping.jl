@@ -107,7 +107,7 @@ function phase(
 
     # impute
     if impute
-        impute_untyped(tgtfile, reffile, outfile, ph, H, chunks, snps_per_chunk, remaining_snps)
+        impute_untyped(tgtfile, reffile_aligned, outfile, ph, H, chunks, snps_per_chunk, remaining_snps)
     else
         impute_typed_only(tgtfile, reffile, outfile, ph, H, chunks, snps_per_chunk, remaining_snps)
     end
@@ -215,7 +215,7 @@ function phase!(
         end
 
         # update progress
-        next!(pmeter)
+        update!(pmeter)
     end
 end
 
@@ -294,7 +294,7 @@ function phase_fast!(
                 window_span[2][i] += 1
             end
         end
-        next!(pmeter) #update progress
+        update!(pmeter) #update progress
     end
 
     # handle last few windows separately, since intersection may not become empty
@@ -383,7 +383,7 @@ function phase_fast!(
                 push!(ph[i].strand2.haplotypelabel, best_s2_next)
             end
         end
-        next!(pmeter) #update progress
+        update!(pmeter) #update progress
     end
 end
 
@@ -479,6 +479,6 @@ function phase_unique_only!(
         # end
 
         # update progress
-        next!(pmeter) 
+        update!(pmeter) 
     end
 end

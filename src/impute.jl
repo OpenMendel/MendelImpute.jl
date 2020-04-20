@@ -64,7 +64,7 @@ function impute_typed_only(
             end
 
             # update progress
-            next!(pmeter) 
+            update!(pmeter) 
         end
         close(Hreader)
     else
@@ -93,7 +93,7 @@ function impute_typed_only(
                 end
             end
             write(writer, record)
-            next!(pmeter) #update progress
+            update!(pmeter) #update progress
         end
     end
 
@@ -106,7 +106,7 @@ end
 
 Phases and imputes `tgtfile` using `phaseinfo` and outputs result in `outfile`. All genotypes 
 in `outfile` are non-missing and phased. Markers that are typed in `reffile` but not in 
-`tgtfile` will be imputed in `outfile` as well. 
+`tgtfile` (determined via SNP position) will be imputed in `outfile` as well. 
 """
 function impute_untyped(
     tgtfile::AbstractString,
@@ -128,7 +128,6 @@ function impute_untyped(
     tgt_record = read(tgt_reader) # first record
     tgt_pos = VCF.pos(tgt_record) # first record's position
     writer = VCF.Writer(openvcf(outfile, "w"), header(ref_reader))
-    pmeter = Progress(size(H, 1), 5, "Writing to file...")
     haplotypes = size(H, 2)
 
     if chunks > 1
@@ -137,6 +136,8 @@ function impute_untyped(
         H = BitArray{2}(undef, snps_per_chunk, haplotypes)
         copy_ht_trans!(H, Hreader)
         record_counter = chunk_counter = 1
+        pmeter = Progress(chunks * snps_per_chunk + snps_in_last_window, 5, "Writing to file...")
+
         for (i, ref_record) in enumerate(ref_reader)
             ref_pos = VCF.pos(ref_record)
             if ref_pos < tgt_pos
@@ -203,17 +204,18 @@ function impute_untyped(
             end
 
             # update progress
-            next!(pmeter) 
+            update!(pmeter) 
         end
         close(Hreader)
     else
         # loop over each record (snp) in ref file
+        pmeter = Progress(size(H, 1), 5, "Writing to file...")
         for (i, ref_record) in enumerate(ref_reader)
             ref_pos = VCF.pos(ref_record)
             if ref_pos < tgt_pos
+                # if snp exist only in reference file, fetch nearest haplotypelabel for everybody
                 gtkey = VCF.findgenokey(ref_record, "GT")
                 if !isnothing(gtkey) 
-                    # if snp exist only in reference file, fetch nearest haplotypelabel 
                     for (person, geno) in enumerate(ref_record.genotype)
                         #find where snp is located in phase
                         hap1_position = searchsortedlast(phaseinfo[person].strand1.start, ref_pos)
@@ -232,9 +234,9 @@ function impute_untyped(
                     write(writer, ref_record)
                 end
             elseif ref_pos == tgt_pos
+                # if snp exist in target, loop over samples and change only missing entries
                 gtkey = VCF.findgenokey(tgt_record, "GT")
                 if !isnothing(gtkey) 
-                    # if snp exist in target, loop over samples and change only missing entries
                     for (person, geno) in enumerate(tgt_record.genotype)
                         if tgt_record.data[geno[gtkey][1]] == 0x2e # 0x2e is '.' which indicates missing
                             #find where snp is located in phase
@@ -262,7 +264,7 @@ function impute_untyped(
                 end
             end
 
-            next!(pmeter) #update progress
+            update!(pmeter) #update progress
         end
     end
 

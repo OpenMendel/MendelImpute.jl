@@ -115,7 +115,7 @@ function compute_optimal_halotype_set(
     Xwork_tmp   = @view(X[cur_range, :])
     haploimpute!(Xwork_tmp, Hwork_tmp, M, N, happairs, hapscore)
     compute_redundant_haplotypes!(redundant_haplotypes, Hunique, happairs, 1, fast_method=fast_method)
-    next!(pmeter)
+    update!(pmeter)
 
     # new resizable working arrays for remaining windows since window 1's size may be different
     threads = Threads.nthreads()
@@ -153,7 +153,7 @@ function compute_optimal_halotype_set(
         compute_redundant_haplotypes!(redundant_haplotypes, Hunique, happairs[id], w, fast_method=fast_method)
 
         # update progress
-        next!(pmeter)
+        update!(pmeter)
     end
 
     # last window reallocate everything 
@@ -165,7 +165,7 @@ function compute_optimal_halotype_set(
     N           = zeros(T, people, num_uniq)
     haploimpute!(Xwork, Hwork_float, M, N, happairs[1], hapscore[1])
     compute_redundant_haplotypes!(redundant_haplotypes, Hunique, happairs[1], windows, fast_method=fast_method)
-    next!(pmeter)
+    update!(pmeter)
 
     return redundant_haplotypes
 end
@@ -208,7 +208,7 @@ function compute_optimal_halotype_pair(
         Hj_idx = Hunique.uniqueindex[1][Hj_uniqueidx]
         optimal_happairs[k][1] = (Hi_idx, Hj_idx)
     end
-    next!(pmeter)
+    update!(pmeter)
 
     # new resizable working arrays for remaining windows since window 1's size may be different
     threads = Threads.nthreads()
@@ -251,7 +251,7 @@ function compute_optimal_halotype_pair(
         end
 
         # update progress
-        next!(pmeter)
+        update!(pmeter)
     end
 
     # last window reallocate everything 
@@ -268,7 +268,7 @@ function compute_optimal_halotype_pair(
         Hj_idx = Hunique.uniqueindex[windows][Hj_uniqueidx]
         optimal_happairs[k][windows] = (Hi_idx, Hj_idx)
     end
-    next!(pmeter)
+    update!(pmeter)
 
     return optimal_happairs
 end
