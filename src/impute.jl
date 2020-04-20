@@ -64,7 +64,7 @@ function impute_typed_only(
             end
 
             # update progress
-            update!(pmeter) 
+            next!(pmeter) 
         end
         close(Hreader)
     else
@@ -93,7 +93,7 @@ function impute_typed_only(
                 end
             end
             write(writer, record)
-            update!(pmeter) #update progress
+            next!(pmeter) #update progress
         end
     end
 
@@ -204,7 +204,7 @@ function impute_untyped(
             end
 
             # update progress
-            update!(pmeter) 
+            next!(pmeter) 
         end
         close(Hreader)
     else
@@ -264,7 +264,7 @@ function impute_untyped(
                 end
             end
 
-            update!(pmeter) #update progress
+            next!(pmeter) #update progress
         end
     end
 

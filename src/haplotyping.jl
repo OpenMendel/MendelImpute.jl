@@ -215,7 +215,7 @@ function phase!(
         end
 
         # update progress
-        update!(pmeter)
+        next!(pmeter)
     end
 end
 
@@ -294,7 +294,7 @@ function phase_fast!(
                 window_span[2][i] += 1
             end
         end
-        update!(pmeter) #update progress
+        next!(pmeter) #update progress
     end
 
     # handle last few windows separately, since intersection may not become empty
@@ -383,7 +383,7 @@ function phase_fast!(
                 push!(ph[i].strand2.haplotypelabel, best_s2_next)
             end
         end
-        update!(pmeter) #update progress
+        next!(pmeter) #update progress
     end
 end
 
@@ -479,6 +479,6 @@ function phase_unique_only!(
         # end
 
         # update progress
-        update!(pmeter) 
+        next!(pmeter) 
     end
 end
