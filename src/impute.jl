@@ -127,7 +127,7 @@ function impute_untyped(
     ref_reader = VCF.Reader(openvcf(reffile, "r"))
     tgt_record = read(tgt_reader) # first record
     tgt_pos = VCF.pos(tgt_record) # first record's position
-    writer = VCF.Writer(openvcf(outfile, "w"), header(ref_reader))
+    writer = VCF.Writer(openvcf(outfile, "w"), header(tgt_reader))
     haplotypes = size(H, 2)
 
     if chunks > 1
