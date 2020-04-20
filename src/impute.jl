@@ -136,30 +136,13 @@ function impute_untyped(
         for (i, ref_record) in enumerate(ref_reader)
             ref_pos = VCF.pos(ref_record)
             if ref_pos < tgt_pos
-                # if snp exist only in reference file, fetch nearest haplotypelabel 
-                for (person, geno) in enumerate(ref_record.genotype)
-                    #find where snp is located in phase
-                    hap1_position = searchsortedlast(phaseinfo[person].strand1.start, ref_pos)
-                    hap2_position = searchsortedlast(phaseinfo[person].strand2.start, ref_pos)
-
-                    #find the correct haplotypes 
-                    hap1 = phaseinfo[person].strand1.haplotypelabel[hap1_position]
-                    hap2 = phaseinfo[person].strand2.haplotypelabel[hap2_position]
-
-                    # save actual allele to data. "0" (REF) => 0x30, "1" (ALT) => 0x31
-                    a1, a2 = H[i, hap1], H[i, hap2]
-                    ref_record.data[geno[gtkey][1]] = ifelse(a1, 0x31, 0x30)
-                    ref_record.data[geno[gtkey][2]] = 0x7c # phased data has separator '|'
-                    ref_record.data[geno[gtkey][3]] = ifelse(a2, 0x31, 0x30)
-                end
-                write(writer, ref_record)
-            elseif ref_pos == tgt_pos
-                # if snp exist in target, loop over samples and change only missing entries
-                for (person, geno) in enumerate(tgt_record.genotype)
-                    if tgt_record.data[geno[gtkey][1]] == 0x2e
+                gtkey = VCF.findgenokey(ref_record, "GT")
+                if !isnothing(gtkey) 
+                    # if snp exist only in reference file, fetch nearest haplotypelabel 
+                    for (person, geno) in enumerate(ref_record.genotype)
                         #find where snp is located in phase
-                        hap1_position = searchsortedlast(phaseinfo[person].strand1.start, tgt_pos)
-                        hap2_position = searchsortedlast(phaseinfo[person].strand2.start, tgt_pos)
+                        hap1_position = searchsortedlast(phaseinfo[person].strand1.start, ref_pos)
+                        hap2_position = searchsortedlast(phaseinfo[person].strand2.start, ref_pos)
 
                         #find the correct haplotypes 
                         hap1 = phaseinfo[person].strand1.haplotypelabel[hap1_position]
@@ -167,24 +150,49 @@ function impute_untyped(
 
                         # save actual allele to data. "0" (REF) => 0x30, "1" (ALT) => 0x31
                         a1, a2 = H[i, hap1], H[i, hap2]
-                        tgt_record.data[geno[gtkey][1]] = ifelse(a1, 0x31, 0x30)
-                        tgt_record.data[geno[gtkey][2]] = 0x7c # phased data has separator '|'
-                        tgt_record.data[geno[gtkey][3]] = ifelse(a2, 0x31, 0x30)
+                        ref_record.data[geno[gtkey][1]] = ifelse(a1, 0x31, 0x30)
+                        ref_record.data[geno[gtkey][2]] = 0x7c # phased data has separator '|'
+                        ref_record.data[geno[gtkey][3]] = ifelse(a2, 0x31, 0x30)
                     end
+                    write(writer, ref_record)
                 end
-                write(writer, tgt_record)
+            elseif ref_pos == tgt_pos
+                gtkey = VCF.findgenokey(tgt_record, "GT")
+                if !isnothing(gtkey) 
+                    # if snp exist in target, loop over samples and change only missing entries
+                    for (person, geno) in enumerate(tgt_record.genotype)
+                        if tgt_record.data[geno[gtkey][1]] == 0x2e # 0x2e is '.' which indicates missing
+                            #find where snp is located in phase
+                            hap1_position = searchsortedlast(phaseinfo[person].strand1.start, tgt_pos)
+                            hap2_position = searchsortedlast(phaseinfo[person].strand2.start, tgt_pos)
+
+                            #find the correct haplotypes 
+                            hap1 = phaseinfo[person].strand1.haplotypelabel[hap1_position]
+                            hap2 = phaseinfo[person].strand2.haplotypelabel[hap2_position]
+
+                            # save actual allele to data. "0" (REF) => 0x30, "1" (ALT) => 0x31
+                            a1, a2 = H[i, hap1], H[i, hap2]
+                            tgt_record.data[geno[gtkey][1]] = ifelse(a1, 0x31, 0x30)
+                            tgt_record.data[geno[gtkey][2]] = 0x7c # phased data has separator '|'
+                            tgt_record.data[geno[gtkey][3]] = ifelse(a2, 0x31, 0x30)
+                        end
+                    end
+                    write(writer, tgt_record)
+                end
 
                 # read next target record
-                tgt_record = read(tgt_reader) 
-                tgt_pos = VCF.pos(tgt_record)
+                if !eof(tgt_reader)
+                    tgt_record = read(tgt_reader) 
+                    tgt_pos = VCF.pos(tgt_record)
+                end
             end
 
             next!(pmeter) #update progress
         end
     end
 
-    # close 
-    flush(writer); close(reader); close(writer)
+    # close reader/writers 
+    flush(writer); close(writer); close(tgt_reader); close(ref_reader)
 end
 
 """
@@ -199,21 +207,27 @@ function update_marker_position!(
     )
     people = length(phaseinfo)
     reader = VCF.Reader(openvcf(tgtfile, "r"))
-    s1_counters, s2_counters = ones(Int, people), ones(Int, people)
+    marker_pos = zeros(Int, phaseinfo[1].strand1.length)
+
+    # find marker position for each SNP
     for (i, record) in enumerate(reader)
-        pos   = VCF.pos(record)
         gtkey = VCF.findgenokey(record, "GT")
-        @inbounds for j in 1:people
-            if phaseinfo[j].strand1.start[s1_counters[j]] == i && !isnothing(gtkey) 
-                phaseinfo[j].strand1.start[s1_counters[j]] = pos
-                s1_counters[j] += 1
-            end
-            if phaseinfo[j].strand2.start[s2_counters[j]] == i && !isnothing(gtkey) 
-                phaseinfo[j].strand2.start[s2_counters[j]] = pos
-                s2_counters[j] += 1
-            end
+        if !isnothing(gtkey) 
+            marker_pos[i] = VCF.pos(record)
         end
     end
+
+    for j in 1:people
+        # update strand1's starting position
+        for (i, idx) in enumerate(phaseinfo[j].strand1.start)
+            phaseinfo[j].strand1.start[i] = marker_pos[idx]
+        end
+        # update strand2's starting position
+        for (i, idx) in enumerate(phaseinfo[j].strand2.start)
+            phaseinfo[j].strand2.start[i] = marker_pos[idx]
+        end
+    end
+    return nothing
 end
 
 """
