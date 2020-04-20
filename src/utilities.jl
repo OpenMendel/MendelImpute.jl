@@ -1030,4 +1030,6 @@ function chunk_size(people::Int, haplotypes::Int)
     usable_bits = round(Int, system_memory_bits * 2 / 3) # use 2/3 of memory for genotype and haplotype matrix per chunk
     max_chunk_size = round(Int, usable_bits / (haplotypes + 32people))
     return max_chunk_size
+
+    # return 1000 # for testing in compare1
 end
