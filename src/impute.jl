@@ -122,14 +122,14 @@ function impute_untyped(
     )
 
     # some constants
-    total_snps = chunks * snps_per_chunk + snps_in_last_window
+    total_snps = (chunks - 1) * snps_per_chunk + snps_in_last_window
     people = nsamples(tgtfile)
     haplotypes = size(H, 2)
     sample_masks = falses(nsamples(reffile)) # needed for filtering ref_record
     sample_masks[1:people] .= true
 
     # convert phase's starting position from matrix index to marker position
-    # update_marker_position!(phaseinfo, tgtfile)
+    update_marker_position!(phaseinfo, tgtfile)
 
     # write phase information to outfile
     tgt_reader = VCF.Reader(openvcf(tgtfile, "r"))
@@ -148,7 +148,7 @@ function impute_untyped(
 
         for (i, ref_record) in enumerate(ref_reader)
             ref_pos = VCF.pos(ref_record)
-            if ref_pos < tgt_pos
+            if ref_pos < tgt_pos || ref_pos > tgt_pos
                 gtkey = VCF.findgenokey(ref_record, "GT")
                 if !isnothing(gtkey) 
                     # filter record so it only contains as many people as in target
@@ -223,7 +223,7 @@ function impute_untyped(
         pmeter = Progress(size(H, 1), 5, "Writing to file...")
         for (i, ref_record) in enumerate(ref_reader)
             ref_pos = VCF.pos(ref_record)
-            if ref_pos < tgt_pos
+            if ref_pos < tgt_pos || ref_pos > tgt_pos
                 # if snp exist only in reference file, fetch nearest haplotypelabel for everybody
                 gtkey = VCF.findgenokey(ref_record, "GT")
                 if !isnothing(gtkey) 
