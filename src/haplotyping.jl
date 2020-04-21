@@ -107,6 +107,7 @@ function phase(
 
     # impute
     if impute
+        H = convert_ht(Bool, reffile, trans=true) #TODO make this better
         impute_untyped(tgtfile, reffile, outfile, ph, H, chunks, snps_per_chunk, remaining_snps)
     else
         impute_typed_only(tgtfile, reffile_aligned, outfile, ph, H, chunks, snps_per_chunk, remaining_snps)
