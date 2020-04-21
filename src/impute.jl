@@ -15,7 +15,9 @@ function impute_typed_only(
     snps_per_chunk::Int,
     snps_in_last_window::Int
     )
+    # some constants
     haplotypes = size(H, 2)
+    total_snps = chunks * snps_per_chunk + snps_in_last_window
 
     # write phase information to outfile
     reader = VCF.Reader(openvcf(tgtfile, "r"))
@@ -119,8 +121,15 @@ function impute_untyped(
     snps_in_last_window::Int
     )
 
+    # some constants
+    total_snps = chunks * snps_per_chunk + snps_in_last_window
+    people = nsamples(tgtfile)
+    haplotypes = size(H, 2)
+    sample_masks = falses(nsamples(reffile)) # needed for filtering ref_record
+    sample_masks[1:people] .= true
+
     # convert phase's starting position from matrix index to marker position
-    update_marker_position!(phaseinfo, tgtfile)
+    # update_marker_position!(phaseinfo, tgtfile)
 
     # write phase information to outfile
     tgt_reader = VCF.Reader(openvcf(tgtfile, "r"))
@@ -128,7 +137,6 @@ function impute_untyped(
     tgt_record = read(tgt_reader) # first record
     tgt_pos = VCF.pos(tgt_record) # first record's position
     writer = VCF.Writer(openvcf(outfile, "w"), header(tgt_reader))
-    haplotypes = size(H, 2)
 
     if chunks > 1
         # reassign and update H chunk by chunk
@@ -136,18 +144,21 @@ function impute_untyped(
         H = BitArray{2}(undef, snps_per_chunk, haplotypes)
         copy_ht_trans!(H, Hreader)
         record_counter = chunk_counter = 1
-        pmeter = Progress(chunks * snps_per_chunk + snps_in_last_window, 5, "Writing to file...")
+        pmeter = Progress(total_snps, 5, "Writing to file...")
 
         for (i, ref_record) in enumerate(ref_reader)
             ref_pos = VCF.pos(ref_record)
             if ref_pos < tgt_pos
                 gtkey = VCF.findgenokey(ref_record, "GT")
                 if !isnothing(gtkey) 
+                    # filter record so it only contains as many people as in target
+                    VCFTools.filter_record!(ref_record, sample_masks)
+
                     # if snp exist only in reference file, fetch nearest haplotypelabel 
                     for (person, geno) in enumerate(ref_record.genotype)
-                        #find where snp is located in phase
-                        hap1_position = searchsortedlast(phaseinfo[person].strand1.start, ref_pos)
-                        hap2_position = searchsortedlast(phaseinfo[person].strand2.start, ref_pos)
+                        #find where snp is located in phase. max() avoids indexing error when ref snps occurs before 1st target snp
+                        hap1_position = max(1, searchsortedlast(phaseinfo[person].strand1.start, ref_pos))
+                        hap2_position = max(1, searchsortedlast(phaseinfo[person].strand2.start, ref_pos))
 
                         #find the correct haplotypes 
                         hap1 = phaseinfo[person].strand1.haplotypelabel[hap1_position]
@@ -216,10 +227,13 @@ function impute_untyped(
                 # if snp exist only in reference file, fetch nearest haplotypelabel for everybody
                 gtkey = VCF.findgenokey(ref_record, "GT")
                 if !isnothing(gtkey) 
+                    # filter record so it only contains as many people as in target
+                    VCFTools.filter_record!(ref_record, sample_masks)
+
                     for (person, geno) in enumerate(ref_record.genotype)
-                        #find where snp is located in phase
-                        hap1_position = searchsortedlast(phaseinfo[person].strand1.start, ref_pos)
-                        hap2_position = searchsortedlast(phaseinfo[person].strand2.start, ref_pos)
+                        #find where snp is located in phase. max() avoids indexing error when ref snps occurs before 1st target snp
+                        hap1_position = max(1, searchsortedlast(phaseinfo[person].strand1.start, ref_pos))
+                        hap2_position = max(1, searchsortedlast(phaseinfo[person].strand2.start, ref_pos))
 
                         #find the correct haplotypes 
                         hap1 = phaseinfo[person].strand1.haplotypelabel[hap1_position]

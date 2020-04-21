@@ -34,7 +34,7 @@ module MendelImpute
     export extract_marker_info
 
     # imputation
-    export impute_typed_only
+    export impute_typed_only, impute_untyped
     export update_marker_position!
 
     include("data_structures.jl")
