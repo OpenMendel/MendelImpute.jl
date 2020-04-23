@@ -429,7 +429,7 @@ function resize_and_sync!(
     H::AbstractMatrix,
     )
     next_d = length(Hnext)
-    if size(N, 1) != next_d
+    if size(N, 2) != next_d
         resize!(N, size(N, 1), next_d)
     end
     if size(Hwork, 2) != next_d
