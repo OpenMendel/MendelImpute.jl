@@ -148,7 +148,7 @@ function impute_untyped(
 
         for (i, ref_record) in enumerate(ref_reader)
             ref_pos = VCF.pos(ref_record)
-            if ref_pos < tgt_pos || ref_pos > tgt_pos
+            if ref_pos != tgt_pos
                 gtkey = VCF.findgenokey(ref_record, "GT")
                 if !isnothing(gtkey) 
                     # filter record so it only contains as many people as in target
@@ -173,7 +173,7 @@ function impute_untyped(
                     end
                     write(writer, ref_record)
                 end
-            elseif ref_pos == tgt_pos
+            else
                 gtkey = VCF.findgenokey(tgt_record, "GT")
                 if !isnothing(gtkey) 
                     # if snp exist in target, loop over samples and change only missing entries
@@ -223,7 +223,7 @@ function impute_untyped(
         pmeter = Progress(size(H, 1), 5, "Writing to file...")
         for (i, ref_record) in enumerate(ref_reader)
             ref_pos = VCF.pos(ref_record)
-            if ref_pos < tgt_pos || ref_pos > tgt_pos
+            if ref_pos != tgt_pos
                 # if snp exist only in reference file, fetch nearest haplotypelabel for everybody
                 gtkey = VCF.findgenokey(ref_record, "GT")
                 if !isnothing(gtkey) 
@@ -247,7 +247,7 @@ function impute_untyped(
                     end
                     write(writer, ref_record)
                 end
-            elseif ref_pos == tgt_pos
+            else
                 # if snp exist in target, loop over samples and change only missing entries
                 gtkey = VCF.findgenokey(tgt_record, "GT")
                 if !isnothing(gtkey) 
@@ -286,15 +286,80 @@ function impute_untyped(
     flush(writer); close(writer); close(tgt_reader); close(ref_reader)
 end
 
+function impute_untyped2(
+    tgtfile::AbstractString,
+    reffile::AbstractString,
+    outfile::AbstractString,
+    phaseinfo::Vector{HaplotypeMosaicPair},
+    H::AbstractMatrix,
+    chunks::Int,
+    snps_per_chunk::Int,
+    snps_in_last_window::Int
+    )
+    
+    # some constants and readers
+    people = nsamples(tgtfile)
+    ref_reader = VCF.Reader(openvcf(reffile, "r"))
+    tgt_reader = VCF.Reader(openvcf(tgtfile, "r"))
+
+    # convert phase's starting position from tgt matrix index to ref matrix index
+    update_marker_position!(phaseinfo, tgtfile, reffile)
+
+    if chunks > 1
+        # TODO
+    else
+        # first impute
+        X = zeros(Int, size(H, 1), people)
+        impute!(X, H, phaseinfo)
+
+        # write minimal meta information to outfile
+        io = openvcf(outfile, "w")
+        write(io, "##fileformat=VCFv4.2\n")
+        write(io, "##source=MendelImpute\n")
+        write(io, "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n")
+
+        # header line should match reffile (i.e. sample ID's should match)
+        write(io, "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT")
+        for id in VCF.header(tgt_reader).sampleID
+            write(io, "\t", id)
+        end
+        write(io, "\n")
+        close(tgt_reader)
+
+        # write phase info
+        pmeter = Progress(size(X, 1), 5, "Writing to file...")
+        for snp in 1:size(X, 1)
+            ref_record = read(ref_reader)
+            write(io, VCF.chrom(ref_record), "\t", string(VCF.pos(ref_record)), "\t", 
+                VCF.id(ref_record)[1], "\t", VCF.ref(ref_record), "\t", VCF.alt(ref_record)[1], 
+                "\t.\tPASS\t.\tGT")
+            for i in 1:size(X, 2)
+                if X[snp, i] == 2
+                    write(io, "\t1/1")
+                elseif X[snp, i] == 1
+                    write(io, "\t1/0")
+                else
+                    write(io, "\t0/0")
+                end
+            end
+            write(io, "\n")
+            next!(pmeter)
+        end
+        close(io); close(ref_reader)
+    end
+end
+
 """
     update_marker_position!(phaseinfo, tgtfile)
 
 Converts `phaseinfo`'s strand1 and strand2's starting position in 
 terms of matrix rows to starting position in terms of SNP position. 
+
+TODO: iterating over vcf files takes a long time, can we get POS somewhere else?
 """
 function update_marker_position!(
     phaseinfo::Vector{HaplotypeMosaicPair},
-    tgtfile::AbstractString,
+    tgtfile::AbstractString;
     )
     people = length(phaseinfo)
     reader = VCF.Reader(openvcf(tgtfile, "r"))
@@ -318,6 +383,63 @@ function update_marker_position!(
             phaseinfo[j].strand2.start[i] = marker_pos[idx]
         end
     end
+
+    # todo: update starting in phase and length?
+
+    return nothing
+end
+
+"""
+    update_marker_position!(phaseinfo, tgtfile, reffile)
+
+Converts `phaseinfo`'s strand1 and strand2's starting position in 
+terms of matrix rows of `tgtfile` to starting position in terms matrix
+rows in `reffile`. 
+
+TODO: iterating over reference vcf files takes a long time, can we get POS somewhere else?
+"""
+function update_marker_position!(
+    phaseinfo::Vector{HaplotypeMosaicPair},
+    tgtfile::AbstractString,
+    reffile::AbstractString
+    )
+    people = length(phaseinfo)
+    tgt_reader = VCF.Reader(openvcf(tgtfile, "r"))
+    ref_reader = VCF.Reader(openvcf(reffile, "r"))
+    ref_records = nrecords(reffile)
+
+    # find marker position for each SNP in reference file
+    # TODO: this loop is extremely slow
+    ref_marker_pos = zeros(Int, ref_records)
+    for (i, record) in enumerate(ref_reader)
+        ref_marker_pos[i] = VCF.pos(record)
+    end
+
+    # find marker position for each SNP in target file
+    tgt_marker_pos = zeros(Int, phaseinfo[1].strand1.length)
+    for (i, record) in enumerate(tgt_reader)
+        tgt_marker_pos[i] = VCF.pos(record)
+    end
+
+    for j in 1:people
+        # update strand1's starting position (optimization: can change findfirst to findnext)
+        for (i, idx) in enumerate(phaseinfo[j].strand1.start)
+            phaseinfo[j].strand1.start[i] = findfirst(x -> x == tgt_marker_pos[idx], ref_marker_pos) :: Int
+        end
+        # update strand2's starting position
+        for (i, idx) in enumerate(phaseinfo[j].strand2.start)
+            phaseinfo[j].strand2.start[i] = findfirst(x -> x == tgt_marker_pos[idx], ref_marker_pos) :: Int
+        end
+    end
+
+    # update first starting position and length
+    for j in 1:people
+        phaseinfo[j].strand1.start[1] = 1
+        phaseinfo[j].strand2.start[1] = 1
+        phaseinfo[j].strand1.length = ref_records
+        phaseinfo[j].strand2.length = ref_records
+    end
+
     return nothing
 end
 
@@ -348,6 +470,40 @@ function impute!(
         end
         idx = phase[i].strand2.start[end]:phase[i].strand2.length
         X[idx, i] += H[idx, phase[i].strand2.haplotypelabel[end]]
+    end
+end
+
+"""
+    impute!(X1, X2, H, phase)
+
+Imputes `X` where `X[:, 1] = X1[:, 1] + X2[:, 1]`, keeping track of phase information. 
+Non-missing entries in `X` can be different after imputation. 
+"""
+function impute!(
+    X1::AbstractMatrix,
+    X2::AbstractMatrix,
+    H::AbstractMatrix,
+    phase::Vector{HaplotypeMosaicPair}
+    )
+
+    fill!(X1, 0)
+    fill!(X2, 0)
+    # loop over individuals
+    for i in 1:size(X, 2)
+        # strand1
+        for s in 1:(length(phase[i].strand1.start) - 1)
+            idx = phase[i].strand1.start[s]:(phase[i].strand1.start[s + 1] - 1)
+            X1[idx, i] = H[idx, phase[i].strand1.haplotypelabel[s]]
+        end
+        idx = phase[i].strand1.start[end]:phase[i].strand1.length
+        X1[idx, i] = H[idx, phase[i].strand1.haplotypelabel[end]]
+        # strand2
+        for s in 1:(length(phase[i].strand2.start) - 1)
+            idx = phase[i].strand2.start[s]:(phase[i].strand2.start[s + 1] - 1)
+            X2[idx, i] += H[idx, phase[i].strand2.haplotypelabel[s]]
+        end
+        idx = phase[i].strand2.start[end]:phase[i].strand2.length
+        X2[idx, i] += H[idx, phase[i].strand2.haplotypelabel[end]]
     end
 end
 
