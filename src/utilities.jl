@@ -400,6 +400,7 @@ function compute_redundant_haplotypes!(
             end
             # reduce search space for dynamic programming later
             if length(redundant_haplotypes[k][window]) > 1000
+                # println("person $k at window $window has ", length(redundant_haplotypes[k][window]), " redundant haplotypes")
                 shuffle!(redundant_haplotypes[k][window])
                 resize!(redundant_haplotypes[k][window], 1000)
             end
