@@ -54,30 +54,30 @@ function phase(
     Hreader = VCF.Reader(openvcf(reffile_aligned, "r"))
 
     # automatic chunking if too many snps
-    if chunks > 1
-        X = Matrix{Union{Float32, Missing}}(undef, snps_per_chunk, people)
-        H = BitArray{2}(undef, snps_per_chunk, haplotypes)
+    # if chunks > 1
+    #     X = Matrix{Union{Float32, Missing}}(undef, snps_per_chunk, people)
+    #     H = BitArray{2}(undef, snps_per_chunk, haplotypes)
 
-        # phase chunk by chunk
-        for chunk in 1:(chunks - 1)
-            println("Running chunk $chunk / $chunks")
+    #     # phase chunk by chunk
+    #     for chunk in 1:(chunks - 1)
+    #         println("Running chunk $chunk / $chunks")
 
-            # copy current chunk's sample data into X and reference panels into H
-            copy_gt_trans!(X, Xreader, msg = "Importing genotype file...")
-            copy_ht_trans!(H, Hreader, msg = "Importing reference haplotype files...")
+    #         # copy current chunk's sample data into X and reference panels into H
+    #         copy_gt_trans!(X, Xreader, msg = "Importing genotype file...")
+    #         copy_ht_trans!(H, Hreader, msg = "Importing reference haplotype files...")
             
-            # compute redundant haplotype sets
-            hs = compute_optimal_halotype_set(X, H, width=width, flankwidth=flankwidth, fast_method=fast_method)
+    #         # compute redundant haplotype sets
+    #         hs = compute_optimal_halotype_set(X, H, width=width, flankwidth=flankwidth, fast_method=fast_method)
 
-            # phase (haplotyping) current chunk
-            offset = (chunk - 1) * snps_per_chunk
-            if fast_method
-                phase_fast!(ph, X, H, hs, width=width, flankwidth=flankwidth, chunk_offset=offset)
-            else
-                phase!(ph, X, H, hs, width=width, flankwidth=flankwidth, chunk_offset=offset)
-            end
-        end
-    end
+    #         # phase (haplotyping) current chunk
+    #         offset = (chunk - 1) * snps_per_chunk
+    #         if fast_method
+    #             phase_fast!(ph, X, H, hs, width=width, flankwidth=flankwidth, chunk_offset=offset)
+    #         else
+    #             phase!(ph, X, H, hs, width=width, flankwidth=flankwidth, chunk_offset=offset)
+    #         end
+    #     end
+    # end
 
     # sync data to phase last (possibly only) chunk
     println("Running chunk $chunks / $chunks")
@@ -150,7 +150,7 @@ function phase!(
     sol_path = [Vector{Tuple{Int, Int}}(undef, windows) for i in 1:Threads.nthreads()]
     nxt_pair = [[Int[] for i in 1:windows] for i in 1:Threads.nthreads()]
     tree_err = [[Float64[] for i in 1:windows] for i in 1:Threads.nthreads()]
-    pmeter   = Progress(people, 5, "Imputing samples...")
+    pmeter   = Progress(people, 5, "Dynamic programming + merging breakpoints...")
 
     # loop over each person
     # first  1/3: ((w - 2) * width + 1):((w - 1) * width)
@@ -418,7 +418,7 @@ function phase_unique_only!(
     snps, people = size(X)
     haplotypes = size(H, 2)
     windows = floor(Int, snps / width)
-    pmeter = Progress(people, 5, "Imputing samples...")
+    pmeter = Progress(people, 5, "Imputing typed markers...")
 
     # loop over each person
     # first  1/3: ((w - 2) * width + 1):((w - 1) * width)

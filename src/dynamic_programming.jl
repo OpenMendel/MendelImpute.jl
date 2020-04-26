@@ -95,19 +95,37 @@ function connect_happairs!(
     end
 
     # search for best haplotype pair in each window bottom-up 
-    @inbounds for w in Iterators.reverse(1:(windows - 1)), happair in haplotype_set[w]
-        # search all pairs in next window
-        best_err = Inf
-        best_next_pair = 0
-        for (i, pair) in enumerate(haplotype_set[w + 1])
-            err = pair_error(happair, pair) + subtree_err[w + 1][i]
-            if err < best_err
-                best_err = err
-                best_next_pair = i
+    @inbounds for w in Iterators.reverse(1:(windows - 1))
+        win_best_err = Inf
+
+        # first pass to compute each pair's optimal error
+        for (j, happair) in enumerate(haplotype_set[w])
+            # search all pairs in next window
+            best_err = Inf
+            best_next_pair = 0
+            for (i, nextpair) in enumerate(haplotype_set[w + 1])
+                err = pair_error(happair, nextpair) + subtree_err[w + 1][i]
+                if err < best_err
+                    best_err = err
+                    best_next_pair = i
+                end
+            end
+            if best_err < win_best_err
+                win_best_err = best_err
+            end
+            push!(subtree_err[w], best_err)
+            push!(next_pair[w], best_next_pair)
+        end
+
+        # second pass to remove pairs that are much worse than best error, reducing search space
+        tol = win_best_err
+        for (i, err) in enumerate(subtree_err[w])
+            if err > tol
+                deleteat!(subtree_err[w], i)
+                deleteat!(next_pair[w], i)
+                deleteat!(haplotype_set[w], i)
             end
         end
-        push!(subtree_err[w], best_err)
-        push!(next_pair[w], best_next_pair)
     end
 
     # find best solution path by forward-tracing
