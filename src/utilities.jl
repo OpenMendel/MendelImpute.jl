@@ -570,13 +570,13 @@ function haplopair!(
             # end
 
             # keep all happairs that are equally good
-            # if score == hapmin[i]
-            #     push!(happairs[i], (j, k))
-            # elseif score < hapmin[i]
-            #     empty!(happairs[i])
-            #     push!(happairs[i], (j, k))
-            #     hapmin[i] = score
-            # end
+            if score == hapmin[i]
+                push!(happairs[i], (j, k))
+            elseif score < hapmin[i]
+                empty!(happairs[i])
+                push!(happairs[i], (j, k))
+                hapmin[i] = score
+            end
 
             # keep top 10 haplotype pairs
             # if score < hapmin[i]
@@ -589,10 +589,10 @@ function haplopair!(
             # end
 
             # keep all previous best pairs
-            if score < hapmin[i]
-                push!(happairs[i], (j, k))
-                hapmin[i] = score
-            end
+            # if score < hapmin[i]
+            #     push!(happairs[i], (j, k))
+            #     hapmin[i] = score
+            # end
 
             # keep all previous best pairs and equally good pairs
             # if score <= hapmin[i]
@@ -791,8 +791,9 @@ end
 """
     choose_happair!(X, H, happairs, hapscore)
 
-Calculates error ||x - hi - hj||^2 only on the observed entries and save observed error in `hapscore`.
-`happairs` will keep only the best haplotype pairs based on the error of observed entries. All happairs
+Calculates error ||x - hi - hj||^2 only on the observed entries and save 
+observed error in `hapscore`. `happairs` will keep only the best haplotype 
+pairs based on the error of observed entries. All happairs
 that attain the best observed error will be kept.
 """
 function choose_happair!(

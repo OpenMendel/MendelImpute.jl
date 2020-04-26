@@ -10,6 +10,7 @@ AFRped_geno.txt
 GBR_data.csv
 
 # don't track simulations 
+*.gz
 *.vcf
 *.vcf.gz
 *.m3vcf
