@@ -547,14 +547,14 @@ using `UniqueHaplotypeMaps`.
 """
 function haplopair!(
     happairs::Vector{Vector{Tuple{Int, Int}}},
-    hapmin::Vector,
+    hapmin::Vector{T},
     M::AbstractMatrix{T},
     N::AbstractMatrix{T},
-    interval::T = convert(T, 3)
     ) where T <: Real
 
     n, d = size(N)
-    fill!(hapmin, typemax(eltype(hapmin)))
+    tol = convert(T, 3)
+    fill!(hapmin, typemax(T))
     empty!.(happairs)
 
     @inbounds for k in 1:d, j in 1:k
@@ -570,12 +570,21 @@ function haplopair!(
             # end
 
             # keep all happairs that are equally good
-            if score == hapmin[i]
-                push!(happairs[i], (j, k))
-            elseif score < hapmin[i]
+            # if score < hapmin[i]
+            #     empty!(happairs[i])
+            #     push!(happairs[i], (j, k))
+            #     hapmin[i] = score
+            # elseif score == hapmin[i]
+            #     push!(happairs[i], (j, k))
+            # end
+
+            # keep happairs that within some range of best pair (but finding all of them requires a 2nd pass)
+            if score < hapmin[i]
                 empty!(happairs[i])
                 push!(happairs[i], (j, k))
                 hapmin[i] = score
+            elseif score <= hapmin[i] + tol
+                push!(happairs[i], (j, k))
             end
 
             # keep top 10 haplotype pairs
