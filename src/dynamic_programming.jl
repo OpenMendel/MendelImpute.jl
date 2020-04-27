@@ -1,6 +1,5 @@
 """
-Helper function to calculate the difference between 2 tuples, with parallel
-connection or cross-over connections. 
+Helper function to calculate the squared Hamming difference between 2 unordered pair of integers.
 
 # Inputs 
 - `pair1`: tuple (a, b) where a, b are integers
@@ -12,7 +11,7 @@ connection or cross-over connections.
 # Examples
 - `pair_error((1, 2), (2, 3)) = pair_error((2, 1), (2, 3)) = λ`
 - `pair_error((2, 5), (5, 2)  = 0` 
-- `pair_error((1, 2), (3, 4)) = 2λ`
+- `pair_error((1, 2), (3, 4)) = 4λ`
 """
 function pair_error(pair1::T, pair2::T; λ::Real = 1.0) where T <: Tuple{Int, Int}
     # parallel connections
