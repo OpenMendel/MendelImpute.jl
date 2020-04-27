@@ -98,7 +98,8 @@ function phase(
     # phase (haplotyping) current chunk
     offset = (chunks - 1) * snps_per_chunk
     if unique_only
-        phase_unique_only!(ph, X, H, hs, width=width, flankwidth=flankwidth, chunk_offset=offset)
+        phase!(ph, X, H, hs, width=width, flankwidth=flankwidth, chunk_offset=offset)
+        # phase_unique_only!(ph, X, H, hs, width=width, flankwidth=flankwidth, chunk_offset=offset)
     elseif fast_method
         phase_fast!(ph, X, H, hs, width=width, flankwidth=flankwidth, chunk_offset=offset)
     else
@@ -407,7 +408,7 @@ function phase_unique_only!(
     ph::Vector{HaplotypeMosaicPair},
     X::AbstractMatrix{Union{Missing, T}},
     H::AbstractMatrix,
-    hapset::Vector{Vector{Tuple{Int, Int}}};
+    hapset::Vector{Vector{Vector{Tuple{Int, Int}}}};
     width::Int = 400,
     flankwidth::Int = round(Int, 0.1width),
     chunk_offset::Int = 0,
