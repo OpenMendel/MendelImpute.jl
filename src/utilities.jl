@@ -90,6 +90,7 @@ function compute_optimal_halotype_set(
     snps, people = size(X)
     haplotypes = size(H, 2)
     windows = floor(Int, snps / width)
+    threads = Threads.nthreads()
 
     # Each person stores a vector of redundant haplotypes matching the optimal one for each window
     if fast_method
@@ -118,7 +119,6 @@ function compute_optimal_halotype_set(
     next!(pmeter)
 
     # new resizable working arrays for remaining windows since window 1's size may be different
-    threads = Threads.nthreads()
     M = Vector{Matrix{T}}(undef, threads)
     N = Vector{ElasticArray{T}}(undef, threads)
     Xwork       = Vector{AbstractMatrix{Union{T, Missing}}}(undef, threads)
@@ -136,6 +136,7 @@ function compute_optimal_halotype_set(
     happairs = [[Tuple{Int, Int}[] for i in 1:people] for _ in 1:threads]
     hapscore = [zeros(T, people) for _ in 1:threads]
 
+    # TODO: this is not thread safe for dp method but not fast method, no idea why
     # loop through each window
     Threads.@threads for w in 2:(windows - 1)
         id = Threads.threadid()
@@ -776,6 +777,7 @@ function haploimpute!(
     )
 
     obj = typemax(eltype(hapscore))
+    size(X) == size(Xfloat) || error("Dimension mismatch: X and Xfloat have sizes $(size(X)) and $(size(Xfloat))")
     initmissing!(X, Xfloat=Xfloat) #Xfloat[i, j] = X[i, j] on observed entries
 
     # mm iteration
