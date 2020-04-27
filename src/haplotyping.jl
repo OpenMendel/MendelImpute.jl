@@ -97,10 +97,7 @@ function phase(
 
     # phase (haplotyping) current chunk
     offset = (chunks - 1) * snps_per_chunk
-    if unique_only
-        phase!(ph, X, H, hs, width=width, flankwidth=flankwidth, chunk_offset=offset)
-        # phase_unique_only!(ph, X, H, hs, width=width, flankwidth=flankwidth, chunk_offset=offset)
-    elseif fast_method
+    if fast_method
         phase_fast!(ph, X, H, hs, width=width, flankwidth=flankwidth, chunk_offset=offset)
     else
         phase!(ph, X, H, hs, width=width, flankwidth=flankwidth, chunk_offset=offset)
@@ -184,36 +181,38 @@ function phase!(
         #     push!(ph[i].strand2.haplotypelabel, l)
         # end
 
-        # phase middle windows
         for w in 2:(windows - 1)
-            Xwi = view(X, ((w - 2) * width + 1):(w * width), i)
-            Hw  = view(H, ((w - 2) * width + 1):(w * width), :)
+            # current window start at the end of nearest bkpt or beginning of previous window, whichever is closer
+            w_start = max(ph[i].strand1.start[end], ph[i].strand2.start[end], ((w - 2) * width + 1))
+            Xwi = view(X, w_start:(w * width), i)
+            Hw  = view(H, w_start:(w * width), :)
             sol_path[id][w], bkpts = continue_haplotype(Xwi, Hw, sol_path[id][w - 1], sol_path[id][w])
 
             # strand 1
             if bkpts[1] > -1 && bkpts[1] < 2width
-                push!(ph[i].strand1.start, chunk_offset + (w - 2) * width + 1 + bkpts[1])
+                push!(ph[i].strand1.start, chunk_offset + w_start + bkpts[1])
                 push!(ph[i].strand1.haplotypelabel, sol_path[id][w][1])
             end
             # strand 2
             if bkpts[2] > -1 && bkpts[2] < 2width
-                push!(ph[i].strand2.start, chunk_offset + (w - 2) * width + 1 + bkpts[2])
+                push!(ph[i].strand2.start, chunk_offset + w_start + bkpts[2])
                 push!(ph[i].strand2.haplotypelabel, sol_path[id][w][2])
             end
         end
 
         # phase last window
-        Xwi = view(X, ((windows - 2) * width + 1):snps, i)
-        Hw  = view(H, ((windows - 2) * width + 1):snps, :)
+        w_start = max(ph[i].strand1.start[end], ph[i].strand2.start[end], ((windows - 2) * width + 1))
+        Xwi = view(X, w_start:snps, i)
+        Hw  = view(H, w_start:snps, :)
         sol_path[id][windows], bkpts = continue_haplotype(Xwi, Hw, sol_path[id][windows - 1], sol_path[id][windows])
         # strand 1
-        if bkpts[1] > -1 && bkpts[1] < 2width
-            push!(ph[i].strand1.start, chunk_offset + (windows - 2) * width + 1 + bkpts[1])
+        if bkpts[1] > -1
+            push!(ph[i].strand1.start, chunk_offset + w_start + bkpts[1])
             push!(ph[i].strand1.haplotypelabel, sol_path[id][windows][1])
         end
         # strand 2
-        if bkpts[2] > -1 && bkpts[2] < 2width
-            push!(ph[i].strand2.start, chunk_offset + (windows - 2) * width + 1 + bkpts[2])
+        if bkpts[2] > -1
+            push!(ph[i].strand2.start, chunk_offset + w_start + bkpts[2])
             push!(ph[i].strand2.haplotypelabel, sol_path[id][windows][2])
         end
 
@@ -300,7 +299,7 @@ function phase_fast!(
         next!(pmeter) #update progress
     end
 
-    # handle last few windows separately, since intersection may not become empty
+    # get rid of redundant haplotypes in last few windows separately, since intersection may not become empty
     for i in 1:people
         for ww in (windows - window_span[1][i] + 1):windows
             hapset[i].strand1[ww] .= haplo_chain[1][i]
@@ -331,8 +330,9 @@ function phase_fast!(
     Threads.@threads for i in 1:people
         id = Threads.threadid()
         for w in 2:windows
-            Hi = view(H, ((w - 2) * width + 1):(w * width), :)
-            Xi = view(X, ((w - 2) * width + 1):(w * width), i)
+            w_start = max(ph[i].strand1.start[end], ph[i].strand2.start[end], ((w - 2) * width + 1))
+            Hi = view(H, w_start:(w * width), :)
+            Xi = view(X, w_start:(w * width), i)
             strand1_intersect[id] .= hapset[i].strand1[w - 1] .& hapset[i].strand1[w]
             strand2_intersect[id] .= hapset[i].strand2[w - 1] .& hapset[i].strand2[w]
             # double haplotype switch
@@ -344,8 +344,8 @@ function phase_fast!(
                 s2_next = findfirst(hapset[i].strand2[w]) :: Int64
                 bkpt, err_optim = search_breakpoint(Xi, Hi, (s1_prev, s1_next), (s2_prev, s2_next))
                 # record info into phase
-                push!(ph[i].strand1.start, chunk_offset + (w - 2) * width + 1 + bkpt[1])
-                push!(ph[i].strand2.start, chunk_offset + (w - 2) * width + 1 + bkpt[2])
+                push!(ph[i].strand1.start, chunk_offset + w_start + bkpt[1])
+                push!(ph[i].strand2.start, chunk_offset + w_start + bkpt[2])
                 push!(ph[i].strand1.haplotypelabel, s1_next)
                 push!(ph[i].strand2.haplotypelabel, s2_next)
             # single haplotype switch
@@ -364,7 +364,7 @@ function phase_fast!(
                     end
                 end
                 # record info into phase
-                push!(ph[i].strand1.start, chunk_offset + (w - 2) * width + 1 + best_bktp)
+                push!(ph[i].strand1.start, chunk_offset + w_start + best_bktp)
                 push!(ph[i].strand1.haplotypelabel, best_s1_next)
             # single haplotype switch
             elseif sum(strand2_intersect[id]) == 0
@@ -382,106 +382,10 @@ function phase_fast!(
                     end
                 end
                 # record info into phase
-                push!(ph[i].strand2.start, chunk_offset + (w - 2) * width + 1 + best_bktp)
+                push!(ph[i].strand2.start, chunk_offset + w_start + best_bktp)
                 push!(ph[i].strand2.haplotypelabel, best_s2_next)
             end
         end
         next!(pmeter) #update progress
-    end
-end
-
-
-
-"""
-    phase_dp_fast!(X, H, width=400, verbose=true)
-
-Phasing (haplotying) of genotype matrix `X` from a pool of haplotypes `H`
-by dynamic programming. A precomputed, window-by-window haplotype pairs is assumed. 
-
-# Input
-* `X`: `p x n` matrix with missing values. Each column is genotypes of an individual.
-* `H`: `p x d` haplotype matrix. Each column is a haplotype.
-* `width`: width of the sliding window.
-* `verbose`: display algorithmic information.
-"""
-function phase_unique_only!(
-    ph::Vector{HaplotypeMosaicPair},
-    X::AbstractMatrix{Union{Missing, T}},
-    H::AbstractMatrix,
-    hapset::Vector{Vector{Vector{Tuple{Int, Int}}}};
-    width::Int = 400,
-    flankwidth::Int = round(Int, 0.1width),
-    chunk_offset::Int = 0,
-    Xtrue::Union{AbstractMatrix, Nothing} = nothing, # for testing
-    ) where T <: Real
-
-    # declare some constants
-    snps, people = size(X)
-    haplotypes = size(H, 2)
-    windows = floor(Int, snps / width)
-    pmeter = Progress(people, 5, "Imputing typed markers...")
-
-    # loop over each person
-    # first  1/3: ((w - 2) * width + 1):((w - 1) * width)
-    # middle 1/3: ((w - 1) * width + 1):(      w * width)
-    # last   1/3: (      w * width + 1):((w + 1) * width)
-    Threads.@threads for i in 1:people
-        # phase first window 
-        push!(ph[i].strand1.start, 1 + chunk_offset)
-        push!(ph[i].strand1.haplotypelabel, hapset[i][1][1]) # i'th person, 1st window, 1 haplotype
-        push!(ph[i].strand2.start, 1 + chunk_offset)
-        push!(ph[i].strand2.haplotypelabel, hapset[i][1][2])
-
-        # phase without searching for breakpoints
-        # for w in 2:windows
-        #     u, j = hapset[i][w - 1] # haplotype pair in previous window
-        #     k, l = hapset[i][w]     # haplotype pair in current window
-
-        #     # switch current window's pair order if 1 or 2 haplotype match
-        #     if (u == l && j == k) || (j == k && u ≠ l) || (u == l && j ≠ k)
-        #         k, l = l, k 
-        #     end
-
-        #     push!(ph[i].strand1.start, chunk_offset + (w - 1) * width + 1)
-        #     push!(ph[i].strand1.haplotypelabel, k)
-        #     push!(ph[i].strand2.start, chunk_offset + (w - 1) * width + 1)
-        #     push!(ph[i].strand2.haplotypelabel, l)
-        # end
-
-        # phase middle windows
-        for w in 2:(windows - 1)
-            Xwi = view(X, ((w - 2) * width + 1):(w * width), i)
-            Hw  = view(H, ((w - 2) * width + 1):(w * width), :)
-            hapset[i][w], bkpts = continue_haplotype(Xwi, Hw, hapset[i][w - 1], hapset[i][w])
-
-            # strand 1
-            if bkpts[1] > -1 && bkpts[1] < 2width
-                push!(ph[i].strand1.start, chunk_offset + (w - 2) * width + 1 + bkpts[1])
-                push!(ph[i].strand1.haplotypelabel, hapset[i][w][1])
-            end
-            # strand 2
-            if bkpts[2] > -1 && bkpts[2] < 2width
-                push!(ph[i].strand2.start, chunk_offset + (w - 2) * width + 1 + bkpts[2])
-                push!(ph[i].strand2.haplotypelabel, hapset[i][w][2])
-            end
-        end
-
-        # phase last window
-        Xwi = view(X, ((windows - 2) * width + 1):snps, i)
-        Hw  = view(H, ((windows - 2) * width + 1):snps, :)
-        hapset[i][windows], bkpts = continue_haplotype(Xwi, Hw, hapset[i][windows - 1], hapset[i][windows])
-        # strand 1
-        if bkpts[1] > -1 && bkpts[1] < 2width
-            push!(ph[i].strand1.start, chunk_offset + (windows - 2) * width + 1 + bkpts[1])
-            push!(ph[i].strand1.haplotypelabel, hapset[i][windows][1])
-        end
-        # strand 2
-        if bkpts[2] > -1 && bkpts[2] < 2width
-            push!(ph[i].strand2.start, chunk_offset + (windows - 2) * width + 1 + bkpts[2])
-            push!(ph[i].strand2.haplotypelabel, hapset[i][windows][2])
-        end
-
-        # update progress
-        next!(pmeter) 
     end
 end
