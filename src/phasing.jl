@@ -37,10 +37,10 @@ function phase(
     # remaining_snps = tgt_snps - ((chunks - 1) * snps_per_chunk)
     # println("Running chunk $chunks / $chunks")
 
-    # import data and each SNP's CHROM/POS/ID/REF/ALT info
-    X, X_chr, X_pos, X_ids, X_ref, X_alt = convert_gt(Float32, tgtfile, trans=true, save_snp_info=true, msg = "Importing genotype file...")
-    H, H_chr, H_pos, H_ids, H_ref, H_alt = convert_ht(Bool, reffile, trans=true, save_snp_info=true, msg = "Importing reference haplotype files...")
-    
+    # import data, sampleID, and each SNP's CHROM/POS/ID/REF/ALT info
+    X, X_sampleID, X_chr, X_pos, X_ids, X_ref, X_alt = convert_gt(Float32, tgtfile, trans=true, save_snp_info=true, msg = "Importing genotype file...")
+    H, H_sampleID, H_chr, H_pos, H_ids, H_ref, H_alt = convert_ht(Bool, reffile, trans=true, save_snp_info=true, msg = "Importing reference haplotype files...")
+
     # match target and ref file by snp position
     XtoH_idx = indexin(X_pos, H_pos) # X_pos[i] == H_pos[XtoH_idx[i]]
     H_aligned     = @view(H[XtoH_idx, :])
@@ -82,7 +82,7 @@ function phase(
         # impute_untyped2(tgtfile, reffile, outfile, ph, H, chunks, snps_per_chunk, remaining_snps)
         impute_untyped(tgtfile, reffile, outfile, ph, H, chunks, snps_per_chunk, remaining_snps)
     else
-        impute_typed_only(ph, X, H_aligned, outfile, X_pos)
+        impute_typed_only(ph, X, H_aligned, outfile, X_sampleID, X_chr, X_pos, X_ids, X_ref, X_alt)
     end
 
     return hs, ph
