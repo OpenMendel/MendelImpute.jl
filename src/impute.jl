@@ -437,6 +437,9 @@ function update_marker_position!(
         phaseinfo[j].strand2.length = ref_records
     end
 
+    close(tgt_reader)
+    close(ref_reader)
+
     return nothing
 end
 
