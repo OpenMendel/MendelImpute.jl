@@ -1662,3 +1662,77 @@ cd("/Users/biona001/.julia/dev/VCFTools/test")
 vcffile = "test.08Jun17.d8b.vcf"
 marker_chrom, marker_pos, marker_ID, marker_REF, marker_ALT = extract_marker_info(vcffile)
 
+
+
+
+
+
+
+# learn to read/write vcf files faster
+using Revise
+using GeneticVariation
+using Random
+using VCFTools
+using BenchmarkTools
+using MendelImpute
+
+cd("/Users/biona001/.julia/dev/MendelImpute/data/1000_genome_phase3_v5/filtered")
+
+function get_ref_pos(reffile)
+    ref_reader = VCF.Reader(openvcf(reffile, "r"))
+
+    ref_marker_pos = zeros(Int, nrecords(reffile))
+    for (i, record) in enumerate(ref_reader)
+        ref_marker_pos[i] = VCF.pos(record)
+    end
+    close(ref_reader)
+
+    return ref_marker_pos
+end
+
+reffile = "ref.chr20.aligned.vcf.gz" # 379432 entries
+@time get_ref_pos(reffile) # 205.682744 seconds (2.75 G allocations: 261.134 GiB, 7.98% gc time)
+
+
+cd("/Users/biona001/.julia/dev/VCFTools/test")
+vcffile = "test.08Jun17.d8b.vcf" # 1356 entries
+@time get_ref_pos(vcffile) # 0.686711 seconds (2.39 M allocations: 187.674 MiB, 4.36% gc time)
+
+
+
+
+using Revise
+using GeneticVariation
+using Random
+using VCFTools
+using BenchmarkTools
+using MendelImpute
+
+cd("/Users/biona001/.julia/dev/VCFTools/test")
+vcffile = "test.08Jun17.d8b.vcf" # 1356 entries
+
+
+
+X, pos = convert_gt(Float64, vcffile, trans=true, save_pos=true)
+@code_warntype X, pos = convert_gt(Float64, vcffile, trans=true, save_pos=true)
+
+# type instatiliby caused by varying number of returns
+@benchmark convert_gt(Float64, vcffile, trans=true, save_pos=true) # 62.234 ms, 104.77 MiB, 1073112 alloc
+
+# no type instability
+@benchmark convert_gt(Float64, vcffile, trans=true) # 68.874 ms, 104.77 MiB, 1073111 alloc
+
+
+
+
+# match indices
+X_pos = [1, 4, 7]
+H_pos = collect(1:10)
+XtoH_idx = indexin(X_pos, H_pos) # X_pos[i] == H_pos[XtoH_idx[i]]
+
+
+
+
+
+
+

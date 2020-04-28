@@ -23,63 +23,52 @@ function phase(
     reffile::AbstractString;
     outfile::AbstractString = "imputed." * tgtfile,
     impute::Bool = false,
-    chrom::AbstractString = "22", # TODO change this to whatever chrom is in tgt/ref file
-    reffile_aligned::AbstractString = reffile,
     width::Int = 400,
     flankwidth::Int = round(Int, 0.1width),
     fast_method::Bool = false,
     unique_only::Bool = false
     )
 
-    # if target and ref file not aligned, create aligned ref file where size(align_ref, 1) == size(tgt, 1)
-    tgt_snps, ref_snps = nrecords(tgtfile), nrecords(reffile_aligned)
-    tgt_snps > ref_snps && error("Target file contains more SNPs than refrence file!")
-    if tgt_snps < ref_snps
-        conformgt_by_pos(reffile, tgtfile, "aligned", chrom, 1:typemax(Int))
-        rm("aligned.tgt.vcf.gz", force=true) # only keep aligned ref file. TODO: what if aligned.tgt has snps filtered out?
-        reffile_aligned = "aligned.ref.vcf.gz"
-    end
+    # decide how to partition the data based on available memory 
+    snps_per_chunk = chunk_size(people, haplotypes)
+    chunks = ceil(Int, tgt_snps / snps_per_chunk)
+    remaining_snps = tgt_snps - ((chunks - 1) * snps_per_chunk)
+    println("Running chunk $chunks / $chunks")
 
     # declare some constants
     people = nsamples(tgtfile)
     haplotypes = 2nsamples(reffile_aligned)
     ph = [HaplotypeMosaicPair(tgt_snps) for i in 1:people] # phase information
 
-    # decide how to partition the data based on available memory 
-    # snps_per_chunk = chunk_size(people, haplotypes)
-    # chunks = ceil(Int, tgt_snps / snps_per_chunk)
+    # import data and each SNP's position, match by position if target and ref file not aligned
+    X, X_pos = convert_gt(Float32, tgtfile, trans=true, save_pos=true, msg = "Importing genotype file...")
+    H, H_pos = convert_ht(Bool, reffile, trans=true, save_pos=true, msg = "Importing reference haplotype files...")
+    XtoH_idx = indexin(X_pos, H_pos) # X_pos[i] == H_pos[XtoH_idx[i]]
+    H_aligned, H_aligned_pos = @view(H[XtoH_idx, :]), @view(H_pos[XtoH_idx, :])
 
-    # setup reader to convert vcf files to numeric matrices
-    Xreader = VCF.Reader(openvcf(tgtfile, "r"))
-    Hreader = VCF.Reader(openvcf(reffile_aligned, "r"))
-
-    # sync data to phase last (possibly only) chunk
-    println("Running chunk $chunks / $chunks")
-    remaining_snps = tgt_snps - ((chunks - 1) * snps_per_chunk)
-    X = Matrix{Union{Float32, Missing}}(undef, remaining_snps, people)
-    H = BitArray{2}(undef, remaining_snps, haplotypes)
-    copy_gt_trans!(X, Xreader, msg = "Importing genotype file...")
-    copy_ht_trans!(H, Hreader, msg = "Importing reference haplotype files...")
-    close(Xreader); close(Hreader)
-
+    #
     # compute redundant haplotype sets
+    #
     if unique_only
-        hs = compute_optimal_halotype_pair(X, H, width = width, flankwidth=flankwidth)
+        hs = compute_optimal_halotype_pair(X, H_aligned, width = width, flankwidth=flankwidth)
     else
-        hs = compute_optimal_halotype_set(X, H, width = width, flankwidth=flankwidth, fast_method=fast_method)
+        hs = compute_optimal_halotype_set(X, H_aligned, width = width, flankwidth=flankwidth, fast_method=fast_method)
     end
 
-    # phase (haplotyping) current chunk
+    #
+    # phasing (haplotyping) step
+    #
     offset = (chunks - 1) * snps_per_chunk
     if fast_method
-        phase_fast!(ph, X, H, hs, width=width, flankwidth=flankwidth, chunk_offset=offset)
+        phase_fast!(ph, X, H_aligned, hs, width=width, flankwidth=flankwidth, chunk_offset=offset)
     else
-        phase!(ph, X, H, hs, width=width, flankwidth=flankwidth, chunk_offset=offset)
+        phase!(ph, X, H_aligned, hs, width=width, flankwidth=flankwidth, chunk_offset=offset)
     end
 
-    # impute
+    #
+    # impute step
+    #
     if impute
-        H = convert_ht(Bool, reffile, trans=true) #TODO make this better
         # impute_untyped2(tgtfile, reffile, outfile, ph, H, chunks, snps_per_chunk, remaining_snps)
         impute_untyped(tgtfile, reffile, outfile, ph, H, chunks, snps_per_chunk, remaining_snps)
     else
