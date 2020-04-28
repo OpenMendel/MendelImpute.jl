@@ -1697,7 +1697,7 @@ reffile = "ref.chr20.aligned.vcf.gz" # 379432 entries
 cd("/Users/biona001/.julia/dev/VCFTools/test")
 vcffile = "test.08Jun17.d8b.vcf" # 1356 entries
 @time get_ref_pos(vcffile) # 0.686711 seconds (2.39 M allocations: 187.674 MiB, 4.36% gc time)
-
+@time X, pos = convert_gt(Float64, vcffile, trans=true, save_pos=true)
 
 
 

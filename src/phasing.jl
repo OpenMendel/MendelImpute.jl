@@ -30,21 +30,30 @@ function phase(
     )
 
     # decide how to partition the data based on available memory 
-    snps_per_chunk = chunk_size(people, haplotypes)
-    chunks = ceil(Int, tgt_snps / snps_per_chunk)
-    remaining_snps = tgt_snps - ((chunks - 1) * snps_per_chunk)
-    println("Running chunk $chunks / $chunks")
+    # people = nsamples(tgtfile)
+    # haplotypes = 2nsamples(reffile_aligned)
+    # snps_per_chunk = chunk_size(people, haplotypes)
+    # chunks = ceil(Int, tgt_snps / snps_per_chunk)
+    # remaining_snps = tgt_snps - ((chunks - 1) * snps_per_chunk)
+    # println("Running chunk $chunks / $chunks")
+
+    # import data and each SNP's CHROM/POS/ID/REF/ALT info
+    X, X_chr, X_pos, X_ids, X_ref, X_alt = convert_gt(Float32, tgtfile, trans=true, save_snp_info=true, msg = "Importing genotype file...")
+    H, H_chr, H_pos, H_ids, H_ref, H_alt = convert_ht(Bool, reffile, trans=true, save_snp_info=true, msg = "Importing reference haplotype files...")
+    
+    # match target and ref file by snp position
+    XtoH_idx = indexin(X_pos, H_pos) # X_pos[i] == H_pos[XtoH_idx[i]]
+    H_aligned     = @view(H[XtoH_idx, :])
+    H_aligned_chr = @view(H_chr[XtoH_idx, :])
+    H_aligned_pos = @view(H_pos[XtoH_idx, :])
+    H_aligned_ids = @view(H_ids[XtoH_idx, :])
+    H_aligned_ref = @view(H_ref[XtoH_idx, :])
+    H_aligned_alt = @view(H_alt[XtoH_idx, :])
 
     # declare some constants
-    people = nsamples(tgtfile)
-    haplotypes = 2nsamples(reffile_aligned)
-    ph = [HaplotypeMosaicPair(tgt_snps) for i in 1:people] # phase information
-
-    # import data and each SNP's position, match by position if target and ref file not aligned
-    X, X_pos = convert_gt(Float32, tgtfile, trans=true, save_pos=true, msg = "Importing genotype file...")
-    H, H_pos = convert_ht(Bool, reffile, trans=true, save_pos=true, msg = "Importing reference haplotype files...")
-    XtoH_idx = indexin(X_pos, H_pos) # X_pos[i] == H_pos[XtoH_idx[i]]
-    H_aligned, H_aligned_pos = @view(H[XtoH_idx, :]), @view(H_pos[XtoH_idx, :])
+    people = size(X, 2)
+    haplotypes = size(H, 2)
+    tgt_snps = size(X, 1)
 
     #
     # compute redundant haplotype sets
@@ -58,11 +67,12 @@ function phase(
     #
     # phasing (haplotyping) step
     #
-    offset = (chunks - 1) * snps_per_chunk
+    # offset = (chunks - 1) * snps_per_chunk
+    ph = [HaplotypeMosaicPair(tgt_snps) for i in 1:people] # phase information
     if fast_method
-        phase_fast!(ph, X, H_aligned, hs, width=width, flankwidth=flankwidth, chunk_offset=offset)
+        phase_fast!(ph, X, H_aligned, hs, width=width, flankwidth=flankwidth)
     else
-        phase!(ph, X, H_aligned, hs, width=width, flankwidth=flankwidth, chunk_offset=offset)
+        phase!(ph, X, H_aligned, hs, width=width, flankwidth=flankwidth)
     end
 
     #
@@ -72,7 +82,7 @@ function phase(
         # impute_untyped2(tgtfile, reffile, outfile, ph, H, chunks, snps_per_chunk, remaining_snps)
         impute_untyped(tgtfile, reffile, outfile, ph, H, chunks, snps_per_chunk, remaining_snps)
     else
-        impute_typed_only(tgtfile, reffile_aligned, outfile, ph, H, chunks, snps_per_chunk, remaining_snps)
+        impute_typed_only(ph, X, H_aligned, outfile, X_pos)
     end
 
     return hs, ph

@@ -38,7 +38,7 @@ module MendelImpute
     export update_marker_position!
 
     include("data_structures.jl")
-    include("haplotyping.jl")
+    include("phasing.jl")
     include("utilities.jl")
     include("simulate_utilities.jl")
     include("dynamic_programming.jl")
