@@ -238,69 +238,6 @@ function impute_untyped(
     flush(writer); close(writer); close(tgt_reader); close(ref_reader)
 end
 
-function impute_untyped2(
-    tgtfile::AbstractString,
-    reffile::AbstractString,
-    outfile::AbstractString,
-    phaseinfo::Vector{HaplotypeMosaicPair},
-    H::AbstractMatrix,
-    chunks::Int,
-    snps_per_chunk::Int,
-    snps_in_last_window::Int
-    )
-    
-    # some constants and readers
-    people = nsamples(tgtfile)
-    ref_reader = VCF.Reader(openvcf(reffile, "r"))
-    tgt_reader = VCF.Reader(openvcf(tgtfile, "r"))
-
-    # convert phase's starting position from tgt matrix index to ref matrix index
-    update_marker_position!(phaseinfo, tgtfile, reffile)
-
-    if chunks > 1
-        # TODO
-    else
-        # first impute
-        X = zeros(Int, size(H, 1), people)
-        impute!(X, H, phaseinfo)
-
-        # write minimal meta information to outfile
-        io = openvcf(outfile, "w")
-        write(io, "##fileformat=VCFv4.2\n")
-        write(io, "##source=MendelImpute\n")
-        write(io, "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n")
-
-        # header line should match reffile (i.e. sample ID's should match)
-        write(io, "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT")
-        for id in VCF.header(tgt_reader).sampleID
-            write(io, "\t", id)
-        end
-        write(io, "\n")
-        close(tgt_reader)
-
-        # write phase info
-        pmeter = Progress(size(X, 1), 5, "Writing to file...")
-        for snp in 1:size(X, 1)
-            ref_record = read(ref_reader)
-            write(io, VCF.chrom(ref_record), "\t", string(VCF.pos(ref_record)), "\t", 
-                VCF.id(ref_record)[1], "\t", VCF.ref(ref_record), "\t", VCF.alt(ref_record)[1], 
-                "\t.\tPASS\t.\tGT")
-            for i in 1:size(X, 2)
-                if X[snp, i] == 2
-                    write(io, "\t1/1")
-                elseif X[snp, i] == 1
-                    write(io, "\t1/0")
-                else
-                    write(io, "\t0/0")
-                end
-            end
-            write(io, "\n")
-            next!(pmeter)
-        end
-        close(io); close(ref_reader)
-    end
-end
-
 """
     update_marker_position!(phaseinfo, tgtfile)
 
