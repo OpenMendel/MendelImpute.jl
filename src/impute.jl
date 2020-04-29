@@ -2,77 +2,19 @@
     impute_typed_only(tgtfile, reffile, outfile, ph, H, chunks, snps_per_chunk)
 
 Phases and imputes `tgtfile` using `phaseinfo` and outputs result in `outfile`. All genotypes 
-in `outfile` are non-missing and phased. Markers that are typed in `reffile` but not in 
-`tgtfile` will not be in `outfile`. 
+in `outfile` are non-missing and phased. 
 """
-function impute_typed_only!(
-    X::AbstractMatrix,
-    H_aligned::AbstractMatrix,
-    phaseinfo::Vector{HaplotypeMosaicPair},
-    outfile::AbstractString,
-    X_sampleID::AbstractVector,
-    X_chr::AbstractVector,
-    X_pos::AbstractVector, 
-    X_ids::AbstractVector,
-    X_ref::AbstractVector,
-    X_alt::AbstractVector
-    )
-    # impute without changing observed entries
-    impute2!(X, H_aligned, phaseinfo)
-
-    # write minimal meta information to outfile
-    io = openvcf(outfile, "w")
-    write(io, "##fileformat=VCFv4.2\n")
-    write(io, "##source=MendelImpute\n")
-    write(io, "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n")
-
-    # header line should match reffile (i.e. sample ID's should match)
-    write(io, "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT")
-    for id in X_sampleID
-        write(io, "\t", id)
-    end
-    write(io, "\n")
-
-    pmeter = Progress(size(X, 1), 5, "Writing to file...")
-    for i in 1:size(X, 1)
-        # write meta info (chrom/pos/id/ref/alt)
-        write(io, X_chr[i], "\t", string(X_pos[i]), "\t", X_ids[i][1], "\t", X_ref[i], "\t", X_alt[i][1], "\t.\tPASS\t.\tGT")
-        for j in 1:size(X, 2)
-            if X[i, j] == 0
-                write(io, "\t0/0")
-            elseif X[i, j] == 1
-                write(io, "\t1/0")
-            else
-                write(io, "\t1/1")
-            end
-        end
-        write(io, "\n")
-        next!(pmeter)
-    end
-
-    # close & return
-    close(io)
-    return nothing
-end
-
-"""
-    impute_untyped(tgtfile, reffile, outfile, ph, H, chunks, snps_per_chunk)
-
-Phases and imputes `tgtfile` using `phaseinfo` and outputs result in `outfile`. All genotypes 
-in `outfile` are non-missing and phased. Markers that are typed in `reffile` but not in 
-`tgtfile` (determined via SNP position) will be imputed in `outfile` as well. 
-"""
-function impute_untyped!(
+function impute!(
     X::AbstractMatrix,
     H::AbstractMatrix,
     phaseinfo::Vector{HaplotypeMosaicPair},
     outfile::AbstractString,
     X_sampleID::AbstractVector,
-    H_pos::AbstractVector, 
-    H_chr::AbstractVector,
-    H_ids::AbstractVector,
-    H_ref::AbstractVector,
-    H_alt::AbstractVector
+    chr::AbstractVector,
+    pos::AbstractVector, 
+    ids::AbstractVector,
+    ref::AbstractVector,
+    alt::AbstractVector
     )
     # impute without changing observed entries
     impute2!(X, H, phaseinfo)
@@ -90,10 +32,10 @@ function impute_untyped!(
     end
     write(io, "\n")
 
-    pmeter = Progress(size(H, 1), 5, "Writing to file...")
+    pmeter = Progress(size(X, 1), 5, "Writing to file...")
     for i in 1:size(X, 1)
         # write meta info (chrom/pos/id/ref/alt)
-        write(io, H_chr[i], "\t", string(H_pos[i]), "\t", H_ids[i][1], "\t", H_ref[i], "\t", H_alt[i][1], "\t.\tPASS\t.\tGT")
+        write(io, chr[i], "\t", string(pos[i]), "\t", ids[i][1], "\t", ref[i], "\t", alt[i][1], "\t.\tPASS\t.\tGT")
         for j in 1:size(X, 2)
             if X[i, j] == 0
                 write(io, "\t0/0")
@@ -109,7 +51,7 @@ function impute_untyped!(
 
     # close & return
     close(io)
-    return X
+    return nothing
 end
 
 """

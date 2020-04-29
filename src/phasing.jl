@@ -43,6 +43,7 @@ function phase(
 
     # match target and ref file by snp position
     XtoH_idx = indexin(X_pos, H_pos) # X_pos[i] == H_pos[XtoH_idx[i]]
+    # H_aligned     = H[XtoH_idx, :]
     H_aligned     = @view(H[XtoH_idx, :])
     H_aligned_chr = @view(H_chr[XtoH_idx])
     H_aligned_pos = @view(H_pos[XtoH_idx])
@@ -86,9 +87,9 @@ function phase(
         # convert phase's starting position from X's index to H's index
         update_marker_position!(ph, XtoH_idx, X_pos, H_pos)
 
-        impute_untyped!(X_full, H, ph, outfile, X_sampleID, H_pos, H_chr, H_ids, H_ref, H_alt)
+        impute!(X_full, H, ph, outfile, X_sampleID, H_chr, H_pos, H_ids, H_ref, H_alt)
     else
-        impute_typed_only!(X, H_aligned, ph, outfile, X_sampleID, X_chr, X_pos, X_ids, X_ref, X_alt)
+        impute!(X, H_aligned, ph, outfile, X_sampleID, X_chr, X_pos, X_ids, X_ref, X_alt)
     end
 
     return hs, ph
