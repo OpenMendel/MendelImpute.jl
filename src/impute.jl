@@ -5,10 +5,10 @@ Phases and imputes `tgtfile` using `phaseinfo` and outputs result in `outfile`. 
 in `outfile` are non-missing and phased. Markers that are typed in `reffile` but not in 
 `tgtfile` will not be in `outfile`. 
 """
-function impute_typed_only(
-    phaseinfo::Vector{HaplotypeMosaicPair},
+function impute_typed_only!(
     X::AbstractMatrix,
     H_aligned::AbstractMatrix,
+    phaseinfo::Vector{HaplotypeMosaicPair},
     outfile::AbstractString,
     X_sampleID::AbstractVector,
     X_chr::AbstractVector,
@@ -62,180 +62,54 @@ Phases and imputes `tgtfile` using `phaseinfo` and outputs result in `outfile`. 
 in `outfile` are non-missing and phased. Markers that are typed in `reffile` but not in 
 `tgtfile` (determined via SNP position) will be imputed in `outfile` as well. 
 """
-function impute_untyped(
-    tgtfile::AbstractString,
-    reffile::AbstractString,
-    outfile::AbstractString,
-    phaseinfo::Vector{HaplotypeMosaicPair},
+function impute_untyped!(
+    X::AbstractMatrix,
     H::AbstractMatrix,
-    chunks::Int,
-    snps_per_chunk::Int,
-    snps_in_last_window::Int
+    phaseinfo::Vector{HaplotypeMosaicPair},
+    outfile::AbstractString,
+    X_sampleID::AbstractVector,
+    H_pos::AbstractVector, 
+    H_chr::AbstractVector,
+    H_ids::AbstractVector,
+    H_ref::AbstractVector,
+    H_alt::AbstractVector
     )
+    # impute without changing observed entries
+    impute2!(X, H, phaseinfo)
 
-    # some constants
-    total_snps = (chunks - 1) * snps_per_chunk + snps_in_last_window
-    people = nsamples(tgtfile)
-    haplotypes = size(H, 2)
-    sample_masks = falses(nsamples(reffile)) # needed for filtering ref_record
-    sample_masks[1:people] .= true
+    # write minimal meta information to outfile
+    io = openvcf(outfile, "w")
+    write(io, "##fileformat=VCFv4.2\n")
+    write(io, "##source=MendelImpute\n")
+    write(io, "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n")
 
-    # convert phase's starting position from matrix index to marker position
-    update_marker_position!(phaseinfo, tgtfile)
+    # header line should match reffile (i.e. sample ID's should match)
+    write(io, "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT")
+    for id in X_sampleID
+        write(io, "\t", id)
+    end
+    write(io, "\n")
 
-    # write phase information to outfile
-    tgt_reader = VCF.Reader(openvcf(tgtfile, "r"))
-    ref_reader = VCF.Reader(openvcf(reffile, "r"))
-    tgt_record = read(tgt_reader) # first record
-    tgt_pos = VCF.pos(tgt_record) # first record's position
-    writer = VCF.Writer(openvcf(outfile, "w"), header(tgt_reader))
-
-    if chunks > 1
-        # reassign and update H chunk by chunk
-        # Hreader = VCF.Reader(openvcf(reffile, "r"))
-        # H = BitArray{2}(undef, snps_per_chunk, haplotypes)
-        # copy_ht_trans!(H, Hreader)
-        # record_counter = chunk_counter = 1
-        # pmeter = Progress(total_snps, 5, "Writing to file...")
-
-        # for (i, ref_record) in enumerate(ref_reader)
-        #     ref_pos = VCF.pos(ref_record)
-        #     if ref_pos != tgt_pos
-        #         gtkey = VCF.findgenokey(ref_record, "GT")
-        #         if !isnothing(gtkey) 
-        #             # filter record so it only contains as many people as in target
-        #             VCFTools.filter_record!(ref_record, sample_masks)
-
-        #             # if snp exist only in reference file, fetch nearest haplotypelabel 
-        #             for (person, geno) in enumerate(ref_record.genotype)
-        #                 #find where snp is located in phase. max() avoids indexing error when ref snps occurs before 1st target snp
-        #                 hap1_position = max(1, searchsortedlast(phaseinfo[person].strand1.start, ref_pos))
-        #                 hap2_position = max(1, searchsortedlast(phaseinfo[person].strand2.start, ref_pos))
-
-        #                 #find the correct haplotypes 
-        #                 hap1 = phaseinfo[person].strand1.haplotypelabel[hap1_position]
-        #                 hap2 = phaseinfo[person].strand2.haplotypelabel[hap2_position]
-
-        #                 # save actual allele to data. "0" (REF) => 0x30, "1" (ALT) => 0x31
-        #                 row = i - (chunk_counter - 1) * snps_per_chunk
-        #                 a1, a2 = H[row, hap1], H[row, hap2]
-        #                 ref_record.data[geno[gtkey][1]] = ifelse(a1, 0x31, 0x30)
-        #                 ref_record.data[geno[gtkey][2]] = 0x7c # phased data has separator '|'
-        #                 ref_record.data[geno[gtkey][3]] = ifelse(a2, 0x31, 0x30)
-        #             end
-        #             write(writer, ref_record)
-        #         end
-        #     else
-        #         gtkey = VCF.findgenokey(tgt_record, "GT")
-        #         if !isnothing(gtkey) 
-        #             # if snp exist in target, loop over samples and change only missing entries
-        #             for (person, geno) in enumerate(tgt_record.genotype)
-        #                 if tgt_record.data[geno[gtkey][1]] == 0x2e # 0x2e is '.' which indicates missing
-        #                     #find where snp is located in phase
-        #                     hap1_position = searchsortedlast(phaseinfo[person].strand1.start, tgt_pos)
-        #                     hap2_position = searchsortedlast(phaseinfo[person].strand2.start, tgt_pos)
-
-        #                     #find the correct haplotypes 
-        #                     hap1 = phaseinfo[person].strand1.haplotypelabel[hap1_position]
-        #                     hap2 = phaseinfo[person].strand2.haplotypelabel[hap2_position]
-
-        #                     # save actual allele to data. "0" (REF) => 0x30, "1" (ALT) => 0x31
-        #                     row = i - (chunk_counter - 1) * snps_per_chunk
-        #                     a1, a2 = H[row, hap1], H[row, hap2]
-        #                     tgt_record.data[geno[gtkey][1]] = ifelse(a1, 0x31, 0x30)
-        #                     tgt_record.data[geno[gtkey][2]] = 0x7c # phased data has separator '|'
-        #                     tgt_record.data[geno[gtkey][3]] = ifelse(a2, 0x31, 0x30)
-        #                 end
-        #             end
-        #             write(writer, tgt_record)
-        #         end
-
-        #         # read next target record
-        #         if !eof(tgt_reader)
-        #             tgt_record = read(tgt_reader) 
-        #             tgt_pos = VCF.pos(tgt_record)
-        #         end
-        #     end
-
-        #     # move to next chunk if we reached the end of current chunk 
-        #     record_counter += 1
-        #     if record_counter > snps_per_chunk
-        #         chunk_counter += 1
-        #         record_counter = 1
-        #         chunk_counter == chunks && (H = BitArray{2}(undef, snps_in_last_window, haplotypes)) #resize H
-        #         copy_ht_trans!(H, Hreader)
-        #     end
-
-        #     # update progress
-        #     next!(pmeter) 
-        # end
-        # close(Hreader)
-    else
-        # loop over each record (snp) in ref file
-        pmeter = Progress(size(H, 1), 5, "Writing to file...")
-        for (i, ref_record) in enumerate(ref_reader)
-            ref_pos = VCF.pos(ref_record)
-            if ref_pos != tgt_pos
-                # if snp exist only in reference file, fetch nearest haplotypelabel for everybody
-                gtkey = VCF.findgenokey(ref_record, "GT")
-                if !isnothing(gtkey) 
-                    # filter record so it only contains as many people as in target
-                    VCFTools.filter_record!(ref_record, sample_masks)
-
-                    for (person, geno) in enumerate(ref_record.genotype)
-                        #find where snp is located in phase. max() avoids indexing error when ref snps occurs before 1st target snp
-                        hap1_position = max(1, searchsortedlast(phaseinfo[person].strand1.start, ref_pos))
-                        hap2_position = max(1, searchsortedlast(phaseinfo[person].strand2.start, ref_pos))
-
-                        #find the correct haplotypes 
-                        hap1 = phaseinfo[person].strand1.haplotypelabel[hap1_position]
-                        hap2 = phaseinfo[person].strand2.haplotypelabel[hap2_position]
-
-                        # save actual allele to data. "0" (REF) => 0x30, "1" (ALT) => 0x31
-                        a1, a2 = H[i, hap1], H[i, hap2]
-                        ref_record.data[geno[gtkey][1]] = ifelse(a1, 0x31, 0x30)
-                        ref_record.data[geno[gtkey][2]] = 0x7c # phased data has separator '|'
-                        ref_record.data[geno[gtkey][3]] = ifelse(a2, 0x31, 0x30)
-                    end
-                    write(writer, ref_record)
-                end
+    pmeter = Progress(size(H, 1), 5, "Writing to file...")
+    for i in 1:size(X, 1)
+        # write meta info (chrom/pos/id/ref/alt)
+        write(io, H_chr[i], "\t", string(H_pos[i]), "\t", H_ids[i][1], "\t", H_ref[i], "\t", H_alt[i][1], "\t.\tPASS\t.\tGT")
+        for j in 1:size(X, 2)
+            if X[i, j] == 0
+                write(io, "\t0/0")
+            elseif X[i, j] == 1
+                write(io, "\t1/0")
             else
-                # if snp exist in target, loop over samples and change only missing entries
-                gtkey = VCF.findgenokey(tgt_record, "GT")
-                if !isnothing(gtkey) 
-                    for (person, geno) in enumerate(tgt_record.genotype)
-                        if tgt_record.data[geno[gtkey][1]] == 0x2e # 0x2e is '.' which indicates missing
-                            #find where snp is located in phase
-                            hap1_position = searchsortedlast(phaseinfo[person].strand1.start, tgt_pos)
-                            hap2_position = searchsortedlast(phaseinfo[person].strand2.start, tgt_pos)
-
-                            #find the correct haplotypes 
-                            hap1 = phaseinfo[person].strand1.haplotypelabel[hap1_position]
-                            hap2 = phaseinfo[person].strand2.haplotypelabel[hap2_position]
-
-                            # save actual allele to data. "0" (REF) => 0x30, "1" (ALT) => 0x31
-                            a1, a2 = H[i, hap1], H[i, hap2]
-                            tgt_record.data[geno[gtkey][1]] = ifelse(a1, 0x31, 0x30)
-                            tgt_record.data[geno[gtkey][2]] = 0x7c # phased data has separator '|'
-                            tgt_record.data[geno[gtkey][3]] = ifelse(a2, 0x31, 0x30)
-                        end
-                    end
-                    write(writer, tgt_record)
-                end
-
-                # read next target record
-                if !eof(tgt_reader)
-                    tgt_record = read(tgt_reader) 
-                    tgt_pos = VCF.pos(tgt_record)
-                end
+                write(io, "\t1/1")
             end
-
-            next!(pmeter) #update progress
         end
+        write(io, "\n")
+        next!(pmeter)
     end
 
-    # close reader/writers 
-    flush(writer); close(writer); close(tgt_reader); close(ref_reader)
+    # close & return
+    close(io)
+    return X
 end
 
 """
@@ -280,44 +154,37 @@ end
     update_marker_position!(phaseinfo, tgtfile, reffile)
 
 Converts `phaseinfo`'s strand1 and strand2's starting position in 
-terms of matrix rows of `tgtfile` to starting position in terms matrix
-rows in `reffile`. 
-
-TODO: iterating over reference vcf files takes a long time, can we get POS somewhere else?
+terms of matrix rows of `X` to starting position in terms matrix
+rows in `H`. 
 """
 function update_marker_position!(
     phaseinfo::Vector{HaplotypeMosaicPair},
-    tgtfile::AbstractString,
-    reffile::AbstractString
+    XtoH_idx::AbstractVector, 
+    tgt_marker_pos::AbstractVector, 
+    ref_marker_pos::AbstractVector
     )
     people = length(phaseinfo)
-    tgt_reader = VCF.Reader(openvcf(tgtfile, "r"))
-    ref_reader = VCF.Reader(openvcf(reffile, "r"))
-    ref_records = nrecords(reffile)
+    ref_records = length(ref_marker_pos)
 
-    # find marker position for each SNP in reference file
-    # TODO: this loop is extremely slow
-    ref_marker_pos = zeros(Int, ref_records)
-    for (i, record) in enumerate(ref_reader)
-        ref_marker_pos[i] = VCF.pos(record)
-    end
-    close(ref_reader)
-
-    # find marker position for each SNP in target file
-    tgt_marker_pos = zeros(Int, phaseinfo[1].strand1.length)
-    for (i, record) in enumerate(tgt_reader)
-        tgt_marker_pos[i] = VCF.pos(record)
-    end
-    close(tgt_reader)
+    # for j in 1:people
+    #     # update strand1's starting position (optimization: can change findfirst to findnext)
+    #     for (i, idx) in enumerate(phaseinfo[j].strand1.start)
+    #         phaseinfo[j].strand1.start[i] = findfirst(x -> x == tgt_marker_pos[idx], ref_marker_pos) :: Int
+    #     end
+    #     # update strand2's starting position
+    #     for (i, idx) in enumerate(phaseinfo[j].strand2.start)
+    #         phaseinfo[j].strand2.start[i] = findfirst(x -> x == tgt_marker_pos[idx], ref_marker_pos) :: Int
+    #     end
+    # end
 
     for j in 1:people
-        # update strand1's starting position (optimization: can change findfirst to findnext)
-        for (i, idx) in enumerate(phaseinfo[j].strand1.start)
-            phaseinfo[j].strand1.start[i] = findfirst(x -> x == tgt_marker_pos[idx], ref_marker_pos) :: Int
+        # update strand1's starting position
+        for i in eachindex(phaseinfo[j].strand1.start)
+            phaseinfo[j].strand1.start[i] = XtoH_idx[i]
         end
         # update strand2's starting position
-        for (i, idx) in enumerate(phaseinfo[j].strand2.start)
-            phaseinfo[j].strand2.start[i] = findfirst(x -> x == tgt_marker_pos[idx], ref_marker_pos) :: Int
+        for i in eachindex(phaseinfo[j].strand2.start)
+            phaseinfo[j].strand2.start[i] = XtoH_idx[i]
         end
     end
 

@@ -1726,13 +1726,17 @@ X, pos = convert_gt(Float64, vcffile, trans=true, save_pos=true)
 
 
 # match indices
-X_pos = [1, 4, 7]
-H_pos = collect(1:10)
-XtoH_idx = indexin(X_pos, H_pos) # X_pos[i] == H_pos[XtoH_idx[i]]
+X_pos = [41, 51, 76]
+H_pos = collect(10:100)
+XtoH_idx = indexin(X_pos, H_pos) 
+
+
+i = 1
+X_pos[i] == H_pos[XtoH_idx[i]]
 
 
 
-
-
+X_full = Vector{Union{Missing, Int}}(missing, length(H_pos))
+copyto!(@view(X_full[X_pos], [1, 2, 3])
 
 

@@ -22,7 +22,7 @@ module MendelImpute
     export compute_optimal_halotype_pair
     export simulate_phased_genotypes
     export connect_happairs
-    export phase!, phase_fast!, phase_unique_only!
+    export phase!, phase_fast!
 
     # main functions that users are exposed to
     export phase
@@ -34,7 +34,7 @@ module MendelImpute
     export extract_marker_info
 
     # imputation
-    export impute_typed_only, impute_untyped, impute_untyped2
+    export impute_typed_only!, impute_untyped!
     export update_marker_position!
 
     include("data_structures.jl")

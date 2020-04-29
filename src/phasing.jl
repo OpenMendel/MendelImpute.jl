@@ -44,11 +44,11 @@ function phase(
     # match target and ref file by snp position
     XtoH_idx = indexin(X_pos, H_pos) # X_pos[i] == H_pos[XtoH_idx[i]]
     H_aligned     = @view(H[XtoH_idx, :])
-    H_aligned_chr = @view(H_chr[XtoH_idx, :])
-    H_aligned_pos = @view(H_pos[XtoH_idx, :])
-    H_aligned_ids = @view(H_ids[XtoH_idx, :])
-    H_aligned_ref = @view(H_ref[XtoH_idx, :])
-    H_aligned_alt = @view(H_alt[XtoH_idx, :])
+    H_aligned_chr = @view(H_chr[XtoH_idx])
+    H_aligned_pos = @view(H_pos[XtoH_idx])
+    H_aligned_ids = @view(H_ids[XtoH_idx])
+    H_aligned_ref = @view(H_ref[XtoH_idx])
+    H_aligned_alt = @view(H_alt[XtoH_idx])
 
     # declare some constants
     people = size(X, 2)
@@ -79,10 +79,16 @@ function phase(
     # impute step
     #
     if impute
-        # impute_untyped2(tgtfile, reffile, outfile, ph, H, chunks, snps_per_chunk, remaining_snps)
-        impute_untyped(tgtfile, reffile, outfile, ph, H, chunks, snps_per_chunk, remaining_snps)
+        # create full target matrix and copy known entries into it
+        X_full = Matrix{Union{Missing, Float32}}(missing, size(H, 1), people)
+        copyto!(@view(X_full[XtoH_idx, :]), X)
+
+        # convert phase's starting position from X's index to H's index
+        update_marker_position!(ph, XtoH_idx, X_pos, H_pos)
+
+        impute_untyped!(X_full, H, ph, outfile, X_sampleID, H_pos, H_chr, H_ids, H_ref, H_alt)
     else
-        impute_typed_only(ph, X, H_aligned, outfile, X_sampleID, X_chr, X_pos, X_ids, X_ref, X_alt)
+        impute_typed_only!(X, H_aligned, ph, outfile, X_sampleID, X_chr, X_pos, X_ids, X_ref, X_alt)
     end
 
     return hs, ph
