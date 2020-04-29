@@ -52,7 +52,7 @@ function impute_typed_only!(
 
     # close & return
     close(io)
-    return X
+    return nothing
 end
 
 """
@@ -166,25 +166,14 @@ function update_marker_position!(
     people = length(phaseinfo)
     ref_records = length(ref_marker_pos)
 
-    # for j in 1:people
-    #     # update strand1's starting position (optimization: can change findfirst to findnext)
-    #     for (i, idx) in enumerate(phaseinfo[j].strand1.start)
-    #         phaseinfo[j].strand1.start[i] = findfirst(x -> x == tgt_marker_pos[idx], ref_marker_pos) :: Int
-    #     end
-    #     # update strand2's starting position
-    #     for (i, idx) in enumerate(phaseinfo[j].strand2.start)
-    #         phaseinfo[j].strand2.start[i] = findfirst(x -> x == tgt_marker_pos[idx], ref_marker_pos) :: Int
-    #     end
-    # end
-
     for j in 1:people
         # update strand1's starting position
-        for i in eachindex(phaseinfo[j].strand1.start)
-            phaseinfo[j].strand1.start[i] = XtoH_idx[i]
+        for (i, idx) in enumerate(phaseinfo[j].strand1.start)
+            phaseinfo[j].strand1.start[i] = XtoH_idx[idx]
         end
         # update strand2's starting position
-        for i in eachindex(phaseinfo[j].strand2.start)
-            phaseinfo[j].strand2.start[i] = XtoH_idx[i]
+        for (i, idx) in enumerate(phaseinfo[j].strand2.start)
+            phaseinfo[j].strand2.start[i] = XtoH_idx[idx]
         end
     end
 
