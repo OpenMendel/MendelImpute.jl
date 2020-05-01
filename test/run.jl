@@ -861,10 +861,8 @@ using ElasticArrays
 cd("/Users/biona001/.julia/dev/MendelImpute/data")
 
 file = "test.08Jun17.d8b.vcf.gz"
-X = convert_ht(Float32, file, has_missing=true)
-H = convert_ht(Float32, file)
-X = copy(X')
-H = copy(H')
+X = convert_ht(Float32, file, trans=true)
+H = convert_ht(Float32, file, trans=true)
 
 width = 400
 hapset = compute_optimal_halotype_set(X, H, width=width)
@@ -1737,6 +1735,52 @@ X_pos[i] == H_pos[XtoH_idx[i]]
 
 
 X_full = Vector{Union{Missing, Int}}(missing, length(H_pos))
-copyto!(@view(X_full[X_pos], [1, 2, 3])
+copyto!(@view(X_full[X_pos], [1, 2, 3]))
+
+
+
+
+
+
+
+using LoopVectorization
+using BenchmarkTools
+
+function sum_skipmissing(x)
+    s = zero(T)
+    @inbounds @simd for i in eachindex(x)
+        if x[i] !== missing
+            s += x[i]
+        end
+    end
+    return s
+end
+
+function sum_skipmissing_avx(x)
+    s = zero(eltype(x))
+    @avx for i in eachindex(x)
+        if !ismissing(x[i])
+            s += x[i]
+        end
+    end
+    return s
+end
+
+function sum_skipmissing_avx2(x)
+    s = zero(eltype(x))
+    @avx for i in eachindex(x)
+        s += ifelse(ismissing(x[i]), zero(eltype(x)), x[i])
+    end
+    return s
+end
+
+x = convert(Vector{Union{Float64, Missing}}, rand(1000));
+sum_skipmissing_avx2(x)
+
+
+@btime euclidean_skipmissing(x, y) #2.727 μs
+@btime euclidean_skipmissing_avx(x, y)
+
+
 
 
