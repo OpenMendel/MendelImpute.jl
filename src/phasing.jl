@@ -43,13 +43,7 @@ function phase(
 
     # match target and ref file by snp position
     XtoH_idx = indexin(X_pos, H_pos) # X_pos[i] == H_pos[XtoH_idx[i]]
-    # H_aligned     = H[XtoH_idx, :]
-    H_aligned     = @view(H[XtoH_idx, :])
-    H_aligned_chr = @view(H_chr[XtoH_idx])
-    H_aligned_pos = @view(H_pos[XtoH_idx])
-    H_aligned_ids = @view(H_ids[XtoH_idx])
-    H_aligned_ref = @view(H_ref[XtoH_idx])
-    H_aligned_alt = @view(H_alt[XtoH_idx])
+    H_aligned = H[XtoH_idx, :]
 
     # declare some constants
     people = size(X, 2)
