@@ -78,19 +78,20 @@ a set of haplotypes that matches the optimal haplotype pair in the current windo
 redundant haplotypes that matches the optimal haplotypes in each window for person i. 
 """
 function compute_optimal_halotype_set(
-    X::AbstractMatrix{Union{Missing, T}},
+    X::AbstractMatrix,
     H::AbstractMatrix;
     width::Int = 400,
     flankwidth::Int = round(Int, 0.1width),
     verbose::Bool = true,
     fast_method::Bool = false,
-    ) where T <: Real
+    )
 
     # define some constants
     snps, people = size(X)
     haplotypes = size(H, 2)
     windows = floor(Int, snps / width)
     threads = Threads.nthreads()
+    T = Float32
 
     # Each person stores a vector of redundant haplotypes matching the optimal one for each window
     if fast_method
@@ -103,17 +104,17 @@ function compute_optimal_halotype_set(
     Hunique = unique_haplotypes(H, width, 'T', flankwidth = flankwidth)
 
     # allocate working arrays
-    happairs    = [Tuple{Int, Int}[] for i in 1:people] # tracks unique haplotype pairs in a window
-    hapscore    = zeros(T, people)
-    num_uniq    = length(Hunique.uniqueindex[1])
-    M           = zeros(T, num_uniq, num_uniq)
-    N           = zeros(T, people, num_uniq)
-    pmeter      = Progress(windows, 5, "Computing optimal haplotype pairs...")
+    happairs = [Tuple{Int, Int}[] for i in 1:people] # tracks unique haplotype pairs in a window
+    hapscore = zeros(T, people)
+    num_uniq = length(Hunique.uniqueindex[1])
+    M        = zeros(T, num_uniq, num_uniq)
+    N        = zeros(T, people, num_uniq)
+    pmeter   = Progress(windows, 5, "Computing optimal haplotype pairs...")
 
     # In first window, calculate optimal haplotype pair among unique haplotypes
-    cur_range   = Hunique.range[1]
-    Hwork_tmp   = convert(Matrix{T}, @view(H[cur_range, Hunique.uniqueindex[1]]))
-    Xwork_tmp   = @view(X[cur_range, :])
+    cur_range = Hunique.range[1]
+    Hwork_tmp = convert(Matrix{T}, @view(H[cur_range, Hunique.uniqueindex[1]]))
+    Xwork_tmp = @view(X[cur_range, :])
     haploimpute!(Xwork_tmp, Hwork_tmp, M, N, happairs, hapscore)
     compute_redundant_haplotypes!(redundant_haplotypes, Hunique, happairs, 1, fast_method=fast_method)
     next!(pmeter)
@@ -121,7 +122,7 @@ function compute_optimal_halotype_set(
     # new resizable working arrays for remaining windows since window 1's size may be different
     M = Vector{Matrix{T}}(undef, threads)
     N = Vector{ElasticArray{T}}(undef, threads)
-    Xwork       = Vector{AbstractMatrix{Union{T, Missing}}}(undef, threads)
+    Xwork       = Vector{AbstractMatrix{Union{eltype(X), Missing}}}(undef, threads)
     Xwork_float = Vector{Matrix{T}}(undef, threads)
     Hwork_float = Vector{ElasticArray{T}}(undef, threads)
     for id in 1:threads 
@@ -628,17 +629,17 @@ remain same.
 * `happair`: pair of haplotypes. `X[:, k] = H[:, happair[1][k]] + H[:, happair[2][k]]`.
 """
 function fillmissing!(
-    Xm::AbstractMatrix{Union{T, Missing}},
+    Xm::AbstractMatrix{Union{U, Missing}},
     Xwork::AbstractMatrix{T},
     H::AbstractMatrix{T},
     happairs::Vector{Vector{Tuple{Int, Int}}},
-    ) where T <: Real
+    ) where {T, U}
 
     p, n = size(Xm)
     best_discrepancy = typemax(eltype(Xwork))
     
     for j in 1:n, happair in happairs[j]
-        discrepancy = zero(promote_type(eltype(Xwork), eltype(H)))
+        discrepancy = zero(T)
         for i in 1:p
             if ismissing(Xm[i, j])
                 tmp = H[i, happair[1]] + H[i, happair[2]]
@@ -678,65 +679,56 @@ genotypes may be changed.
 # end
 
 """
-    initmissing(X, Xwork)
+    initXfloat(X, Xfloat)
 
-Initializes the matrix `Xfloat` where missing values of matrix `X` by `2 x` allele frequency.
+Initializes the matrix `Xfloat` where missing values of matrix `X` by `2 x` allele frequency
+and nonmissing entries of `X` are converted to type `Float32` for subsequent BLAS routines. 
 
 # Input
 * `X` is a `p x n` genotype matrix. Each column is an individual.
 * `Xfloat` is the `p x n` matrix of X where missing values are filled by 2x allele frequency. 
 """
-function initmissing!(
+function initXfloat!(
     X::AbstractMatrix;
-    Xfloat::AbstractMatrix = zeros(eltype(X), size(X)),
-    Xtrue::Union{AbstractMatrix, Nothing} = nothing # for testing
+    Xfloat::AbstractMatrix = zeros(Float32, size(X)),
     )
     
-    T = eltype(X)
+    T = Float32
     p, n = size(X)
 
-    if Xtrue != nothing
-        for j in 1:n, i in 1:p
-            if ismissing(X[i, j])
-                Xfloat[i, j] = Xtrue[i, j]
+    @inbounds for i in 1:p
+        # allele frequency
+        cnnz = zero(T)
+        csum = zero(T)
+        for j in 1:n
+            if !ismissing(X[i, j])
+                cnnz += one(T)
+                csum += convert(T, X[i, j])
+            end
+        end
+        # set missing values to 2freq
+        imp = csum / cnnz
+        for j in 1:n
+            if ismissing(X[i, j]) 
+                Xfloat[i, j] = imp
             else
-                Xfloat[i, j] = X[i, j]
+                Xfloat[i, j] = convert(T, X[i, j])
             end
         end
-    else
-        for i in 1:p
-            # allele frequency
-            cnnz = 0
-            csum = zero(T)
-            for j in 1:n
-                if !ismissing(X[i, j])
-                    cnnz += 1
-                    csum += X[i, j]
-                end
-            end
-            # set missing values to 2freq
-            imp = csum / cnnz
-            for j in 1:n
-                if ismissing(X[i, j]) 
-                    Xfloat[i, j] = imp
-                else
-                    Xfloat[i, j] = X[i, j]
-                end
-            end
-        end
-        # impute using mode
-        # for i in 1:p
-        #     # set missing values to mode
-        #     imp = mode(@view(X[i, :]))
-        #     for j in 1:n
-        #         if ismissing(X[i, j]) 
-        #             Xfloat[i, j] = imp
-        #         else
-        #             Xfloat[i, j] = X[i, j]
-        #         end
-        #     end
-        # end
     end
+
+    # impute using mode
+    # for i in 1:p
+    #     # set missing values to mode
+    #     imp = mode(@view(X[i, :]))
+    #     for j in 1:n
+    #         if ismissing(X[i, j]) 
+    #             Xfloat[i, j] = imp
+    #         else
+    #             Xfloat[i, j] = X[i, j]
+    #         end
+    #     end
+    # end
 
     # initialize using 0
     # for i in 1:p, j in 1:n
@@ -766,19 +758,19 @@ haplotypes `H`.
 """
 function haploimpute!(
     X::AbstractMatrix,
-    H::AbstractMatrix,
-    M::AbstractMatrix,
-    N::AbstractMatrix,
+    H::AbstractMatrix{T},
+    M::AbstractMatrix{T},
+    N::AbstractMatrix{T},
     happairs::Vector{Vector{Tuple{Int, Int}}},
     hapscore::AbstractVector;
-    Xfloat::AbstractMatrix = zeros(eltype(M), size(X)),
+    Xfloat::AbstractMatrix = zeros(T, size(X)),
     maxiters::Int  = 1,
     tolfun::Number = 1e-3,
-    )
+    ) where T
 
     obj = typemax(eltype(hapscore))
     size(X) == size(Xfloat) || error("Dimension mismatch: X and Xfloat have sizes $(size(X)) and $(size(Xfloat))")
-    initmissing!(X, Xfloat=Xfloat) #Xfloat[i, j] = X[i, j] on observed entries
+    initXfloat!(X, Xfloat=Xfloat) #Xfloat is the matrix that engages in BLAS routines
 
     # mm iteration
     for iter in 1:maxiters

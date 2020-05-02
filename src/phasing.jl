@@ -38,7 +38,7 @@ function phase(
     # println("Running chunk $chunks / $chunks")
 
     # import data, sampleID, and each SNP's CHROM/POS/ID/REF/ALT info
-    X, X_sampleID, X_chr, X_pos, X_ids, X_ref, X_alt = convert_gt(Float32, tgtfile, trans=true, save_snp_info=true, msg = "Importing genotype file...")
+    X, X_sampleID, X_chr, X_pos, X_ids, X_ref, X_alt = convert_gt(UInt8, tgtfile, trans=true, save_snp_info=true, msg = "Importing genotype file...")
     H, H_sampleID, H_chr, H_pos, H_ids, H_ref, H_alt = convert_ht(Bool, reffile, trans=true, save_snp_info=true, msg = "Importing reference haplotype files...")
 
     # match target and ref file by snp position
@@ -77,7 +77,7 @@ function phase(
     #
     if impute
         # create full target matrix and copy known entries into it
-        X_full = Matrix{Union{Missing, Float32}}(missing, size(H, 1), people)
+        X_full = Matrix{Union{Missing, UInt8}}(missing, size(H, 1), people)
         copyto!(@view(X_full[XtoH_idx, :]), X)
 
         # convert phase's starting position from X's index to H's index
