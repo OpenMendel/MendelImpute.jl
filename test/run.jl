@@ -1784,3 +1784,69 @@ sum_skipmissing_avx2(x)
 
 
 
+
+# learn to write to file fast 
+using Random
+using CodecZlib
+using BenchmarkTools
+
+cd("/Users/biona001/.julia/dev/MendelImpute/test")
+function write_test(A)
+    io = GzipCompressorStream(open("test.txt.gz", "w"))
+    for i in 1:size(A, 1)
+        write(io, "hi", "\t", "bye", "\t", "benjamin", "\t", "this is false", "\t", "\t.\tPASS\t.\tGT")
+        for j in 1:size(A, 2)
+            if A[i, j] < 0.8
+                write(io, "\t0/0")
+            elseif A[i, j] < 0.9
+                write(io, "\t1/0")
+            elseif A[i, j] < 1.0
+                write(io, "\t1/1")
+            else
+                error("hi")
+            end
+        end
+        write(io, "\n")
+    end
+    close(io)
+end
+
+function write_test2(A)
+    io = GzipCompressorStream(open("test.txt.gz", "w"))
+    pb = PipeBuffer()
+    for i in 1:size(A, 1)
+        print(pb, "hi", "\t", "bye", "\t", "benjamin", "\t", "this is false", "\t", "\t.\tPASS\t.\tGT")
+        for j in 1:size(A, 2)
+            if A[i, j] < 0.8
+                print(pb, "\t0/0")
+            elseif A[i, j] < 0.9
+                print(pb, "\t1/0")
+            elseif A[i, j] < 1.0
+                print(pb, "\t1/1")
+            else
+                error("hi")
+            end
+        end
+        (bytesavailable(pb) > (16*1024)) && write(io, take!(pb))
+    end
+    write(io, take!(pb))
+    close(pb); close(io)
+end
+
+Random.seed!(2020)
+A = rand(100000, 1000);
+# write_test(A)
+# write_test2(A)
+@time write_test(A)
+@time write_test2(A)
+
+
+
+
+
+
+
+
+
+
+

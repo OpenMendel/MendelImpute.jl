@@ -26,26 +26,30 @@ function make_refvcf_file(
 
     # first write minimal meta information
     io = openvcf(vcffilename, "w")
-    write(io, "##fileformat=VCFv4.2\n")
-    write(io, "##source=MendelImpute\n")
-    write(io, "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n")
+    pb = PipeBuffer()
+    print(pb, "##fileformat=VCFv4.2\n")
+    print(pb, "##source=MendelImpute\n")
+    print(pb, "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n")
 
     # header line
-    write(io, "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT")
+    print(pb, "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT")
     for i in 1:Int(d / 2)
-        write(io, "\tref$i")
+        print(pb, "\tref$i")
     end
-    write(io, "\n")
+    print(pb, "\n")
+    (bytesavailable(pb) > (16*1024)) && write(io, take!(pb))
 
     # write phase info
     for snp in 1:p
-        write(io, "1\t$snp\tref_snp_$snp\tA\tC\t.\tPASS\t.\tGT")
+        print(pb, "1\t$snp\tref_snp_$snp\tA\tC\t.\tPASS\t.\tGT")
         for i in 1:2:d
-            write(io, string("\t", Int(H[snp, i]), separator, Int(H[snp, i + 1])))
+            print(pb, string("\t", Int(H[snp, i]), separator, Int(H[snp, i + 1])))
         end
-        write(io, "\n")
+        print(pb, "\n")
+        (bytesavailable(pb) > (16*1024)) && write(io, take!(pb))
     end
-    close(io)
+    write(io, take!(pb)
+    close(io); close(pb)
 end
 
 """
@@ -104,39 +108,43 @@ function make_tgtvcf_file(
     separator = (phased ? '|' : '/')
 
     # first write minimal meta information
-    io = openvcf(vcffilename, "w")    
-    write(io, "##fileformat=VCFv4.2\n")
-    write(io, "##source=MendelImpute\n")
-    write(io, "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n")
+    io = openvcf(vcffilename, "w")
+    pb = PipeBuffer()
+    print(pb, "##fileformat=VCFv4.2\n")
+    print(pb, "##source=MendelImpute\n")
+    print(pb, "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n")
 
     # header line
-    write(io, "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT")
+    print(pb, "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT")
     for i in 1:d
-        write(io, "\ttarget$i")
+        print(pb, "\ttarget$i")
     end
-    write(io, "\n")
+    print(pb, "\n")
+    (bytesavailable(pb) > (16*1024)) && write(io, take!(pb))
 
     # write phase info
     for snp in 1:p
-        write(io, marker_chrom[snp], '\t', string(marker_pos[snp]), '\t', marker_ID[snp], '\t', 
+        print(pb, marker_chrom[snp], '\t', string(marker_pos[snp]), '\t', marker_ID[snp], '\t', 
             marker_REF[snp], '\t', marker_ALT[snp], "\t.\tPASS\t.\tGT")
-        @inbounds for i in 1:d
+        for i in 1:d
             if ismissing(X[snp, i])
                 genotype = "./."
-            elseif X[snp, i] == 2
-                genotype = "1/1"
-            elseif X[snp, i] == 1
-                genotype = "1/0"
             elseif X[snp, i] == 0
                 genotype = "0/0"
+            elseif X[snp, i] == 1
+                genotype = "1/0"
+            elseif X[snp, i] == 2
+                genotype = "1/1"
             else
                 error("genotypes can only be 0, 1, 2, or missing, but was $(X[snp, i])")
             end
-            write(io, '\t', genotype)
+            print(pb, '\t', genotype)
         end
-        write(io, '\n')
+        print(pb, '\n')
+        (bytesavailable(pb) > (16*1024)) && write(io, take!(pb))
     end
-    close(io)
+    write(io, take!(pb))
+    close(io); close(pb)
 end
 
 """
@@ -222,7 +230,7 @@ last window.
 - `T`: Type of output matrix, default `Float32`.
 - `min_cross_over`: Minimum number of breakpoints for each person's genotype. 
 - `max_cross_over`: Maximum number of breakpoints for each person's genotype. 
-- `width`: Number of SNPs in a window. 
+- `width`: Number of SNPs in a window. Cross-overs can happen at most once in a window
 
 # Output:
 * `X`: `p x people` genotype matrix. Each column is a person's genotype. 

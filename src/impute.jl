@@ -21,36 +21,43 @@ function impute!(
 
     # write minimal meta information to outfile
     io = openvcf(outfile, "w")
-    write(io, "##fileformat=VCFv4.2\n")
-    write(io, "##source=MendelImpute\n")
-    write(io, "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n")
+    pb = PipeBuffer()
+    print(pb, "##fileformat=VCFv4.2\n")
+    print(pb, "##source=MendelImpute\n")
+    print(pb, "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n")
 
     # header line should match reffile (i.e. sample ID's should match)
-    write(io, "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT")
+    print(pb, "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT")
     for id in X_sampleID
-        write(io, "\t", id)
+        print(pb, "\t", id)
     end
-    write(io, "\n")
+    print(pb, "\n")
+    (bytesavailable(pb) > (16*1024)) && write(io, take!(pb))
 
     pmeter = Progress(size(X, 1), 5, "Writing to file...")
     for i in 1:size(X, 1)
         # write meta info (chrom/pos/id/ref/alt)
-        write(io, chr[i], "\t", string(pos[i]), "\t", ids[i][1], "\t", ref[i], "\t", alt[i][1], "\t.\tPASS\t.\tGT")
+        print(pb, chr[i], "\t", string(pos[i]), "\t", ids[i][1], "\t", ref[i], "\t", alt[i][1], "\t.\tPASS\t.\tGT")
+        
         for j in 1:size(X, 2)
             if X[i, j] == 0
-                write(io, "\t0/0")
+                print(pb, "\t0/0")
             elseif X[i, j] == 1
-                write(io, "\t1/0")
+                print(pb, "\t1/0")
+            elseif X[i, j] == 2
+                print(pb, "\t1/1")
             else
-                write(io, "\t1/1")
+                error("imputed genotypes can only be 0, 1, 2 but X[$i, $j]) = $(X[i, j])")
             end
         end
-        write(io, "\n")
+        print(pb, "\n")
+        (bytesavailable(pb) > (16*1024)) && write(io, take!(pb))
         next!(pmeter)
     end
+    write(io, take!(pb))
 
     # close & return
-    close(io)
+    close(io); close(pb)
     return nothing
 end
 
