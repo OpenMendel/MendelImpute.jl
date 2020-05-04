@@ -96,15 +96,13 @@ function compute_optimal_halotype_set(
     # get unique haplotype indices and maps for each window
     Hunique = unique_haplotypes(H, width, 'T', flankwidth = flankwidth)
 
-    # allocate working arrays
+    # In first window, calculate optimal haplotype pair among unique haplotypes
+    pmeter   = Progress(windows, 5, "Computing optimal haplotype pairs...")
     happairs = [Tuple{Int, Int}[] for i in 1:people] # tracks unique haplotype pairs in a window
     hapscore = zeros(T, people)
     num_uniq = length(Hunique.uniqueindex[1])
     M        = zeros(T, num_uniq, num_uniq)
     N        = zeros(T, people, num_uniq)
-    pmeter   = Progress(windows, 5, "Computing optimal haplotype pairs...")
-
-    # In first window, calculate optimal haplotype pair among unique haplotypes
     cur_range = Hunique.range[1]
     Hwork_tmp = convert(Matrix{T}, @view(H[cur_range, Hunique.uniqueindex[1]]))
     Xwork_tmp = @view(X[cur_range, :])
@@ -112,7 +110,7 @@ function compute_optimal_halotype_set(
     compute_redundant_haplotypes!(redundant_haplotypes, Hunique, happairs, 1, fast_method=fast_method)
     next!(pmeter)
 
-    # new resizable working arrays for remaining windows since window 1's size may be different
+    # allocate working arrays for remaining windows (beware: window 1's cur_range length is different than these)
     M = Vector{Matrix{T}}(undef, threads)
     N = Vector{ElasticArray{T}}(undef, threads)
     Xwork       = Vector{AbstractMatrix{Union{eltype(X), Missing}}}(undef, threads)
@@ -395,8 +393,7 @@ function compute_redundant_haplotypes!(
             end
             # reduce search space for dynamic programming later
             if length(redundant_haplotypes[k][window]) > 1000
-                # println("person $k at window $window has ", length(redundant_haplotypes[k][window]), " redundant haplotypes")
-                shuffle!(redundant_haplotypes[k][window])
+                # shuffle!(redundant_haplotypes[k][window]) # THIS IS NOT THREAD SAFE!
                 resize!(redundant_haplotypes[k][window], 1000)
             end
         end
