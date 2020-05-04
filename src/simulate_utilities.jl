@@ -48,7 +48,7 @@ function make_refvcf_file(
         print(pb, "\n")
         (bytesavailable(pb) > (16*1024)) && write(io, take!(pb))
     end
-    write(io, take!(pb)
+    write(io, take!(pb))
     close(io); close(pb)
 end
 

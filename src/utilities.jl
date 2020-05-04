@@ -32,31 +32,24 @@ function unique_haplotypes(
     windows = floor(Int, p / width)
     hapset  = UniqueHaplotypeMaps(windows, d)
 
-    # find unique haplotypes in first & second window
-    first_range = 1:(width + flankwidth)
-    H_cur_window = view(H, first_range, :)
-    hapset.hapmap[1] = groupslices(H_cur_window, dim)
-    hapset.uniqueindex[1] = unique(hapset.hapmap[1])
-    hapset.range[1] = first_range
-
     # record unique haplotypes and mappings window by window (using flanking windows)
     # first  1/3: ((w - 2) * width + 1):((w - 1) * width)
     # middle 1/3: ((w - 1) * width + 1):(      w * width)
     # last   1/3: (      w * width + 1):((w + 1) * width)
-    for w in 2:(windows - 1)
-        cur_range = ((w - 1) * width - flankwidth + 1):(w * width + flankwidth)
+    Threads.@threads for w in 1:windows
+        if w == 1
+            cur_range = 1:(width + flankwidth)
+        elseif w == windows
+            cur_range = ((windows - 1) * width - flankwidth + 1):p
+        else
+            cur_range = ((w - 1) * width - flankwidth + 1):(w * width + flankwidth)
+        end
+
         H_cur_window = view(H, cur_range, :)
         hapset.hapmap[w] = groupslices(H_cur_window, dim)
         hapset.uniqueindex[w] = unique(hapset.hapmap[w])
         hapset.range[w] = cur_range
     end
-
-    # find unique haplotype in penultimate & last window
-    last_range   = ((windows - 1) * width - flankwidth + 1):p
-    H_cur_window = view(H, last_range, :)
-    hapset.hapmap[end] = groupslices(H_cur_window, dim)
-    hapset.uniqueindex[end] = unique(hapset.hapmap[end])
-    hapset.range[end] = last_range
 
     return hapset
 end
