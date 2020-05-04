@@ -699,16 +699,20 @@ function initXfloat!(
                 csum += convert(T, X[i, j])
             end
         end
-        # set missing values to 2freq
-        imp = csum / cnnz
+        # set missing values to 2freq, unless cnnz is 0
+        imp = (cnnz == 0 ? zero(T) : csum / cnnz)
         for j in 1:n
-            if ismissing(X[i, j]) 
+            if ismissing(X[i, j])
                 Xfloat[i, j] = imp
             else
                 Xfloat[i, j] = convert(T, X[i, j])
             end
         end
     end
+
+    any(isnan, Xfloat) && error("Xfloat contains NaN during initialization! Shouldn't happen!")
+    any(isinf, Xfloat) && error("Xfloat contains Inf during initialization! Shouldn't happen!")
+    any(ismissing, Xfloat) && error("Xfloat contains Missing during initialization! Shouldn't happen!")
 
     # impute using mode
     # for i in 1:p
