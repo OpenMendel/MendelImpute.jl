@@ -43,5 +43,6 @@ module MendelImpute
     include("simulate_utilities.jl")
     include("dynamic_programming.jl")
     include("impute.jl")
+    include("breakpoints.jl")
 
 end # module

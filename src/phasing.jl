@@ -182,12 +182,12 @@ function phase!(
         Hw  = view(H, w_start:snps, :)
         sol_path[id][windows], bkpts = continue_haplotype(Xwi, Hw, sol_path[id][windows - 1], sol_path[id][windows])
         # strand 1
-        if bkpts[1] > -1
+        if bkpts[1] > -1 && bkpts[1] < 2width
             push!(ph[i].strand1.start, chunk_offset + w_start + bkpts[1])
             push!(ph[i].strand1.haplotypelabel, sol_path[id][windows][1])
         end
         # strand 2
-        if bkpts[2] > -1
+        if bkpts[2] > -1 && bkpts[2] < 2width
             push!(ph[i].strand2.start, chunk_offset + w_start + bkpts[2])
             push!(ph[i].strand2.haplotypelabel, sol_path[id][windows][2])
         end
