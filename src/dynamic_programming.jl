@@ -116,15 +116,15 @@ function connect_happairs!(
             push!(next_pair[w], best_next_pair)
         end
 
-        # second pass to remove pairs that are much worse than best error, reducing search space
-        tol = win_best_err
-        for (i, err) in enumerate(subtree_err[w])
-            if err > tol
-                deleteat!(subtree_err[w], i)
-                deleteat!(next_pair[w], i)
-                deleteat!(haplotype_set[w], i)
-            end
-        end
+        # remove pairs that are much worse than best error, reducing dp search space
+        # tol = win_best_err
+        # for (i, err) in enumerate(subtree_err[w])
+        #     if err > tol
+        #         deleteat!(subtree_err[w], i)
+        #         deleteat!(next_pair[w], i)
+        #         deleteat!(haplotype_set[w], i)
+        #     end
+        # end
     end
 
     # find best solution path by forward-tracing
