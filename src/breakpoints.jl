@@ -92,8 +92,8 @@ function search_breakpoint(
     # extend haplotype H[:, s2[1]] position by position
     @inbounds for bkpt in 1:n
         if !ismissing(X[bkpt]) && H[bkpt, s2[1]] ≠ H[bkpt, s2[2]]
-            errors -= X[bkpt] ≠ H[bkpt, s1] + H[bkpt, s2[2]]
-            errors += X[bkpt] ≠ H[bkpt, s1] + H[bkpt, s2[1]]
+            errors -= abs2(X[bkpt] - H[bkpt, s1] - H[bkpt, s2[2]])
+            errors += abs2(X[bkpt] - H[bkpt, s1] - H[bkpt, s2[1]])
             if errors :: Int < err_optim
                 bkpt_optim, err_optim = bkpt, errors
                 # quick return if perfect match
@@ -129,12 +129,12 @@ function search_breakpoint(
         errors = 0
         for pos in 1:bkpt1
             if !ismissing(X[pos])
-                errors += X[pos] ≠ H[pos, s1[1]] + H[pos, s2[2]]
+                errors += abs2(X[pos] - H[pos, s1[1]] - H[pos, s2[2]])
             end
         end
         for pos in (bkpt1 + 1):length(X)
             if !ismissing(X[pos])
-                errors += X[pos] ≠ H[pos, s1[2]] + H[pos, s2[2]]
+                errors += abs2(X[pos] - H[pos, s1[2]] - H[pos, s2[2]])
             end
         end
         if errors :: Int < err_optim
@@ -147,9 +147,9 @@ function search_breakpoint(
 
         # extend haplotype H[:, s2[1]] position by position
         for bkpt2 in 1:bkpt1
-            if !ismissing(X[bkpt2])
-                errors -= X[bkpt2] ≠ H[bkpt2, s1[1]] + H[bkpt2, s2[2]]
-                errors += X[bkpt2] ≠ H[bkpt2, s1[1]] + H[bkpt2, s2[1]]
+            if !ismissing(X[bkpt2]) && H[bkpt2, s2[2]] != H[bkpt2, s2[1]]
+                errors -= abs2(X[bkpt2] - H[bkpt2, s1[1]] - H[bkpt2, s2[2]])
+                errors += abs2(X[bkpt2] - H[bkpt2, s1[1]] - H[bkpt2, s2[1]])
                 if errors :: Int < err_optim
                     err_optim = errors
                     bkpts_optim = (bkpt1, bkpt2)
@@ -157,9 +157,9 @@ function search_breakpoint(
             end
         end
         for bkpt2 in (bkpt1 + 1):length(X)
-            if !ismissing(X[bkpt2])
-                errors -= X[bkpt2] ≠ H[bkpt2, s1[2]] + H[bkpt2, s2[2]]
-                errors += X[bkpt2] ≠ H[bkpt2, s1[2]] + H[bkpt2, s2[1]]
+            if !ismissing(X[bkpt2]) && H[bkpt2, s2[2]] != H[bkpt2, s2[1]]
+                errors -= abs2(X[bkpt2] - H[bkpt2, s1[2]] - H[bkpt2, s2[2]])
+                errors += abs2(X[bkpt2] - H[bkpt2, s1[2]] - H[bkpt2, s2[1]])
                 if errors :: Int < err_optim
                     err_optim = errors
                     bkpts_optim = (bkpt1, bkpt2)
@@ -194,6 +194,8 @@ function search_breakpoint_dp(
     s1::Tuple{Int, Int},
     s2::Tuple{Int, Int}
     )
+
+    # TODO: THIS FUNCTION IS NOT COMPLETE
     
     width = length(X)
     sol_path = zeros(Int, width)
@@ -244,7 +246,7 @@ function pair_error(Xi, h1, h2, cross)
     if cross > 1 
         return Inf
     else
-
+        
     end
 end
 
