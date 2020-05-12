@@ -11,12 +11,11 @@ reference `aligned.ref.vcf.gz` file matching `tgtfile` position by position.
 
 # Optional Inputs
 - `outfile`: output filename. Output genotypes will be phased with no missing data.
-- `impute`: If `true`, untyped SNPs will be imputed, otherwise only missing snps in `tgtfile` will be imputed. 
-- `chrom`: chromosome name, must be identical in target and reference files
-- `reffile_aligned`: phased reference file with number of snps matching `tgtfile`. 
-- `width`: number of SNPs (markers) in each sliding window. 
+- `impute`: If `true`, untyped SNPs will be imputed, otherwise only missing snps in `tgtfile` will be imputed.  (default `false`)
+- `width`: number of SNPs (markers) in each sliding window. (default `400`)
 - `flankwidth`: Number of SNPs flanking the sliding window (defaults to 10% of `width`)
-- `fast_method`: If `true`, will use window-by-window intersection for phasing. If `false`, phasing uses dynamic progrmaming. 
+- `fast_method`: If `true`, will use window-by-window intersection for phasing. If `false`, phasing uses dynamic progrmaming. (default `false`)
+- `unique_only`: If `true`, will phase and impute using only unique haplotypes in each window. Usually faster than `fast_method=true`.  (default `false`)
 """
 function phase(
     tgtfile::AbstractString,
