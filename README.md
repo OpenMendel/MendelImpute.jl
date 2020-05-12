@@ -1,8 +1,6 @@
-# MendelImpute - Fast genotype imputation and phasing via haplotype reference panels.
+# MendelImpute
 
-[![Build Status](https://travis-ci.com/biona001/MendelImpute.svg?branch=master)](https://travis-ci.com/biona001/MendelImpute.jl)
-
-Our software takes a data-mining approach for genotype imputation, contrary to popular HMM or low rank approximation methods. Manuscript coming soon!
+[![Build Status](https://travis-ci.com/biona001/MendelImpute.svg?branch=master)](https://travis-ci.com/github/biona001/MendelImpute)
 
 ## Installation
 
@@ -13,11 +11,17 @@ Pkg.add("https://github.com/OpenMendel/VCFTools.jl")
 Pkg.add("https://github.com/biona001/MendelImpute")
 ```
 
-## Example usage
+## Usage
+
+Our software takes a data-mining approach for genotype imputation, contrary to HMM or low rank approximation methods. Given a target genotype file (phased or unphased) and a reference haplotype file (phased), our software phases and imputes every SNP in the reference file to the target file. Observed data remains unchanged.
+
+Manuscript coming soon!
+
+## Examples
 
 Please impute one chromosome at a time. 
 
-```
+```julia
 tgtfile = "target.vcf.gz"           # Target imputation file name. Doesn't have to be phased. 
 reffile = "ref.vcf.gz"              # Reference haplotype file name. Genotypes must be phased. 
 outfile = "mendel.imputed.vcf.gz"   # Output file name. All output genotypes will be phased. 
@@ -25,7 +29,7 @@ width = 400                         # Number of SNPs per imputation window. (def
 @time phase(tgtfile, reffile, outfile = outfile, impute=true, width = width)
 ```
 Example output:
-```
+```julia
 Importing genotype file...100%|█████████████████████████| Time: 0:00:05
 Importing reference haplotype files...100%|█████████████| Time: 0:03:07
 Computing optimal haplotype pairs...100%|███████████████| Time: 0:03:23
@@ -47,10 +51,12 @@ These options are usable with the `phase` function.
 - `fast_method`: If `true`, will use window-by-window intersection for phasing. If `false`, phasing uses dynamic progrmaming.  (default `false`)
 - `unique_only`: If `true`, will phase and impute using only unique haplotypes in each window. Usually faster than `fast_method=true`.  (default `false`)
 
+**Note for multithreading**: The default number of threads is 1. To change this, type `export JULIA_NUM_THREADS=4` in your terminal *before starting julia*. We recommend setting number of threads equal to number of physical CPU cores. 
+
 ## Package features
 
-- Built-in support `.vcf`, `.vcf.gz` and PLINK (comming soon) files.
-- Out-of-the-box multi-threaded parallelism
+- Built-in support `.vcf`, `.vcf.gz` and PLINK (coming soon) files.
+- Out-of-the-box multi-threaded parallelism (before starting julia, type `export JULIA_NUM_THREADS=4`)
 - Impute dosage data (genotype is any real number in [0, 2]) using a haplotype reference panel (coming soon)
 - Intuitive manipulation of genotype files via `VCFTools.jl` and `SnpArrays.jl`
 - Some simple simulation routines for generating haplotype and phase/unphased target files. 
