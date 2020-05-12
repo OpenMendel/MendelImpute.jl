@@ -54,9 +54,8 @@ These options are usable with the `phase` function.
 
 ## Package features
 
-- Built-in support for `.vcf`, `.vcf.gz` and PLINK (coming soon) files.
-- Out-of-the-box multi-threaded parallelism (before starting julia, type `export JULIA_NUM_THREADS=4`)
-- Impute dosage data (genotype is any real number in [0, 2]) using a haplotype reference panel (coming soon)
+- Built-in support for `.vcf`, `.vcf.gz` and PLINK files.
+- Out-of-the-box multi-threaded parallelism
 - Intuitive manipulation of genotype files via `VCFTools.jl` and `SnpArrays.jl`
 - Some simple simulation routines for generating haplotype and phase/unphased target files. 
 

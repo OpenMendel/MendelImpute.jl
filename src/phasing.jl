@@ -6,8 +6,8 @@ by sliding windows and saves result in `outfile`. Will also create an aligned
 reference `aligned.ref.vcf.gz` file matching `tgtfile` position by position. 
 
 # Input
-- `reffile`: VCF file with reference genotype (GT) data
-- `tgtfile`: VCF file with target genotype (GT) data
+- `reffile`: VCF file name. Should end in `.vcf` or `.vcf.gz`. 
+- `tgtfile`: VCF or PLINK file. VCF files should end in `.vcf` or `.vcf.gz`. PLINK files should exclude the `.bim/.bed/.fam` names but the trio must all be present in the directory
 
 # Optional Inputs
 - `outfile`: output filename. Output genotypes will be phased with no missing data.
@@ -36,11 +36,29 @@ function phase(
     # remaining_snps = tgt_snps - ((chunks - 1) * snps_per_chunk)
     # println("Running chunk $chunks / $chunks")
 
+    #
+    # TODO: check if target/reference files have the same assembly build (e.g hr19, b36 etc)
+    #
+
     # import data, sampleID, and each SNP's CHROM/POS/ID/REF/ALT info
-    X, X_sampleID, X_chr, X_pos, X_ids, X_ref, X_alt = convert_gt(UInt8, tgtfile, trans=true, save_snp_info=true, msg = "Importing genotype file...")
+    if endswith(tgtfile, ".vcf") || endswith(tgtfile, ".vcf.gz")
+        X, X_sampleID, X_chr, X_pos, X_ids, X_ref, X_alt = convert_gt(UInt8, tgtfile, trans=true, save_snp_info=true, msg = "Importing genotype file...")
+    else
+        # must be PLINK file
+        isfile(tgtfile * ".bed") && isfile(tgtfile * ".fam") && isfile(tgtfile * ".bim") || error("Target file can only be VCF files (ends in .vcf or .vcf.gz) or PLINK files (do not include .bim/bed/fam)")
+
+        X_snpdata = SnpData(tgtfile)
+        X = convert(Matrix{UInt8}, X_snpdata.snparray)
+        X_sampleID = X_snpdata.person_info[!, :iid] 
+        X_chr = X_snpdata.snp_info[!, :chromosome]
+        X_pos = X_snpdata.snp_info[!, :position]
+        X_ids = X_snpdata.snp_info[!, :snpid]
+        X_ref = X_snpdata.snp_info[!, :allele1]
+        X_alt = X_snpdata.snp_info[!, :allele2]
+    end
     H, H_sampleID, H_chr, H_pos, H_ids, H_ref, H_alt = convert_ht(Bool, reffile, trans=true, save_snp_info=true, msg = "Importing reference haplotype files...")
 
-    # match target and ref file by snp position
+    # match target and ref file by snp position (TODO: currently assumes all SNPs in X is in H)
     XtoH_idx = indexin(X_pos, H_pos) # X_pos[i] == H_pos[XtoH_idx[i]]
     H_aligned = H[XtoH_idx, :]
 
