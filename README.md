@@ -4,11 +4,10 @@
 
 ## Installation
 
-Within Julia,
+Start Julia, press ] to enter package manager mode, and type:
 ```julia
-using Pkg
-Pkg.add("https://github.com/OpenMendel/VCFTools.jl")
-Pkg.add("https://github.com/biona001/MendelImpute")
+(v1.3) pkg> add https://github.com/OpenMendel/VCFTools.jl
+(v1.3) pkg> add https://github.com/biona001/MendelImpute
 ```
 
 ## Usage
