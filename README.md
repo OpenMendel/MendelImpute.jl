@@ -1,6 +1,6 @@
 # MendelImpute
 
-[![Build Status](https://travis-ci.com/biona001/MendelImpute.svg?branch=master)](https://travis-ci.com/github/biona001/MendelImpute)
+[![Build Status](https://travis-ci.com/biona001/MendelImpute.svg?branch=master)](https://travis-ci.com/github/biona001/MendelImpute)[![Coverage Status](https://coveralls.io/repos/github/biona001/MendelImpute/badge.svg?branch=master)](https://coveralls.io/github/biona001/MendelImpute?branch=master)
 
 ## Installation
 
