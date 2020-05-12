@@ -1,11 +1,11 @@
 # MendelImpute
 
-[![Build Status](https://travis-ci.com/biona001/MendelImpute.svg?branch=master)](https://travis-ci.com/github/biona001/MendelImpute)[![Coverage Status](https://coveralls.io/repos/github/biona001/MendelImpute/badge.svg?branch=master)](https://coveralls.io/github/biona001/MendelImpute?branch=master)
+[![Build Status](https://travis-ci.com/biona001/MendelImpute.svg?branch=master)](https://travis-ci.com/github/biona001/MendelImpute) [![Coverage Status](https://coveralls.io/repos/github/biona001/MendelImpute/badge.svg?branch=master)](https://coveralls.io/github/biona001/MendelImpute?branch=master)
 
 ## Installation
 
 Within Julia,
-```
+```julia
 using Pkg
 Pkg.add("https://github.com/OpenMendel/VCFTools.jl")
 Pkg.add("https://github.com/biona001/MendelImpute")
@@ -13,7 +13,7 @@ Pkg.add("https://github.com/biona001/MendelImpute")
 
 ## Usage
 
-Our software takes a data-mining approach for genotype imputation, contrary to HMM or low rank approximation methods. Given a target genotype file (phased or unphased) and a reference haplotype file (phased), our software phases and imputes every SNP in the reference file to the target file. Observed data remains unchanged.
+Our software takes a data-mining approach for genotype imputation, contrary to HMM or low rank approximation methods. Given a target genotype file (phased or unphased and may contain missing data) and a reference haplotype file (phased, no missing), our software phases and imputes every SNP in the reference file to the target file. Observed data remains unchanged.
 
 Manuscript coming soon!
 
@@ -38,7 +38,7 @@ Writing to file...100%|███████████████████
 517.542827 seconds (3.07 G allocations: 288.416 GiB, 7.70% gc time)
 ```
 
-Check out our [Jupyter notebook examples](https://github.com/biona001/MendelImpute/tree/master/data/1000_genome_phase3_v5/filtered) (click on any `.pynb` link)!
+Check out our [Jupyter notebook examples](https://github.com/biona001/MendelImpute/tree/master/data/1000_genome_phase3_v5/filtered) (click on any `.pynb` link)! The result above is from `chrom22` notebook ran on 8 threads, with 644939 reference SNPs, 100000 target SNPs, 250 samples, and 4508 haplotypes.
 
 ## Options
 
@@ -55,7 +55,7 @@ These options are usable with the `phase` function.
 
 ## Package features
 
-- Built-in support `.vcf`, `.vcf.gz` and PLINK (coming soon) files.
+- Built-in support for `.vcf`, `.vcf.gz` and PLINK (coming soon) files.
 - Out-of-the-box multi-threaded parallelism (before starting julia, type `export JULIA_NUM_THREADS=4`)
 - Impute dosage data (genotype is any real number in [0, 2]) using a haplotype reference panel (coming soon)
 - Intuitive manipulation of genotype files via `VCFTools.jl` and `SnpArrays.jl`
