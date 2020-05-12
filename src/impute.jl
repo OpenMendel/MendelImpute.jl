@@ -62,44 +62,6 @@ function impute!(
 end
 
 """
-    update_marker_position!(phaseinfo, tgtfile)
-
-Converts `phaseinfo`'s strand1 and strand2's starting position in 
-terms of matrix rows to starting position in terms of SNP position. 
-
-TODO: iterating over vcf files takes a long time, can we get POS somewhere else?
-"""
-function update_marker_position!(
-    phaseinfo::Vector{HaplotypeMosaicPair},
-    tgtfile::AbstractString;
-    )
-    people = length(phaseinfo)
-    reader = VCF.Reader(openvcf(tgtfile, "r"))
-    marker_pos = zeros(Int, phaseinfo[1].strand1.length)
-
-    # find marker position for each SNP
-    for (i, record) in enumerate(reader)
-        gtkey = VCF.findgenokey(record, "GT")
-        if !isnothing(gtkey) 
-            marker_pos[i] = VCF.pos(record)
-        end
-    end
-
-    for j in 1:people
-        # update strand1's starting position
-        for (i, idx) in enumerate(phaseinfo[j].strand1.start)
-            phaseinfo[j].strand1.start[i] = marker_pos[idx]
-        end
-        # update strand2's starting position
-        for (i, idx) in enumerate(phaseinfo[j].strand2.start)
-            phaseinfo[j].strand2.start[i] = marker_pos[idx]
-        end
-    end
-
-    return nothing
-end
-
-"""
     update_marker_position!(phaseinfo, tgtfile, reffile)
 
 Converts `phaseinfo`'s strand1 and strand2's starting position in 

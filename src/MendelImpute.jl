@@ -39,7 +39,7 @@ module MendelImpute
 
     include("data_structures.jl")
     include("phasing.jl")
-    include("utilities.jl")
+    include("halotype_pair.jl")
     include("simulate_utilities.jl")
     include("dynamic_programming.jl")
     include("impute.jl")

@@ -321,18 +321,18 @@ end
 # end
 
 # TODO: possible type instability
-function euclidean_skipmissing(
-    x::AbstractVector{U}, 
-    y::AbstractVector{T}
-    ) where {T <: Real, U <: Union{T, Missing}}
-    s = zero(T)
-    @inbounds @simd for i in eachindex(x)
-        if x[i] !== missing
-            s += (x[i] - y[i])^2
-        end
-    end
-    return s
-end
+# function euclidean_skipmissing(
+#     x::AbstractVector{Union{T, Missing}}, 
+#     y::AbstractVector{T}
+#     ) where {T <: Real}
+#     s = zero(T)
+#     @inbounds @simd for i in eachindex(x)
+#         if x[i] !== missing
+#             s += (x[i] - y[i])^2
+#         end
+#     end
+#     return s
+# end
 
 """
 Records optimal-redundant haplotypes for each window. 
@@ -643,17 +643,17 @@ function fillmissing!(
     return best_discrepancy
 end
 
-"""
-    fillgeno!(X, H, happair)
+# """
+#     fillgeno!(X, H, happair)
 
-Fill in genotypes according to haplotypes. Both missing and non-missing
-genotypes may be changed.
+# Fill in genotypes according to haplotypes. Both missing and non-missing
+# genotypes may be changed.
 
-# Input
-* `X`: `p x n` genotype matrix. Each column is an individual.
-* `H`: `p x d` haplotype matrix. Each column is a haplotype.
-* `happair`: pair of haplotypes. `X[:, k] = H[:, happair[1][k]] + H[:, happair[2][k]]`.
-"""
+# # Input
+# * `X`: `p x n` genotype matrix. Each column is an individual.
+# * `H`: `p x d` haplotype matrix. Each column is a haplotype.
+# * `happair`: pair of haplotypes. `X[:, k] = H[:, happair[1][k]] + H[:, happair[2][k]]`.
+# """
 # function fillgeno!(
 #     X::AbstractMatrix,
 #     H::AbstractMatrix,
