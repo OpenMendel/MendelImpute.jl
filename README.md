@@ -1,5 +1,7 @@
 # MendelImpute - Fast genotype imputation and phasing via haplotype reference panels.
 
+[![Build Status](https://travis-ci.com/biona001/MendelImpute.svg?branch=master)](https://travis-ci.com/biona001/MendelImpute.jl)
+
 Our software takes a data-mining approach for genotype imputation, contrary to popular HMM or low rank approximation methods. Manuscript coming soon!
 
 ## Installation
