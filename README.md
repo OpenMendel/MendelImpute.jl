@@ -56,7 +56,7 @@ These options are usable with the `phase` function.
 - `fast_method`: If `true`, will use window-by-window intersection for phasing. If `false`, phasing uses dynamic progrmaming.  (default `false`)
 - `unique_only`: If `true`, will phase and impute using only unique haplotypes in each window. Usually faster than `fast_method=true`.  (default `false`)
 
-**Note for multithreading**: The default number of threads is 1. To change this, type `export JULIA_NUM_THREADS=4` in your terminal *before starting julia*. We recommend setting number of threads equal to number of physical CPU cores. 
+**Note for multithreading**: The default number of threads is 1. To change this, type `export JULIA_NUM_THREADS=4` in your terminal *before starting Julia*. After starting Julia, verify you have the correct number of threads by `Threads.nthreads()`. We recommend setting the number of threads equal to the number of physical CPU cores. 
 
 ## Bug Fixes and User support
 
