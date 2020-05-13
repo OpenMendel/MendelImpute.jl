@@ -9,6 +9,7 @@ module MendelImpute
     using ElasticArrays
     using GeneticVariation
     using VCFTools
+    using SnpArrays
     using GroupSlices
     using Random
     using ProgressMeter
