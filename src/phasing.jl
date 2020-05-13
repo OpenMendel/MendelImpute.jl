@@ -7,7 +7,7 @@ reference `aligned.ref.vcf.gz` file matching `tgtfile` position by position.
 
 # Input
 - `reffile`: VCF file name. Should end in `.vcf` or `.vcf.gz`. 
-- `tgtfile`: VCF or PLINK file. VCF files should end in `.vcf` or `.vcf.gz`. PLINK files should exclude the `.bim/.bed/.fam` names but the trio must all be present in the directory
+- `tgtfile`: VCF or PLINK file. VCF files should end in `.vcf` or `.vcf.gz`. PLINK files should exclude the `.bim/.bed/.fam` names but the trio must all be present in the directory.
 
 # Optional Inputs
 - `outfile`: output filename. Output genotypes will be phased with no missing data.
@@ -135,6 +135,7 @@ function phase!(
     snps, people = size(X)
     haplotypes = size(H, 2)
     windows = floor(Int, snps / width)
+    last_window_width = snps - (windows - 1) * width 
 
     # allocate working arrays
     Tu       = Tuple{Int, Int}
@@ -199,12 +200,12 @@ function phase!(
         Hw  = view(H, w_start:snps, :)
         sol_path[id][windows], bkpts = continue_haplotype(Xwi, Hw, sol_path[id][windows - 1], sol_path[id][windows])
         # strand 1
-        if bkpts[1] > -1 && bkpts[1] < 2width
+        if bkpts[1] > -1 && bkpts[1] < last_window_width
             push!(ph[i].strand1.start, chunk_offset + w_start + bkpts[1])
             push!(ph[i].strand1.haplotypelabel, sol_path[id][windows][1])
         end
         # strand 2
-        if bkpts[2] > -1 && bkpts[2] < 2width
+        if bkpts[2] > -1 && bkpts[2] < last_window_width
             push!(ph[i].strand2.start, chunk_offset + w_start + bkpts[2])
             push!(ph[i].strand2.haplotypelabel, sol_path[id][windows][2])
         end

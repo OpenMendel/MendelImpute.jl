@@ -14,7 +14,13 @@ Start Julia, press ] to enter package manager mode, and type:
 
 Our software takes a data-mining approach for genotype imputation, contrary to HMM or low rank approximation methods. Given a target genotype file (phased or unphased and may contain missing data) and a reference haplotype file (phased, no missing), our software phases and imputes every SNP in the reference file to the target file. Observed data remains unchanged.
 
-Manuscript coming soon!
+We offer the following features:
+
+- Built-in support for imputing `.vcf`, `.vcf.gz` and PLINK files.
+- Out-of-the-box multithreaded (shared memory) parallelism. 
+- Some (very naive) simulation routines for generating haplotype and imputation target files. 
+
+Also check out [VCFTools.jl](https://github.com/OpenMendel/VCFTools.jl) and [SnpArrays.jl](https://github.com/OpenMendel/SnpArrays.jl) for intuitive manipulation of VCF and PLINK files. 
 
 ## Examples
 
@@ -51,13 +57,6 @@ These options are usable with the `phase` function.
 - `unique_only`: If `true`, will phase and impute using only unique haplotypes in each window. Usually faster than `fast_method=true`.  (default `false`)
 
 **Note for multithreading**: The default number of threads is 1. To change this, type `export JULIA_NUM_THREADS=4` in your terminal *before starting julia*. We recommend setting number of threads equal to number of physical CPU cores. 
-
-## Package features
-
-- Built-in support for `.vcf`, `.vcf.gz` and PLINK files.
-- Out-of-the-box multi-threaded parallelism
-- Intuitive manipulation of genotype files via `VCFTools.jl` and `SnpArrays.jl`
-- Some simple simulation routines for generating haplotype and phase/unphased target files. 
 
 ## Bug Fixes and User support
 
