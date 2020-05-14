@@ -48,7 +48,7 @@ function phase(
         isfile(tgtfile * ".bed") && isfile(tgtfile * ".fam") && isfile(tgtfile * ".bim") || error("Target file can only be VCF files (ends in .vcf or .vcf.gz) or PLINK files (do not include .bim/bed/fam)")
 
         X_snpdata = SnpData(tgtfile)
-        X = convert(Matrix{UInt8}, X_snpdata.snparray)
+        X = convert(Matrix{UInt8}, X_snpdata.snparray')
         X_sampleID = X_snpdata.person_info[!, :iid] 
         X_chr = X_snpdata.snp_info[!, :chromosome]
         X_pos = X_snpdata.snp_info[!, :position]
