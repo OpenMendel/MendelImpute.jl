@@ -71,11 +71,9 @@ rows in `H`.
 function update_marker_position!(
     phaseinfo::Vector{HaplotypeMosaicPair},
     XtoH_idx::AbstractVector, 
-    tgt_marker_pos::AbstractVector, 
-    ref_marker_pos::AbstractVector
+    ref_records::Int
     )
     people = length(phaseinfo)
-    ref_records = length(ref_marker_pos)
 
     for j in 1:people
         # update strand1's starting position

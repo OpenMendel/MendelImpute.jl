@@ -504,20 +504,14 @@ function haplopair!(
     end
 
     # computational routine
-    xtx = zeros(eltype(hapscore), length(hapscore))
-    @inbounds for j in 1:n
-        @simd for i in 1:p
-            xtx[j] += abs2(X[i, j])
-        end
-    end
-    haplopair!(happairs, hapscore, M, N, xtx)
+    haplopair!(happairs, hapscore, M, N)
 
     # supplement the constant terms in objective
-    # @inbounds for j in 1:n
-    #     @simd for i in 1:p
-    #         hapscore[j] += abs2(X[i, j])
-    #     end
-    # end
+    @inbounds for j in 1:n
+        @simd for i in 1:p
+            hapscore[j] += abs2(X[i, j])
+        end
+    end
 
     return nothing
 end
@@ -547,7 +541,6 @@ function haplopair!(
     hapmin::Vector{T},
     M::AbstractMatrix{T},
     N::AbstractMatrix{T},
-    xtx::AbstractVector{T}
     ) where T <: Real
 
     n, d = size(N)
@@ -558,7 +551,7 @@ function haplopair!(
     @inbounds for k in 1:d, j in 1:k
         # loop over individuals
         @simd for i in 1:n
-            score = sqrt(xtx[i] + M[j, k] - N[i, j] - N[i, k])
+            score = M[j, k] - N[i, j] - N[i, k]
 
             # keep best happair (original code)
             # if score < hapmin[i]

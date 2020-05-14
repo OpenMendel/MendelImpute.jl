@@ -58,22 +58,25 @@ function phase(
     end
     H, H_sampleID, H_chr, H_pos, H_ids, H_ref, H_alt = convert_ht(Bool, reffile, trans=true, save_snp_info=true, msg = "Importing reference haplotype files...")
 
-    # match target and ref file by snp position (TODO: currently assumes all SNPs in X is in H)
+    # match target and ref file by snp position
     XtoH_idx = indexin(X_pos, H_pos) # X_pos[i] == H_pos[XtoH_idx[i]]
-    H_aligned = H[XtoH_idx, :]
+    XtoH_rm_nothing = Base.filter(!isnothing, XtoH_idx)
+    X_aligned = any(isnothing.(XtoH_idx)) ? X[findall(!isnothing, XtoH_idx), :] : X
+    H_aligned = H[XtoH_rm_nothing, :]
 
     # declare some constants
     people = size(X, 2)
     haplotypes = size(H, 2)
-    tgt_snps = size(X, 1)
+    tgt_snps = size(X_aligned, 1)
+    ref_snps = size(H, 1)
 
     #
     # compute redundant haplotype sets
     #
     if unique_only
-        hs = compute_optimal_halotype_pair(X, H_aligned, width = width, flankwidth=flankwidth)
+        hs = compute_optimal_halotype_pair(X_aligned, H_aligned, width = width, flankwidth=flankwidth)
     else
-        hs = compute_optimal_halotype_set(X, H_aligned, width = width, flankwidth=flankwidth, fast_method=fast_method)
+        hs = compute_optimal_halotype_set(X_aligned, H_aligned, width = width, flankwidth=flankwidth, fast_method=fast_method)
     end
 
     #
@@ -82,11 +85,11 @@ function phase(
     # offset = (chunks - 1) * snps_per_chunk
     ph = [HaplotypeMosaicPair(tgt_snps) for i in 1:people] # phase information
     if unique_only
-        phase_unique_only!(ph, X, H_aligned, hs, width=width, flankwidth=flankwidth)
+        phase_unique_only!(ph, X_aligned, H_aligned, hs, width=width, flankwidth=flankwidth)
     elseif fast_method
-        phase_fast!(ph, X, H_aligned, hs, width=width, flankwidth=flankwidth)
+        phase_fast!(ph, X_aligned, H_aligned, hs, width=width, flankwidth=flankwidth)
     else
-        phase!(ph, X, H_aligned, hs, width=width, flankwidth=flankwidth)
+        phase!(ph, X_aligned, H_aligned, hs, width=width, flankwidth=flankwidth)
     end
 
     #
@@ -94,19 +97,35 @@ function phase(
     #
     if impute
         # create full target matrix and copy known entries into it
-        X_full = Matrix{Union{Missing, UInt8}}(missing, size(H, 1), people)
-        copyto!(@view(X_full[XtoH_idx, :]), X)
+        X_full = Matrix{Union{Missing, UInt8}}(missing, ref_snps, people)
+        copyto!(@view(X_full[XtoH_rm_nothing, :]), X_aligned)
 
         # convert phase's starting position from X's index to H's index
-        update_marker_position!(ph, XtoH_idx, X_pos, H_pos)
+        update_marker_position!(ph, XtoH_rm_nothing, ref_snps)
 
         impute!(X_full, H, ph, outfile, X_sampleID, H_chr, H_pos, H_ids, H_ref, H_alt)
     else
-        impute!(X, H_aligned, ph, outfile, X_sampleID, X_chr, X_pos, X_ids, X_ref, X_alt)
+        impute!(X_aligned, H_aligned, ph, outfile, X_sampleID, X_chr, X_pos, X_ids, X_ref, X_alt)
     end
 
     return hs, ph
 end
+
+# """
+#     interleave_index(idx)
+
+# For an index vector called from `indexin()`, removes filters out all Nothing and entries after
+# every `nothing` is incremented by how many `nothing` preceeds it. 
+# """
+# function interleave_index(idx::Vector{Union{Nothing, Int}})
+#     out = Int[]
+#     sizehint!(out, count(!isnothing, idx))
+#     num = 0
+#     for i in idx
+#         isnothing(i) ? (num += 1) : push!(out, i + num)
+#     end
+#     return out
+# end
 
 """
     phase(X, H, width=400, verbose=true)
