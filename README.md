@@ -12,13 +12,13 @@ Start Julia, press ] to enter package manager mode, and type:
 
 ## Usage
 
-Our software takes a data-mining approach for genotype imputation, contrary to HMM or low rank approximation methods. Given a target genotype file (phased or unphased and may contain missing data) and a reference haplotype file (phased, no missing), our software phases and imputes every SNP in the reference file to the target file. Observed data remains unchanged.
-
 We offer the following features:
 
-- Built-in support for imputing `.vcf`, `.vcf.gz` and PLINK files.
+- Built-in support for imputing VCF (`.vcf`, `.vcf.gz`) and PLINK files (currently only outputs VCF files).
 - Out-of-the-box multithreaded (shared memory) parallelism. 
 - Some (very naive) simulation routines for generating haplotype and imputation target files. 
+
+Given a target genotype file (phased or unphased and may contain missing data) and a reference haplotype file (phased, no missing), our software phases and imputes every SNP in the reference file to the target file. Observed data remains unchanged. Snps typed in target but not in reference panel will be excluded. 
 
 Also check out [VCFTools.jl](https://github.com/OpenMendel/VCFTools.jl) and [SnpArrays.jl](https://github.com/OpenMendel/SnpArrays.jl) for intuitive manipulation of VCF and PLINK files. 
 
