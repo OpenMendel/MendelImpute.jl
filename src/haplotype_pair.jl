@@ -9,6 +9,7 @@ structure for examples.
 * `H`: An `p x d` reference panel of haplotypes within a genomic window. 
 * `width`: The window width 
 * `trans`: Orientation of `H`. 'T' means columns of `H` are a haplotype vectors. 'N' means rows of `H` are. 
+* `flankwidth`: Number of SNPs flanking the sliding window (defaults to 10% of `width`)
 
 # Output
 * `hapset`: Data structure for keeping track of unique haplotypes in each window. 

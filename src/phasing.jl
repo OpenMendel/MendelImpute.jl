@@ -361,42 +361,46 @@ function phase_fast!(
                 push!(ph[i].strand2.start, chunk_offset + w_start + bkpt[2])
                 push!(ph[i].strand1.haplotypelabel, s1_next)
                 push!(ph[i].strand2.haplotypelabel, s2_next)
-            # single haplotype switch
-            elseif sum(strand1_intersect[id]) == 0
-                # search breakpoints among all possible haplotypes
-                s1_prev = ph[i].strand1.haplotypelabel[end]
-                s1_win_next = findall(hapset[i].strand1[w])
-                s2_win_next = findall(hapset[i].strand2[w])
-                best_bktp = 0
-                best_err  = typemax(Int)
-                best_s1_next = 0
-                for s1_next in s1_win_next, s2_next in s2_win_next
-                    bkpt, err_optim = search_breakpoint(Xi, Hi, s2_next, (s1_prev, s1_next))
-                    if err_optim < best_err
-                        best_bktp, best_err, best_s1_next = bkpt, err_optim, s1_next
+            else
+                # single haplotype switch
+                if sum(strand1_intersect[id]) == 0
+                    # search breakpoints among all possible haplotypes
+                    s1_prev = ph[i].strand1.haplotypelabel[end]
+                    s1_win_next = findall(hapset[i].strand1[w])
+                    s2_win_next = findall(hapset[i].strand2[w])
+                    best_bktp = 0
+                    best_err  = typemax(Int)
+                    best_s1_next = 0
+                    for s1_next in s1_win_next, s2_next in s2_win_next
+                        bkpt, err_optim = search_breakpoint(Xi, Hi, s2_next, (s1_prev, s1_next))
+                        if err_optim < best_err
+                            best_bktp, best_err, best_s1_next = bkpt, err_optim, s1_next
+                        end
                     end
+                    # record info into phase
+                    push!(ph[i].strand1.start, chunk_offset + w_start + best_bktp)
+                    push!(ph[i].strand1.haplotypelabel, best_s1_next)
                 end
-                # record info into phase
-                push!(ph[i].strand1.start, chunk_offset + w_start + best_bktp)
-                push!(ph[i].strand1.haplotypelabel, best_s1_next)
-            # single haplotype switch
-            elseif sum(strand2_intersect[id]) == 0
-                # search breakpoints among all possible haplotypes
-                s2_prev = ph[i].strand2.haplotypelabel[end]
-                s2_win_next = findall(hapset[i].strand2[w])
-                s1_win_next = findall(hapset[i].strand1[w])
-                best_bktp = 0
-                best_err  = typemax(Int)
-                best_s2_next = 0
-                for s2_next in s2_win_next, s1_next in s1_win_next
-                    bkpt, err_optim = search_breakpoint(Xi, Hi, s1_next, (s2_prev, s2_next))
-                    if err_optim < best_err
-                        best_bktp, best_err, best_s2_next = bkpt, err_optim, s2_next
+
+                # single haplotype switch
+                if sum(strand2_intersect[id]) == 0
+                    # search breakpoints among all possible haplotypes
+                    s2_prev = ph[i].strand2.haplotypelabel[end]
+                    s2_win_next = findall(hapset[i].strand2[w])
+                    s1_win_next = findall(hapset[i].strand1[w])
+                    best_bktp = 0
+                    best_err  = typemax(Int)
+                    best_s2_next = 0
+                    for s2_next in s2_win_next, s1_next in s1_win_next
+                        bkpt, err_optim = search_breakpoint(Xi, Hi, s1_next, (s2_prev, s2_next))
+                        if err_optim < best_err
+                            best_bktp, best_err, best_s2_next = bkpt, err_optim, s2_next
+                        end
                     end
+                    # record info into phase
+                    push!(ph[i].strand2.start, chunk_offset + w_start + best_bktp)
+                    push!(ph[i].strand2.haplotypelabel, best_s2_next)
                 end
-                # record info into phase
-                push!(ph[i].strand2.start, chunk_offset + w_start + best_bktp)
-                push!(ph[i].strand2.haplotypelabel, best_s2_next)
             end
         end
         next!(pmeter) #update progress
