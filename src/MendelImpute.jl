@@ -13,6 +13,7 @@ module MendelImpute
     using GroupSlices
     using Random
     using ProgressMeter
+    using JLD2, FileIO
 
     export continue_haplotype, haplopair!, haplopair, haploimpute!
     export impute!, impute2!, search_breakpoint, unique_haplotypes
@@ -27,6 +28,7 @@ module MendelImpute
 
     # main functions that users are exposed to
     export phase
+    export compress_haplotypes
 
     export OptimalHaplotypeSet, compute_optimal_halotype_set
     export make_refvcf_file, make_tgtvcf_file
@@ -45,5 +47,6 @@ module MendelImpute
     include("dynamic_programming.jl")
     include("impute.jl")
     include("breakpoints.jl")
+    include("compress.jl")
 
 end # module
