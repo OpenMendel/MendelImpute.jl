@@ -6,9 +6,9 @@ saves a mapping vector of unique columns of H. See `UniqueHaplotypeMaps` data
 structure for examples. 
 
 # Input
-* `H`: An `p x d` reference panel of haplotypes within a genomic window. 
-* `width`: The window width 
-* `trans`: Orientation of `H`. 'T' means columns of `H` are a haplotype vectors. 'N' means rows of `H` are. 
+* `H`: An `p x d` or `d x p` reference panel of haplotypes within a genomic window. 
+* `width`: Number of SNPs per window
+* `dims`: Orientation of `H`. `2` means columns of `H` are a haplotype vectors. `1` means rows of `H` are. 
 * `flankwidth`: Number of SNPs flanking the sliding window (defaults to 10% of `width`)
 
 # Output
@@ -16,22 +16,19 @@ structure for examples.
 """
 function unique_haplotypes(
     H::AbstractMatrix,
-    width::Int,
-    trans::Char;
+    width::Int;
+    dims::Int, 
     flankwidth::Int = round(Int, 0.1width)
     )
 
-    if trans == 'N'
-        dim = 1
-    elseif trans == 'T'
-        dim = 2
-    else
-        error("trans can only be 'N' or 'T' but was $dim" )
+    dims <= 2 || error("Currently dims can only be 1 or 2, but was $dims.")
+    if dims == 2
+        p, d = size(H)
+    elseif dims == 1
+        d, p = size(H)
     end
-
-    p, d    = size(H)
     windows = floor(Int, p / width)
-    hapset  = UniqueHaplotypeMaps(windows, d)
+    hapset = UniqueHaplotypeMaps(windows, d)
 
     # record unique haplotypes and mappings window by window (using flanking windows)
     # first  1/3: ((w - 2) * width + 1):((w - 1) * width)
@@ -46,8 +43,8 @@ function unique_haplotypes(
             cur_range = ((w - 1) * width - flankwidth + 1):(w * width + flankwidth)
         end
 
-        H_cur_window = view(H, cur_range, :)
-        hapset.hapmap[w] = groupslices(H_cur_window, dim)
+        H_cur_window = (dims == 2 ? view(H, cur_range, :) : view(H, :, cur_range))
+        hapset.hapmap[w] = groupslices(H_cur_window, dims=dims)
         hapset.uniqueindex[w] = unique(hapset.hapmap[w])
         hapset.range[w] = cur_range
     end
@@ -95,7 +92,7 @@ function compute_optimal_halotype_set(
     end
 
     # get unique haplotype indices and maps for each window
-    Hunique = unique_haplotypes(H, width, 'T', flankwidth = flankwidth)
+    Hunique = unique_haplotypes(H, width, dims=2, flankwidth = flankwidth)
 
     # In first window, calculate optimal haplotype pair among unique haplotypes
     pmeter   = Progress(windows, 5, "Computing optimal haplotype pairs...")
@@ -178,7 +175,7 @@ function compute_optimal_halotype_pair(
     threads = Threads.nthreads()
 
     # get unique haplotype indices and maps for each window
-    Hunique = unique_haplotypes(H, width, 'T', flankwidth = flankwidth)
+    Hunique = unique_haplotypes(H, width, dims=2, flankwidth = flankwidth)
 
     # stores optimal haplotype pairs in each window
     optimal_happairs = [[Tuple{Int, Int}[] for i in 1:windows] for j in 1:people]
@@ -280,7 +277,7 @@ end
 #     windows = floor(Int, snps / width)
 
 #     # get unique haplotype indices and maps for current window
-#     Hunique = unique_haplotypes(H, width, 'T', flankwidth = flankwidth)
+#     Hunique = unique_haplotypes(H, width, dims=2, flankwidth = flankwidth)
 #     hapset  = [OptimalHaplotypeSet(windows, haplotypes) for i in 1:people]
 
 #     for w in 1:windows, i in 1:people
