@@ -20,3 +20,4 @@ GBR_data.csv
 *.jar
 *eagle
 *.tbi
+*.jld2

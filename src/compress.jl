@@ -28,7 +28,6 @@ struct CompressedWindow
     range::UnitRange
     uniqueH::BitMatrix
 end
-CompressedWindow(haps::Int) = CompressedWindow(Int[], zeros(Int, haps), 1:0, BitMatrix(undef, 0, 2))
 
 """
 Keeps a vector of `CompressedWindow`. 
@@ -40,7 +39,13 @@ struct CompressedHaplotypes
     cw::Vector{CompressedWindow}
     width::Int
 end
-CompressedHaplotypes(windows::Int, haps::Int, width::Int) = CompressedHaplotypes([CompressedWindow(haps) for _ in 1:windows], width)
+CompressedHaplotypes(windows::Int, width::Int) = CompressedHaplotypes(Vector{CompressedWindow}(undef, windows), width)
+
+# methods to implement: https://docs.julialang.org/en/v1/manual/interfaces/#Indexing-1
+Base.getindex(x::CompressedHaplotypes, w::Int) = x.cw[w]
+Base.setindex!(x::CompressedHaplotypes, v::CompressedWindow, w::Int) = x.cw[w] = v
+Base.firstindex(x::CompressedHaplotypes) = firstindex(x.cw)
+Base.lastindex(x::CompressedHaplotypes) = lastindex(x.cw)
 
 """
     compress_haplotypes(vcffile, outfile, [width], [dims], [flankwidth])
@@ -79,10 +84,11 @@ function compress_haplotypes(
     end
     windows = floor(Int, p / width)
 
-    hapset = CompressedHaplotypes(windows, d, width)
+    # initialize compressed haplotype object
+    hapset = CompressedHaplotypes(windows, width)
 
     # record unique haplotypes and mappings window by window
-    Threads.@threads for w in 1:windows
+    for w in 1:windows
         if w == 1
             cur_range = 1:(width + flankwidth)
         elseif w == windows
@@ -92,11 +98,10 @@ function compress_haplotypes(
         end
 
         H_cur_window = (dims == 2 ? view(H, cur_range, :) : view(H, :, cur_range))
-        hapset.cw[w].hapmap = groupslices(H_cur_window, dims=dims)
-        unique_idx = unique(hapset.cw[w].hapmap)
-        hapset.cw[w].uniqueindex = unique_idx
-        hapset.cw[w].range = cur_range
-        hapset.cw[w].uniqueH = convert(BitMatrix, (dims == 2 ? H_cur_window[:, unique_idx] : H_cur_window[unique_idx, :]))
+        hapmap = groupslices(H_cur_window, dims=dims)
+        unique_idx = unique(hapmap)
+        uniqueH = convert(BitMatrix, (dims == 2 ? H_cur_window[:, unique_idx] : H_cur_window[unique_idx, :]))
+        hapset[w] = CompressedWindow(unique_idx, hapmap, cur_range, uniqueH)
     end
 
     # save hapset to binary file using JLD2 package
