@@ -1,58 +1,4 @@
 """
-    unique_haplotypes(H, width, trans)
-
-For each window, finds unique haplotype indices stored in the columns of H and 
-saves a mapping vector of unique columns of H. See `UniqueHaplotypeMaps` data 
-structure for examples. 
-
-# Input
-* `H`: An `p x d` or `d x p` reference panel of haplotypes within a genomic window. 
-* `width`: Number of SNPs per window
-* `dims`: Orientation of `H`. `2` means columns of `H` are a haplotype vectors. `1` means rows of `H` are. 
-* `flankwidth`: Number of SNPs flanking the sliding window (defaults to 10% of `width`)
-
-# Output
-* `hapset`: Data structure for keeping track of unique haplotypes in each window. 
-"""
-function unique_haplotypes(
-    H::AbstractMatrix,
-    width::Int;
-    dims::Int, 
-    flankwidth::Int = round(Int, 0.1width)
-    )
-
-    dims <= 2 || error("Currently dims can only be 1 or 2, but was $dims.")
-    if dims == 2
-        p, d = size(H)
-    elseif dims == 1
-        d, p = size(H)
-    end
-    windows = floor(Int, p / width)
-    hapset = UniqueHaplotypeMaps(windows, d)
-
-    # record unique haplotypes and mappings window by window (using flanking windows)
-    # first  1/3: ((w - 2) * width + 1):((w - 1) * width)
-    # middle 1/3: ((w - 1) * width + 1):(      w * width)
-    # last   1/3: (      w * width + 1):((w + 1) * width)
-    Threads.@threads for w in 1:windows
-        if w == 1
-            cur_range = 1:(width + flankwidth)
-        elseif w == windows
-            cur_range = ((windows - 1) * width - flankwidth + 1):p
-        else
-            cur_range = ((w - 1) * width - flankwidth + 1):(w * width + flankwidth)
-        end
-
-        H_cur_window = (dims == 2 ? view(H, cur_range, :) : view(H, :, cur_range))
-        hapset.hapmap[w] = groupslices(H_cur_window, dims=dims)
-        hapset.uniqueindex[w] = unique(hapset.hapmap[w])
-        hapset.range[w] = cur_range
-    end
-
-    return hapset
-end
-
-"""
     compute_optimal_halotype_set(X, H, width, verbose)
 
 Computes the optimal haplotype pair for each person in each window, then computes
@@ -431,8 +377,8 @@ end
 """
     haplopair(X, H)
 
-Calculate the best pair of haplotypes in `H` for each individual in `X`. Assumes `X` 
-does not have missing data. 
+Calculate the best pair of haplotypes in `H` for each individual in `X`. Missing data in `X` 
+does not have missing data. Missing data is initialized as 2x alternate allele freq.
 
 # Input
 * `X`: `p x n` genotype matrix. Each column is an individual.
@@ -443,17 +389,21 @@ does not have missing data.
 * `hapscore`: haplotyping score. 0 means best. Larger means worse.
 """
 function haplopair(
-    X::AbstractMatrix,
-    H::AbstractMatrix
+    X::AbstractMatrix{Union{UInt8, Missing}},
+    H::BitMatrix
     )
+
+    Xwork = zeros(Float32, size(X, 1), size(X, 2))
+    Hwork = convert(Matrix{Float32}, H)
+    initXfloat!(X, Xwork)
 
     p, n     = size(X)
     d        = size(H, 2)
-    M        = zeros(eltype(H), d, d)
-    N        = zeros(promote_type(eltype(H), eltype(X)), n, d)
+    M        = zeros(Float32, d, d)
+    N        = zeros(Float32, n, d)
     happairs = [Tuple{Int, Int}[] for i in 1:n]
-    hapscore = zeros(eltype(N), n)
-    haplopair!(X, H, M, N, happairs, hapscore)
+    hapscore = zeros(Float32, n)
+    haplopair!(Xwork, Hwork, M, N, happairs, hapscore)
 
     return happairs, hapscore
 end
@@ -666,7 +616,7 @@ end
 # end
 
 """
-    initXfloat(X, Xfloat)
+    initXfloat!(X, Xfloat)
 
 Initializes the matrix `Xfloat` where missing values of matrix `X` by `2 x` allele frequency
 and nonmissing entries of `X` are converted to type `Float32` for subsequent BLAS routines. 
@@ -676,8 +626,8 @@ and nonmissing entries of `X` are converted to type `Float32` for subsequent BLA
 * `Xfloat` is the `p x n` matrix of X where missing values are filled by 2x allele frequency. 
 """
 function initXfloat!(
-    X::AbstractMatrix;
-    Xfloat::AbstractMatrix = zeros(Float32, size(X)),
+    X::AbstractMatrix,
+    Xfloat::AbstractMatrix
     )
     
     T = Float32
@@ -761,7 +711,7 @@ function haploimpute!(
 
     obj = typemax(eltype(hapscore))
     size(X) == size(Xfloat) || error("Dimension mismatch: X and Xfloat have sizes $(size(X)) and $(size(Xfloat))")
-    initXfloat!(X, Xfloat=Xfloat) #Xfloat is the matrix that engages in BLAS routines
+    initXfloat!(X, Xfloat) #Xfloat is the matrix that engages in BLAS routines
 
     # mm iteration
     for iter in 1:maxiters

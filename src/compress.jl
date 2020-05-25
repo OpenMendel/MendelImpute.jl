@@ -2,7 +2,6 @@
     Data structure saving each VCF record's relevant information
 """
 struct VCFInfo
-    sampleID::Vector{String}
     chr::Vector{String}
     pos::Vector{Int}
     SNPid::Vector{Vector{String}}
@@ -46,13 +45,17 @@ end
 Keeps a vector of `CompressedWindow`. 
 
 - `cw`: Vector of `CompressedWindow`. 
-- `width`: The number of SNPs per `CompressedWindow`
+- `width`: The number of SNPs per `CompressedWindow`. The last window may have a different width
+- `snps`: Total number of snps in every window
+- `sampleID`: Sample names for every pair of haplotypes as listed in the VCF file
 """
 struct CompressedHaplotypes
     cw::Vector{CompressedWindow}
     width::Int
+    snps::Int
+    sampleID::Vector{String}
 end
-CompressedHaplotypes(windows::Int, width::Int) = CompressedHaplotypes(Vector{CompressedWindow}(undef, windows), width)
+CompressedHaplotypes(windows::Int, width::Int, snps::Int, sampleID::Vector{String}) = CompressedHaplotypes(Vector{CompressedWindow}(undef, windows), width, snps, sampleID)
 
 # methods to implement: https://docs.julialang.org/en/v1/manual/interfaces/#Indexing-1
 Base.getindex(x::CompressedHaplotypes, w::Int) = x.cw[w]
@@ -63,9 +66,8 @@ Base.lastindex(x::CompressedHaplotypes) = lastindex(x.cw)
 """
     compress_haplotypes(vcffile, outfile, [width], [dims], [flankwidth])
 
-For each window, finds unique haplotype indices stored in the columns of H and 
-saves a mapping vector of unique columns of H. See `UniqueHaplotypeMaps` data 
-structure for examples. 
+For each window, finds unique haplotype indices stored in the columns/rows of H, saves
+a mapping vector to the unique col/row of H, and outputs result as binary `.jld2` file. 
 
 # Input
 * `vcffile`: file name
@@ -73,9 +75,6 @@ structure for examples.
 * `width`: Number of SNPs per window
 * `dims`: Orientation of `H`. `2` means columns of `H` are a haplotype vectors. `1` means rows of `H` are. 
 * `flankwidth`: Number of SNPs flanking the sliding window (defaults to 10% of `width`)
-
-# Output
-* `hapset`: Data structure for keeping track of unique haplotypes in each window (written to `outfile`). 
 """
 function compress_haplotypes(
     vcffile::AbstractString,
@@ -85,28 +84,22 @@ function compress_haplotypes(
     flankwidth::Int = 0
     )
     # import data
-    trans = (dims == 2 ? true : false)
-    H, H_sampleID, H_chr, H_pos, H_ids, H_ref, H_alt = convert_ht(Bool, vcffile, trans=trans, save_snp_info=true, msg="importing vcf data")
+    trans = (dims == 2 ? true : error("currently VCFTools only import chr/pos...info when H transposed"))
+    H, H_sampleID, H_chr, H_pos, H_ids, H_ref, H_alt = convert_ht(Bool, vcffile, trans=trans, save_snp_info=true, msg="importing vcf data...")
 
-    # initialize constants
-    if dims == 2
-        p, d = size(H)
-    elseif dims == 1
-        d, p = size(H)
-    else
-        error("Currently dims can only be 1 or 2, but was $dims.")
-    end
-    windows = floor(Int, p / width)
+    # some constants
+    snps = (dims == 2 ? size(H, 1) : size(H, 2))
+    windows = floor(Int, snps / width)
 
     # initialize compressed haplotype object
-    compressed_Hunique = CompressedHaplotypes(windows, width)
+    compressed_Hunique = CompressedHaplotypes(windows, width, snps, H_sampleID)
 
     # record unique haplotypes and mappings window by window
     for w in 1:windows
         if w == 1
             cur_range = 1:(width + flankwidth)
         elseif w == windows
-            cur_range = ((windows - 1) * width - flankwidth + 1):p
+            cur_range = ((windows - 1) * width - flankwidth + 1):snps
         else
             cur_range = ((w - 1) * width - flankwidth + 1):(w * width + flankwidth)
         end
@@ -114,8 +107,8 @@ function compress_haplotypes(
         H_cur_window = (dims == 2 ? view(H, cur_range, :) : view(H, :, cur_range))
         hapmap = groupslices(H_cur_window, dims=dims)
         unique_idx = unique(hapmap)
-        uniqueH = convert(BitMatrix, (dims == 2 ? H_cur_window[:, unique_idx] : H_cur_window[unique_idx, :]))
-        info = VCFInfo(H_sampleID[cur_range], H_chr[cur_range], H_pos[cur_range], H_ids[cur_range], H_ref[cur_range], H_alt[cur_range])
+        uniqueH = (dims == 2 ? H_cur_window[:, unique_idx] : H_cur_window[unique_idx, :])
+        info = VCFInfo(H_chr[cur_range], H_pos[cur_range], H_ids[cur_range], H_ref[cur_range], H_alt[cur_range])
         compressed_Hunique[w] = CompressedWindow(unique_idx, hapmap, cur_range, info, uniqueH)
     end
 

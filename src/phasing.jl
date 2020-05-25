@@ -40,7 +40,7 @@ function phase(
     # TODO: check if target/reference files have the same assembly build (e.g hr19, b36 etc)
     #
 
-    # import data, sampleID, and each SNP's CHROM/POS/ID/REF/ALT info
+    # import gebotype data, sampleID, and each SNP's CHROM/POS/ID/REF/ALT info
     if endswith(tgtfile, ".vcf") || endswith(tgtfile, ".vcf.gz")
         X, X_sampleID, X_chr, X_pos, X_ids, X_ref, X_alt = convert_gt(UInt8, tgtfile, trans=true, save_snp_info=true, msg = "Importing genotype file...")
     else
@@ -56,23 +56,34 @@ function phase(
         X_ref = X_snpdata.snp_info[!, :allele1]
         X_alt = X_snpdata.snp_info[!, :allele2]
     end
+
+    # import reference data
     if endswith(reffile, ".jld2")
-        @time @load reffile compressed_Hunique;
+        @load reffile compressed_Hunique 
     else
-        H, H_sampleID, H_chr, H_pos, H_ids, H_ref, H_alt = convert_ht(Bool, reffile, trans=true, save_snp_info=true, msg = "Importing reference haplotype files...")
+        # filter for unique haplotypes if not already done 
+        compressed_Hunique = compress_haplotypes(reffile, "compressed." * reffile, width=width, dims=2, flankwidth = flankwidth)
     end
-    
-    # match target and ref file by snp position
-    XtoH_idx = indexin(X_pos, H_pos) # X_pos[i] == H_pos[XtoH_idx[i]]
-    XtoH_rm_nothing = Base.filter(!isnothing, XtoH_idx)
-    X_aligned = any(isnothing.(XtoH_idx)) ? X[findall(!isnothing, XtoH_idx), :] : X
-    H_aligned = H[XtoH_rm_nothing, :]
 
     # declare some constants
     people = size(X, 2)
-    haplotypes = size(H, 2)
+    ref_snps = compressed_Hunique.snps
+    windows = floor(Int, ref_snps / width)
+
+    for w in 1:windows
+        # match target and ref file by snp position
+        Hw_pos = compressed_Hunique[w].vcfinfo.pos
+        XtoH_idx = indexin(X_pos, Hw_pos) # X_pos[i] == Hw_pos[XtoH_idx[i]]
+        XtoH_rm_nothing = Base.filter(!isnothing, XtoH_idx)
+        X_aligned = X[findall(!isnothing, XtoH_idx), :]
+        H_aligned = compressed_Hunique[w].uniqueH[XtoH_rm_nothing, :]
+
+        # compute best happair for each sample
+        happairs, hapscore = haplopair(X_aligned, H_aligned)
+    end
+
+    # declare more constants
     tgt_snps = size(X_aligned, 1)
-    ref_snps = size(H, 1)
 
     #
     # compute redundant haplotype sets
