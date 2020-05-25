@@ -56,8 +56,12 @@ function phase(
         X_ref = X_snpdata.snp_info[!, :allele1]
         X_alt = X_snpdata.snp_info[!, :allele2]
     end
-    H, H_sampleID, H_chr, H_pos, H_ids, H_ref, H_alt = convert_ht(Bool, reffile, trans=true, save_snp_info=true, msg = "Importing reference haplotype files...")
-
+    if endswith(reffile, ".jld2")
+        @time @load reffile compressed_Hunique;
+    else
+        H, H_sampleID, H_chr, H_pos, H_ids, H_ref, H_alt = convert_ht(Bool, reffile, trans=true, save_snp_info=true, msg = "Importing reference haplotype files...")
+    end
+    
     # match target and ref file by snp position
     XtoH_idx = indexin(X_pos, H_pos) # X_pos[i] == H_pos[XtoH_idx[i]]
     XtoH_rm_nothing = Base.filter(!isnothing, XtoH_idx)

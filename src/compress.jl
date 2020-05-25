@@ -1,4 +1,16 @@
 """
+    Data structure saving each VCF record's relevant information
+"""
+struct VCFInfo
+    sampleID::Vector{String}
+    chr::Vector{String}
+    pos::Vector{Int}
+    SNPid::Vector{Vector{String}}
+    refallele::Vector{String}
+    altallele::Vector{Vector{String}}
+end
+
+"""
 Data structure for keeping track of unique haplotypes in a window. 
 
 - `uniqueindex`: the unique haplotype indices in a window.
@@ -26,6 +38,7 @@ struct CompressedWindow
     uniqueindex::Vector{Int}
     hapmap::Vector{Int}
     range::UnitRange
+    vcfinfo::VCFInfo
     uniqueH::BitMatrix
 end
 
@@ -73,19 +86,20 @@ function compress_haplotypes(
     )
     # import data
     trans = (dims == 2 ? true : false)
-    H = convert_ht(Bool, vcffile, trans=trans)
+    H, H_sampleID, H_chr, H_pos, H_ids, H_ref, H_alt = convert_ht(Bool, vcffile, trans=trans, save_snp_info=true, msg="importing vcf data")
 
     # initialize constants
-    dims <= 2 || error("Currently dims can only be 1 or 2, but was $dims.")
     if dims == 2
         p, d = size(H)
     elseif dims == 1
         d, p = size(H)
+    else
+        error("Currently dims can only be 1 or 2, but was $dims.")
     end
     windows = floor(Int, p / width)
 
     # initialize compressed haplotype object
-    hapset = CompressedHaplotypes(windows, width)
+    compressed_Hunique = CompressedHaplotypes(windows, width)
 
     # record unique haplotypes and mappings window by window
     for w in 1:windows
@@ -101,12 +115,13 @@ function compress_haplotypes(
         hapmap = groupslices(H_cur_window, dims=dims)
         unique_idx = unique(hapmap)
         uniqueH = convert(BitMatrix, (dims == 2 ? H_cur_window[:, unique_idx] : H_cur_window[unique_idx, :]))
-        hapset[w] = CompressedWindow(unique_idx, hapmap, cur_range, uniqueH)
+        info = VCFInfo(H_sampleID[cur_range], H_chr[cur_range], H_pos[cur_range], H_ids[cur_range], H_ref[cur_range], H_alt[cur_range])
+        compressed_Hunique[w] = CompressedWindow(unique_idx, hapmap, cur_range, info, uniqueH)
     end
 
-    # save hapset to binary file using JLD2 package
+    # save to binary file using JLD2 package
     endswith(outfile, ".jld2") || (outfile = outfile * ".jld2")
-    @save outfile hapset
+    @save outfile compressed_Hunique
 
-    return hapset
+    return compressed_Hunique
 end
