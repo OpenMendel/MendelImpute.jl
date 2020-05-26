@@ -73,7 +73,7 @@ function compress_haplotypes(
     vcffile::AbstractString,
     outfile::AbstractString,
     width::Int;
-    dims::Int, 
+    dims::Int = 2, 
     flankwidth::Int = 0
     )
     # import data

@@ -137,7 +137,7 @@ by dynamic programming. A precomputed, window-by-window haplotype pairs is assum
 function phase!(
     ph::Vector{HaplotypeMosaicPair},
     X::AbstractMatrix{Union{Missing, T}},
-    compressed_haplotypes::CompressedHaplotypes,
+    compressed_Hunique::CompressedHaplotypes,
     hapset::Vector{Vector{Vector{Tuple{Int, Int}}}};
     width::Int = 400,
     flankwidth::Int = round(Int, 0.1width),
@@ -147,7 +147,7 @@ function phase!(
 
     # declare some constants
     snps, people = size(X)
-    haplotypes = 2length(compressed_haplotypes.sampleID)
+    haplotypes = 2length(compressed_Hunique.sampleID)
     windows = floor(Int, snps / width)
     last_window_width = snps - (windows - 1) * width 
 
@@ -161,7 +161,7 @@ function phase!(
     # first  1/3: ((w - 2) * width + 1):((w - 1) * width)
     # middle 1/3: ((w - 1) * width + 1):(      w * width)
     # last   1/3: (      w * width + 1):((w + 1) * width)
-    Threads.@threads for i in 1:people
+    for i in 1:people
         # first find optimal haplotype pair in each window using dynamic programming
         id = Threads.threadid()
         connect_happairs!(sol_path[id], nxt_pair[id], tree_err[id], hapset[i], λ = 1.0)
