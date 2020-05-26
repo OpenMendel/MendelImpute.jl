@@ -179,55 +179,56 @@ function phase!(
         push!(ph[i].strand2.haplotypelabel, sol_path[id][1][2])
 
         # don't search breakpoints
-        # for w in 2:windows
-        #     u, j = sol_path[id][w - 1] # haplotype pair in previous window
-        #     k, l = sol_path[id][w]     # haplotype pair in current window
+        for w in 2:windows
+            u, j = sol_path[id][w - 1] # haplotype pair in previous window
+            k, l = sol_path[id][w]     # haplotype pair in current window
 
-        #     # switch current window's pair order if 1 or 2 haplotype match
-        #     if (u == l && j == k) || (j == k && u ≠ l) || (u == l && j ≠ k)
-        #         k, l = l, k 
+            # switch current window's pair order if 1 or 2 haplotype match
+            if (u == l && j == k) || (j == k && u ≠ l) || (u == l && j ≠ k)
+                k, l = l, k 
+                sol_path[id][w] = (k, l)
+            end
+
+            push!(ph[i].strand1.start, chunk_offset + (w - 1) * width + 1)
+            push!(ph[i].strand1.haplotypelabel, k)
+            push!(ph[i].strand2.start, chunk_offset + (w - 1) * width + 1)
+            push!(ph[i].strand2.haplotypelabel, l)
+        end
+
+        # for w in 2:(windows - 1)
+        #     # current window start at the end of nearest bkpt or beginning of previous window, whichever is closer
+        #     w_start = max(ph[i].strand1.start[end], ph[i].strand2.start[end], ((w - 2) * width + 1))
+        #     Xwi = view(X, w_start:(w * width), i)
+        #     Hw  = view(H, w_start:(w * width), :)
+        #     sol_path[id][w], bkpts = continue_haplotype(Xwi, Hw, sol_path[id][w - 1], sol_path[id][w])
+
+        #     # strand 1
+        #     if bkpts[1] > -1 && bkpts[1] < 2width
+        #         push!(ph[i].strand1.start, chunk_offset + w_start + bkpts[1])
+        #         push!(ph[i].strand1.haplotypelabel, sol_path[id][w][1])
         #     end
-
-        #     push!(ph[i].strand1.start, chunk_offset + (w - 1) * width + 1)
-        #     push!(ph[i].strand1.haplotypelabel, k)
-        #     push!(ph[i].strand2.start, chunk_offset + (w - 1) * width + 1)
-        #     push!(ph[i].strand2.haplotypelabel, l)
+        #     # strand 2
+        #     if bkpts[2] > -1 && bkpts[2] < 2width
+        #         push!(ph[i].strand2.start, chunk_offset + w_start + bkpts[2])
+        #         push!(ph[i].strand2.haplotypelabel, sol_path[id][w][2])
+        #     end
         # end
 
-        for w in 2:(windows - 1)
-            # current window start at the end of nearest bkpt or beginning of previous window, whichever is closer
-            w_start = max(ph[i].strand1.start[end], ph[i].strand2.start[end], ((w - 2) * width + 1))
-            Xwi = view(X, w_start:(w * width), i)
-            Hw  = view(H, w_start:(w * width), :)
-            sol_path[id][w], bkpts = continue_haplotype(Xwi, Hw, sol_path[id][w - 1], sol_path[id][w])
-
-            # strand 1
-            if bkpts[1] > -1 && bkpts[1] < 2width
-                push!(ph[i].strand1.start, chunk_offset + w_start + bkpts[1])
-                push!(ph[i].strand1.haplotypelabel, sol_path[id][w][1])
-            end
-            # strand 2
-            if bkpts[2] > -1 && bkpts[2] < 2width
-                push!(ph[i].strand2.start, chunk_offset + w_start + bkpts[2])
-                push!(ph[i].strand2.haplotypelabel, sol_path[id][w][2])
-            end
-        end
-
-        # phase last window
-        w_start = max(ph[i].strand1.start[end], ph[i].strand2.start[end], ((windows - 2) * width + 1))
-        Xwi = view(X, w_start:snps, i)
-        Hw  = view(H, w_start:snps, :)
-        sol_path[id][windows], bkpts = continue_haplotype(Xwi, Hw, sol_path[id][windows - 1], sol_path[id][windows])
-        # strand 1
-        if bkpts[1] > -1 && bkpts[1] < last_window_width
-            push!(ph[i].strand1.start, chunk_offset + w_start + bkpts[1])
-            push!(ph[i].strand1.haplotypelabel, sol_path[id][windows][1])
-        end
-        # strand 2
-        if bkpts[2] > -1 && bkpts[2] < last_window_width
-            push!(ph[i].strand2.start, chunk_offset + w_start + bkpts[2])
-            push!(ph[i].strand2.haplotypelabel, sol_path[id][windows][2])
-        end
+        # # phase last window
+        # w_start = max(ph[i].strand1.start[end], ph[i].strand2.start[end], ((windows - 2) * width + 1))
+        # Xwi = view(X, w_start:snps, i)
+        # Hw  = view(H, w_start:snps, :)
+        # sol_path[id][windows], bkpts = continue_haplotype(Xwi, Hw, sol_path[id][windows - 1], sol_path[id][windows])
+        # # strand 1
+        # if bkpts[1] > -1 && bkpts[1] < last_window_width
+        #     push!(ph[i].strand1.start, chunk_offset + w_start + bkpts[1])
+        #     push!(ph[i].strand1.haplotypelabel, sol_path[id][windows][1])
+        # end
+        # # strand 2
+        # if bkpts[2] > -1 && bkpts[2] < last_window_width
+        #     push!(ph[i].strand2.start, chunk_offset + w_start + bkpts[2])
+        #     push!(ph[i].strand2.haplotypelabel, sol_path[id][windows][2])
+        # end
 
         # update progress
         next!(pmeter)
