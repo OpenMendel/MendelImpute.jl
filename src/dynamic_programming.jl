@@ -37,7 +37,7 @@ such that number of switch points is minimized.
 - `λ`: Error each switch contributes. Defaults to 1.0
 
 # Output:
-- `sol_path`: Optimal sequence of haplotype pairs in each window
+- `sol_path`: Optimal sequence of haplotype pairs indices (in the complete haplotype pool) in each window
 - `memory`: Vector of dictionary storing the optimal error for each haplotype pair in each window
 - `path_err`: Error for each window induced by `sol_path`
 - `best_err`: Osverall error induced by `sol_path`. Equals λ times number of switch points. 
@@ -64,7 +64,7 @@ end
 In-place version of `connect_happairs`. 
 
 # Inputs
-- `sol_path`: Optimal sequence of haplotype pairs in each window
+- `sol_path`: Optimal sequence of haplotype pairs indices (in the complete haplotype pool) in each window
 - `memory`: Vector of dictionary storing the optimal error for each haplotype pair in each window
 - `path_err`: Error for each window induced by `sol_path`
 - `haplotype_set`: A vector of vectors. `haplotype_set[1]` stores all pairs of haplotypes in window 1 in a vector, and so on. 

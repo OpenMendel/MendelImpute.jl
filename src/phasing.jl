@@ -87,6 +87,12 @@ function phase(
 
         # computational routine (TODO: preallocate all internal matrices here)
         happairs, hapscore = haplopair(X_aligned, H_aligned)
+
+        if w == 1
+            println("unique index happairs[10][1] = $(happairs[10])")
+        end
+
+        # convert happairs (which index off unique haplotypes) to indices of full haplotype pool, and find all matching happairs
         compute_redundant_haplotypes!(redundant_haplotypes, compressed_Hunique, happairs, w)
     
         # update progress
@@ -168,9 +174,18 @@ function phase!(
 
         # phase first window 
         push!(ph[i].strand1.start, 1 + chunk_offset)
-        push!(ph[i].strand1.haplotypelabel, sol_path[id][1][1])
+        push!(ph[i].strand1.haplotypelabel, sol_path[id][1][1]) # 1st window, 1st haplotype 
         push!(ph[i].strand2.start, 1 + chunk_offset)
-        push!(ph[i].strand2.haplotypelabel, sol_path[id][1][2])
+        push!(ph[i].strand2.haplotypelabel, sol_path[id][1][2]) # 1st window, 2nd haplotype 
+
+        # if i == 10
+        #     println("hapset[10][1] = $(hapset[i][1])")
+        # end
+
+        # if i == 10
+        #     println("ph[10].strand1.haplotypelabel = $(ph[i].strand1.haplotypelabel)")
+        #     println("ph[10].strand2.haplotypelabel = $(ph[i].strand2.haplotypelabel)")
+        # end
 
         # don't search breakpoints
         for w in 2:windows
@@ -180,6 +195,7 @@ function phase!(
             # switch current window's pair order if 1 or 2 haplotype match
             if (u == l && j == k) || (j == k && u ≠ l) || (u == l && j ≠ k)
                 k, l = l, k 
+                sol_path[id][w] = (k, l)
             end
 
             push!(ph[i].strand1.start, chunk_offset + (w - 1) * width + 1)

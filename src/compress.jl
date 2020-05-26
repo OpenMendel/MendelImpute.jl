@@ -111,3 +111,19 @@ function compress_haplotypes(
 
     return compressed_Hunique
 end
+
+"""
+For an index in unique haplotype, finds the first occurance of that haplotype 
+in the complete reference pool for the specified window.
+"""
+function unique_idx_to_complete_idx(unique_idx::Int, window::Int, Hunique::CompressedHaplotypes)
+    return Hunique[window].uniqueindex[unique_idx]
+end
+
+"""
+For an index in the complete haplotype pool, find its index in the unique haplotype pool 
+in specified window. 
+"""
+function complete_idx_to_unique_idx(complete_idx::Int, window::Int, Hunique::CompressedHaplotypes)
+    return Hunique[window].hapmap[complete_idx]
+end
