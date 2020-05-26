@@ -283,7 +283,7 @@ Records optimal-redundant haplotypes for each window.
 """
 function compute_redundant_haplotypes!(
     redundant_haplotypes::Union{Vector{Vector{Vector{T}}}, Vector{OptimalHaplotypeSet}}, 
-    Hunique::UniqueHaplotypeMaps, 
+    Hunique::CompressedHaplotypes, 
     happairs::Vector{Vector{T}}, 
     window::Int;
     fast_method::Bool = false,
@@ -296,15 +296,15 @@ function compute_redundant_haplotypes!(
             Hj_uniqueidx = happair[2]
             # println("person $k's optimal haplotype pairs are: $((Hi_uniqueidx, Hj_uniqueidx))")
 
-            Hi_idx = Hunique.uniqueindex[window][Hi_uniqueidx]
-            Hj_idx = Hunique.uniqueindex[window][Hj_uniqueidx]
+            Hi_idx = Hunique[window].uniqueindex[Hi_uniqueidx]
+            Hj_idx = Hunique[window].uniqueindex[Hj_uniqueidx]
             # println("person $k's optimal haplotype pairs are located at columns $Hi_idx and $Hj_idx in current window of H")
 
             # loop through all haplotypes and find ones that match either of the optimal haplotypes 
-            mapping = Hunique.hapmap[window]
+            mapping = Hunique[window].hapmap
             redunhaps_bitvec1 = redundant_haplotypes[k].strand1[window]
             redunhaps_bitvec2 = redundant_haplotypes[k].strand2[window]
-            for jj in 1:length(Hunique.hapmap[1])
+            for jj in 1:length(Hunique[1].hapmap)
                 mapping[jj] == Hi_idx && (redunhaps_bitvec1[jj] = true)
                 mapping[jj] == Hj_idx && (redunhaps_bitvec2[jj] = true)
             end
@@ -317,14 +317,14 @@ function compute_redundant_haplotypes!(
                 Hj_uniqueidx = happair[2]
                 # println("person $k's optimal haplotype pairs are: $((Hi_uniqueidx, Hj_uniqueidx))")
 
-                Hi_idx = Hunique.uniqueindex[window][Hi_uniqueidx]
-                Hj_idx = Hunique.uniqueindex[window][Hj_uniqueidx]
+                Hi_idx = Hunique[window].uniqueindex[Hi_uniqueidx]
+                Hj_idx = Hunique[window].uniqueindex[Hj_uniqueidx]
                 # println("person $k's optimal haplotype pairs are located at columns $Hi_idx and $Hj_idx in current window of H")
 
                 # loop through all haplotypes and find ones that match either of the optimal haplotypes 
                 empty!(h1_set)
                 empty!(h2_set)
-                for (idx, hap) in enumerate(Hunique.hapmap[window])
+                for (idx, hap) in enumerate(Hunique[window].hapmap)
                     hap == Hi_idx && push!(h1_set, idx)
                     hap == Hj_idx && push!(h2_set, idx)
                 end

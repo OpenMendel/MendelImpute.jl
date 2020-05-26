@@ -62,7 +62,7 @@ function phase(
         @load reffile compressed_Hunique 
     else
         # filter for unique haplotypes if not already done 
-        compressed_Hunique = compress_haplotypes(reffile, "compressed." * reffile, width=width, dims=2, flankwidth = flankwidth)
+        compressed_Hunique = compress_haplotypes(reffile, "compressed." * reffile, width, dims=2, flankwidth = flankwidth)
     end
 
     # declare some constants
@@ -70,6 +70,10 @@ function phase(
     ref_snps = compressed_Hunique.snps
     windows = floor(Int, ref_snps / width)
 
+    #
+    # compute redundant haplotype sets
+    #
+    redundant_haplotypes = [[Tuple{Int, Int}[] for i in 1:windows] for j in 1:people]
     for w in 1:windows
         # match target and ref file by snp position
         Hw_pos = compressed_Hunique[w].vcfinfo.pos
@@ -78,26 +82,16 @@ function phase(
         X_aligned = X[findall(!isnothing, XtoH_idx), :]
         H_aligned = compressed_Hunique[w].uniqueH[XtoH_rm_nothing, :]
 
-        # compute best happair for each sample
+        # computational routine (TODO: preallocate all internal matrices here)
         happairs, hapscore = haplopair(X_aligned, H_aligned)
-    end
-
-    # declare more constants
-    tgt_snps = size(X_aligned, 1)
-
-    #
-    # compute redundant haplotype sets
-    #
-    if unique_only
-        hs = compute_optimal_halotype_pair(X_aligned, H_aligned, width = width, flankwidth=flankwidth)
-    else
-        hs = compute_optimal_halotype_set(X_aligned, H_aligned, width = width, flankwidth=flankwidth, fast_method=fast_method)
+        compute_redundant_haplotypes!(redundant_haplotypes, compressed_Hunique, happairs, w)
     end
 
     #
     # phasing (haplotyping) step
     #
     # offset = (chunks - 1) * snps_per_chunk
+    tgt_snps = size(X, 1)
     ph = [HaplotypeMosaicPair(tgt_snps) for i in 1:people] # phase information
     if unique_only
         phase_unique_only!(ph, X_aligned, H_aligned, hs, width=width, flankwidth=flankwidth)
