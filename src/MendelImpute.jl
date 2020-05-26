@@ -40,6 +40,7 @@ module MendelImpute
     export impute_typed_only!, impute_untyped!
     export update_marker_position!
 
+    include("compress.jl")
     include("data_structures.jl")
     include("phasing.jl")
     include("haplotype_pair.jl")
@@ -47,6 +48,5 @@ module MendelImpute
     include("dynamic_programming.jl")
     include("impute.jl")
     include("breakpoints.jl")
-    include("compress.jl")
 
 end # module

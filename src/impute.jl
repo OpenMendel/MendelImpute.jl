@@ -6,18 +6,20 @@ in `outfile` are non-missing and phased.
 """
 function impute!(
     X::AbstractMatrix,
-    H::AbstractMatrix,
+    compressed_haplotypes::CompressedHaplotypes,
     phaseinfo::Vector{HaplotypeMosaicPair},
     outfile::AbstractString,
     X_sampleID::AbstractVector,
-    chr::AbstractVector,
-    pos::AbstractVector, 
-    ids::AbstractVector,
-    ref::AbstractVector,
-    alt::AbstractVector
     )
     # impute without changing observed entries
-    impute2!(X, H, phaseinfo)
+    impute2!(X, compressed_haplotypes, phaseinfo)
+
+    # retrieve reference file information
+    chr = compressed_haplotypes.chr
+    pos = compressed_haplotypes.pos
+    ids = compressed_haplotypes.SNPid
+    ref = compressed_haplotypes.refallele
+    alt = compressed_haplotypes.altallele
 
     # write minimal meta information to outfile
     io = openvcf(outfile, "w")
@@ -135,11 +137,12 @@ Non-missing entries in `X` will not change, but X and H has to be aligned.
 """
 function impute2!(
     X::AbstractMatrix,
-    H::AbstractMatrix,
+    compressed_haplotypes::CompressedHaplotypes,
     phase::Vector{HaplotypeMosaicPair}
     )
 
     p, n = size(X)
+    width = compressed_haplotypes.width + 1 # + 1 for % operator
 
     @inbounds for snp in 1:p, person in 1:n
         if ismissing(X[snp, person])
@@ -151,8 +154,11 @@ function impute2!(
             hap1 = phase[person].strand1.haplotypelabel[hap1_position]
             hap2 = phase[person].strand2.haplotypelabel[hap2_position]
 
-            # imputation step 
-            X[snp, person] = H[snp, hap1] + H[snp, hap2]
+            # imputation step
+            i = snp % width
+            w = ceil(Int, snp / compressed_haplotypes.snps)
+            H = compressed_haplotypes[w].uniqueH
+            X[snp, person] = H[i, hap1] + H[i, hap2]
         end
     end
 

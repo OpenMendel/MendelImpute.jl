@@ -1,15 +1,4 @@
 """
-    Data structure saving each VCF record's relevant information
-"""
-struct VCFInfo
-    chr::Vector{String}
-    pos::Vector{Int}
-    SNPid::Vector{Vector{String}}
-    refallele::Vector{String}
-    altallele::Vector{Vector{String}}
-end
-
-"""
 Data structure for keeping track of unique haplotypes in a window. 
 
 - `uniqueindex`: the unique haplotype indices in a window.
@@ -36,32 +25,36 @@ the set of haplotypes that matches (b, c) is in columns {2, 3, 4, 5}
 struct CompressedWindow
     uniqueindex::Vector{Int}
     hapmap::Vector{Int}
-    range::UnitRange
-    vcfinfo::VCFInfo
     uniqueH::BitMatrix
 end
 
 """
 Keeps a vector of `CompressedWindow`. 
 
-- `cw`: Vector of `CompressedWindow`. 
+- `CW`: Vector of `CompressedWindow`. 
 - `width`: The number of SNPs per `CompressedWindow`. The last window may have a different width
 - `snps`: Total number of snps in every window
 - `sampleID`: Sample names for every pair of haplotypes as listed in the VCF file
 """
 struct CompressedHaplotypes
-    cw::Vector{CompressedWindow}
+    CW::Vector{CompressedWindow}
+    CWrange::Vector{UnitRange}
     width::Int
     snps::Int
     sampleID::Vector{String}
+    chr::Vector{String}
+    pos::Vector{Int}
+    SNPid::Vector{Vector{String}}
+    refallele::Vector{String}
+    altallele::Vector{Vector{String}}
 end
-CompressedHaplotypes(windows::Int, width::Int, snps::Int, sampleID::Vector{String}) = CompressedHaplotypes(Vector{CompressedWindow}(undef, windows), width, snps, sampleID)
+CompressedHaplotypes(windows::Int, width, snps, sampleID, chr, pos, SNPid, ref, alt) = CompressedHaplotypes(Vector{CompressedWindow}(undef, windows), Vector{UnitRange}(undef, windows), width, snps, sampleID, chr, pos, SNPid, ref, alt)
 
 # methods to implement: https://docs.julialang.org/en/v1/manual/interfaces/#Indexing-1
-Base.getindex(x::CompressedHaplotypes, w::Int) = x.cw[w]
-Base.setindex!(x::CompressedHaplotypes, v::CompressedWindow, w::Int) = x.cw[w] = v
-Base.firstindex(x::CompressedHaplotypes) = firstindex(x.cw)
-Base.lastindex(x::CompressedHaplotypes) = lastindex(x.cw)
+Base.getindex(x::CompressedHaplotypes, w::Int) = x.CW[w]
+Base.setindex!(x::CompressedHaplotypes, v::CompressedWindow, w::Int) = x.CW[w] = v
+Base.firstindex(x::CompressedHaplotypes) = firstindex(x.CW)
+Base.lastindex(x::CompressedHaplotypes) = lastindex(x.CW)
 
 """
     compress_haplotypes(vcffile, outfile, [width], [dims], [flankwidth])
@@ -92,10 +85,10 @@ function compress_haplotypes(
     windows = floor(Int, snps / width)
 
     # initialize compressed haplotype object
-    compressed_Hunique = CompressedHaplotypes(windows, width, snps, H_sampleID)
+    compressed_Hunique = CompressedHaplotypes(windows, width, snps, H_sampleID, H_chr, H_pos, H_ids, H_ref, H_alt)
 
     # record unique haplotypes and mappings window by window
-    for w in 1:windows
+    Threads.@threads for w in 1:windows
         if w == 1
             cur_range = 1:(width + flankwidth)
         elseif w == windows
@@ -103,13 +96,13 @@ function compress_haplotypes(
         else
             cur_range = ((w - 1) * width - flankwidth + 1):(w * width + flankwidth)
         end
+        compressed_Hunique.CWrange[w] = cur_range
 
         H_cur_window = (dims == 2 ? view(H, cur_range, :) : view(H, :, cur_range))
         hapmap = groupslices(H_cur_window, dims=dims)
         unique_idx = unique(hapmap)
         uniqueH = (dims == 2 ? H_cur_window[:, unique_idx] : H_cur_window[unique_idx, :])
-        info = VCFInfo(H_chr[cur_range], H_pos[cur_range], H_ids[cur_range], H_ref[cur_range], H_alt[cur_range])
-        compressed_Hunique[w] = CompressedWindow(unique_idx, hapmap, cur_range, info, uniqueH)
+        compressed_Hunique[w] = CompressedWindow(unique_idx, hapmap, uniqueH)
     end
 
     # save to binary file using JLD2 package
