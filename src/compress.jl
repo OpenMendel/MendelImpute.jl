@@ -29,7 +29,8 @@ struct CompressedWindow
 end
 
 """
-Keeps a vector of `CompressedWindow`. 
+Keeps a vector of `CompressedWindow`. Indexing off instances of `CompressedHaplotypes`
+means indexing off `CompressedHaplotypes.CW`
 
 - `CW`: Vector of `CompressedWindow`. 
 - `width`: The number of SNPs per `CompressedWindow`. The last window may have a different width
@@ -55,6 +56,7 @@ Base.getindex(x::CompressedHaplotypes, w::Int) = x.CW[w]
 Base.setindex!(x::CompressedHaplotypes, v::CompressedWindow, w::Int) = x.CW[w] = v
 Base.firstindex(x::CompressedHaplotypes) = firstindex(x.CW)
 Base.lastindex(x::CompressedHaplotypes) = lastindex(x.CW)
+nhaplotypes(x::CompressedHaplotypes) = 2length(x.sampleID)
 
 """
     compress_haplotypes(vcffile, outfile, [width], [dims], [flankwidth])

@@ -23,7 +23,6 @@ function phase(
     outfile::AbstractString = "imputed." * tgtfile,
     impute::Bool = false,
     width::Int = 400,
-    flankwidth::Int = round(Int, 0.1width),
     fast_method::Bool = false,
     unique_only::Bool = false
     )
@@ -46,7 +45,7 @@ function phase(
         width == compressed_Hunique.width || error("Specified width = $width does not equal $(compressed_Hunique.width) = width in .jdl2 file")
     else
         # filter for unique haplotypes if not already done 
-        compressed_Hunique = compress_haplotypes(reffile, "compressed." * reffile, width, dims=2, flankwidth = flankwidth)
+        compressed_Hunique = compress_haplotypes(reffile, "compressed." * reffile, width, dims=2, flankwidth = 0)
     end
 
     # import gebotype data, sampleID, and each SNP's CHROM/POS/ID/REF/ALT info
@@ -72,22 +71,25 @@ function phase(
     windows = floor(Int, ref_snps / width)
 
     #
-    # compute redundant haplotype sets
+    # compute redundant haplotype sets TODO: make this thread safe
     #
     pmeter = Progress(windows, 5, "Computing optimal haplotype pairs...")
     redundant_haplotypes = [[Tuple{Int, Int}[] for i in 1:windows] for j in 1:people]
-    for w in 1:windows
+    mutex = Threads.SpinLock()
+    Threads.@threads for w in 1:windows
         # match target and ref file by snp position
+        Threads.lock(mutex)
         cur_range = compressed_Hunique.CWrange[w]
         Hw_pos = compressed_Hunique.pos[cur_range]
         XtoH_idx = indexin(X_pos, Hw_pos) # X_pos[i] == Hw_pos[XtoH_idx[i]]
         XtoH_rm_nothing = Base.filter(!isnothing, XtoH_idx)
-        X_aligned = X[findall(!isnothing, XtoH_idx), :]
-        H_aligned = compressed_Hunique[w].uniqueH[XtoH_rm_nothing, :]
+        Xw_aligned = X[findall(!isnothing, XtoH_idx), :]
+        Hw_aligned = compressed_Hunique[w].uniqueH[XtoH_rm_nothing, :]
+        Threads.unlock(mutex)
 
         # computational routine (TODO: preallocate all internal matrices here)
-        happairs, hapscore = haplopair(X_aligned, H_aligned)
-
+        happairs, hapscore = haplopair(Xw_aligned, Hw_aligned)
+        
         # convert happairs (which index off unique haplotypes) to indices of full haplotype pool, and find all matching happairs
         compute_redundant_haplotypes!(redundant_haplotypes, compressed_Hunique, happairs, w)
 
@@ -101,7 +103,7 @@ function phase(
     # offset = (chunks - 1) * snps_per_chunk
     tgt_snps = size(X, 1)
     ph = [HaplotypeMosaicPair(tgt_snps) for i in 1:people] # phase information
-    phase!(ph, X, compressed_Hunique, redundant_haplotypes, width=width, flankwidth=flankwidth)
+    phase!(ph, X, compressed_Hunique, redundant_haplotypes, width=width)
 
     # setup for imputation
     H_pos = compressed_Hunique.pos
@@ -142,7 +144,6 @@ function phase!(
     compressed_Hunique::CompressedHaplotypes,
     hapset::Vector{Vector{Vector{Tuple{Int, Int}}}};
     width::Int = 400,
-    flankwidth::Int = round(Int, 0.1width),
     chunk_offset::Int = 0,
     Xtrue::Union{AbstractMatrix, Nothing} = nothing, # for testing
     ) where T <: Real
@@ -163,7 +164,7 @@ function phase!(
     # first  1/3: ((w - 2) * width + 1):((w - 1) * width)
     # middle 1/3: ((w - 1) * width + 1):(      w * width)
     # last   1/3: (      w * width + 1):((w + 1) * width)
-    for i in 1:people
+    Threads.@threads for i in 1:people
         # first find optimal haplotype pair in each window using dynamic programming
         id = Threads.threadid()
         connect_happairs!(sol_path[id], nxt_pair[id], tree_err[id], hapset[i], λ = 1.0)
