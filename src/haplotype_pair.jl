@@ -292,12 +292,8 @@ function compute_redundant_haplotypes!(
     people = length(redundant_haplotypes)
     if fast_method
         @inbounds for k in 1:people, happair in happairs[k]
-            Hi_uniqueidx = happair[1]
-            Hj_uniqueidx = happair[2]
-            # println("person $k's optimal haplotype pairs are: $((Hi_uniqueidx, Hj_uniqueidx))")
-
-            Hi_idx = Hunique[window].uniqueindex[Hi_uniqueidx]
-            Hj_idx = Hunique[window].uniqueindex[Hj_uniqueidx]
+            Hi_idx = unique_idx_to_complete_idx(happair[1], window, Hunique)
+            Hj_idx = unique_idx_to_complete_idx(happair[2], window, Hunique)
             # println("person $k's optimal haplotype pairs are located at columns $Hi_idx and $Hj_idx in current window of H")
 
             # loop through all haplotypes and find ones that match either of the optimal haplotypes 
@@ -315,11 +311,6 @@ function compute_redundant_haplotypes!(
             for happair in happairs[k]
                 Hi_idx = unique_idx_to_complete_idx(happair[1], window, Hunique)
                 Hj_idx = unique_idx_to_complete_idx(happair[2], window, Hunique)
-                # println("person $k's optimal haplotype pairs are located at columns $Hi_idx and $Hj_idx in current window of H")
-
-                if k == 10 && window == 1
-                    println("unique to redund idx: ($(happair[1]), $(happair[2])) => ($Hi_idx, $Hj_idx)")
-                end
 
                 # loop through all haplotypes and find ones that match either of the optimal haplotypes 
                 empty!(h1_set)

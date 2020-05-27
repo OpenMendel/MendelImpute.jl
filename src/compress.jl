@@ -125,5 +125,6 @@ For an index in the complete haplotype pool, find its index in the unique haplot
 in specified window. 
 """
 function complete_idx_to_unique_idx(complete_idx::Int, window::Int, Hunique::CompressedHaplotypes)
-    return Hunique[window].hapmap[complete_idx]
+    elem = Hunique[window].hapmap[complete_idx]
+    return something(findfirst(elem .== Hunique[window].uniqueindex)) # is this allocating?
 end
