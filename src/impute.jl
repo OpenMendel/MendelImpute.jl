@@ -156,13 +156,13 @@ function impute2!(
             hap2 = phase[person].strand2.haplotypelabel[hap2_segment]
 
             # map hap1 and hap2 back to unique index
-            w = something(findfirst([snp in CWrange[j] for j in eachindex(CWrange)]))
-            h1 = complete_idx_to_unique_idx(hap1, w, compressed_haplotypes)
-            h2 = complete_idx_to_unique_idx(hap2, w, compressed_haplotypes)
+            window = something(findfirst(x -> snp in x, CWrange))
+            h1 = complete_idx_to_unique_idx(hap1, window, compressed_haplotypes)
+            h2 = complete_idx_to_unique_idx(hap2, window, compressed_haplotypes)
 
             # imputation step
-            i = snp - (w - 1) * width
-            H = compressed_haplotypes[w].uniqueH
+            i = snp - (window - 1) * width
+            H = compressed_haplotypes[window].uniqueH
             X[snp, person] = H[i, h1] + H[i, h2]
         end
     end

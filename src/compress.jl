@@ -126,5 +126,5 @@ in specified window.
 """
 function complete_idx_to_unique_idx(complete_idx::Int, window::Int, Hunique::CompressedHaplotypes)
     elem = Hunique[window].hapmap[complete_idx]
-    return something(findfirst(elem .== Hunique[window].uniqueindex)) # is this allocating?
+    return something(findfirst(x -> x == elem, Hunique[window].uniqueindex))
 end
