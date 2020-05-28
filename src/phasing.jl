@@ -185,6 +185,10 @@ function phase!(
                 sol_path[id][w] = (k, l)
             end
 
+            # map hap1 and hap2 back to unique index in given window
+            # h1 = complete_idx_to_unique_idx(k, w, compressed_Hunique)
+            # h2 = complete_idx_to_unique_idx(l, w, compressed_Hunique)
+
             push!(ph[i].strand1.start, chunk_offset + (w - 1) * width + 1)
             push!(ph[i].strand1.haplotypelabel, k)
             push!(ph[i].strand2.start, chunk_offset + (w - 1) * width + 1)
