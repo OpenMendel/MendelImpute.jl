@@ -64,6 +64,17 @@ function phase(
         H_ids = hapset.SNPid
         H_ref = hapset.refallele
         H_alt = hapset.altallele
+    elseif endswith(reffile, ".jlso")
+        loaded = JLSO.load(reffile)
+        hapset = loaded[:hapset]
+        hapset.column_major == true || error(".jlso file is not column major! Please recompress")
+        H = hapset.H
+        H_sampleID = hapset.sampleID
+        H_chr = hapset.chr
+        H_pos = hapset.pos
+        H_ids = hapset.SNPid
+        H_ref = hapset.refallele
+        H_alt = hapset.altallele
     else
         H, H_sampleID, H_chr, H_pos, H_ids, H_ref, H_alt = convert_ht(Bool, reffile, trans=true, save_snp_info=true, msg = "Importing reference haplotype files...")
     end

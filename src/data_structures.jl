@@ -64,7 +64,7 @@ end
 OptimalHaplotypeSet(windows::Int, haps::Int) = OptimalHaplotypeSet([falses(haps) for i in 1:windows], [falses(haps) for i in 1:windows])
 
 """
-Object storing haplotypes (in `H`) and its relevant information. 
+Object storing haplotypes and its relevant information. 
 
 - `H`: BitMatrix of haplotypes
 - `column_major`: `true` means columns of `H` are haplotypes, `false` means rows of `H` are.
