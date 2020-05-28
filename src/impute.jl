@@ -88,7 +88,7 @@ function update_marker_position!(
         end
     end
 
-    # update first starting position and length
+    # enforce starting and ending position
     for j in 1:people
         phaseinfo[j].strand1.start[1] = 1
         phaseinfo[j].strand2.start[1] = 1

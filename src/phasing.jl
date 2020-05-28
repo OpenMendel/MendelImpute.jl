@@ -103,20 +103,18 @@ function phase(
     # offset = (chunks - 1) * snps_per_chunk
     tgt_snps = size(X, 1)
     ph = [HaplotypeMosaicPair(tgt_snps) for i in 1:people] # phase information
-    phase!(ph, X, compressed_Hunique, redundant_haplotypes, width=width)
+    phase!(ph, X, compressed_Hunique, redundant_haplotypes)
 
     # setup for imputation
     H_pos = compressed_Hunique.pos
     XtoH_idx = indexin(X_pos, H_pos) # X_pos[i] == H_pos[XtoH_idx[i]]
-    X_aligned = @view(X[findall(!isnothing, XtoH_idx), :])
-
-    # create full target matrix and copy known entries into it
     XtoH_rm_nothing = Base.filter(!isnothing, XtoH_idx)
+    X_aligned = any(isnothing.(XtoH_idx)) ? X[findall(!isnothing, XtoH_idx), :] : X
     X_full = Matrix{Union{Missing, UInt8}}(missing, ref_snps, people)
     copyto!(@view(X_full[XtoH_rm_nothing, :]), X_aligned)
 
-    # convert phase's starting position from X's index to H's index
-    update_marker_position!(ph, XtoH_rm_nothing, ref_snps)
+    # convert phase's starting position from X's index to (complete) H's index
+    # update_marker_position!(ph, XtoH_rm_nothing, ref_snps)
 
     #
     # impute step
@@ -143,14 +141,15 @@ function phase!(
     X::AbstractMatrix{Union{Missing, T}},
     compressed_Hunique::CompressedHaplotypes,
     hapset::Vector{Vector{Vector{Tuple{Int, Int}}}};
-    width::Int = 400,
     chunk_offset::Int = 0,
     Xtrue::Union{AbstractMatrix, Nothing} = nothing, # for testing
     ) where T <: Real
 
     # declare some constants
-    snps, people = size(X)
-    haplotypes = 2length(compressed_Hunique.sampleID)
+    people = size(X, 2)
+    haplotypes = nhaplotypes(compressed_Hunique)
+    snps = compressed_Hunique.snps
+    width = compressed_Hunique.width
     windows = floor(Int, snps / width)
     last_window_width = snps - (windows - 1) * width 
 
