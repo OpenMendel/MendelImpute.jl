@@ -40,6 +40,7 @@ function phase(
     #
 
     # import reference data
+    import_data_start = time()
     if endswith(reffile, ".jld2")
         @load reffile compressed_Hunique 
         width == compressed_Hunique.width || error("Specified width = $width does not equal $(compressed_Hunique.width) = width in .jdl2 file")
@@ -64,6 +65,7 @@ function phase(
         X_ref = X_snpdata.snp_info[!, :allele1]
         X_alt = X_snpdata.snp_info[!, :allele2]
     end
+    import_data_time = time() - import_data_start
 
     # declare some constants
     people = size(X, 2)
@@ -73,6 +75,7 @@ function phase(
     #
     # compute redundant haplotype sets TODO: make this thread safe
     #
+    calculate_happairs_start = time()
     pmeter = Progress(windows, 5, "Computing optimal haplotype pairs...")
     redundant_haplotypes = [[Tuple{Int, Int}[] for i in 1:windows] for j in 1:people]
     mutex = Threads.SpinLock()
@@ -96,30 +99,35 @@ function phase(
         # update progress
         next!(pmeter)
     end
+    calculate_happairs_time = time() - calculate_happairs_start
 
     #
     # phasing (haplotyping) step
     #
     # offset = (chunks - 1) * snps_per_chunk
+    phase_start = time()
     tgt_snps = size(X, 1)
-    ph = [HaplotypeMosaicPair(tgt_snps) for i in 1:people] # phase information
-    phase!(ph, X, compressed_Hunique, redundant_haplotypes)
+    ph = [HaplotypeMosaicPair(tgt_snps) for i in 1:people]
+    phase!(ph, X, compressed_Hunique, redundant_haplotypes) # phase by dynamic programming + breakpoint search
+    phase_time = time() - phase_start
 
-    # setup for imputation
+    #
+    # impute step
+    #
+    impute_alloc_start = time()
     H_pos = compressed_Hunique.pos
     XtoH_idx = indexin(X_pos, H_pos) # X_pos[i] == H_pos[XtoH_idx[i]]
     XtoH_rm_nothing = Base.filter(!isnothing, XtoH_idx)
     X_aligned = any(isnothing.(XtoH_idx)) ? X[findall(!isnothing, XtoH_idx), :] : X
     X_full = Matrix{Union{Missing, UInt8}}(missing, ref_snps, people)
     copyto!(@view(X_full[XtoH_rm_nothing, :]), X_aligned)
+    impute_alloc_time = time() - impute_alloc_start
+    impute!(X_full, compressed_Hunique, ph, outfile, X_sampleID) # imputes X_full and writes to file
 
-    # convert phase's starting position from X's index to (complete) H's index
-    # update_marker_position!(ph, XtoH_rm_nothing, ref_snps)
-
-    #
-    # impute step
-    #
-    impute!(X_full, compressed_Hunique, ph, outfile, X_sampleID)
+    println("Data import time                    = ", round(import_data_time, sigdigits=3), " seconds")
+    println("Computing haplotype pair time       = ", round(calculate_happairs_time, sigdigits=3), " seconds")
+    println("Phasing by dynamic programming time = ", round(phase_time, sigdigits=3), " seconds")
+    println("Imputing allocation time            = ", round(impute_alloc_time, sigdigits=3), " seconds")
 
     return redundant_haplotypes, ph
 end

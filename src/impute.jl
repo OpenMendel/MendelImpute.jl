@@ -12,9 +12,12 @@ function impute!(
     X_sampleID::AbstractVector,
     )
     # impute without changing observed entries
+    impute_start = time()
     impute2!(X, compressed_haplotypes, phaseinfo)
+    impute_time = time() - impute_start
 
     # retrieve reference file information
+    write_start = time()
     chr = compressed_haplotypes.chr
     pos = compressed_haplotypes.pos
     ids = compressed_haplotypes.SNPid
@@ -60,41 +63,10 @@ function impute!(
 
     # close & return
     close(io); close(pb)
-    return nothing
-end
 
-"""
-    update_marker_position!(phaseinfo, tgtfile, reffile)
-
-Converts `phaseinfo`'s strand1 and strand2's starting position in 
-terms of matrix rows of `X` to starting position in terms matrix
-rows in `H`. 
-"""
-function update_marker_position!(
-    phaseinfo::Vector{HaplotypeMosaicPair},
-    XtoH_idx::AbstractVector, 
-    ref_records::Int
-    )
-    people = length(phaseinfo)
-
-    for j in 1:people
-        # update strand1's starting position
-        for (i, idx) in enumerate(phaseinfo[j].strand1.start)
-            phaseinfo[j].strand1.start[i] = XtoH_idx[idx]
-        end
-        # update strand2's starting position
-        for (i, idx) in enumerate(phaseinfo[j].strand2.start)
-            phaseinfo[j].strand2.start[i] = XtoH_idx[idx]
-        end
-    end
-
-    # enforce starting and ending position
-    for j in 1:people
-        phaseinfo[j].strand1.start[1] = 1
-        phaseinfo[j].strand2.start[1] = 1
-        phaseinfo[j].strand1.length = ref_records
-        phaseinfo[j].strand2.length = ref_records
-    end
+    write_time = time() - write_start
+    println("impute time  = $(round(impute_time, sigdigits=3)) seconds")
+    println("writing time = $(round(write_time, sigdigits=3)) seconds\n")
 
     return nothing
 end
@@ -145,26 +117,31 @@ function impute2!(
     width = compressed_haplotypes.width
     CWrange = compressed_haplotypes.CWrange
 
-    @inbounds for snp in 1:p, person in 1:n
-        if ismissing(X[snp, person])
-            #find which segment the snp is located
-            hap1_segment = searchsortedlast(phase[person].strand1.start, snp)
-            hap2_segment = searchsortedlast(phase[person].strand2.start, snp)
+    pmeter = Progress(p, 5, "Imputing X...")
 
-            #find haplotype pair in this segment (note: the pair indexes to the entire haplotype pool)
-            hap1 = phase[person].strand1.haplotypelabel[hap1_segment]
-            hap2 = phase[person].strand2.haplotypelabel[hap2_segment]
+    @inbounds for snp in 1:p
+        window = something(findfirst(x -> snp in x, CWrange)) # optimize this by writing a binary search alg, since CWrange is sorted 
+        i = snp - (window - 1) * width
+        for person in 1:n
+            if ismissing(X[snp, person])
+                #find which segment the snp is located
+                hap1_segment = searchsortedlast(phase[person].strand1.start, snp)
+                hap2_segment = searchsortedlast(phase[person].strand2.start, snp)
 
-            # map hap1 and hap2 back to unique index
-            window = something(findfirst(x -> snp in x, CWrange))
-            h1 = complete_idx_to_unique_idx(hap1, window, compressed_haplotypes)
-            h2 = complete_idx_to_unique_idx(hap2, window, compressed_haplotypes)
+                #find haplotype pair in this segment (note: the pair indexes to the entire haplotype pool)
+                hap1 = phase[person].strand1.haplotypelabel[hap1_segment]
+                hap2 = phase[person].strand2.haplotypelabel[hap2_segment]
 
-            # imputation step
-            i = snp - (window - 1) * width
-            H = compressed_haplotypes[window].uniqueH
-            X[snp, person] = H[i, h1] + H[i, h2]
+                # map hap1 and hap2 back to unique index
+                h1 = complete_idx_to_unique_idx(hap1, window, compressed_haplotypes)
+                h2 = complete_idx_to_unique_idx(hap2, window, compressed_haplotypes)
+
+                # imputation step
+                H = compressed_haplotypes[window].uniqueH
+                X[snp, person] = H[i, h1] + H[i, h2]
+            end
         end
+        next!(pmeter)
     end
 
     return nothing
