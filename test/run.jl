@@ -1848,5 +1848,41 @@ A = rand(100000, 1000);
 
 
 
+function test_lock(b)
+    a = 0
+    Threads.@threads for i in eachindex(b)
+        a += b[i]
+    end
+    a
+end
+
+function test_lock2(b)
+    a = 0
+    mutex = Threads.SpinLock()
+    Threads.@threads for i in eachindex(b)
+        lock(mutex)
+        a += b[i]
+        unlock(mutex)
+    end
+    a
+end
+
+b = 1:1000
+test_lock(b)  # 93885
+test_lock2(b) # 500500 = correct answer
+
+
+function text_indexin(a::Vector{Int}, b::Vector{Int}, c::Vector{Int})
+    b_in_a = zeros(Int, length(a))
+    c_in_a = zeros(Int, length(a))
+    for i in 1:2
+        b_in_a .= indexin(a, b)
+        c_in_a .= indexin(a, c)
+    end
+    return b_in_a, c_in_a
+end
+
+
+
 
 

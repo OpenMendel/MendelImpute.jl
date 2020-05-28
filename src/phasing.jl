@@ -82,7 +82,7 @@ function phase(
         cur_range = compressed_Hunique.CWrange[w]
         Hw_pos = compressed_Hunique.pos[cur_range]
         XtoH_idx = indexin(X_pos, Hw_pos) # X_pos[i] == Hw_pos[XtoH_idx[i]]
-        XtoH_rm_nothing = Base.filter(!isnothing, XtoH_idx)
+        XtoH_rm_nothing = Base.filter(!isnothing, XtoH_idx) # delete snps not in ref panel
         Xw_aligned = X[findall(!isnothing, XtoH_idx), :]
         Hw_aligned = compressed_Hunique[w].uniqueH[XtoH_rm_nothing, :]
         Threads.unlock(mutex)
