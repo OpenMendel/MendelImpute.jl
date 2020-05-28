@@ -62,3 +62,26 @@ struct OptimalHaplotypeSet
     strand2::Vector{BitVector}
 end
 OptimalHaplotypeSet(windows::Int, haps::Int) = OptimalHaplotypeSet([falses(haps) for i in 1:windows], [falses(haps) for i in 1:windows])
+
+"""
+Object storing haplotypes (in `H`) and its relevant information. 
+
+- `H`: BitMatrix of haplotypes
+- `column_major`: `true` means columns of `H` are haplotypes, `false` means rows of `H` are.
+"""
+struct RefHaplotypes
+    H::BitMatrix
+    column_major::Bool
+    sampleID::Vector{String}
+    chr::Vector{String}
+    pos::Vector{Int}
+    SNPid::Vector{Vector{String}}
+    refallele::Vector{String}
+    altallele::Vector{Vector{String}} #SNPs can be multi-allelic
+end
+
+# methods to implement: https://docs.julialang.org/en/v1/manual/interfaces/#Indexing-1
+Base.getindex(x::RefHaplotypes, w::Int) = x.H[w]
+Base.setindex!(x::RefHaplotypes, v::Bool, idx::Int) = x.H[idx] = v
+Base.firstindex(x::RefHaplotypes) = firstindex(x.H)
+Base.lastindex(x::RefHaplotypes) = lastindex(x.H)
