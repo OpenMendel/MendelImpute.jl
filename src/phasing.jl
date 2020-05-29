@@ -50,7 +50,7 @@ function phase(
         X_ref = X_snpdata.snp_info[!, :allele1]
         X_alt = X_snpdata.snp_info[!, :allele2]
     else
-        error("Target file can only be VCF files (ends in .vcf or .vcf.gz) or PLINK files (do not include .bim/bed/fam and all three files must exist in 1 directory)")
+        error("Unrecognized target file format: target file can only be VCF files (ends in .vcf or .vcf.gz) or PLINK files (do not include .bim/bed/fam and all three files must exist in 1 directory)")
     end
 
     # import haplotype data
@@ -75,8 +75,10 @@ function phase(
         H_ids = hapset.SNPid
         H_ref = hapset.refallele
         H_alt = hapset.altallele
-    else
+    elseif endswith(reffile, ".vcf") || endswith(reffile, ".vcf.gz")
         H, H_sampleID, H_chr, H_pos, H_ids, H_ref, H_alt = convert_ht(Bool, reffile, trans=true, save_snp_info=true, msg = "Importing reference haplotype files...")
+    else
+        error("Unrecognized reference file format: reference file can only be VCF format (ends in .vcf or .vcf.gz) or JLD2 format (ends in .jld2), or JLSO format (ends in .jlso).")
     end
 
     # match target and ref file by snp position
