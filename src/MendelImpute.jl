@@ -50,5 +50,6 @@ module MendelImpute
     include("impute.jl")
     include("breakpoints.jl")
     include("jld2.jl")
+    include("jlso.jl")
 
 end # module
