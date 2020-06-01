@@ -44,26 +44,30 @@ function phase(
     if endswith(reffile, ".jld2")
         @load reffile compressed_Hunique 
         width == compressed_Hunique.width || error("Specified width = $width does not equal $(compressed_Hunique.width) = width in .jdl2 file")
-    else
+    elseif endswith(reffile, ".jlso")
+        loaded = JLSO.load(reffile)
+        compressed_Hunique = loaded[:compressed_Hunique]
+    elseif endswith(reffile, ".vcf") || endswith(reffile, ".vcf.gz")
         # filter for unique haplotypes if not already done 
         compressed_Hunique = compress_haplotypes(reffile, "compressed." * reffile, width, dims=2, flankwidth = 0)
     end
 
     # import gebotype data, sampleID, and each SNP's CHROM/POS/ID/REF/ALT info
+    # import genotype data
     if endswith(tgtfile, ".vcf") || endswith(tgtfile, ".vcf.gz")
-        X, X_sampleID, X_chr, X_pos, X_ids, X_ref, X_alt = convert_gt(UInt8, tgtfile, trans=true, save_snp_info=true, msg = "Importing genotype file...")
-    else
-        # must be PLINK file
-        isfile(tgtfile * ".bed") && isfile(tgtfile * ".fam") && isfile(tgtfile * ".bim") || error("Target file can only be VCF files (ends in .vcf or .vcf.gz) or PLINK files (do not include .bim/bed/fam)")
-
-        X_snpdata = SnpData(tgtfile)
-        X = convert(Matrix{UInt8}, X_snpdata.snparray')
+        X, X_sampleID, X_chr, X_pos, X_ids, X_ref, X_alt = VCFTools.convert_gt(UInt8, tgtfile, trans=true, save_snp_info=true, msg = "Importing genotype file...")
+    elseif isfile(tgtfile * ".bed") && isfile(tgtfile * ".fam") && isfile(tgtfile * ".bim")
+        # PLINK files
+        X_snpdata = SnpArrays.SnpData(tgtfile)
+        X = convert(Matrix{UInt8}, X_snpdata.snparray') # transpose genotypes from rows to column 
         X_sampleID = X_snpdata.person_info[!, :iid] 
         X_chr = X_snpdata.snp_info[!, :chromosome]
         X_pos = X_snpdata.snp_info[!, :position]
         X_ids = X_snpdata.snp_info[!, :snpid]
         X_ref = X_snpdata.snp_info[!, :allele1]
         X_alt = X_snpdata.snp_info[!, :allele2]
+    else
+        error("Unrecognized target file format: target file can only be VCF files (ends in .vcf or .vcf.gz) or PLINK files (do not include .bim/bed/fam and all three files must exist in 1 directory)")
     end
     import_data_time = time() - import_data_start
 
@@ -114,20 +118,20 @@ function phase(
     #
     # impute step
     #
-    impute_alloc_start = time()
+    impute_start = time()
     H_pos = compressed_Hunique.pos
     XtoH_idx = indexin(X_pos, H_pos) # X_pos[i] == H_pos[XtoH_idx[i]]
     XtoH_rm_nothing = Base.filter(!isnothing, XtoH_idx)
     X_aligned = any(isnothing.(XtoH_idx)) ? X[findall(!isnothing, XtoH_idx), :] : X
     X_full = Matrix{Union{Missing, UInt8}}(missing, ref_snps, people)
     copyto!(@view(X_full[XtoH_rm_nothing, :]), X_aligned)
-    impute_alloc_time = time() - impute_alloc_start
     impute!(X_full, compressed_Hunique, ph, outfile, X_sampleID) # imputes X_full and writes to file
+    impute_time = time() - impute_start
 
-    println("Data import time                    = ", round(import_data_time, sigdigits=3), " seconds")
-    println("Computing haplotype pair time       = ", round(calculate_happairs_time, sigdigits=3), " seconds")
-    println("Phasing by dynamic programming time = ", round(phase_time, sigdigits=3), " seconds")
-    println("Imputing allocation time            = ", round(impute_alloc_time, sigdigits=3), " seconds")
+    println("Data import time                    = ", round(import_data_time, sigdigits=6), " seconds")
+    println("Computing haplotype pair time       = ", round(calculate_happairs_time, sigdigits=6), " seconds")
+    println("Phasing by dynamic programming time = ", round(phase_time, sigdigits=6), " seconds")
+    println("Imputing time                       = ", round(impute_time, sigdigits=6), " seconds")
 
     return redundant_haplotypes, ph
 end
