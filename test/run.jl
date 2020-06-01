@@ -1886,3 +1886,14 @@ end
 
 
 
+# binary search for vector of invervals
+using Revise
+using Random
+using MendelImpute
+using BenchmarkTools
+
+v = [1:4, 5:10, 11:20, 21:35]
+searchsortedlast(last.(v), 3)
+
+
+

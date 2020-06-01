@@ -14,6 +14,7 @@ module MendelImpute
     using Random
     using ProgressMeter
     using JLD2, FileIO
+    using JLSO
 
     export continue_haplotype, haplopair!, haplopair, haploimpute!
     export impute!, impute2!, search_breakpoint, unique_haplotypes
@@ -25,6 +26,7 @@ module MendelImpute
     export simulate_phased_genotypes
     export connect_happairs
     export phase!, phase_fast!
+    export searchsortedlast
 
     # main functions that users are exposed to
     export phase

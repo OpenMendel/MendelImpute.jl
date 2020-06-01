@@ -21,3 +21,6 @@ GBR_data.csv
 *eagle
 *.tbi
 *.jld2
+*.jlso
+*.bson
+*.h5

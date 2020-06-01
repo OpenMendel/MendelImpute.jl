@@ -115,33 +115,39 @@ function impute2!(
 
     p, n = size(X)
     width = compressed_haplotypes.width
-    CWrange = compressed_haplotypes.CWrange
+    CWrange_begin = first.(compressed_haplotypes.CWrange)
+    println(typeof(CWrange_begin))
+    fdsa
 
-    pmeter = Progress(p, 5, "Imputing X...")
-
-    @inbounds for snp in 1:p
-        window = something(findfirst(x -> snp in x, CWrange)) # optimize this by writing a binary search alg, since CWrange is sorted 
-        i = snp - (window - 1) * width
-        for person in 1:n
+    @inbounds for person in 1:n
+        window = 1
+        window_counter = 0
+        for snp in 1:p
             if ismissing(X[snp, person])
                 #find which segment the snp is located
                 hap1_segment = searchsortedlast(phase[person].strand1.start, snp)
                 hap2_segment = searchsortedlast(phase[person].strand2.start, snp)
+                # window = searchsortedlast(CWrange_begin, snp)
 
                 #find haplotype pair in this segment (note: the pair indexes to the entire haplotype pool)
                 hap1 = phase[person].strand1.haplotypelabel[hap1_segment]
                 hap2 = phase[person].strand2.haplotypelabel[hap2_segment]
 
                 # map hap1 and hap2 back to unique index
-                h1 = complete_idx_to_unique_idx(hap1, window, compressed_haplotypes)
-                h2 = complete_idx_to_unique_idx(hap2, window, compressed_haplotypes)
+                # h1 = complete_idx_to_unique_idx(hap1, window, compressed_haplotypes)
+                # h2 = complete_idx_to_unique_idx(hap2, window, compressed_haplotypes)
+                h1 = h2 = 1
 
                 # imputation step
+                i = snp - (window - 1) * width
                 H = compressed_haplotypes[window].uniqueH
                 X[snp, person] = H[i, h1] + H[i, h2]
             end
+            window_counter += 1
+            if window_counter % width == 0 && window != total_windows
+                window_counter = 1
+            end
         end
-        next!(pmeter)
     end
 
     return nothing

@@ -67,7 +67,7 @@ a mapping vector to the unique col/row of H, and outputs result as binary `.jld2
 # Input
 * `vcffile`: file name
 * `outfile`: Output file name (with or without `.jld2` extension)
-* `width`: Number of SNPs per window
+* `width`: Number of SNPs per window. Number of SNPs in last window may be in `[width, 2width]`.
 * `dims`: Orientation of `H`. `2` means columns of `H` are a haplotype vectors. `1` means rows of `H` are. 
 * `flankwidth`: Number of SNPs flanking the sliding window (defaults to 10% of `width`)
 """
@@ -78,6 +78,8 @@ function compress_haplotypes(
     dims::Int = 2, 
     flankwidth::Int = 0
     )
+    endswith(outfile, ".jld2") || endswith(outfile, ".jlso") || error("Unrecognized compression format: `outfile` can only end in `.jlso` or `.jld2`")
+    
     # import data
     trans = (dims == 2 ? true : error("currently VCFTools only import chr/pos...info when H transposed"))
     H, H_sampleID, H_chr, H_pos, H_ids, H_ref, H_alt = convert_ht(Bool, vcffile, trans=trans, save_snp_info=true, msg="importing vcf data...")
@@ -87,10 +89,10 @@ function compress_haplotypes(
     windows = floor(Int, snps / width)
 
     # initialize compressed haplotype object
-    compressed_Hunique = CompressedHaplotypes(windows, width, snps, H_sampleID, H_chr, H_pos, H_ids, H_ref, H_alt)
+    compressed_Hunique = MendelImpute.CompressedHaplotypes(windows, width, snps, H_sampleID, H_chr, H_pos, H_ids, H_ref, H_alt)
 
     # record unique haplotypes and mappings window by window
-    Threads.@threads for w in 1:windows
+    for w in 1:windows
         if w == 1
             cur_range = 1:(width + flankwidth)
         elseif w == windows
@@ -104,12 +106,12 @@ function compress_haplotypes(
         hapmap = groupslices(H_cur_window, dims=dims)
         unique_idx = unique(hapmap)
         uniqueH = (dims == 2 ? H_cur_window[:, unique_idx] : H_cur_window[unique_idx, :])
-        compressed_Hunique[w] = CompressedWindow(unique_idx, hapmap, uniqueH)
+        compressed_Hunique[w] = MendelImpute.CompressedWindow(unique_idx, hapmap, uniqueH)
     end
 
-    # save to binary file using JLD2 package
-    endswith(outfile, ".jld2") || (outfile = outfile * ".jld2")
-    @save outfile compressed_Hunique
+    # save using JLSO or JLD2
+    endswith(outfile, ".jld2") && JLD2.@save outfile compressed_Hunique
+    endswith(outfile, ".jlso") && JLSO.save(outfile, :compressed_Hunique => compressed_Hunique, format=:julia_serialize, compression=:gzip)
 
     return compressed_Hunique
 end
