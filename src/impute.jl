@@ -107,27 +107,25 @@ function impute2!(
 
     p, n = size(X)
     width = compressed_haplotypes.width
-    CWrange_begin = first.(compressed_haplotypes.CWrange)
 
     @inbounds for person in 1:n, snp in 1:p
         if ismissing(X[snp, person])
             #find which segment the snp is located
             hap1_segment = searchsortedlast(phase[person].strand1.start, snp)
             hap2_segment = searchsortedlast(phase[person].strand2.start, snp)
-            window = searchsortedlast(CWrange_begin, snp)
 
-            #find haplotype pair in this segment (note: the pair indexes to the entire haplotype pool)
-            hap1 = phase[person].strand1.haplotypelabel[hap1_segment]
-            hap2 = phase[person].strand2.haplotypelabel[hap2_segment]
-
-            # map hap1 and hap2 back to unique index
-            h1 = complete_idx_to_unique_idx(hap1, window, compressed_haplotypes)
-            h2 = complete_idx_to_unique_idx(hap2, window, compressed_haplotypes)
+            #find haplotype pair in corresponding window for this segment
+            h1 = phase[person].strand1.haplotypelabel[hap1_segment]
+            h2 = phase[person].strand2.haplotypelabel[hap2_segment]
+            w1 = phase[person].strand1.window[hap1_segment]
+            w2 = phase[person].strand2.window[hap2_segment]
+            i1 = snp - (w1 - 1) * width
+            i2 = snp - (w2 - 1) * width
 
             # imputation step
-            i = snp - (window - 1) * width
-            H = compressed_haplotypes[window].uniqueH
-            X[snp, person] = H[i, h1] + H[i, h2]
+            H1 = compressed_haplotypes[w1].uniqueH
+            H2 = compressed_haplotypes[w2].uniqueH
+            X[snp, person] = H1[i1, h1] + H2[i2, h2]
         end
     end
 

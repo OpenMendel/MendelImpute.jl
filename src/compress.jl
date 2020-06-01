@@ -127,10 +127,9 @@ end
 """
 For an index in the complete haplotype pool, find its index in the unique haplotype pool 
 in specified window. 
-
-Todo: optimize this by writing a binary search alg, since CWrange is sorted 
 """
 function complete_idx_to_unique_idx(complete_idx::Int, window::Int, Hunique::CompressedHaplotypes)
     elem = Hunique[window].hapmap[complete_idx]
-    return something(findfirst(x -> x == elem, Hunique[window].uniqueindex)) 
+    return searchsortedfirst(Hunique[window].uniqueindex, elem)
+    # return something(findfirst(x -> x == elem, Hunique[window].uniqueindex)) 
 end

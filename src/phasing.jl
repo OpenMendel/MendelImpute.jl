@@ -181,10 +181,15 @@ function phase!(
         connect_happairs!(sol_path[id], nxt_pair[id], tree_err[id], hapset[i], λ = 1.0)
 
         # phase first window 
+        k, l = sol_path[id][1][1], sol_path[id][1][2] # complete haplotype index
+        h1 = complete_idx_to_unique_idx(k, 1, compressed_Hunique)
+        h2 = complete_idx_to_unique_idx(l, 1, compressed_Hunique)
         push!(ph[i].strand1.start, 1 + chunk_offset)
-        push!(ph[i].strand1.haplotypelabel, sol_path[id][1][1]) # 1st window, 1st haplotype 
+        push!(ph[i].strand1.window, 1) 
+        push!(ph[i].strand1.haplotypelabel, h1)
         push!(ph[i].strand2.start, 1 + chunk_offset)
-        push!(ph[i].strand2.haplotypelabel, sol_path[id][1][2]) # 1st window, 2nd haplotype 
+        push!(ph[i].strand2.window, 1)
+        push!(ph[i].strand2.haplotypelabel, h2)
 
         # don't search breakpoints
         for w in 2:windows
@@ -198,13 +203,15 @@ function phase!(
             end
 
             # map hap1 and hap2 back to unique index in given window
-            # h1 = complete_idx_to_unique_idx(k, w, compressed_Hunique)
-            # h2 = complete_idx_to_unique_idx(l, w, compressed_Hunique)
+            h1 = complete_idx_to_unique_idx(k, w, compressed_Hunique)
+            h2 = complete_idx_to_unique_idx(l, w, compressed_Hunique)
 
             push!(ph[i].strand1.start, chunk_offset + (w - 1) * width + 1)
-            push!(ph[i].strand1.haplotypelabel, k)
+            push!(ph[i].strand1.haplotypelabel, h1)
+            push!(ph[i].strand1.window, w)
             push!(ph[i].strand2.start, chunk_offset + (w - 1) * width + 1)
-            push!(ph[i].strand2.haplotypelabel, l)
+            push!(ph[i].strand2.haplotypelabel, h2)
+            push!(ph[i].strand2.window, w)
         end
 
         # for w in 2:(windows - 1)
