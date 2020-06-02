@@ -66,7 +66,7 @@ function phase(
         H_alt = hapset.altallele
     elseif endswith(reffile, ".jlso")
         loaded = JLSO.load(reffile)
-        hapset = loaded[:hapset]
+        hapset = loaded[:compressed_Hunique]
         hapset.column_major == true || error(".jlso file is not column major! Please recompress")
         H = hapset.H
         H_sampleID = hapset.sampleID
