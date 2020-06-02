@@ -6,23 +6,23 @@ by sliding windows and saves result in `outfile`. Will also create an aligned
 reference `aligned.ref.vcf.gz` file matching `tgtfile` position by position. 
 
 # Input
+- `tgtfile`: VCF or PLINK file. VCF files should end in `.vcf` or `.vcf.gz`. PLINK files should exclude `.bim/.bed/.fam` suffixes but the trio must all be present in the directory.
 - `reffile`: VCF file name. Should end in `.vcf` or `.vcf.gz`. 
-- `tgtfile`: VCF or PLINK file. VCF files should end in `.vcf` or `.vcf.gz`. PLINK files should exclude the `.bim/.bed/.fam` names but the trio must all be present in the directory.
 
 # Optional Inputs
-- `outfile`: output filename. Output genotypes will be phased with no missing data.
+- `outfile`: output filename ending in `.vcf.gz` or `.vcf`. Output genotypes will have no missing data.
 - `impute`: If `true`, untyped SNPs will be imputed, otherwise only missing snps in `tgtfile` will be imputed.  (default `false`)
-- `width`: number of SNPs (markers) in each sliding window. (default `400`)
+- `width`: number of SNPs (markers) in each haplotype window. (default `2000`)
 - `flankwidth`: Number of SNPs flanking the sliding window (defaults to 10% of `width`)
-- `fast_method`: If `true`, will use window-by-window intersection for phasing. If `false`, phasing uses dynamic progrmaming. (default `false`)
-- `unique_only`: If `true`, will phase and impute using only unique haplotypes in each window. Usually faster than `fast_method=true`.  (default `false`)
+- `typed_snps_threshold`: Number of typed SNPs required in each window. Below this threshold means optimal haplotype pair will be copied from the nearest window with enough typed SNPs
 """
 function phase(
     tgtfile::AbstractString,
     reffile::AbstractString;
     outfile::AbstractString = "imputed." * tgtfile,
-    impute::Bool = false,
-    width::Int = 400,
+    impute::Bool = true, #TODO for impute=false
+    width::Int = 2000,
+    typed_snps_threshold = round(Int, 0.05width),
     fast_method::Bool = false,
     unique_only::Bool = false
     )
@@ -47,12 +47,14 @@ function phase(
     elseif endswith(reffile, ".jlso")
         loaded = JLSO.load(reffile)
         compressed_Hunique = loaded[:compressed_Hunique]
+        width == compressed_Hunique.width || error("Specified width = $width does not equal $(compressed_Hunique.width) = width in .jlso file")
     elseif endswith(reffile, ".vcf") || endswith(reffile, ".vcf.gz")
         # filter for unique haplotypes if not already done 
         compressed_Hunique = compress_haplotypes(reffile, "compressed." * reffile, width, dims=2, flankwidth = 0)
+    else
+        error("Unrecognized reference file format: only VCF (ends in .vcf or .vcf.gz), `.jlso`, or `.jld2` files are acceptable.")
     end
 
-    # import gebotype data, sampleID, and each SNP's CHROM/POS/ID/REF/ALT info
     # import genotype data
     if endswith(tgtfile, ".vcf") || endswith(tgtfile, ".vcf.gz")
         X, X_sampleID, X_chr, X_pos, X_ids, X_ref, X_alt = VCFTools.convert_gt(UInt8, tgtfile, trans=true, save_snp_info=true, msg = "Importing genotype file...")
@@ -93,6 +95,14 @@ function phase(
         Xw_aligned = X[findall(!isnothing, XtoH_idx), :]
         Hw_aligned = compressed_Hunique[w].uniqueH[XtoH_rm_nothing, :]
         Threads.unlock(mutex)
+
+        # Skip windows with too few typed SNPs
+        if length(XtoH_rm_nothing) < typed_snps_threshold
+            for k in 1:people
+                push!(redundant_haplotypes[k][w], (-1, -1))
+            end
+            continue
+        end
 
         # computational routine (TODO: preallocate all internal matrices here)
         happairs, hapscore = haplopair(Xw_aligned, Hw_aligned)
@@ -143,10 +153,11 @@ Phasing (haplotying) of genotype matrix `X` from a pool of haplotypes `H`
 by dynamic programming. A precomputed, window-by-window haplotype pairs is assumed. 
 
 # Input
+* `ph`: A vector of `HaplotypeMosaicPair` keeping track of each person's phase information.
 * `X`: `p x n` matrix with missing values. Each column is genotypes of an individual.
-* `H`: `p x d` haplotype matrix. Each column is a haplotype.
-* `width`: width of the sliding window.
-* `verbose`: display algorithmic information.
+* `compressed_Hunique`: A `CompressedHaplotypes` keeping track of unique haplotypes for each window and some other information
+* `hapset`: Vector of optimal haplotype pairs across windows. The haplotype pairs are indices to the full haplotype set and NOT the compressed haplotypes
+* `chunk_offset`: Shifts SNPs if a chromosome had been chunked. (not currently implemented)
 """
 function phase!(
     ph::Vector{HaplotypeMosaicPair},
@@ -154,7 +165,6 @@ function phase!(
     compressed_Hunique::CompressedHaplotypes,
     hapset::Vector{Vector{Vector{Tuple{Int, Int}}}};
     chunk_offset::Int = 0,
-    Xtrue::Union{AbstractMatrix, Nothing} = nothing, # for testing
     ) where T <: Real
 
     # declare some constants
