@@ -131,5 +131,4 @@ in specified window.
 function complete_idx_to_unique_idx(complete_idx::Int, window::Int, Hunique::CompressedHaplotypes)
     elem = Hunique[window].hapmap[complete_idx]
     return searchsortedfirst(Hunique[window].uniqueindex, elem)
-    # return something(findfirst(x -> x == elem, Hunique[window].uniqueindex)) 
 end
