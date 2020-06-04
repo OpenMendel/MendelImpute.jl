@@ -18,8 +18,8 @@ function continue_haplotype(
         return (l, k), (-1, -1)
     end
 
-    Hcurr = compressed_Hunique[window].uniqueH
     Hprev = compressed_Hunique[window - 1].uniqueH
+    Hcurr = compressed_Hunique[window].uniqueH
 
     # only one strand matches
     if i == k && j ≠ l
@@ -88,8 +88,7 @@ function continue_haplotype(
     # else
     #     return (l, k), breakpt2
     # end
-    width = round(Int, length(X) / 2) # must use round since last window width might not be integer
-    return (k, l), (width, width)
+    return (k, l), (-1, -1)
 end
 
 """
