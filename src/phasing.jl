@@ -184,7 +184,7 @@ function phase!(
     # first  1/3: ((w - 2) * width + 1):((w - 1) * width)
     # middle 1/3: ((w - 1) * width + 1):(      w * width)
     # last   1/3: (      w * width + 1):((w + 1) * width)
-    for i in 1:people
+    Threads.@threads for i in 1:people
         # first find optimal haplotype pair in each window using dynamic programming
         id = Threads.threadid()
         connect_happairs!(sol_path[id], nxt_pair[id], tree_err[id], hapset[i], λ = 1.0)
@@ -223,188 +223,71 @@ function phase!(
         #     push!(ph[i].strand2.window, w)
         # end
 
-        for w in 2:(windows - 1)
+        for w in 2:windows
             #get imputation target range
             Hw_start  = (w - 2) * width + 1
-            Hw_end    = w * width
+            Hw_end    = (w == windows ? snps : w * width)
             Xwi_start = something(findnext(!isnothing, HtoX_idx, Hw_start))
             Xwi_end   = something(findprev(!isnothing, HtoX_idx, Hw_end))
             Xwi = view(X, Xwi_start:Xwi_end, i)
+            cur_window_width = (w == windows ? last_window_width : width)
 
             # find optimal breakpoint
-            sol_path[id][w], bkpts = continue_haplotype(Xwi, compressed_Hunique, w, sol_path[id][w - 1], sol_path[id][w])
+            sol_path[id][w], bkpts = continue_haplotype(Xwi, 
+                compressed_Hunique, w, sol_path[id][w - 1], sol_path[id][w])
 
-            # strand 1
-            if bkpts[1] == -1
-                # no breakpoint
-                k = sol_path[id][w][1]
-                h1 = complete_idx_to_unique_idx(k, w, compressed_Hunique)
-                push!(ph[i].strand1.start, chunk_offset + (w - 1) * width + 1)
-                push!(ph[i].strand1.haplotypelabel, h1)
-                push!(ph[i].strand1.window, w)
-            elseif width <= bkpts[1] < 2width
-                # previous window extends to current window 
-                k = sol_path[id][w - 1][1]
-                h1 = complete_idx_to_unique_idx(k, w, compressed_Hunique)
-                push!(ph[i].strand1.start, chunk_offset + (w - 1) * width + 1)
-                push!(ph[i].strand1.haplotypelabel, h1)
-                push!(ph[i].strand1.window, w)
-
-                # 2nd part of current window
-                k = sol_path[id][w][1]
-                h1 = complete_idx_to_unique_idx(k, w, compressed_Hunique)
-                push!(ph[i].strand1.start, chunk_offset + Hw_start + bkpts[1])
-                push!(ph[i].strand1.haplotypelabel, h1)
-                push!(ph[i].strand1.window, w)
-            elseif -1 < bkpts[1] < width
-                # current window extends to previous window
-                k = sol_path[id][w][1]
-                h1 = complete_idx_to_unique_idx(k, w - 1, compressed_Hunique)
-                push!(ph[i].strand1.start, chunk_offset + Hw_start + bkpts[1])
-                push!(ph[i].strand1.haplotypelabel, h1)
-                push!(ph[i].strand1.window, w - 1)
-                # update current window
-                h1 = complete_idx_to_unique_idx(k, w, compressed_Hunique)
-                push!(ph[i].strand1.start, chunk_offset + (w - 1) * width + 1)
-                push!(ph[i].strand1.haplotypelabel, h1)
-                push!(ph[i].strand1.window, w)
-            elseif bkpts[1] >= 2width
-                println("bkpts[1] = $(bkpts[1]), 2width = $(2width), w = $w / $windows")
-                continue
-            else
-                error("something impossible happened")
-            end
-
-            # strand 2
-            if bkpts[2] == -1
-                # no breakpoint
-                k = sol_path[id][w][2]
-                h2 = complete_idx_to_unique_idx(k, w, compressed_Hunique)
-                push!(ph[i].strand2.start, chunk_offset + (w - 1) * width + 1)
-                push!(ph[i].strand2.haplotypelabel, h2)
-                push!(ph[i].strand2.window, w)
-            elseif width <= bkpts[2] < 2width
-                # previous window extends to current window 
-                k = sol_path[id][w - 1][2]
-                h2 = complete_idx_to_unique_idx(k, w, compressed_Hunique)
-                push!(ph[i].strand2.start, chunk_offset + (w - 1) * width + 1)
-                push!(ph[i].strand2.haplotypelabel, h2)
-                push!(ph[i].strand2.window, w)
-                # 2nd part of current window
-                k = sol_path[id][w][2]
-                h2 = complete_idx_to_unique_idx(k, w, compressed_Hunique)
-                push!(ph[i].strand2.start, chunk_offset + Hw_start + bkpts[2])
-                push!(ph[i].strand2.haplotypelabel, h2)
-                push!(ph[i].strand2.window, w)
-            elseif -1 < bkpts[2] < width
-                # current window extends to previous window
-                k = sol_path[id][w][2]
-                h2 = complete_idx_to_unique_idx(k, w - 1, compressed_Hunique)
-                push!(ph[i].strand2.start, chunk_offset + Hw_start + bkpts[2])
-                push!(ph[i].strand2.haplotypelabel, h2)
-                push!(ph[i].strand2.window, w - 1)
-                # update current window
-                h2 = complete_idx_to_unique_idx(k, w, compressed_Hunique)
-                push!(ph[i].strand2.start, chunk_offset + (w - 1) * width + 1)
-                push!(ph[i].strand2.haplotypelabel, h2)
-                push!(ph[i].strand2.window, w)
-            elseif bkpts[2] >= 2width
-                # println("bkpts[2] = $(bkpts[2]), 2width = $(2width), w = $w / $windows")
-                println("bkpts[2] = $(bkpts[2]), 2width = $(2width), w = $w / $windows")
-                continue
-            else
-                error("something impossible happened2")
-            end
-        end
-
-        # phase last window
-        Hw_start  = (windows - 2) * width + 1
-        Hw_end    = snps
-        Xwi_start = something(findnext(!isnothing, HtoX_idx, Hw_start))
-        Xwi_end   = something(findprev(!isnothing, HtoX_idx, Hw_end))
-        Xwi = view(X, Xwi_start:Xwi_end, i)
-        sol_path[1][windows], bkpts = continue_haplotype(Xwi, compressed_Hunique, windows, sol_path[1][windows - 1], sol_path[1][windows])
-        # strand 1
-        if bkpts[1] == -1
-            # no breakpoint
-            k = sol_path[id][windows][1]
-            h1 = complete_idx_to_unique_idx(k, windows, compressed_Hunique)
-            push!(ph[i].strand1.start, chunk_offset + (windows - 1) * width + 1)
-            push!(ph[i].strand1.haplotypelabel, h1)
-            push!(ph[i].strand1.window, windows)
-        elseif width <= bkpts[1] < width + last_window_width
-            # previous window extends to current window 
-            k = sol_path[id][windows - 1][1]
-            h1 = complete_idx_to_unique_idx(k, windows, compressed_Hunique)
-            push!(ph[i].strand1.start, chunk_offset + (windows - 1) * width + 1)
-            push!(ph[i].strand1.haplotypelabel, h1)
-            push!(ph[i].strand1.window, windows)
-            # 2nd part of current window
-            k = sol_path[id][windows][1]
-            h1 = complete_idx_to_unique_idx(k, windows, compressed_Hunique)
-            push!(ph[i].strand1.start, chunk_offset + Hw_start + bkpts[1])
-            push!(ph[i].strand1.haplotypelabel, h1)
-            push!(ph[i].strand1.window, windows)
-        elseif -1 < bkpts[1] < width
-            # current window extends to previous window
-            k = sol_path[id][windows][1]
-            h1 = complete_idx_to_unique_idx(k, windows - 1, compressed_Hunique)
-            push!(ph[i].strand1.start, chunk_offset + Hw_start + bkpts[1])
-            push!(ph[i].strand1.haplotypelabel, h1)
-            push!(ph[i].strand1.window, windows - 1)
-            # update current window
-            h1 = complete_idx_to_unique_idx(k, windows, compressed_Hunique)
-            push!(ph[i].strand1.start, chunk_offset + (windows - 1) * width + 1)
-            push!(ph[i].strand1.haplotypelabel, h1)
-            push!(ph[i].strand1.window, windows)
-        elseif bkpts[1] >= width + last_window_width
-            println("bkpts[1] = $(bkpts[1]), 2width = $(2width), w = $windows / $windows")
-            continue
-        else
-            error("something impossible happened")
-        end
-        # strand 2
-        if bkpts[2] == -1
-            # no breakpoint
-            k = sol_path[id][windows][2]
-            h2 = complete_idx_to_unique_idx(k, windows, compressed_Hunique)
-            push!(ph[i].strand2.start, chunk_offset + (windows - 1) * width + 1)
-            push!(ph[i].strand2.haplotypelabel, h2)
-            push!(ph[i].strand2.window, windows)
-        elseif width <= bkpts[2] < width + last_window_width
-            # previous window extends to current window 
-            k = sol_path[id][windows - 1][2]
-            h2 = complete_idx_to_unique_idx(k, windows, compressed_Hunique)
-            push!(ph[i].strand2.start, chunk_offset + (windows - 1) * width + 1)
-            push!(ph[i].strand2.haplotypelabel, h2)
-            push!(ph[i].strand2.window, windows)
-            # 2nd part of current window
-            k = sol_path[id][windows][2]
-            h2 = complete_idx_to_unique_idx(k, windows, compressed_Hunique)
-            push!(ph[i].strand2.start, chunk_offset + Hw_start + bkpts[2])
-            push!(ph[i].strand2.haplotypelabel, h2)
-            push!(ph[i].strand2.window, windows)
-        elseif -1 < bkpts[2] < width
-            # current window extends to previous window
-            k = sol_path[id][windows][2]
-            h2 = complete_idx_to_unique_idx(k, windows - 1, compressed_Hunique)
-            push!(ph[i].strand2.start, chunk_offset + Hw_start + bkpts[2])
-            push!(ph[i].strand2.haplotypelabel, h2)
-            push!(ph[i].strand2.window, windows - 1)
-            # update current window
-            h2 = complete_idx_to_unique_idx(k, windows, compressed_Hunique)
-            push!(ph[i].strand2.start, chunk_offset + (windows - 1) * width + 1)
-            push!(ph[i].strand2.haplotypelabel, h2)
-            push!(ph[i].strand2.window, windows)
-        elseif bkpts[2] >= width + last_window_width
-            println("bkpts[2] = $(bkpts[2]), 2width = $(2width), w = $windows / $windows")
-            continue
-        else
-            error("something impossible happened2")
+            # record strand 1 info
+            update_phase!(ph[i].strand1, compressed_Hunique, bkpts[1], sol_path[id][w - 1][1], 
+                sol_path[id][w][1], w, width, chunk_offset, cur_window_width)
+            # record strand 2 info
+            update_phase!(ph[i].strand2, compressed_Hunique, bkpts[2], sol_path[id][w - 1][2], 
+                sol_path[id][w][2], w, width, chunk_offset, cur_window_width)
         end
 
         # update progress
         next!(pmeter)
+    end
+end
+
+function update_phase!(ph::HaplotypeMosaic, compressed_Hunique::CompressedHaplotypes,
+    bkpt::Int, hap_prev::Int, hap_curr::Int, w::Int, width::Int, chunk_offset::Int,
+    cur_window_width::Int)
+    if bkpt == -1
+        # no breakpoint
+        h1 = complete_idx_to_unique_idx(hap_curr, w, compressed_Hunique)
+        push!(ph.start, chunk_offset + (w - 1) * width + 1)
+        push!(ph.haplotypelabel, h1)
+        push!(ph.window, w)
+    elseif bkpt == width + cur_window_width
+        # previous window dominates current window 
+        h = complete_idx_to_unique_idx(hap_prev, w, compressed_Hunique)
+        push!(ph.start, chunk_offset + (w - 1) * width + 1)
+        push!(ph.haplotypelabel, h)
+        push!(ph.window, w)
+    elseif width <= bkpt < width + cur_window_width
+        # previous window extends to current window 
+        h1 = complete_idx_to_unique_idx(hap_prev, w, compressed_Hunique)
+        push!(ph.start, chunk_offset + (w - 1) * width + 1)
+        push!(ph.haplotypelabel, h1)
+        push!(ph.window, w)
+        # 2nd part of current window
+        h2 = complete_idx_to_unique_idx(hap_curr, w, compressed_Hunique)
+        push!(ph.start, chunk_offset + (w - 2) * width + 1 + bkpt)
+        push!(ph.haplotypelabel, h2)
+        push!(ph.window, w)
+    elseif -1 < bkpt < width
+        # current window extends to previous window
+        h1 = complete_idx_to_unique_idx(hap_curr, w - 1, compressed_Hunique)
+        push!(ph.start, chunk_offset + (w - 2) * width + 1 + bkpt)
+        push!(ph.haplotypelabel, h1)
+        push!(ph.window, w - 1)
+        # update current window
+        h2 = complete_idx_to_unique_idx(hap_curr, w, compressed_Hunique)
+        push!(ph.start, chunk_offset + (w - 1) * width + 1)
+        push!(ph.haplotypelabel, h2)
+        push!(ph.window, w)
+    else
+        error("update_phase!: bkpt does not satisfy -1 <= bkpt <= 2width! Shouldn't be possible")
     end
 end
 
