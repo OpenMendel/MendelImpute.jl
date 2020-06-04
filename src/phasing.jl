@@ -22,7 +22,7 @@ function phase(
     outfile::AbstractString = "imputed." * tgtfile,
     impute::Bool = true, #TODO for impute=false
     width::Int = 2000,
-    typed_snps_threshold = round(Int, 0.05width),
+    min_typed_snps = 100, 
     fast_method::Bool = false,
     unique_only::Bool = false
     )
@@ -93,7 +93,7 @@ function phase(
         Threads.unlock(mutex)
 
         # Skip windows with too few typed SNPs
-        if length(XtoH_rm_nothing) < typed_snps_threshold
+        if length(XtoH_rm_nothing) < min_typed_snps
             for k in 1:people
                 push!(redundant_haplotypes[k][w], (-1, -1))
             end
@@ -184,7 +184,7 @@ function phase!(
     # first  1/3: ((w - 2) * width + 1):((w - 1) * width)
     # middle 1/3: ((w - 1) * width + 1):(      w * width)
     # last   1/3: (      w * width + 1):((w + 1) * width)
-    Threads.@threads for i in 1:people
+    for i in 1:people
         # first find optimal haplotype pair in each window using dynamic programming
         id = Threads.threadid()
         connect_happairs!(sol_path[id], nxt_pair[id], tree_err[id], hapset[i], λ = 1.0)
@@ -227,8 +227,8 @@ function phase!(
             #get imputation target range
             Hw_start  = (w - 2) * width + 1
             Hw_end    = (w == windows ? snps : w * width)
-            Xwi_start = something(findnext(!isnothing, HtoX_idx, Hw_start))
-            Xwi_end   = something(findprev(!isnothing, HtoX_idx, Hw_end))
+            Xwi_start = HtoX_idx[something(findnext(!isnothing, HtoX_idx, Hw_start))]
+            Xwi_end   = HtoX_idx[something(findprev(!isnothing, HtoX_idx, Hw_end))]
             Xwi = view(X, Xwi_start:Xwi_end, i)
             cur_window_width = (w == windows ? last_window_width : width)
 
@@ -249,6 +249,10 @@ function phase!(
     end
 end
 
+"""
+Helper function for updating phase information after breakpoints have been identified
+between windows `w - 1` and `w`. Every window have 0 or 1 breakpoint.
+"""
 function update_phase!(ph::HaplotypeMosaic, compressed_Hunique::CompressedHaplotypes,
     bkpt::Int, hap_prev::Int, hap_curr::Int, w::Int, width::Int, chunk_offset::Int,
     cur_window_width::Int)
