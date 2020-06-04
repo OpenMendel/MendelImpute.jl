@@ -18,6 +18,9 @@ function continue_haplotype(
         return (l, k), (-1, -1)
     end
 
+    Hcurr = compressed_Hunique[window].uniqueH
+    Hprev = compressed_Hunique[window - 1].uniqueH
+
     # only one strand matches
     if i == k && j ≠ l
         iu = complete_idx_to_unique_idx(i, window - 1, compressed_Hunique)
@@ -117,7 +120,7 @@ function search_breakpoint(
     err_optim == 0 && return 0, 0
 
     # extend haplotype s21 position by position
-    @inbounds for bkpt in 1:l1
+    @inbounds for bkpt in 1:n
         if !ismissing(X[bkpt]) && s21[bkpt] ≠ s22[bkpt]
             errors -= X[bkpt] ≠ s1[bkpt] + s22[bkpt]
             errors += X[bkpt] ≠ s1[bkpt] + s21[bkpt]
