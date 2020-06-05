@@ -80,6 +80,7 @@ function phase(
     calculate_happairs_start = time()
     pmeter = Progress(windows, 5, "Computing optimal haplotype pairs...")
     redundant_haplotypes = [[Tuple{Int, Int}[] for i in 1:windows] for j in 1:people]
+    typed_snps = Vector{Vector{Int}}(undef, windows) #tracks index for typed snps in each window
     mutex = Threads.SpinLock()
     Threads.@threads for w in 1:windows
         # match target and ref file by snp position
@@ -90,6 +91,7 @@ function phase(
         XtoH_rm_nothing = Base.filter(!isnothing, XtoH_idx) # delete snps not in ref panel
         Xw_aligned = X[findall(!isnothing, XtoH_idx), :]
         Hw_aligned = compressed_Hunique[w].uniqueH[XtoH_rm_nothing, :]
+        typed_snps[w] = XtoH_rm_nothing # save typed snps index for current window
         Threads.unlock(mutex)
 
         # Skip windows with too few typed SNPs
@@ -116,9 +118,8 @@ function phase(
     #
     # offset = (chunks - 1) * snps_per_chunk
     phase_start = time()
-    tgt_snps = size(X, 1)
-    ph = [HaplotypeMosaicPair(tgt_snps) for i in 1:people]
-    phase!(ph, X, compressed_Hunique, redundant_haplotypes, X_pos) # phase by dynamic programming + breakpoint search
+    ph = [HaplotypeMosaicPair(ref_snps) for i in 1:people]
+    phase!(ph, X, compressed_Hunique, typed_snps, redundant_haplotypes, X_pos) # phase by dynamic programming + breakpoint search
     phase_time = time() - phase_start
 
     #
@@ -139,7 +140,7 @@ function phase(
     println("Phasing by dynamic programming time = ", round(phase_time, sigdigits=6), " seconds")
     println("Imputing time                       = ", round(impute_time, sigdigits=6), " seconds")
 
-    return redundant_haplotypes, ph
+    return ph, redundant_haplotypes
 end
 
 """
@@ -152,6 +153,7 @@ by dynamic programming. A precomputed, window-by-window haplotype pairs is assum
 * `ph`: A vector of `HaplotypeMosaicPair` keeping track of each person's phase information.
 * `X`: `p x n` matrix with missing values. Each column is genotypes of an individual.
 * `compressed_Hunique`: A `CompressedHaplotypes` keeping track of unique haplotypes for each window and some other information
+* `typed_snps`: `typed_snps[w]` are indices of typed SNPs in window `w`
 * `hapset`: Vector of optimal haplotype pairs across windows. The haplotype pairs are indices to the full haplotype set and NOT the compressed haplotypes
 * `chunk_offset`: Shifts SNPs if a chromosome had been chunked. (not currently implemented)
 """
@@ -159,6 +161,7 @@ function phase!(
     ph::Vector{HaplotypeMosaicPair},
     X::AbstractMatrix{Union{Missing, T}},
     compressed_Hunique::CompressedHaplotypes,
+    typed_snps::Vector{Vector{Int}},
     hapset::Vector{Vector{Vector{Tuple{Int, Int}}}},
     X_pos::Vector{Int};
     chunk_offset::Int = 0,
@@ -178,6 +181,7 @@ function phase!(
     nxt_pair = [[Int[] for i in 1:windows] for i in 1:Threads.nthreads()]
     tree_err = [[Float64[] for i in 1:windows] for i in 1:Threads.nthreads()]
     HtoX_idx = indexin(H_pos, X_pos)
+    XtoH_idx = indexin(X_pos, H_pos)
     pmeter   = Progress(people, 5, "Merging breakpoints...")
 
     # loop over each person
@@ -223,25 +227,28 @@ function phase!(
         #     push!(ph[i].strand2.window, w)
         # end
 
+        # search breakpoints then record result into ph
         for w in 2:windows
-            #get imputation target range
+            # get imputation target range = 2 windows of H, tracking untyped snps
             Hw_start  = (w - 2) * width + 1
+            Hw_mid    = (w - 1) * width + 1
             Hw_end    = (w == windows ? snps : w * width)
             Xwi_start = HtoX_idx[something(findnext(!isnothing, HtoX_idx, Hw_start))]
             Xwi_end   = HtoX_idx[something(findprev(!isnothing, HtoX_idx, Hw_end))]
             Xwi = view(X, Xwi_start:Xwi_end, i)
-            cur_window_width = (w == windows ? last_window_width : width)
 
             # find optimal breakpoint
-            sol_path[id][w], bkpts = continue_haplotype(Xwi, 
-                compressed_Hunique, w, sol_path[id][w - 1], sol_path[id][w])
+            sol_path[id][w], bkpts = continue_haplotype(Xwi, compressed_Hunique, 
+                typed_snps, w, sol_path[id][w - 1], sol_path[id][w])
 
             # record strand 1 info
             update_phase!(ph[i].strand1, compressed_Hunique, bkpts[1], sol_path[id][w - 1][1], 
-                sol_path[id][w][1], w, width, chunk_offset, cur_window_width)
+                sol_path[id][w][1], w, width, chunk_offset, Hw_start, Hw_mid, Hw_end, 
+                HtoX_idx, XtoH_idx, Xwi_start)
             # record strand 2 info
             update_phase!(ph[i].strand2, compressed_Hunique, bkpts[2], sol_path[id][w - 1][2], 
-                sol_path[id][w][2], w, width, chunk_offset, cur_window_width)
+                sol_path[id][w][2], w, width, chunk_offset, Hw_start, Hw_mid, Hw_end, 
+                HtoX_idx, XtoH_idx, Xwi_start)
         end
 
         # update progress
@@ -255,20 +262,29 @@ between windows `w - 1` and `w`. Every window have 0 or 1 breakpoint.
 """
 function update_phase!(ph::HaplotypeMosaic, compressed_Hunique::CompressedHaplotypes,
     bkpt::Int, hap_prev::Int, hap_curr::Int, w::Int, width::Int, chunk_offset::Int,
-    cur_window_width::Int)
+    Hw_start::Int, Hw_mid::Int, Hw_end::Int, HtoX_idx::AbstractVector, 
+    XtoH_idx::AbstractVector, Xwi_start::Int)
+
+    # no breakpoints
     if bkpt == -1
-        # no breakpoint
-        h1 = complete_idx_to_unique_idx(hap_curr, w, compressed_Hunique)
+        h = complete_idx_to_unique_idx(hap_curr, w, compressed_Hunique)
         push!(ph.start, chunk_offset + (w - 1) * width + 1)
-        push!(ph.haplotypelabel, h1)
+        push!(ph.haplotypelabel, h)
         push!(ph.window, w)
-    elseif bkpt == width + cur_window_width
+        return nothing
+    end
+
+    # convert bkpt (in terms of X index) to index in H
+    X_bkpt_end = Xwi_start + bkpt
+    H_bkpt_pos = XtoH_idx[X_bkpt_end]
+
+    if H_bkpt_pos >= Hw_end
         # previous window dominates current window 
         h = complete_idx_to_unique_idx(hap_prev, w, compressed_Hunique)
         push!(ph.start, chunk_offset + (w - 1) * width + 1)
         push!(ph.haplotypelabel, h)
         push!(ph.window, w)
-    elseif width <= bkpt < width + cur_window_width
+    elseif Hw_mid <= H_bkpt_pos < Hw_end
         # previous window extends to current window 
         h1 = complete_idx_to_unique_idx(hap_prev, w, compressed_Hunique)
         push!(ph.start, chunk_offset + (w - 1) * width + 1)
@@ -276,13 +292,17 @@ function update_phase!(ph::HaplotypeMosaic, compressed_Hunique::CompressedHaplot
         push!(ph.window, w)
         # 2nd part of current window
         h2 = complete_idx_to_unique_idx(hap_curr, w, compressed_Hunique)
-        push!(ph.start, chunk_offset + (w - 2) * width + 1 + bkpt)
+        X_bkpt_end = Xwi_start + bkpt
+        H_bkpt_pos = XtoH_idx[X_bkpt_end]
+        push!(ph.start, chunk_offset + H_bkpt_pos)
         push!(ph.haplotypelabel, h2)
         push!(ph.window, w)
-    elseif -1 < bkpt < width
+    elseif H_bkpt_pos < Hw_mid
         # current window extends to previous window
         h1 = complete_idx_to_unique_idx(hap_curr, w - 1, compressed_Hunique)
-        push!(ph.start, chunk_offset + (w - 2) * width + 1 + bkpt)
+        X_bkpt_end = Xwi_start + bkpt
+        H_bkpt_pos = XtoH_idx[X_bkpt_end]
+        push!(ph.start, chunk_offset + H_bkpt_pos)
         push!(ph.haplotypelabel, h1)
         push!(ph.window, w - 1)
         # update current window
@@ -291,8 +311,11 @@ function update_phase!(ph::HaplotypeMosaic, compressed_Hunique::CompressedHaplot
         push!(ph.haplotypelabel, h2)
         push!(ph.window, w)
     else
+        # println("H_bkpt_pos = $H_bkpt_pos, Hw_start=$Hw_start, Hw_mid=$Hw_mid, Hw_end=$Hw_end ")
         error("update_phase!: bkpt does not satisfy -1 <= bkpt <= 2width! Shouldn't be possible")
     end
+
+    return nothing
 end
 
 function phase_fast!(
