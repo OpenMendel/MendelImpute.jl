@@ -197,6 +197,7 @@ function nearest_window_with_sufficient_typed_snps(
     end 
 
     right == left == typemax(Int) && error("No window contains feasible haplotype pairs!")
+    
     if abs(cur_win - right) < abs(cur_win - left)
         return right
     else

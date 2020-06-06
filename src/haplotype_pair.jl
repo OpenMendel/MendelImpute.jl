@@ -85,6 +85,7 @@ function haplopair(
     N        = zeros(Float32, n, d)
     happairs = [Tuple{Int, Int}[] for i in 1:n]
     hapscore = zeros(Float32, n)
+    sizehint!.(happairs, 100) # will not save > 100 unique haplotype pairs to conserve memory
     haplopair!(Xwork, Hwork, M, N, happairs, hapscore)
 
     return happairs, hapscore
@@ -204,7 +205,7 @@ function haplopair!(
                 empty!(happairs[i])
                 push!(happairs[i], (j, k))
                 hapmin[i] = score
-            elseif score <= hapmin[i] + tol
+            elseif score <= hapmin[i] + tol && length(happairs[i]) < 100
                 push!(happairs[i], (j, k))
             end
 

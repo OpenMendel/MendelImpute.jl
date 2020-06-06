@@ -22,7 +22,7 @@ function phase(
     outfile::AbstractString = "imputed." * tgtfile,
     impute::Bool = true, #TODO for impute=false
     width::Int = 2000,
-    min_typed_snps = 100, 
+    min_typed_snps = 20, 
     fast_method::Bool = false,
     unique_only::Bool = false
     )
@@ -99,6 +99,7 @@ function phase(
             for k in 1:people
                 push!(redundant_haplotypes[k][w], (-1, -1))
             end
+            next!(pmeter) # update progress
             continue
         end
 
