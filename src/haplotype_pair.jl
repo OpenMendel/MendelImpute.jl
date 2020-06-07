@@ -10,46 +10,31 @@ function compute_redundant_haplotypes!(
     ) where T <: Tuple{Int, Int}
     
     people = length(redundant_haplotypes)
-    if fast_method
-        @inbounds for k in 1:people, happair in happairs[k]
+    h1_set = Int[]
+    h2_set = Int[]
+
+    @inbounds for k in 1:people
+        for happair in happairs[k]
             Hi_idx = unique_idx_to_complete_idx(happair[1], window, Hunique)
             Hj_idx = unique_idx_to_complete_idx(happair[2], window, Hunique)
-            # println("person $k's optimal haplotype pairs are located at columns $Hi_idx and $Hj_idx in current window of H")
 
             # loop through all haplotypes and find ones that match either of the optimal haplotypes 
-            mapping = Hunique[window].hapmap
-            redunhaps_bitvec1 = redundant_haplotypes[k].strand1[window]
-            redunhaps_bitvec2 = redundant_haplotypes[k].strand2[window]
-            for jj in 1:length(Hunique[1].hapmap)
-                mapping[jj] == Hi_idx && (redunhaps_bitvec1[jj] = true)
-                mapping[jj] == Hj_idx && (redunhaps_bitvec2[jj] = true)
+            empty!(h1_set)
+            empty!(h2_set)
+            for (idx, hap) in enumerate(Hunique[window].hapmap)
+                hap == Hi_idx && push!(h1_set, idx)
+                hap == Hj_idx && push!(h2_set, idx)
+            end
+
+            # push all possible happair into `redundant_haplotypes` 
+            for h1 in h1_set, h2 in h2_set
+                push!(redundant_haplotypes[k][window], (h1, h2))
             end
         end
-    else
-        h1_set, h2_set = Int[], Int[]
-        @inbounds for k in 1:people
-            for happair in happairs[k]
-                Hi_idx = unique_idx_to_complete_idx(happair[1], window, Hunique)
-                Hj_idx = unique_idx_to_complete_idx(happair[2], window, Hunique)
-
-                # loop through all haplotypes and find ones that match either of the optimal haplotypes 
-                empty!(h1_set)
-                empty!(h2_set)
-                for (idx, hap) in enumerate(Hunique[window].hapmap)
-                    hap == Hi_idx && push!(h1_set, idx)
-                    hap == Hj_idx && push!(h2_set, idx)
-                end
-
-                # push all possible happair into `redundant_haplotypes` 
-                for h1 in h1_set, h2 in h2_set
-                    push!(redundant_haplotypes[k][window], (h1, h2))
-                end
-            end
-            # reduce search space for dynamic programming later
-            if length(redundant_haplotypes[k][window]) > 1000
-                # shuffle!(redundant_haplotypes[k][window]) # THIS IS NOT THREAD SAFE!
-                resize!(redundant_haplotypes[k][window], 1000)
-            end
+        # reduce search space for dynamic programming later
+        if length(redundant_haplotypes[k][window]) > 1000
+            # shuffle!(redundant_haplotypes[k][window]) # THIS IS NOT THREAD SAFE!
+            resize!(redundant_haplotypes[k][window], 1000)
         end
     end
 
