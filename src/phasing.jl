@@ -241,13 +241,14 @@ function phase!(
                 typed_snps, w, sol_path[id][w - 1], sol_path[id][w])
 
             # record strand 1 info
+            cur_window_width = (w == windows ? last_window_width : width)
             update_phase!(ph[i].strand1, compressed_Hunique, bkpts[1], sol_path[id][w - 1][1], 
                 sol_path[id][w][1], w, width, chunk_offset, Hw_start, Hw_mid, Hw_end, 
-                HtoX_idx, XtoH_idx, Xwi_start)
+                HtoX_idx, XtoH_idx, Xwi_start, Xwi_end)
             # record strand 2 info
             update_phase!(ph[i].strand2, compressed_Hunique, bkpts[2], sol_path[id][w - 1][2], 
                 sol_path[id][w][2], w, width, chunk_offset, Hw_start, Hw_mid, Hw_end, 
-                HtoX_idx, XtoH_idx, Xwi_start)
+                HtoX_idx, XtoH_idx, Xwi_start, Xwi_end)
         end
 
         # update progress
@@ -258,11 +259,15 @@ end
 """
 Helper function for updating phase information after breakpoints have been identified
 between windows `w - 1` and `w`. Every window have 0 or 1 breakpoint.
+
+Caveat: technically it is possible for a window to have 2 breakpoints (that might even overlap)
+since we can have the previous and next window both extend into the current one, but hopefully
+this is extremely rare.
 """
 function update_phase!(ph::HaplotypeMosaic, compressed_Hunique::CompressedHaplotypes,
     bkpt::Int, hap_prev::Int, hap_curr::Int, w::Int, width::Int, chunk_offset::Int,
     Hw_start::Int, Hw_mid::Int, Hw_end::Int, HtoX_idx::AbstractVector, 
-    XtoH_idx::AbstractVector, Xwi_start::Int)
+    XtoH_idx::AbstractVector, Xwi_start::Int, Xwi_end::Int)
 
     # no breakpoints
     if bkpt == -1
@@ -273,17 +278,20 @@ function update_phase!(ph::HaplotypeMosaic, compressed_Hunique::CompressedHaplot
         return nothing
     end
 
-    # convert bkpt (in terms of X index) to index in H
-    X_bkpt_end = Xwi_start + bkpt
-    H_bkpt_pos = XtoH_idx[X_bkpt_end]
-
-    if H_bkpt_pos >= Hw_end
-        # previous window dominates current window 
+    # previous window completely covers current window 
+    if bkpt == length(Xwi_start:Xwi_end)
         h = complete_idx_to_unique_idx(hap_prev, w, compressed_Hunique)
         push!(ph.start, chunk_offset + (w - 1) * width + 1)
         push!(ph.haplotypelabel, h)
         push!(ph.window, w)
-    elseif Hw_mid <= H_bkpt_pos < Hw_end
+        return nothing
+    end
+
+    # convert bkpt (in terms of X index) to index in H
+    X_bkpt_end = Xwi_start + bkpt
+    H_bkpt_pos = XtoH_idx[X_bkpt_end]
+
+    if Hw_mid <= H_bkpt_pos <= Hw_end
         # previous window extends to current window 
         h1 = complete_idx_to_unique_idx(hap_prev, w, compressed_Hunique)
         push!(ph.start, chunk_offset + (w - 1) * width + 1)
