@@ -1,5 +1,9 @@
 """
-Records optimal-redundant haplotypes for each window. 
+Records optimal-redundant haplotypes for each window. Currently, only the first 1000
+haplotype pairs will be saved to reduce search space for dynamic programming. 
+
+Warning: This function is called in a multithreaded loop. If you modify this function
+you must check whether imputation accuracy is affected (when run with >1 threads).
 """
 function compute_redundant_haplotypes!(
     redundant_haplotypes::Union{Vector{Vector{Vector{T}}}, Vector{OptimalHaplotypeSet}}, 

@@ -3,7 +3,7 @@ Data structure for keeping track of unique haplotypes in a window.
 
 - `uniqueindex`: the unique haplotype indices in a window.
 - `hapmap`: information to map every haplotype to the first appearance of the same haplotype
-- `range`: range of SNPs of the window
+- `to_unique`: map every haplotype index to the unique haplotype index
 - `uniqueH`: A BitMatrix storing unique haplotypes in columns or rows, depending on `dims` argument of `compress_haplotypes`
 
 # Example:
@@ -16,6 +16,7 @@ then
 
     uniqueindex = [1 2 4 6]
     hapmap = [1 2 2 4 2 6 1 6 1]
+    to_unique = [1 2 2 3 2 4 1 4 1]
     uniqueH = [a b c d]
 
 `hapmap` is used to find the set of matching haplotypes after identifying the best
@@ -25,6 +26,7 @@ the set of haplotypes that matches (b, c) is in columns {2, 3, 4, 5}
 struct CompressedWindow
     uniqueindex::Vector{Int}
     hapmap::Vector{Int}
+    to_unique::Vector{Int}
     uniqueH::BitMatrix
 end
 
@@ -59,15 +61,17 @@ Base.lastindex(x::CompressedHaplotypes) = lastindex(x.CW)
 nhaplotypes(x::CompressedHaplotypes) = 2length(x.sampleID)
 
 """
-    compress_haplotypes(vcffile, outfile, [width], [dims], [flankwidth])
+    compress_haplotypes(vcffile, outfile, width, [dims], [flankwidth])
 
 For each window, finds unique haplotype indices stored in the columns/rows of H, saves
 a mapping vector to the unique col/row of H, and outputs result as binary `.jld2` file. 
 
-# Input
+# Inputs
 * `vcffile`: file name
 * `outfile`: Output file name (with or without `.jld2` extension)
 * `width`: Number of SNPs per window. Number of SNPs in last window may be in `[width, 2width]`.
+
+# Optional inputs
 * `dims`: Orientation of `H`. `2` means columns of `H` are a haplotype vectors. `1` means rows of `H` are. 
 * `flankwidth`: Number of SNPs flanking the sliding window (defaults to 10% of `width`)
 """
@@ -105,8 +109,9 @@ function compress_haplotypes(
         H_cur_window = (dims == 2 ? view(H, cur_range, :) : view(H, :, cur_range))
         hapmap = groupslices(H_cur_window, dims=dims)
         unique_idx = unique(hapmap)
+        complete_to_unique = indexin(hapmap, unique_idx)
         uniqueH = (dims == 2 ? H_cur_window[:, unique_idx] : H_cur_window[unique_idx, :])
-        compressed_Hunique[w] = MendelImpute.CompressedWindow(unique_idx, hapmap, uniqueH)
+        compressed_Hunique[w] = MendelImpute.CompressedWindow(unique_idx, hapmap, complete_to_unique, uniqueH)
     end
 
     # save using JLSO or JLD2
@@ -129,6 +134,5 @@ For an index in the complete haplotype pool, find its index in the unique haplot
 in specified window. 
 """
 function complete_idx_to_unique_idx(complete_idx::Int, window::Int, Hunique::CompressedHaplotypes)
-    elem = Hunique[window].hapmap[complete_idx]
-    return searchsortedfirst(Hunique[window].uniqueindex, elem)
+    return Hunique[window].to_unique[complete_idx]
 end
