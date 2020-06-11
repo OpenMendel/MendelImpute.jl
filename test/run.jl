@@ -1848,5 +1848,84 @@ A = rand(100000, 1000);
 
 
 
+function test_lock(b)
+    a = 0
+    Threads.@threads for i in eachindex(b)
+        a += b[i]
+    end
+    a
+end
+
+function test_lock2(b)
+    a = 0
+    mutex = Threads.SpinLock()
+    Threads.@threads for i in eachindex(b)
+        lock(mutex)
+        a += b[i]
+        unlock(mutex)
+    end
+    a
+end
+
+b = 1:1000
+test_lock(b)  # 93885
+test_lock2(b) # 500500 = correct answer
+
+
+function text_indexin(a::Vector{Int}, b::Vector{Int}, c::Vector{Int})
+    b_in_a = zeros(Int, length(a))
+    c_in_a = zeros(Int, length(a))
+    for i in 1:2
+        b_in_a .= indexin(a, b)
+        c_in_a .= indexin(a, c)
+    end
+    return b_in_a, c_in_a
+end
+
+
+
+
+
+# binary search for vector of invervals
+using Revise
+using Random
+using MendelImpute
+using BenchmarkTools
+
+v = [1:4, 5:10, 11:20, 21:35]
+searchsortedlast(first.(v), 3)
+
+
+
+
+
+
+
+# generate happairs in windows
+using Revise
+using Random
+using MendelImpute
+
+windows = 10
+haplotype_set = [Tuple{Int, Int}[] for i in 1:windows]
+
+Random.seed!(2020)
+for w in 1:windows
+    haplotype_set[w] = [(rand(1:5), rand(1:5)) for i in 1:rand(1:10)]
+end
+haplotype_set[2] = haplotype_set[3] = haplotype_set[4] = haplotype_set[5] = haplotype_set[10] = [(-1, -1)]
+haplotype_set
+
+originally_empty = falses(windows)
+@inbounds for w in 1:windows
+    if haplotype_set[w][1] == (-1, -1)
+        originally_empty[w] = true
+    end
+end
+originally_empty
+nearest_window_with_sufficient_typed_snps(4, haplotype_set, originally_empty)
+
+connect_happairs(haplotype_set)
+haplotype_set
 
 

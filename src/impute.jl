@@ -6,18 +6,20 @@ in `outfile` are non-missing and phased.
 """
 function impute!(
     X::AbstractMatrix,
-    H::AbstractMatrix,
+    compressed_haplotypes::CompressedHaplotypes,
     phaseinfo::Vector{HaplotypeMosaicPair},
     outfile::AbstractString,
     X_sampleID::AbstractVector,
-    chr::AbstractVector,
-    pos::AbstractVector, 
-    ids::AbstractVector,
-    ref::AbstractVector,
-    alt::AbstractVector
     )
     # impute without changing observed entries
-    impute2!(X, H, phaseinfo)
+    impute2!(X, compressed_haplotypes, phaseinfo)
+
+    # retrieve reference file information
+    chr = compressed_haplotypes.chr
+    pos = compressed_haplotypes.pos
+    ids = compressed_haplotypes.SNPid
+    ref = compressed_haplotypes.refallele
+    alt = compressed_haplotypes.altallele
 
     # write minimal meta information to outfile
     io = openvcf(outfile, "w")
@@ -62,42 +64,6 @@ function impute!(
 end
 
 """
-    update_marker_position!(phaseinfo, tgtfile, reffile)
-
-Converts `phaseinfo`'s strand1 and strand2's starting position in 
-terms of matrix rows of `X` to starting position in terms matrix
-rows in `H`. 
-"""
-function update_marker_position!(
-    phaseinfo::Vector{HaplotypeMosaicPair},
-    XtoH_idx::AbstractVector, 
-    ref_records::Int
-    )
-    people = length(phaseinfo)
-
-    for j in 1:people
-        # update strand1's starting position
-        for (i, idx) in enumerate(phaseinfo[j].strand1.start)
-            phaseinfo[j].strand1.start[i] = XtoH_idx[idx]
-        end
-        # update strand2's starting position
-        for (i, idx) in enumerate(phaseinfo[j].strand2.start)
-            phaseinfo[j].strand2.start[i] = XtoH_idx[idx]
-        end
-    end
-
-    # update first starting position and length
-    for j in 1:people
-        phaseinfo[j].strand1.start[1] = 1
-        phaseinfo[j].strand2.start[1] = 1
-        phaseinfo[j].strand1.length = ref_records
-        phaseinfo[j].strand2.length = ref_records
-    end
-
-    return nothing
-end
-
-"""
     impute!(X, H, phase)
 
 Imputes `X` completely using segments of haplotypes `H` where segments are stored in `phase`. 
@@ -135,24 +101,31 @@ Non-missing entries in `X` will not change, but X and H has to be aligned.
 """
 function impute2!(
     X::AbstractMatrix,
-    H::AbstractMatrix,
+    compressed_haplotypes::CompressedHaplotypes,
     phase::Vector{HaplotypeMosaicPair}
     )
 
     p, n = size(X)
+    width = compressed_haplotypes.width
 
-    @inbounds for snp in 1:p, person in 1:n
+    @inbounds for person in 1:n, snp in 1:p
         if ismissing(X[snp, person])
-            #find where snp is located in phase
-            hap1_position = searchsortedlast(phase[person].strand1.start, snp)
-            hap2_position = searchsortedlast(phase[person].strand2.start, snp)
+            #find which segment the snp is located
+            hap1_segment = searchsortedlast(phase[person].strand1.start, snp)
+            hap2_segment = searchsortedlast(phase[person].strand2.start, snp)
 
-            #find the correct haplotypes 
-            hap1 = phase[person].strand1.haplotypelabel[hap1_position]
-            hap2 = phase[person].strand2.haplotypelabel[hap2_position]
+            #find haplotype pair in corresponding window for this segment
+            h1 = phase[person].strand1.haplotypelabel[hap1_segment]
+            h2 = phase[person].strand2.haplotypelabel[hap2_segment]
+            w1 = phase[person].strand1.window[hap1_segment]
+            w2 = phase[person].strand2.window[hap2_segment]
+            i1 = snp - (w1 - 1) * width
+            i2 = snp - (w2 - 1) * width
 
-            # imputation step 
-            X[snp, person] = H[snp, hap1] + H[snp, hap2]
+            # imputation step
+            H1 = compressed_haplotypes[w1].uniqueH
+            H2 = compressed_haplotypes[w2].uniqueH
+            X[snp, person] = H1[i1, h1] + H2[i2, h2]
         end
     end
 

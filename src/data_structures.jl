@@ -1,14 +1,16 @@
 """
 Data structure for recording haplotype mosaic of one strand:
 `start[i]` to `start[i+1]` has haplotype `haplotypelabel[i]`
-`start[end]` to `length` has haplotype `haplotypelabel[end]`
+in window `window[i]` of a `CompressedWindow`. `start[end]` to
+`length` has haplotype `haplotypelabel[end]` in `window[end]`
 """
 mutable struct HaplotypeMosaic
     length::Int
     start::Vector{Int}
+    window::Vector{Int}
     haplotypelabel::Vector{Int}
 end
-HaplotypeMosaic(len) = HaplotypeMosaic(len, Int[], Int[])
+HaplotypeMosaic(len) = HaplotypeMosaic(len, Int[], Int[], Int[])
 
 # data structure for recording haplotype mosaic of two strands
 struct HaplotypeMosaicPair
