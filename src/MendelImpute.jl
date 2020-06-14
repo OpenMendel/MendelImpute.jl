@@ -29,8 +29,7 @@ module MendelImpute
 
     # main functions that users are exposed to
     export phase
-    export vcf_to_jlso
-    export vcf_to_jld2
+    export compress_haplotypes
 
     export OptimalHaplotypeSet, compute_optimal_halotype_set
     export make_refvcf_file, make_tgtvcf_file
