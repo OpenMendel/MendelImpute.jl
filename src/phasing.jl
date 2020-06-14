@@ -1,27 +1,26 @@
 """
     phase(tgtfile, reffile; [outfile], [width], [flankwidth], [fast_method])
 
-Phasing (haplotying) of `tgtfile` from a pool of haplotypes `reffile`
-by sliding windows and saves result in `outfile`. Will also create an aligned 
-reference `aligned.ref.vcf.gz` file matching `tgtfile` position by position. 
+Main function of MendelImpute program. Phasing (haplotying) of `tgtfile` from a pool 
+of haplotypes `reffile` by sliding windows and saves result in `outfile`. 
 
 # Input
-- `tgtfile`: VCF or PLINK file. VCF files should end in `.vcf` or `.vcf.gz`. PLINK files should exclude `.bim/.bed/.fam` suffixes but the trio must all be present in the directory.
-- `reffile`: VCF file name. Should end in `.vcf` or `.vcf.gz`. 
+- `tgtfile`: VCF or PLINK files. VCF files should end in `.vcf` or `.vcf.gz`. PLINK files should exclude `.bim/.bed/.fam` suffixes but the trio must all be present in the directory. 
+- `reffile`: VCF or compressed Julia binary files. VCF files should end in `.vcf` or `.vcf.gz`. Acceptable Julia binary formats includes `.jld2` (fastest read time) and `.jlso` (smallest file size).
 
 # Optional Inputs
 - `outfile`: output filename ending in `.vcf.gz` or `.vcf`. Output genotypes will have no missing data.
 - `impute`: If `true`, untyped SNPs will be imputed, otherwise only missing snps in `tgtfile` will be imputed.  (default `false`)
-- `width`: number of SNPs (markers) in each haplotype window. (default `2000`)
+- `width`: number of SNPs (markers) in each haplotype window. (default `2048`)
 - `flankwidth`: Number of SNPs flanking the sliding window (defaults to 10% of `width`)
-- `typed_snps_threshold`: Number of typed SNPs required in each window. Below this threshold means optimal haplotype pair will be copied from the nearest window with enough typed SNPs
+- `min_typed_snps`: Number of typed SNPs required in each window. Below this threshold means optimal haplotype pair will be copied from the nearest window with enough typed SNPs
 """
 function phase(
     tgtfile::AbstractString,
     reffile::AbstractString;
     outfile::AbstractString = "imputed." * tgtfile,
-    impute::Bool = true, #TODO for impute=false
-    width::Int = 2000,
+    impute::Bool = true,
+    width::Int = 2048,
     min_typed_snps = 50, 
     )
 
@@ -43,7 +42,8 @@ function phase(
         compressed_Hunique = loaded[:compressed_Hunique]
         width == compressed_Hunique.width || error("Specified width = $width does not equal $(compressed_Hunique.width) = width in .jlso file")
     elseif endswith(reffile, ".vcf") || endswith(reffile, ".vcf.gz")
-        # filter for unique haplotypes if not already done 
+        # for VCF files, compress into jlso files and filter for unique haplotypes in each window
+        @info "VCF files detected: compressing reference file to .jlso format..."
         compressed_Hunique = compress_haplotypes(reffile, "compressed." * reffile, width, dims=2, flankwidth = 0)
     else
         error("Unrecognized reference file format: only VCF (ends in .vcf or .vcf.gz), `.jlso`, or `.jld2` files are acceptable.")
@@ -128,10 +128,14 @@ function phase(
     H_pos = compressed_Hunique.pos
     XtoH_idx = indexin(X_pos, H_pos) # X_pos[i] == H_pos[XtoH_idx[i]]
     XtoH_rm_nothing = Base.filter(!isnothing, XtoH_idx)
-    X_aligned = any(isnothing.(XtoH_idx)) ? X[findall(!isnothing, XtoH_idx), :] : X
-    X_full = Matrix{Union{Missing, UInt8}}(missing, ref_snps, people)
-    copyto!(@view(X_full[XtoH_rm_nothing, :]), X_aligned)
-    impute!(X_full, compressed_Hunique, ph, outfile, X_sampleID) # imputes X_full and writes to file
+    X_aligned = any(isnothing.(XtoH_idx)) ? X[findall(!isnothing, XtoH_idx), :] : X # exclude snps not in ref panel
+    if impute
+        X_full = Matrix{Union{Missing, UInt8}}(missing, ref_snps, people)
+        copyto!(@view(X_full[XtoH_rm_nothing, :]), X_aligned)
+        impute!(X_full, compressed_Hunique, ph, outfile, X_sampleID, XtoH_idx=nothing) # imputes X_full and writes to file
+    else
+        impute!(X_aligned, compressed_Hunique, ph, outfile, X_sampleID, XtoH_idx=XtoH_rm_nothing) # imputes X_aligned and writes to file
+    end
     impute_time = time() - impute_start
 
     println("Data import time                    = ", round(import_data_time, sigdigits=6), " seconds")
