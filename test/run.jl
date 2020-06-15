@@ -2041,3 +2041,34 @@ maf = ARGS[2]
 println("Running chrom $chr. Typed SNPs have frequency maf > $maf")
 fdsa
 @time filter_and_mask(chr, maf)
+
+
+
+
+using Revise
+using VCFTools
+using MendelImpute
+using GeneticVariation
+using Random
+using StatsBase
+using CodecZlib
+using ProgressMeter
+using JLD2, FileIO, JLSO
+using BenchmarkTools
+using GroupSlices
+
+chr = parse(Int, ARGS[1])
+maf = parse(Float64, ARGS[2])
+width = 2048
+
+# searching single bkpts, deleting suboptimal pairs in dp, skip windows with <50 typed snps
+Random.seed!(2020)
+tgtfile = "target.chr$chr.typedOnly.maf$maf.masked.vcf.gz"
+reffile = "ref.chr$chr.excludeTarget.jlso"
+outfile = "mendel.imputed.dp$width.maf$maf.vcf.gz"
+@time ph, hs = phase(tgtfile, reffile, outfile=outfile, impute=true, width=width)
+
+X_complete = convert_gt(UInt8, "target.chr$chr.full.vcf.gz")
+n, p = size(X_complete)
+X_mendel = convert_gt(UInt8, outfile)
+println("error overall = $(sum(X_mendel .!= X_complete) / n / p) \n")
