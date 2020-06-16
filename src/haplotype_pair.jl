@@ -29,7 +29,7 @@ function compute_redundant_haplotypes!(
             hap == Hj_idx && push!(h2_set, idx)
         end
 
-        # push all possible happair into `redundant_haplotypes` 
+        # save first 1000 haplotype pairs
         for h1 in h1_set, h2 in h2_set
             if length(redundant_haplotypes[k][window]) <= 1000 
                 push!(redundant_haplotypes[k][window], (h1, h2))

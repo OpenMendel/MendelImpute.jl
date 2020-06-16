@@ -78,7 +78,7 @@ function phase(
     calculate_happairs_start = time()
     pmeter = Progress(windows, 5, "Computing optimal haplotype pairs...")
     redundant_haplotypes = [[Tuple{Int, Int}[] for i in 1:windows] for j in 1:people]
-    [[sizehint!(redundant_haplotypes[j][i], 1000) for i in 1:windows] for j in 1:people]
+    [[sizehint!(redundant_haplotypes[j][i], 1000) for i in 1:windows] for j in 1:people] # don't save >1000 redundant happairs
     typed_snps = Vector{Vector{Int}}(undef, windows) #tracks index for typed snps in each window
     mutex = Threads.SpinLock()
     Threads.@threads for w in 1:windows
@@ -91,6 +91,7 @@ function phase(
         Xw_aligned = X[findall(!isnothing, XtoH_idx), :]
         Hw_aligned = compressed_Hunique[w].uniqueH[XtoH_rm_nothing, :]
         typed_snps[w] = XtoH_rm_nothing # save typed snps index for current window
+        Threads.unlock(mutex)
 
         # Skip windows with too few typed SNPs
         if length(XtoH_rm_nothing) < min_typed_snps
@@ -100,7 +101,6 @@ function phase(
             next!(pmeter) # update progress
             continue
         end
-        Threads.unlock(mutex)
 
         # computational routine (TODO: preallocate all internal matrices here)
         happairs, hapscore = haplopair(Xw_aligned, Hw_aligned)
