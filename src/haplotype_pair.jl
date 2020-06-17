@@ -8,7 +8,7 @@ you must check whether imputation accuracy is affected (when run with >1 threads
 function compute_redundant_haplotypes!(
     redundant_haplotypes::Union{Vector{Vector{Vector{T}}}, Vector{OptimalHaplotypeSet}}, 
     Hunique::CompressedHaplotypes, 
-    happairs::Vector{Vector{T}}, 
+    happairs::Tuple{AbstractVector, AbstractVector},
     window::Int;
     fast_method::Bool = false,
     ) where T <: Tuple{Int, Int}
@@ -17,9 +17,9 @@ function compute_redundant_haplotypes!(
     h1_set = Int[]
     h2_set = Int[]
 
-    @inbounds for k in 1:people, happair in happairs[k]
-        Hi_idx = unique_idx_to_complete_idx(happair[1], window, Hunique)
-        Hj_idx = unique_idx_to_complete_idx(happair[2], window, Hunique)
+    @inbounds for k in 1:people
+        Hi_idx = unique_idx_to_complete_idx(happairs[1][k], window, Hunique)
+        Hj_idx = unique_idx_to_complete_idx(happairs[2][k], window, Hunique)
 
         # loop through all haplotypes and find ones that match either of the optimal haplotypes 
         empty!(h1_set)
@@ -63,16 +63,19 @@ function haplopair(
 
     Xwork = zeros(Float32, size(X, 1), size(X, 2))
     Hwork = convert(Matrix{Float32}, H)
-    initXfloat!(X, Xwork)
+    t1 = @elapsed initXfloat!(X, Xwork)
 
     p, n     = size(X)
     d        = size(H, 2)
     M        = zeros(Float32, d, d)
     N        = zeros(Float32, n, d)
-    happairs = [Tuple{Int, Int}[] for i in 1:n]
+    happairs = ones(Int, n), ones(Int, n)
     hapscore = zeros(Float32, n)
     sizehint!.(happairs, 100) # will not save > 100 unique haplotype pairs to conserve memory
-    haplopair!(Xwork, Hwork, M, N, happairs, hapscore)
+    t2 = @elapsed haplopair!(Xwork, Hwork, M, N, happairs, hapscore)
+
+    println("initXfloat! time = $t1")
+    println("haplopair!  time = $t2")
 
     return happairs, hapscore
 end
@@ -99,36 +102,44 @@ function haplopair!(
     H::AbstractMatrix,
     M::AbstractMatrix,
     N::AbstractMatrix,
-    happairs::Vector{Vector{Tuple{Int, Int}}},
+    happairs::Tuple{AbstractVector, AbstractVector},
     hapscore::AbstractVector
     )
 
     p, n, d = size(X, 1), size(X, 2), size(H, 2)
 
     # assemble M (upper triangular only)
-    mul!(M, Transpose(H), H)
-    for j in 1:d, i in 1:(j - 1) # off-diagonal
-        M[i, j] = 2M[i, j] + M[i, i] + M[j, j]
-    end
-    for j in 1:d # diagonal
-        M[j, j] *= 4
-    end
+    t1 = @elapsed begin mul!(M, Transpose(H), H)
+        for j in 1:d, i in 1:(j - 1) # off-diagonal
+            M[i, j] = 2M[i, j] + M[i, i] + M[j, j]
+        end
+        for j in 1:d # diagonal
+            M[j, j] *= 4
+        end
 
-    # assemble N
-    mul!(N, Transpose(X), H)
-    @simd for I in eachindex(N)
-        N[I] *= 2
+        # assemble N
+        mul!(N, Transpose(X), H)
+        @simd for I in eachindex(N)
+            N[I] *= 2
+        end
     end
 
     # computational routine
-    haplopair!(happairs, hapscore, M, N)
+    t2 = @elapsed begin
+        haplopair!(happairs, hapscore, M, N)
+    end
 
     # supplement the constant terms in objective
-    @inbounds for j in 1:n
-        @simd for i in 1:p
-            hapscore[j] += abs2(X[i, j])
+    t3 = @elapsed begin @inbounds for j in 1:n
+            @simd for i in 1:p
+                hapscore[j] += abs2(X[i, j])
+            end
         end
     end
+
+    println("multiplication took $t1 seconds")
+    println("haplopair      took $t2 seconds")
+    println("last step      took $t3 seconds")
 
     return nothing
 end
@@ -140,9 +151,7 @@ Calculate the best pair of haplotypes pairs in the filtered haplotype panel
 for each individual in `X` using sufficient statistics `M` and `N`. 
 
 # Note
-The best haplotype pairs are column indices of the filtered haplotype 
-panel, and must be converted back to the indices of the actual haplotype panel
-using `UniqueHaplotypeMaps`. 
+The best haplotype pairs are column indices of the filtered haplotype panels. 
 
 # Input
 * `happair`: optimal haplotype pair for each individual.
@@ -154,7 +163,7 @@ using `UniqueHaplotypeMaps`.
     in columns.
 """
 function haplopair!(
-    happairs::Vector{Vector{Tuple{Int, Int}}},
+    happairs::Tuple{AbstractVector, AbstractVector},
     hapmin::Vector{T},
     M::AbstractMatrix{T},
     N::AbstractMatrix{T},
@@ -163,7 +172,6 @@ function haplopair!(
     n, d = size(N)
     tol = convert(T, 3)
     fill!(hapmin, typemax(T))
-    empty!.(happairs)
 
     @inbounds for k in 1:d, j in 1:k
         # loop over individuals
@@ -171,11 +179,9 @@ function haplopair!(
             score = M[j, k] - N[i, j] - N[i, k]
 
             # keep best happair (original code)
-            # if score < hapmin[i]
-            #     empty!(happairs[i])
-            #     push!(happairs[i], (j, k))
-            #     hapmin[i] = score
-            # end
+            if score < hapmin[i]
+                hapmin[i], happairs[1][i], happairs[2][i] = score, j, k
+            end
 
             # keep all happairs that are equally good
             # if score < hapmin[i]
@@ -187,13 +193,13 @@ function haplopair!(
             # end
 
             # keep happairs that within some range of best pair (but finding all of them requires a 2nd pass)
-            if score < hapmin[i]
-                empty!(happairs[i])
-                push!(happairs[i], (j, k))
-                hapmin[i] = score
-            elseif score <= hapmin[i] + tol && length(happairs[i]) < 100
-                push!(happairs[i], (j, k))
-            end
+            # if score < hapmin[i]
+            #     empty!(happairs[i])
+            #     push!(happairs[i], (j, k))
+            #     hapmin[i] = score
+            # elseif score <= hapmin[i] + tol && length(happairs[i]) < 100
+            #     push!(happairs[i], (j, k))
+            # end
 
             # keep top 10 haplotype pairs
             # if score < hapmin[i]

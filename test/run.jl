@@ -2065,7 +2065,7 @@ width = 2048
 Random.seed!(2020)
 tgtfile = "target.chr$chr.typedOnly.maf$maf.masked.vcf.gz"
 reffile = "ref.chr$chr.excludeTarget.jlso"
-outfile = "mendel.imputed.dp$width.maf$maf.vcf.gz"
+outfile = "mendel.imputed.dp$width.chr$chr.maf$maf.vcf.gz"
 @time ph, hs = phase(tgtfile, reffile, outfile=outfile, impute=true, width=width)
 
 X_complete = convert_gt(UInt8, "target.chr$chr.full.vcf.gz")
