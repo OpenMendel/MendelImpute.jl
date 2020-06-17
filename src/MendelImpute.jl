@@ -17,7 +17,7 @@ module MendelImpute
     using JLSO
 
     export continue_haplotype, haplopair!, haplopair, haploimpute!
-    export impute!, impute2!, search_breakpoint, unique_haplotypes
+    export impute!, impute_discard_phase!, search_breakpoint, unique_haplotypes
     export unique_haplotype_idx
     export compute_redundant_haplotypes!, redundant_haplotypes
     export HaplotypeMosaicPair, HaplotypeMosaic, UniqueHaplotypeMaps

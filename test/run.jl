@@ -1929,3 +1929,146 @@ connect_happairs(haplotype_set)
 haplotype_set
 
 
+
+
+
+(v1.2) pkg> update Distributions
+  Updating registry at `~/.julia/registries/General`
+  Updating git-repo `https://github.com/JuliaRegistries/General.git`
+ Resolving package versions...
+ Installed Distributions ─ v0.21.9
+  Updating `~/.julia/environments/v1.2/Project.toml`
+  [31c24e10] ↑ Distributions v0.21.5 ⇒ v0.21.9
+  Updating `~/.julia/environments/v1.2/Manifest.toml`
+  [9e28174c] ↑ BinDeps v0.8.10 ⇒ v1.0.1
+  [b552c78f] ↑ DiffRules v0.0.10 ⇒ v1.0.1
+  [31c24e10] ↑ Distributions v0.21.5 ⇒ v0.21.9
+  [276daf66] ↑ SpecialFunctions v0.7.2 ⇒ v0.8.0
+
+(v1.2) pkg> update SpecialFunctions
+  Updating registry at `~/.julia/registries/General`
+  Updating git-repo `https://github.com/JuliaRegistries/General.git`
+ERROR: The following package names could not be resolved:
+ * SpecialFunctions (276daf66-3868-5448-9aa4-cd146d93841b in manifest but not in project)
+Please specify by known `name=uuid`.
+
+(v1.2) pkg> update VCFTools SnpArrays
+  Updating registry at `~/.julia/registries/General`
+  Updating git-repo `https://github.com/JuliaRegistries/General.git`
+  Updating git-repo `https://github.com/OpenMendel/VCFTools.jl`
+  Updating git-repo `https://github.com/OpenMendel/SnpArrays.jl`
+ Resolving package versions...
+  Updating `~/.julia/environments/v1.2/Project.toml`
+  [4e780e97] ~ SnpArrays v0.3.2 #master (https://github.com/OpenMendel/SnpArrays.jl)
+  [a620830f] ~ VCFTools v0.1.2 #master (https://github.com/OpenMendel/VCFTools.jl)
+  Updating `~/.julia/environments/v1.2/Manifest.toml`
+  [4e780e97] ~ SnpArrays v0.3.2 #master (https://github.com/OpenMendel/SnpArrays.jl)
+  [a620830f] ~ VCFTools v0.1.2 #master (https://github.com/OpenMendel/VCFTools.jl)
+
+julia>
+(base) [biona001@n2238 ~]$ ls
+haplotype_comparisons  IHT  ProPCA  R  thyrosim  yeast_eQTL  yeast_eQTL_newton
+(base) [biona001@n2238 ~]$ cd haplotype_comparisons/HRC/
+(base) [biona001@n2238 HRC]$ clear
+
+
+using Revise
+using VCFTools
+using MendelImpute
+using GeneticVariation
+using Random
+using StatsBase
+using CodecZlib
+using ProgressMeter
+using JLD2, FileIO, JLSO
+using BenchmarkTools
+using GroupSlices
+
+cd("/u/home/b/biona001/haplotype_comparisons/HRC")
+function filter_and_mask(chr::Int, maf::Float64)
+    # filter chromosome data for unique snps
+    println("filtering for unique snps")
+    data = "HRC.r1-1.EGA.GRCh37.chr$chr.haplotypes.vcf.gz"
+    full_record_index = .!find_duplicate_marker(data)
+    @time VCFTools.filter(data, full_record_index, 1:nsamples(data), 
+        des = "chr$chr.uniqueSNPs.vcf.gz")
+
+    # summarize data
+    println("summarizing data")
+    total_snps, samples, _, _, _, maf_by_record, _ = gtstats("chr$chr.uniqueSNPs.vcf.gz")
+
+    # generate target panel with all snps
+    println("generating complete target panel")
+    n = 1000
+    sample_idx = falses(samples)
+    sample_idx[1:n] .= true
+    shuffle!(sample_idx)
+    @time VCFTools.filter("chr$chr.uniqueSNPs.vcf.gz", 1:total_snps, 
+        sample_idx, des = "target.chr$chr.full.vcf.gz", allow_multiallelic=false)
+
+    # also generate reference panel without target samples
+    println("generating reference panel without target samples")
+    @time VCFTools.filter("chr$chr.uniqueSNPs.vcf.gz", 1:total_snps, 
+        .!sample_idx, des = "ref.chr$chr.excludeTarget.vcf.gz", allow_multiallelic=false)
+
+    # generate target file with 1000 samples and typed snps with certain maf
+    println("generating target file with typed snps only")
+    my_maf = findall(x -> x > maf, maf_by_record)  
+    p = length(my_maf)
+    record_idx = falses(total_snps)
+    record_idx[my_maf] .= true
+    @time VCFTools.filter("chr$chr.uniqueSNPs.vcf.gz", record_idx, sample_idx, 
+        des = "target.chr$chr.typedOnly.maf$maf.vcf.gz", allow_multiallelic=false)
+
+    # unphase and mask 1% entries in target file
+    println("unphasing and masking entries in target file with typed snps only")
+    masks = falses(p, n)
+    missingprop = 0.01
+    for j in 1:n, i in 1:p
+        rand() < missingprop && (masks[i, j] = true)
+    end
+    @time mask_gt("target.chr$chr.typedOnly.maf$maf.vcf.gz", masks, 
+        des="target.chr$chr.typedOnly.maf$maf.masked.vcf.gz", unphase=true)
+
+    # finally compress reference file to jlso format
+    reffile = "ref.chr$chr.excludeTarget.vcf.gz"
+    outfile = "ref.chr$chr.excludeTarget.jlso"
+    @time compress_haplotypes(reffile, outfile, width=2048);
+end
+Random.seed!(2020)
+chr = ARGS[1]
+maf = ARGS[2]
+println("Running chrom $chr. Typed SNPs have frequency maf > $maf")
+fdsa
+@time filter_and_mask(chr, maf)
+
+
+
+
+using Revise
+using VCFTools
+using MendelImpute
+using GeneticVariation
+using Random
+using StatsBase
+using CodecZlib
+using ProgressMeter
+using JLD2, FileIO, JLSO
+using BenchmarkTools
+using GroupSlices
+
+chr = parse(Int, ARGS[1])
+maf = parse(Float64, ARGS[2])
+width = 2048
+
+# searching single bkpts, deleting suboptimal pairs in dp, skip windows with <50 typed snps
+Random.seed!(2020)
+tgtfile = "target.chr$chr.typedOnly.maf$maf.masked.vcf.gz"
+reffile = "ref.chr$chr.excludeTarget.jlso"
+outfile = "mendel.imputed.dp$width.maf$maf.vcf.gz"
+@time ph, hs = phase(tgtfile, reffile, outfile=outfile, impute=true, width=width)
+
+X_complete = convert_gt(UInt8, "target.chr$chr.full.vcf.gz")
+n, p = size(X_complete)
+X_mendel = convert_gt(UInt8, outfile)
+println("error overall = $(sum(X_mendel .!= X_complete) / n / p) \n")

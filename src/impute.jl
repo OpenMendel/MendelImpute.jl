@@ -1,25 +1,27 @@
 """
-    impute_typed_only(tgtfile, reffile, outfile, ph, H, chunks, snps_per_chunk)
+    impute!(X, compressed_haplotypes, phaseinfo, outfile, X_sampleID)
 
-Phases and imputes `tgtfile` using `phaseinfo` and outputs result in `outfile`. All genotypes 
-in `outfile` are non-missing and phased. 
+Imputes `X` using `phaseinfo` and outputs result in `outfile`. All genotypes 
+in `outfile` are non-missing. If `XtoH_idx == nothing`, all SNPs in reference
+file will be imputed. 
 """
 function impute!(
     X::AbstractMatrix,
     compressed_haplotypes::CompressedHaplotypes,
     phaseinfo::Vector{HaplotypeMosaicPair},
     outfile::AbstractString,
-    X_sampleID::AbstractVector,
+    X_sampleID::AbstractVector;
+    XtoH_idx::Union{Nothing, AbstractVector} = nothing
     )
     # impute without changing observed entries
-    impute2!(X, compressed_haplotypes, phaseinfo)
+    impute_discard_phase!(X, compressed_haplotypes, phaseinfo)
 
     # retrieve reference file information
-    chr = compressed_haplotypes.chr
-    pos = compressed_haplotypes.pos
-    ids = compressed_haplotypes.SNPid
-    ref = compressed_haplotypes.refallele
-    alt = compressed_haplotypes.altallele
+    chr = (isnothing(XtoH_idx) ? compressed_haplotypes.chr : compressed_haplotypes.chr[XtoH_idx])
+    pos = (isnothing(XtoH_idx) ? compressed_haplotypes.pos : compressed_haplotypes.pos[XtoH_idx])
+    ids = (isnothing(XtoH_idx) ? compressed_haplotypes.SNPid : compressed_haplotypes.SNPid[XtoH_idx])
+    ref = (isnothing(XtoH_idx) ? compressed_haplotypes.refallele : compressed_haplotypes.refallele[XtoH_idx])
+    alt = (isnothing(XtoH_idx) ? compressed_haplotypes.altallele : compressed_haplotypes.altallele[XtoH_idx])
 
     # write minimal meta information to outfile
     io = openvcf(outfile, "w")
@@ -67,7 +69,7 @@ end
     impute!(X, H, phase)
 
 Imputes `X` completely using segments of haplotypes `H` where segments are stored in `phase`. 
-Non-missing entries in `X` can be different after imputation. 
+Non-missing entries in `X` can be different after imputation. Preserves phase information.
 """
 function impute!(
     X::AbstractMatrix,
@@ -97,9 +99,10 @@ end
     impute2!(X, H, phase)
 
 Imputes missing entries of `X` using corresponding haplotypes `H` via `phase` information. 
-Non-missing entries in `X` will not change, but X and H has to be aligned. 
+Non-missing entries in `X` will not change, but X and H has to be aligned. This does NOT 
+preserve phase information. 
 """
-function impute2!(
+function impute_discard_phase!(
     X::AbstractMatrix,
     compressed_haplotypes::CompressedHaplotypes,
     phase::Vector{HaplotypeMosaicPair}
