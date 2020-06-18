@@ -63,7 +63,7 @@ function haplopair(
 
     Xwork = zeros(Float32, size(X, 1), size(X, 2))
     Hwork = convert(Matrix{Float32}, H)
-    t1 = @elapsed initXfloat!(X, Xwork)
+    initXfloat!(X, Xwork)
 
     p, n     = size(X)
     d        = size(H, 2)
@@ -71,11 +71,7 @@ function haplopair(
     N        = zeros(Float32, n, d)
     happairs = ones(Int, n), ones(Int, n)
     hapscore = zeros(Float32, n)
-    sizehint!.(happairs, 100) # will not save > 100 unique haplotype pairs to conserve memory
-    t2 = @elapsed haplopair!(Xwork, Hwork, M, N, happairs, hapscore)
-
-    println("initXfloat! time = $t1")
-    println("haplopair!  time = $t2")
+    haplopair!(Xwork, Hwork, M, N, happairs, hapscore)
 
     return happairs, hapscore
 end
@@ -125,9 +121,7 @@ function haplopair!(
     end
 
     # computational routine
-    t2 = @elapsed begin
-        haplopair!(happairs, hapscore, M, N)
-    end
+    t2 = @elapsed haplopair!(happairs, hapscore, M, N)
 
     # supplement the constant terms in objective
     t3 = @elapsed begin @inbounds for j in 1:n
@@ -137,9 +131,9 @@ function haplopair!(
         end
     end
 
-    println("multiplication took $t1 seconds")
-    println("haplopair      took $t2 seconds")
-    println("last step      took $t3 seconds")
+    # println("multiplication took $t1 seconds")
+    # println("haplopair      took $t2 seconds")
+    # println("last step      took $t3 seconds")
 
     return nothing
 end
