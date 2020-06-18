@@ -102,7 +102,7 @@ function phase(
             continue
         end
 
-        # computational routine (TODO: preallocate all internal matrices here)
+        # computational routine
         happairs, hapscore = haplopair(Xw_aligned, Hw_aligned)
         
         # convert happairs (which index off unique haplotypes) to indices of full haplotype pool, and find all matching happairs

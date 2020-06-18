@@ -105,7 +105,8 @@ function haplopair!(
     p, n, d = size(X, 1), size(X, 2), size(H, 2)
 
     # assemble M (upper triangular only)
-    t1 = @elapsed begin mul!(M, Transpose(H), H)
+    t1 = @elapsed begin 
+        mul!(M, Transpose(H), H)
         for j in 1:d, i in 1:(j - 1) # off-diagonal
             M[i, j] = 2M[i, j] + M[i, i] + M[j, j]
         end
@@ -121,7 +122,7 @@ function haplopair!(
     end
 
     # computational routine
-    t2 = @elapsed haplopair!(happairs, hapscore, M, N)
+    t2 = @elapsed haplopair!(happairs[1], happairs[2], hapscore, M, N)
 
     # supplement the constant terms in objective
     t3 = @elapsed begin @inbounds for j in 1:n
@@ -157,24 +158,25 @@ The best haplotype pairs are column indices of the filtered haplotype panels.
     in columns.
 """
 function haplopair!(
-    happairs::Tuple{AbstractVector, AbstractVector},
-    hapmin::Vector{T},
+    happair1::AbstractVector{Int},
+    happair2::AbstractVector{Int},
+    hapmin::AbstractVector{T},
     M::AbstractMatrix{T},
     N::AbstractMatrix{T},
     ) where T <: Real
 
     n, d = size(N)
-    tol = convert(T, 3)
     fill!(hapmin, typemax(T))
 
     @inbounds for k in 1:d, j in 1:k
+        Mjk = M[j, k]
         # loop over individuals
         @simd for i in 1:n
-            score = M[j, k] - N[i, j] - N[i, k]
+            score = Mjk - N[i, j] - N[i, k]
 
             # keep best happair (original code)
             if score < hapmin[i]
-                hapmin[i], happairs[1][i], happairs[2][i] = score, j, k
+                hapmin[i], happair1[i], happair2[i] = score, j, k
             end
 
             # keep all happairs that are equally good

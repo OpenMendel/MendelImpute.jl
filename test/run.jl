@@ -2090,7 +2090,7 @@ using JLD2, FileIO, JLSO
 using BenchmarkTools
 using GroupSlices
 
-vcffile = "ref.chr22.excludeTarget.vcf.gz"
+vcffile = "ref.chr21.excludeTarget.vcf.gz"
 widths  = [128, 256, 512, 1024]
 dims = 2
 flankwidth = 0
@@ -2098,7 +2098,7 @@ trans = (dims == 2 ? true : error("currently VCFTools only import chr/pos...info
 H, H_sampleID, H_chr, H_pos, H_ids, H_ref, H_alt = convert_ht(Bool, vcffile, trans=trans, save_snp_info=true, msg="importing vcf data...")
 
 for width in widths
-    outfile = "ref.chr22.w$width.excludeTarget.jlso"
+    outfile = "ref.chr21.w$width.excludeTarget.jlso"
 
     snps = (dims == 2 ? size(H, 1) : size(H, 2))
     windows = floor(Int, snps / width)
@@ -2144,3 +2144,50 @@ a = rand(1000);
 b = rand(1000);
 
 @time test(storage, a, b);
+
+
+
+
+using BenchmarkTools, Random
+
+"""
+Find minimum of `M_jk - N_ij - N_ik` for each i. M is upper triangular. 
+
+Saves minimum value in `best_err` and `j, k` index in `row` and `col`. 
+"""
+function best_index!(
+    best_err::Vector{T},
+    row::Vector{Int},
+    col::Vector{Int},
+    M::AbstractMatrix{T},
+    N::AbstractMatrix{T},
+    ) where T <: Real
+
+    n, d = size(N)
+
+    @inbounds for k in 1:d, j in 1:k 
+        @simd for i in 1:n
+            score = M[j, k] - N[i, j] - N[i, k]
+
+            # save minimum value and index
+            if score < best_err[i]
+                best_err[i], row[i], col[i] = score, j, k
+            end
+        end
+    end
+end
+
+n = 100
+p = 100
+d = 5000
+
+row_index, col_index = ones(Int, n), ones(Int, n)
+best_err = [typemax(Float64) for _ in 1:n]
+M = rand(d, d)
+N = rand(n, d)
+
+@btime best_index!(best_err, row_index, col_index, M, N)
+
+
+
+
