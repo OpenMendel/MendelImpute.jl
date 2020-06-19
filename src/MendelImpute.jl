@@ -15,6 +15,7 @@ module MendelImpute
     using ProgressMeter
     using JLD2, FileIO
     using JLSO
+    using Distances
 
     export continue_haplotype, haplopair!, haplopair, haploimpute!
     export impute!, impute_discard_phase!, search_breakpoint, unique_haplotypes
@@ -26,6 +27,7 @@ module MendelImpute
     export simulate_phased_genotypes
     export connect_happairs
     export phase!, phase_fast!, nearest_window_with_sufficient_typed_snps
+    export haplopair_thin
 
     # main functions that users are exposed to
     export phase
@@ -49,5 +51,6 @@ module MendelImpute
     include("dynamic_programming.jl")
     include("impute.jl")
     include("breakpoints.jl")
+    include("haplotype_thinning.jl")
 
 end # module
