@@ -19,7 +19,8 @@ function haplopair_thin(
     hapscore = zeros(Float32, n)
 
     # compute distances between each column of H and each column of X
-    R = pairwise(Hamming(), Hwork, Xwork, dims=2) # Rij = Hamming(H[:, i], X[:, j])
+    R = pairwise(Euclidean(), Hwork, Xwork, dims=2) # Rij = Hamming(H[:, i], X[:, j])
+    # R = pairwise(Hamming(), Hwork, Xwork, dims=2) # Rij = Hamming(H[:, i], X[:, j])
 
     for i in 1:n
         # find top matching haplotypes for sample i

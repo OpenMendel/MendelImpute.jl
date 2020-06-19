@@ -105,8 +105,8 @@ function phase(
         end
 
         # computational routine
-        happairs, hapscore = (size(Hw_aligned, 2) < 1000 ? haplopair(Xw_aligned, Hw_aligned) :  
-            haplopair_thin(Xw_aligned, Hw_aligned, keep=1000))
+        happairs, hapscore = (size(Hw_aligned, 2) < 100 ? haplopair(Xw_aligned, Hw_aligned) :  
+            haplopair_thin(Xw_aligned, Hw_aligned, keep=100))
         
         # convert happairs (which index off unique haplotypes) to indices of full haplotype pool, and find all matching happairs
         compute_redundant_haplotypes!(redundant_haplotypes, compressed_Hunique, happairs, w)
