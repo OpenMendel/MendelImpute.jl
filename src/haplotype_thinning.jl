@@ -19,35 +19,41 @@ function haplopair_thin(
     hapscore = zeros(Float32, n)
 
     # compute distances between each column of H and each column of X
-    R = pairwise(Euclidean(), Hwork, Xwork, dims=2) # Rij = Hamming(H[:, i], X[:, j])
-    # R = pairwise(Hamming(), Hwork, Xwork, dims=2) # Rij = Hamming(H[:, i], X[:, j])
+    t1 = @elapsed R = pairwise(Euclidean(), Hwork, Xwork, dims=2) # Rij = d(H[:, i], X[:, j])
+    # t1 = @elapsed R = pairwise(SqEuclidean(), Hwork, Xwork, dims=2) # Rij = d(H[:, i], X[:, j])
+    # t1 = @elapsed R = pairwise(Hamming(), Hwork, Xwork, dims=2) # Rij = d(H[:, i], X[:, j])
 
+    t1 = t2 = t3 = 0
     for i in 1:n
         # find top matching haplotypes for sample i
         partialsortperm!(perm, view(R, :, i), keep) # perm[1:keep] = hap indices that best matches xi 
         
         # sync Hk, Xi, M, N
-        for k in 1:keep
-            col = perm[k]
-            for j in 1:p
-                Hk[j, k] = Hwork[j, col]
+        t1 += @elapsed begin
+            for k in 1:keep
+                col = perm[k]
+                for j in 1:p
+                    Hk[j, k] = Hwork[j, col]
+                end
             end
+            for j in eachindex(Xi)
+                Xi[j] = Xwork[j, i]
+            end
+            update_M!(M, Hk)
+            update_N!(N, Xi, Hk)
         end
-        for j in eachindex(Xi)
-            Xi[j] = Xwork[j, i]
-        end
-        update_M!(M, Hk)
-        update_N!(N, Xi, Hk)
 
         # computational routine
-        hapscore[i], h1, h2 = haplopair!(M, N)
-        happairs[1][i], happairs[2][i] = perm[h1], perm[h2]
+        t2 += @elapsed begin
+            hapscore[i], h1, h2 = haplopair!(M, N)
+            happairs[1][i], happairs[2][i] = perm[h1], perm[h2]
+        end
 
         # supply constant term in objective
-        hapscore[i] += dot(Xi, Xi)
+        t3 += @elapsed hapscore[i] += dot(Xi, Xi)
     end
 
-    return happairs, hapscore
+    return happairs, hapscore, t1, t2, t3
 end
 
 function update_M!(M::AbstractMatrix, H::AbstractMatrix)

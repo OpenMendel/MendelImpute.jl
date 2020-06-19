@@ -71,9 +71,9 @@ function haplopair(
     N        = zeros(Float32, n, d)
     happairs = ones(Int, n), ones(Int, n)
     hapscore = zeros(Float32, n)
-    haplopair!(Xwork, Hwork, M, N, happairs, hapscore)
+    t1, t2, t3 = haplopair!(Xwork, Hwork, M, N, happairs, hapscore)
 
-    return happairs, hapscore
+    return happairs, hapscore, t1, t2, t3
 end
 
 """
@@ -132,11 +132,11 @@ function haplopair!(
         end
     end
 
-    # println("multiplication took $t1 seconds")
-    # println("haplopair      took $t2 seconds")
-    # println("last step      took $t3 seconds")
+    # println("multiplication   = $t1 seconds")
+    # println("haplopair search = $t2 seconds")
+    # println("last step        = $t3 seconds")
 
-    return nothing
+    return t1, t2, t3
 end
 
 """

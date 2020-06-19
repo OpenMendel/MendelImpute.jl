@@ -71,6 +71,7 @@ function phase(
     people = size(X, 2)
     ref_snps = compressed_Hunique.snps
     windows = floor(Int, ref_snps / width)
+    quad_timers = [zeros(4) for _ in 1:Threads.nthreads()]
 
     #
     # compute redundant haplotype sets
@@ -105,17 +106,24 @@ function phase(
         end
 
         # computational routine
-        happairs, hapscore = (size(Hw_aligned, 2) < 100 ? haplopair(Xw_aligned, Hw_aligned) :  
-            haplopair_thin(Xw_aligned, Hw_aligned, keep=100))
+        happairs, hapscore, t1, t2, t3 = (size(Hw_aligned, 2) < 600 ? haplopair(Xw_aligned, Hw_aligned) :  
+            haplopair_thin(Xw_aligned, Hw_aligned, keep=600))
         
         # convert happairs (which index off unique haplotypes) to indices of full haplotype pool, and find all matching happairs
-        compute_redundant_haplotypes!(redundant_haplotypes, compressed_Hunique, happairs, w)
+        t4 = @elapsed compute_redundant_haplotypes!(redundant_haplotypes, compressed_Hunique, happairs, w)
+
+        # record timings
+        Threads.lock(mutex)
+        quad_timers[Threads.threadid()][1] += t1
+        quad_timers[Threads.threadid()][2] += t2
+        quad_timers[Threads.threadid()][3] += t3
+        quad_timers[Threads.threadid()][4] += t4
+        Threads.unlock(mutex)
 
         # update progress
         next!(pmeter)
     end
     avg_num_unique_haps = avg_num_unique_haps / windows
-    println("Each window have ~ $(round(Int, avg_num_unique_haps)) unique haplotypes on average")
     calculate_happairs_time = time() - calculate_happairs_start
 
     #
@@ -144,8 +152,13 @@ function phase(
     end
     impute_time = time() - impute_start
 
+    println("Total window = $windows, each with ~ $(round(Int, avg_num_unique_haps)) unique haplotypes on avg")
     println("Data import time                    = ", round(import_data_time, sigdigits=6), " seconds")
     println("Computing haplotype pair time       = ", round(calculate_happairs_time, sigdigits=6), " seconds")
+    println("    BLAS3 mul! to get M and N           = ", round(quad_timers[1][1], sigdigits=6), " seconds (on thread 1)")
+    println("    haplopair search                    = ", round(quad_timers[1][2], sigdigits=6), " seconds (on thread 1)")
+    println("    supplying constant terms            = ", round(quad_timers[1][3], sigdigits=6), " seconds (on thread 1)")
+    println("    finding redundant happairs          = ", round(quad_timers[1][4], sigdigits=6), " seconds (on thread 1)")
     println("Phasing by dynamic programming time = ", round(phase_time, sigdigits=6), " seconds")
     println("Imputing time                       = ", round(impute_time, sigdigits=6), " seconds")
 
