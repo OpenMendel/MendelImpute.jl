@@ -1,8 +1,12 @@
 function haplopair_thin(
     X::AbstractMatrix,
     H::AbstractMatrix;
-    keep::Int = 10
+    keep::Int = 100
     )
+
+    Xwork = zeros(Float32, size(X, 1), size(X, 2))
+    Hwork = convert(Matrix{Float32}, H)
+    initXfloat!(X, Xwork)
 
     p, n = size(X)
     d    = size(H, 2)
@@ -11,22 +15,30 @@ function haplopair_thin(
     perm = zeros(Int, d)
     Hk   = zeros(Float32, p, keep)
     Xi   = zeros(Float32, p)
-
     happairs = ones(Int, n), ones(Int, n)
     hapscore = zeros(Float32, n)
 
     # compute distances between each column of H and each column of X
-    R = pairwise(Hamming(), H, X, dims=2) # Rij = Hamming(H[:, i], X[:, j])
+    R = pairwise(Hamming(), Hwork, Xwork, dims=2) # Rij = Hamming(H[:, i], X[:, j])
 
     for i in 1:n
         # find top matching haplotypes for sample i
         partialsortperm!(perm, view(R, :, i), keep) # perm[1:keep] = hap indices that best matches xi 
-        copyto!(Hk, @view(H[:, perm[1:keep]]))
-        copyto!(Xi, @view(X[:, i]))
+        
+        # sync Hk, Xi, M, N
+        for k in 1:keep
+            col = perm[k]
+            for j in 1:p
+                Hk[j, k] = Hwork[j, col]
+            end
+        end
+        for j in eachindex(Xi)
+            Xi[j] = Xwork[j, i]
+        end
         update_M!(M, Hk)
         update_N!(N, Xi, Hk)
 
-        # find best haplotype pair among the candidate pool
+        # computational routine
         hapscore[i], h1, h2 = haplopair!(M, N)
         happairs[1][i], happairs[2][i] = perm[h1], perm[h2]
 

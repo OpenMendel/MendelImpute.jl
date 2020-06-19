@@ -81,6 +81,7 @@ function phase(
     [[sizehint!(redundant_haplotypes[j][i], 1000) for i in 1:windows] for j in 1:people] # don't save >1000 redundant happairs
     typed_snps = Vector{Vector{Int}}(undef, windows) #tracks index for typed snps in each window
     mutex = Threads.SpinLock()
+    avg_num_unique_haps = 0
     Threads.@threads for w in 1:windows
         # match target and ref file by snp position
         Threads.lock(mutex)
@@ -91,6 +92,7 @@ function phase(
         Xw_aligned = X[findall(!isnothing, XtoH_idx), :]
         Hw_aligned = compressed_Hunique[w].uniqueH[XtoH_rm_nothing, :]
         typed_snps[w] = XtoH_rm_nothing # save typed snps index for current window
+        avg_num_unique_haps += size(Hw_aligned, 2)
         Threads.unlock(mutex)
 
         # Skip windows with too few typed SNPs
@@ -103,7 +105,8 @@ function phase(
         end
 
         # computational routine
-        happairs, hapscore = haplopair(Xw_aligned, Hw_aligned)
+        # happairs, hapscore = haplopair(Xw_aligned, Hw_aligned)
+        happairs, hapscore = haplopair_thin(Xw_aligned, Hw_aligned, keep=50)
         
         # convert happairs (which index off unique haplotypes) to indices of full haplotype pool, and find all matching happairs
         compute_redundant_haplotypes!(redundant_haplotypes, compressed_Hunique, happairs, w)
@@ -111,6 +114,8 @@ function phase(
         # update progress
         next!(pmeter)
     end
+    avg_num_unique_haps = avg_num_unique_haps / windows
+    println("Each window have ~ $(round(Int, avg_num_unique_haps)) unique haplotypes on average")
     calculate_happairs_time = time() - calculate_happairs_start
 
     #
