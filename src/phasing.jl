@@ -81,16 +81,12 @@ function phase(
     pmeter = Progress(windows, 5, "Computing optimal haplotype pairs...")
     redundant_haplotypes = [[Tuple{Int, Int}[] for i in 1:windows] for j in 1:people]
     [[sizehint!(redundant_haplotypes[j][i], 1000) for i in 1:windows] for j in 1:people] # don't save >1000 redundant happairs
-    avg_num_unique_haps = 0
-    mutex = Threads.SpinLock()
+    num_unique_haps = zeros(Threads.nthreads())
     Threads.@threads for w in 1:windows
-        Threads.lock(mutex)
         Hw_aligned = compressed_Hunique.CW_typed[w].uniqueH
         Xw_idx_start = (w - 1) * width + 1
         Xw_idx_end = (w == windows ? length(X_pos) : w * width)
         Xw_aligned = X[Xw_idx_start:Xw_idx_end, :]
-        avg_num_unique_haps += size(Hw_aligned, 2)
-        Threads.unlock(mutex)
 
         # computational routine
         happairs, hapscore, t1, t2, t3 = haplopair(Xw_aligned, Hw_aligned)
@@ -101,18 +97,17 @@ function phase(
         t4 = @elapsed compute_redundant_haplotypes!(redundant_haplotypes, compressed_Hunique, happairs, w)
 
         # record timings
-        Threads.lock(mutex)
         id = Threads.threadid()
         quad_timers[id][1] += t1
         quad_timers[id][2] += t2
         quad_timers[id][3] += t3
         quad_timers[id][4] += t4
-        Threads.unlock(mutex)
+        num_unique_haps[id] += size(Hw_aligned, 2)
 
         # update progress
         next!(pmeter)
     end
-    avg_num_unique_haps = avg_num_unique_haps / windows
+    avg_num_unique_haps = sum(num_unique_haps) / windows
     calculate_happairs_time = time() - calculate_happairs_start
 
     #
@@ -131,6 +126,7 @@ function phase(
     H_pos = compressed_Hunique.pos
     XtoH_idx = indexin(X_pos, H_pos) # X_pos[i] == H_pos[XtoH_idx[i]]
     if impute
+        # initialize whole genotype matrix and copy known entries into it
         X_full = Matrix{Union{Missing, UInt8}}(missing, ref_snps, people)
         copyto!(@view(X_full[XtoH_idx, :]), X)
 
@@ -143,15 +139,16 @@ function phase(
     end
     impute_time = time() - impute_start
 
-    println("Total window = $windows, each with ~ $(round(Int, avg_num_unique_haps)) unique haplotypes on avg")
-    println("Data import time                    = ", round(import_data_time, sigdigits=6), " seconds")
-    println("Computing haplotype pair time       = ", round(calculate_happairs_time, sigdigits=6), " seconds")
-    println("    BLAS3 mul! to get M and N           = ", round(quad_timers[1][1], sigdigits=6), " seconds (on thread 1)")
-    println("    haplopair search                    = ", round(quad_timers[1][2], sigdigits=6), " seconds (on thread 1)")
-    println("    supplying constant terms            = ", round(quad_timers[1][3], sigdigits=6), " seconds (on thread 1)")
-    println("    finding redundant happairs          = ", round(quad_timers[1][4], sigdigits=6), " seconds (on thread 1)")
-    println("Phasing by dynamic programming time = ", round(phase_time, sigdigits=6), " seconds")
-    println("Imputing time                       = ", round(impute_time, sigdigits=6), " seconds")
+    println("Total window = $windows, each with ~ $(round(Int, avg_num_unique_haps)) unique haplotypes on avg\n")
+    println("Timings: ")
+    println("    Data import                     = ", round(import_data_time, sigdigits=6), " seconds")
+    println("    Computing haplotype pair        = ", round(calculate_happairs_time, sigdigits=6), " seconds")
+    println("        BLAS3 mul! to get M and N      = ", round(quad_timers[1][1], sigdigits=6), " seconds (on thread 1)")
+    println("        haplopair search               = ", round(quad_timers[1][2], sigdigits=6), " seconds (on thread 1)")
+    println("        supplying constant terms       = ", round(quad_timers[1][3], sigdigits=6), " seconds (on thread 1)")
+    println("        finding redundant happairs     = ", round(quad_timers[1][4], sigdigits=6), " seconds (on thread 1)")
+    println("    Phasing by dynamic programming  = ", round(phase_time, sigdigits=6), " seconds")
+    println("    Imputation                      = ", round(impute_time, sigdigits=6), " seconds\n")
 
     return ph, redundant_haplotypes
 end
