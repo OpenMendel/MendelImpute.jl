@@ -36,13 +36,15 @@ means indexing off `CompressedHaplotypes.CW`
 
 - `CW`: Vector of `CompressedWindow`. `CW[i]` stores unique haplotypes filtered with respect to all SNPs in `CWrange[i]`
 - `CW_typed`: Vector of `CompressedWindow`. `CW_typed[i]` stores unique haplotypes filtered with respect to typed SNPs in `CWrange[i]`
-- `CWrange`: `CWrange[i]` is the range of SNPs that are in window `i`. 
+- `CWrange`: `CWrange[i]` is the range of H's SNPs that are in window `i`. 
 - `sampleID`: Sample names for every pair of haplotypes as listed in the VCF file
+- `width`: Number of typed SNPs per window
 """
 struct CompressedHaplotypes
     CW::Vector{CompressedWindow}
     CW_typed::Vector{CompressedWindow}
     CWrange::Vector{UnitRange}
+    width::Int
     sampleID::Vector{String}
     chr::Vector{String}
     pos::Vector{Int}
@@ -50,7 +52,9 @@ struct CompressedHaplotypes
     refallele::Vector{String}
     altallele::Vector{Vector{String}}
 end
-CompressedHaplotypes(windows::Int, sampleID, chr, pos, SNPid, ref, alt) = CompressedHaplotypes(Vector{CompressedWindow}(undef, windows), Vector{CompressedWindow}(undef, windows), Vector{UnitRange}(undef, windows), sampleID, chr, pos, SNPid, ref, alt)
+CompressedHaplotypes(windows::Int, width, sampleID, chr, pos, SNPid, ref, alt) = CompressedHaplotypes(Vector{CompressedWindow}(undef, windows), Vector{CompressedWindow}(undef, windows), Vector{UnitRange}(undef, windows), width, sampleID, chr, pos, SNPid, ref, alt)
+
+nhaplotypes(x::CompressedHaplotypes) = 2length(x.sampleID)
 
 """
     compress_haplotypes(vcffile, tgtfile, outfile, width, [dims], [flankwidth])
@@ -88,7 +92,7 @@ function compress_haplotypes(
     Hw_idx_start = 1
 
     # initialize compressed haplotype object
-    compressed_Hunique = MendelImpute.CompressedHaplotypes(windows, H_sampleID, H_chr, H_pos, H_ids, H_ref, H_alt)
+    compressed_Hunique = MendelImpute.CompressedHaplotypes(windows, width, H_sampleID, H_chr, H_pos, H_ids, H_ref, H_alt)
 
     # record unique haplotypes and mappings window by window
     for w in 1:windows
@@ -97,6 +101,7 @@ function compress_haplotypes(
         Xw_idx_end = (w == windows ? length(X_pos) : w * width)
         Xw_pos_end = X_pos[Xw_idx_end]
         Hw_idx_end = (w == windows ? length(H_pos) : something(findnext(x -> x == Xw_pos_end, H_pos, Hw_idx_start)))
+        compressed_Hunique.CWrange[w] = Hw_idx_start:Hw_idx_end
 
         # get current window of H, including all snps and only typed snps
         Xw_pos = X_pos[Xw_idx_start:Xw_idx_end]
@@ -134,7 +139,7 @@ For an index in unique haplotype, finds the first occurance of that haplotype
 in the complete reference pool for the specified window.
 """
 function unique_idx_to_complete_idx(unique_idx::Int, window::Int, Hunique::CompressedHaplotypes)
-    return Hunique[window].uniqueindex[unique_idx]
+    return Hunique.CW[window].uniqueindex[unique_idx]
 end
 
 """
@@ -142,5 +147,5 @@ For an index in the complete haplotype pool, find its index in the unique haplot
 in specified window. 
 """
 function complete_idx_to_unique_idx(complete_idx::Int, window::Int, Hunique::CompressedHaplotypes)
-    return Hunique[window].to_unique[complete_idx]
+    return Hunique.CW[window].to_unique[complete_idx]
 end

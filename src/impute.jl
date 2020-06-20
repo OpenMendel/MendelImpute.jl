@@ -96,7 +96,7 @@ function impute!(
 end
 
 """
-    impute2!(X, H, phase)
+    impute_discard_phase!(X, H, phase)
 
 Imputes missing entries of `X` using corresponding haplotypes `H` via `phase` information. 
 Non-missing entries in `X` will not change, but X and H has to be aligned. This does NOT 
@@ -126,10 +126,45 @@ function impute_discard_phase!(
             i2 = snp - (w2 - 1) * width
 
             # imputation step
-            H1 = compressed_haplotypes[w1].uniqueH
-            H2 = compressed_haplotypes[w2].uniqueH
+            H1 = compressed_haplotypes.CW[w1].uniqueH
+            H2 = compressed_haplotypes.CW[w2].uniqueH
             X[snp, person] = H1[i1, h1] + H2[i2, h2]
         end
+    end
+
+    return nothing
+end
+
+"""
+    update_marker_position!(phaseinfo, tgtfile, reffile)
+Converts `phaseinfo`'s strand1 and strand2's starting position in 
+terms of matrix rows of `X` to starting position in terms matrix
+rows in `H`. 
+"""
+function update_marker_position!(
+    phaseinfo::Vector{HaplotypeMosaicPair},
+    XtoH_idx::AbstractVector, 
+    ref_records::Int
+    )
+    people = length(phaseinfo)
+
+    for j in 1:people
+        # update strand1's starting position
+        for (i, idx) in enumerate(phaseinfo[j].strand1.start)
+            phaseinfo[j].strand1.start[i] = XtoH_idx[idx]
+        end
+        # update strand2's starting position
+        for (i, idx) in enumerate(phaseinfo[j].strand2.start)
+            phaseinfo[j].strand2.start[i] = XtoH_idx[idx]
+        end
+    end
+
+    # update first starting position and length
+    for j in 1:people
+        phaseinfo[j].strand1.start[1] = 1
+        phaseinfo[j].strand2.start[1] = 1
+        phaseinfo[j].strand1.length = ref_records
+        phaseinfo[j].strand2.length = ref_records
     end
 
     return nothing

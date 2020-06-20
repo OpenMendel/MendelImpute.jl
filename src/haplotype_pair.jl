@@ -24,7 +24,7 @@ function compute_redundant_haplotypes!(
         # loop through all haplotypes and find ones that match either of the optimal haplotypes 
         empty!(h1_set)
         empty!(h2_set)
-        for (idx, hap) in enumerate(Hunique[window].hapmap)
+        for (idx, hap) in enumerate(Hunique.CW_typed[window].hapmap)
             hap == Hi_idx && push!(h1_set, idx)
             hap == Hj_idx && push!(h2_set, idx)
         end
@@ -131,10 +131,6 @@ function haplopair!(
             end
         end
     end
-
-    # println("multiplication   = $t1 seconds")
-    # println("haplopair search = $t2 seconds")
-    # println("last step        = $t3 seconds")
 
     return t1, t2, t3
 end
