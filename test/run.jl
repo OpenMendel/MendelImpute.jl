@@ -2177,6 +2177,7 @@ function best_index!(
     end
 end
 
+Random.seed!(2020)
 n = 100
 p = 100
 d = 5000
@@ -2186,7 +2187,31 @@ best_err = [typemax(Float64) for _ in 1:n]
 M = rand(d, d)
 N = rand(n, d)
 
-@btime best_index!(best_err, row_index, col_index, M, N)
+@btime best_index!($best_err, $row_index, $col_index, $M, $N)
+
+
+
+using Revise
+using VCFTools
+using MendelImpute
+using GeneticVariation
+using Random
+using StatsBase
+using CodecZlib
+using ProgressMeter
+using JLD2, FileIO, JLSO
+using BenchmarkTools
+using GroupSlices
+
+tgtfile = "target.chr18.typedOnly.maf0.1.masked.vcf.gz"
+reffile = "ref.chr18.excludeTarget.vcf.gz"
+outfile = "ref.chr18.excludeTarget.jlso"
+width = 512
+
+compress_haplotypes(reffile, tgtfile, outfile, width)
+
+
+
 
 
 

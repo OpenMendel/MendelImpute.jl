@@ -34,16 +34,15 @@ end
 Keeps a vector of `CompressedWindow`. Indexing off instances of `CompressedHaplotypes`
 means indexing off `CompressedHaplotypes.CW`
 
-- `CW`: Vector of `CompressedWindow`. 
-- `width`: The number of SNPs per `CompressedWindow`. The last window may have a different width
-- `snps`: Total number of snps in every window
+- `CW`: Vector of `CompressedWindow`. `CW[i]` stores unique haplotypes filtered with respect to all SNPs in `CWrange[i]`
+- `CW_typed`: Vector of `CompressedWindow`. `CW_typed[i]` stores unique haplotypes filtered with respect to typed SNPs in `CWrange[i]`
+- `CWrange`: `CWrange[i]` is the range of SNPs that are in window `i`. 
 - `sampleID`: Sample names for every pair of haplotypes as listed in the VCF file
 """
 struct CompressedHaplotypes
     CW::Vector{CompressedWindow}
+    CW_typed::Vector{CompressedWindow}
     CWrange::Vector{UnitRange}
-    width::Int
-    snps::Int
     sampleID::Vector{String}
     chr::Vector{String}
     pos::Vector{Int}
@@ -51,67 +50,76 @@ struct CompressedHaplotypes
     refallele::Vector{String}
     altallele::Vector{Vector{String}}
 end
-CompressedHaplotypes(windows::Int, width, snps, sampleID, chr, pos, SNPid, ref, alt) = CompressedHaplotypes(Vector{CompressedWindow}(undef, windows), Vector{UnitRange}(undef, windows), width, snps, sampleID, chr, pos, SNPid, ref, alt)
-
-# methods to implement: https://docs.julialang.org/en/v1/manual/interfaces/#Indexing-1
-Base.getindex(x::CompressedHaplotypes, w::Int) = x.CW[w]
-Base.setindex!(x::CompressedHaplotypes, v::CompressedWindow, w::Int) = x.CW[w] = v
-Base.firstindex(x::CompressedHaplotypes) = firstindex(x.CW)
-Base.lastindex(x::CompressedHaplotypes) = lastindex(x.CW)
-nhaplotypes(x::CompressedHaplotypes) = 2length(x.sampleID)
+CompressedHaplotypes(windows::Int, sampleID, chr, pos, SNPid, ref, alt) = CompressedHaplotypes(Vector{CompressedWindow}(undef, windows), Vector{CompressedWindow}(undef, windows), Vector{UnitRange}(undef, windows), sampleID, chr, pos, SNPid, ref, alt)
 
 """
-    compress_haplotypes(vcffile, outfile, width, [dims], [flankwidth])
+    compress_haplotypes(vcffile, tgtfile, outfile, width, [dims], [flankwidth])
 
-For each window, finds unique haplotype indices stored in the columns/rows of H, saves
-a mapping vector to the unique col/row of H, and outputs result as binary `.jld2` file. 
+For each window of `X`, finds unique haplotype indices stored in the columns of H, saves
+a mapping vector to the unique col of H, and outputs compressed haplotypes as binary Julia file. 
+Assumes all SNPs in `tgtfile` is present in `reffile`. 
 
 # Inputs
-* `vcffile`: file name
-* `outfile`: Output file name (with or without `.jld2` extension)
-* `width`: Number of SNPs per window. Number of SNPs in last window may be in `[width, 2width]`.
+* `reffile`: reference haplotype file name
+* `reffile`: target genotype file name
+* `outfile`: Output file name (ends in `.jld2` or `.jlso` (recommended))
+* `width`: Number of typed SNPs per window. Number of SNPs in last window may be in `[width, 2width]`.
 
 # Optional inputs
-* `dims`: Orientation of `H`. `2` means columns of `H` are a haplotype vectors. `1` means rows of `H` are. 
 * `flankwidth`: Number of SNPs flanking the sliding window (defaults to 10% of `width`)
 """
 function compress_haplotypes(
-    vcffile::AbstractString,
+    reffile::AbstractString,
+    tgtfile::AbstractString,
     outfile::AbstractString,
-    width::Int;
-    dims::Int = 2, 
-    flankwidth::Int = 0
+    width::Int
     )
     endswith(outfile, ".jld2") || endswith(outfile, ".jlso") || error("Unrecognized compression format: `outfile` can only end in `.jlso` or `.jld2`")
-    
+
     # import data
-    trans = (dims == 2 ? true : error("currently VCFTools only import chr/pos...info when H transposed"))
-    H, H_sampleID, H_chr, H_pos, H_ids, H_ref, H_alt = convert_ht(Bool, vcffile, trans=trans, save_snp_info=true, msg="importing vcf data...")
+    X, X_sampleID, X_chr, X_pos, X_ids, X_ref, X_alt = VCFTools.convert_gt(UInt8, tgtfile, trans=true, save_snp_info=true, msg = "Importing genotype file...")
+    H, H_sampleID, H_chr, H_pos, H_ids, H_ref, H_alt = convert_ht(Bool, reffile, trans=true, save_snp_info=true, msg="importing vcf data...")
+    any(isnothing, indexin(X_pos, H_pos)) && error("Found SNPs in target file that are not in reference file!")
 
     # some constants
-    snps = (dims == 2 ? size(H, 1) : size(H, 2))
-    windows = floor(Int, snps / width)
+    ref_snps = size(H, 1)
+    tgt_snps = size(X, 1)
+    windows = floor(Int, tgt_snps / width)
+    Hw_idx_start = 1
 
     # initialize compressed haplotype object
-    compressed_Hunique = MendelImpute.CompressedHaplotypes(windows, width, snps, H_sampleID, H_chr, H_pos, H_ids, H_ref, H_alt)
+    compressed_Hunique = MendelImpute.CompressedHaplotypes(windows, H_sampleID, H_chr, H_pos, H_ids, H_ref, H_alt)
 
     # record unique haplotypes and mappings window by window
     for w in 1:windows
-        if w == 1
-            cur_range = 1:(width + flankwidth)
-        elseif w == windows
-            cur_range = ((windows - 1) * width - flankwidth + 1):snps
-        else
-            cur_range = ((w - 1) * width - flankwidth + 1):(w * width + flankwidth)
-        end
-        compressed_Hunique.CWrange[w] = cur_range
+        # current window ranges
+        Xw_idx_start = (w - 1) * width + 1
+        Xw_idx_end = (w == windows ? length(X_pos) : w * width)
+        Xw_pos_end = X_pos[Xw_idx_end]
+        Hw_idx_end = (w == windows ? length(H_pos) : something(findnext(x -> x == Xw_pos_end, H_pos, Hw_idx_start)))
 
-        H_cur_window = (dims == 2 ? view(H, cur_range, :) : view(H, :, cur_range))
-        hapmap = groupslices(H_cur_window, dims=dims)
+        # get current window of H, including all snps and only typed snps
+        Xw_pos = X_pos[Xw_idx_start:Xw_idx_end]
+        XwtoH_idx = indexin(Xw_pos, H_pos)
+        Hw = H[Hw_idx_start:Hw_idx_end, :] # all snps
+        Hw_typed = H[XwtoH_idx, :]         # only typed snps
+
+        # find unique haplotypes on all SNPs
+        hapmap = groupslices(Hw, dims = 2)
         unique_idx = unique(hapmap)
         complete_to_unique = indexin(hapmap, unique_idx)
-        uniqueH = (dims == 2 ? H_cur_window[:, unique_idx] : H_cur_window[unique_idx, :])
-        compressed_Hunique[w] = MendelImpute.CompressedWindow(unique_idx, hapmap, complete_to_unique, uniqueH)
+        uniqueH = Hw[:, unique_idx]
+        compressed_Hunique.CW[w] = MendelImpute.CompressedWindow(unique_idx, hapmap, complete_to_unique, uniqueH)
+
+        # find unique haplotypes on typed SNPs
+        hapmap = groupslices(Hw_typed, dims = 2)
+        unique_idx = unique(hapmap)
+        complete_to_unique = indexin(hapmap, unique_idx)
+        uniqueH = Hw_typed[:, unique_idx]
+        compressed_Hunique.CW_typed[w] = MendelImpute.CompressedWindow(unique_idx, hapmap, complete_to_unique, uniqueH)
+
+        # update Hw_idx_start
+        Hw_idx_start = Hw_idx_end + 1
     end
 
     # save using JLSO or JLD2
