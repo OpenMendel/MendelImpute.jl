@@ -4,7 +4,7 @@ Data structure for recording haplotype mosaic of one strand:
 in window `window[i]` of a `CompressedWindow`. `start[end]` to
 `length` has haplotype `haplotypelabel[end]` in `window[end]`
 """
-mutable struct HaplotypeMosaic
+struct HaplotypeMosaic
     length::Int
     start::Vector{Int}
     window::Vector{Int}

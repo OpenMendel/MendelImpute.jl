@@ -76,14 +76,27 @@ function compress_haplotypes(
     reffile::AbstractString,
     tgtfile::AbstractString,
     outfile::AbstractString,
-    width::Int
+    width::Int,
     )
     endswith(outfile, ".jld2") || endswith(outfile, ".jlso") || error("Unrecognized compression format: `outfile` can only end in `.jlso` or `.jld2`")
 
-    # import data
+    # import reference haplotypes
+    H, H_sampleID, H_chr, H_pos, H_ids, H_ref, H_alt = convert_ht(Bool, reffile, trans=true, save_snp_info=true, msg="importing reference data...")
     X, X_sampleID, X_chr, X_pos, X_ids, X_ref, X_alt = VCFTools.convert_gt(UInt8, tgtfile, trans=true, save_snp_info=true, msg = "Importing genotype file...")
-    H, H_sampleID, H_chr, H_pos, H_ids, H_ref, H_alt = convert_ht(Bool, reffile, trans=true, save_snp_info=true, msg="importing vcf data...")
     any(isnothing, indexin(X_pos, H_pos)) && error("Found SNPs in target file that are not in reference file!")
+
+    # compress routine
+    compress_haplotypes(H, X, outfile, X_pos, H_sampleID, H_chr, H_pos, H_ids, H_ref, H_alt, width)
+
+    return nothing
+end
+
+function compress_haplotypes(H::AbstractMatrix, X::AbstractMatrix, outfile::AbstractString,
+    X_pos::AbstractVector, H_sampleID::AbstractVector, H_chr::AbstractVector, 
+    H_pos::AbstractVector, H_ids::AbstractVector, H_ref::AbstractVector, H_alt::AbstractVector,
+    width::Int)
+
+    endswith(outfile, ".jld2") || endswith(outfile, ".jlso") || error("Unrecognized compression format: `outfile` can only end in `.jlso` or `.jld2`")
 
     # some constants
     ref_snps = size(H, 1)
@@ -103,11 +116,11 @@ function compress_haplotypes(
         Hw_idx_end = (w == windows ? length(H_pos) : something(findnext(x -> x == Xw_pos_end, H_pos, Hw_idx_start)))
         compressed_Hunique.CWrange[w] = Hw_idx_start:Hw_idx_end
 
-        # get current window of H, including all snps and only typed snps
+        # get current window of H
         Xw_pos = X_pos[Xw_idx_start:Xw_idx_end]
-        XwtoH_idx = indexin(Xw_pos, H_pos)
-        Hw = H[Hw_idx_start:Hw_idx_end, :] # all snps
-        Hw_typed = H[XwtoH_idx, :]         # only typed snps
+        XwtoH_idx = indexin(Xw_pos, H_pos) # assumes all SNPs in X are in H
+        Hw = H[Hw_idx_start:Hw_idx_end, :] # including all snps
+        Hw_typed = H[XwtoH_idx, :]         # includingonly typed snps
 
         # find unique haplotypes on all SNPs
         hapmap = groupslices(Hw, dims = 2)
@@ -131,21 +144,31 @@ function compress_haplotypes(
     endswith(outfile, ".jld2") && JLD2.@save outfile compressed_Hunique
     endswith(outfile, ".jlso") && JLSO.save(outfile, :compressed_Hunique => compressed_Hunique, format=:julia_serialize, compression=:gzip)
 
-    return compressed_Hunique
+    return nothing
 end
 
 """
-For an index in unique haplotype, finds the first occurance of that haplotype 
-in the complete reference pool for the specified window.
+For an index in unique haplotype (of typed snps), finds the first occurance of that haplotype 
+in the complete reference pool for the specified window. 
+
+This is only needed for the typed SNPs!
 """
 function unique_idx_to_complete_idx(unique_idx::Int, window::Int, Hunique::CompressedHaplotypes)
-    return Hunique.CW[window].uniqueindex[unique_idx]
+    return Hunique.CW_typed[window].uniqueindex[unique_idx]
 end
 
 """
 For an index in the complete haplotype pool, find its index in the unique haplotype pool 
-in specified window. 
+of all SNPs (typed + untyped) in specified window. 
 """
-function complete_idx_to_unique_idx(complete_idx::Int, window::Int, Hunique::CompressedHaplotypes)
+function complete_idx_to_unique_all_idx(complete_idx::Int, window::Int, Hunique::CompressedHaplotypes)
     return Hunique.CW[window].to_unique[complete_idx]
+end
+
+"""
+For an index in the complete haplotype pool, find its index in the unique haplotype pool 
+of just the typed SNPs in specified window. 
+"""
+function complete_idx_to_unique_typed_idx(complete_idx::Int, window::Int, Hunique::CompressedHaplotypes)
+    return Hunique.CW_typed[window].to_unique[complete_idx]
 end

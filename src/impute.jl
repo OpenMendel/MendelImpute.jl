@@ -144,7 +144,6 @@ rows in `H`.
 function update_marker_position!(
     phaseinfo::Vector{HaplotypeMosaicPair},
     XtoH_idx::AbstractVector, 
-    ref_records::Int
     )
     people = length(phaseinfo)
 
@@ -159,12 +158,10 @@ function update_marker_position!(
         end
     end
 
-    # update first starting position and length
+    # update first starting position
     for j in 1:people
         phaseinfo[j].strand1.start[1] = 1
         phaseinfo[j].strand2.start[1] = 1
-        phaseinfo[j].strand1.length = ref_records
-        phaseinfo[j].strand2.length = ref_records
     end
 
     return nothing
