@@ -120,7 +120,7 @@ function compress_haplotypes(H::AbstractMatrix, X::AbstractMatrix, outfile::Abst
         Xw_pos = X_pos[Xw_idx_start:Xw_idx_end]
         XwtoH_idx = indexin(Xw_pos, H_pos) # assumes all SNPs in X are in H
         Hw = H[Hw_idx_start:Hw_idx_end, :] # including all snps
-        Hw_typed = H[XwtoH_idx, :]         # includingonly typed snps
+        Hw_typed = H[XwtoH_idx, :]         # including only typed snps
 
         # find unique haplotypes on all SNPs
         hapmap = groupslices(Hw, dims = 2)
