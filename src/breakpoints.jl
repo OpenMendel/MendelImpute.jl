@@ -114,7 +114,7 @@ function search_breakpoint(
 
     # count number of errors if second haplotype is all from s22
     errors = 0
-    for pos in 1:n
+    @inbounds for pos in 1:n
         if !ismissing(X[pos])
             errors += X[pos] ≠ s1[pos] + s22[pos]
         end
@@ -125,7 +125,7 @@ function search_breakpoint(
     err_optim == 0 && return 0, 0
 
     # extend haplotype s21 position by position
-    for bkpt in 1:n
+    @inbounds for bkpt in 1:n
         if !ismissing(X[bkpt]) && s21[bkpt] ≠ s22[bkpt]
             errors -= X[bkpt] ≠ s1[bkpt] + s22[bkpt]
             errors += X[bkpt] ≠ s1[bkpt] + s21[bkpt]

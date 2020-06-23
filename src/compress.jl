@@ -34,16 +34,16 @@ end
 Keeps a vector of `CompressedWindow`. Indexing off instances of `CompressedHaplotypes`
 means indexing off `CompressedHaplotypes.CW`
 
-- `CW`: Vector of `CompressedWindow`. `CW[i]` stores unique haplotypes filtered with respect to all SNPs in `CWrange[i]`
-- `CW_typed`: Vector of `CompressedWindow`. `CW_typed[i]` stores unique haplotypes filtered with respect to typed SNPs in `CWrange[i]`
-- `CWrange`: `CWrange[i]` is the range of H's SNPs that are in window `i`. It includes all SNP until the first typed snp of window `i + 1`. 
+- `CW`: Vector of `CompressedWindow`. `CW[i]` stores unique haplotypes filtered with respect to all SNPs from `start[i]` to `start[i + 1]`
+- `CW_typed`: Vector of `CompressedWindow`. `CW_typed[i]` stores unique haplotypes filtered with respect to typed SNPs from `start[i]` to `start[i + 1]`
+- `start`: `start[i]` to `start[i + 1]` is the range of H's SNPs that are in window `i`. It includes all SNP until the first typed snp of window `i + 1`. 
 - `sampleID`: Sample names for every pair of haplotypes as listed in the VCF file
 - `width`: Number of typed SNPs per window
 """
 struct CompressedHaplotypes
     CW::Vector{CompressedWindow}
     CW_typed::Vector{CompressedWindow}
-    CWrange::Vector{UnitRange}
+    start::Vector{Int}
     width::Int
     sampleID::Vector{String}
     chr::Vector{String}
@@ -52,7 +52,7 @@ struct CompressedHaplotypes
     refallele::Vector{String}
     altallele::Vector{Vector{String}}
 end
-CompressedHaplotypes(windows::Int, width, sampleID, chr, pos, SNPid, ref, alt) = CompressedHaplotypes(Vector{CompressedWindow}(undef, windows), Vector{CompressedWindow}(undef, windows), Vector{UnitRange}(undef, windows), width, sampleID, chr, pos, SNPid, ref, alt)
+CompressedHaplotypes(windows::Int, width, sampleID, chr, pos, SNPid, ref, alt) = CompressedHaplotypes(Vector{CompressedWindow}(undef, windows), Vector{CompressedWindow}(undef, windows), zeros(windows), width, sampleID, chr, pos, SNPid, ref, alt)
 
 nhaplotypes(x::CompressedHaplotypes) = 2length(x.sampleID)
 
@@ -116,7 +116,7 @@ function compress_haplotypes(H::AbstractMatrix, X::AbstractMatrix, outfile::Abst
         Xw_pos_next = X_pos[w * width + 1]
         Hw_idx_end = (w == windows ? length(H_pos) : 
             something(findnext(x -> x == Xw_pos_next, H_pos, Hw_idx_start)) - 1)
-        compressed_Hunique.CWrange[w] = Hw_idx_start:Hw_idx_end
+        compressed_Hunique.start[w] = Hw_idx_start
 
         # get current window of H
         Xw_pos = X_pos[Xw_idx_start:Xw_idx_end]

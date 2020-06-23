@@ -195,7 +195,7 @@ function phase!(
     # first  1/3: ((w - 2) * width + 1):((w - 1) * width)
     # middle 1/3: ((w - 1) * width + 1):(      w * width)
     # last   1/3: (      w * width + 1):((w + 1) * width)
-    for i in 1:people
+    Threads.@threads for i in 1:people
         # first find optimal haplotype pair in each window using dynamic programming
         id = Threads.threadid()
         connect_happairs!(sol_path[id], nxt_pair[id], tree_err[id], redundant_haplotypes[i], λ = 1.0)
@@ -211,46 +211,46 @@ function phase!(
         push!(ph[i].strand2.haplotypelabel, h2)
 
         # don't search breakpoints
-        for w in 2:windows
-            u, j = sol_path[id][w - 1] # haplotype pair in previous window
-            k, l = sol_path[id][w]     # haplotype pair in current window
+        # for w in 2:windows
+        #     u, j = sol_path[id][w - 1] # haplotype pair in previous window
+        #     k, l = sol_path[id][w]     # haplotype pair in current window
 
-            # switch current window's pair order if 1 or 2 haplotype match
-            if (u == l && j == k) || (j == k && u ≠ l) || (u == l && j ≠ k)
-                k, l = l, k 
-                sol_path[id][w] = (k, l)
-            end
+        #     # switch current window's pair order if 1 or 2 haplotype match
+        #     if (u == l && j == k) || (j == k && u ≠ l) || (u == l && j ≠ k)
+        #         k, l = l, k 
+        #         sol_path[id][w] = (k, l)
+        #     end
 
-            # map hap1 and hap2 back to unique index in given window
-            h1 = complete_idx_to_unique_all_idx(k, w, compressed_Hunique)
-            h2 = complete_idx_to_unique_all_idx(l, w, compressed_Hunique)
+        #     # map hap1 and hap2 back to unique index in given window
+        #     h1 = complete_idx_to_unique_all_idx(k, w, compressed_Hunique)
+        #     h2 = complete_idx_to_unique_all_idx(l, w, compressed_Hunique)
 
-            push!(ph[i].strand1.start, chunk_offset + (w - 1) * width + 1)
-            push!(ph[i].strand1.haplotypelabel, h1)
-            push!(ph[i].strand1.window, w)
-            push!(ph[i].strand2.start, chunk_offset + (w - 1) * width + 1)
-            push!(ph[i].strand2.haplotypelabel, h2)
-            push!(ph[i].strand2.window, w)
-        end
+        #     push!(ph[i].strand1.start, chunk_offset + (w - 1) * width + 1)
+        #     push!(ph[i].strand1.haplotypelabel, h1)
+        #     push!(ph[i].strand1.window, w)
+        #     push!(ph[i].strand2.start, chunk_offset + (w - 1) * width + 1)
+        #     push!(ph[i].strand2.haplotypelabel, h2)
+        #     push!(ph[i].strand2.window, w)
+        # end
 
         # search breakpoints 
-        # for w in 2:windows
-        #     # get genotype vector spanning 2 windows
-        #     Xwi_start = (w - 2) * width + 1
-        #     Xwi_end = (w == windows ? snps : w * width)
-        #     Xwi = view(X, Xwi_start:Xwi_end, i)
+        for w in 2:windows
+            # get genotype vector spanning 2 windows
+            Xwi_start = (w - 2) * width + 1
+            Xwi_end = (w == windows ? snps : w * width)
+            Xwi = view(X, Xwi_start:Xwi_end, i)
 
-        #     # find optimal breakpoint if there is one
-        #     sol_path[id][w], bkpts = continue_haplotype(Xwi, compressed_Hunique, 
-        #         w, sol_path[id][w - 1], sol_path[id][w])
+            # find optimal breakpoint if there is one
+            sol_path[id][w], bkpts = continue_haplotype(Xwi, compressed_Hunique, 
+                w, sol_path[id][w - 1], sol_path[id][w])
 
-        #     # record strand 1 info
-        #     update_phase!(ph[i].strand1, compressed_Hunique, bkpts[1], sol_path[id][w - 1][1], 
-        #         sol_path[id][w][1], w, width, chunk_offset, XtoH_idx, Xwi_start, Xwi_end)
-        #     # record strand 2 info
-        #     update_phase!(ph[i].strand2, compressed_Hunique, bkpts[2], sol_path[id][w - 1][2], 
-        #         sol_path[id][w][2], w, width, chunk_offset, XtoH_idx, Xwi_start, Xwi_end)
-        # end
+            # record strand 1 info
+            update_phase!(ph[i].strand1, compressed_Hunique, bkpts[1], sol_path[id][w - 1][1], 
+                sol_path[id][w][1], w, width, chunk_offset, XtoH_idx, Xwi_start, Xwi_end)
+            # record strand 2 info
+            update_phase!(ph[i].strand2, compressed_Hunique, bkpts[2], sol_path[id][w - 1][2], 
+                sol_path[id][w][2], w, width, chunk_offset, XtoH_idx, Xwi_start, Xwi_end)
+        end
 
         # update progress
         next!(pmeter)

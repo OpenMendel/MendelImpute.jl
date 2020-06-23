@@ -39,7 +39,7 @@ function impute!(
     (bytesavailable(pb) > (16*1024)) && write(io, take!(pb))
 
     pmeter = Progress(size(X, 1), 5, "Writing to file...")
-    for i in 1:size(X, 1)
+    @inbounds for i in 1:size(X, 1)
         # write meta info (chrom/pos/id/ref/alt)
         print(pb, chr[i], "\t", string(pos[i]), "\t", ids[i][1], "\t", ref[i], "\t", alt[i][1], "\t.\tPASS\t.\tGT")
         
@@ -121,8 +121,8 @@ function impute_discard_phase!(
             h2 = phase[person].strand2.haplotypelabel[hap2_segment]
             w1 = phase[person].strand1.window[hap1_segment]
             w2 = phase[person].strand2.window[hap2_segment]
-            i1 = snp - first(compressed_Hunique.CWrange[w1]) + 1
-            i2 = snp - first(compressed_Hunique.CWrange[w2]) + 1
+            i1 = snp - compressed_Hunique.start[w1] + 1
+            i2 = snp - compressed_Hunique.start[w2] + 1
 
             # imputation step
             H1 = compressed_Hunique.CW[w1].uniqueH

@@ -95,13 +95,13 @@ function connect_happairs!(
     empty!.(subtree_err)
 
     # base case: last window induces no error and connects to nothing
-    for pair in haplotype_set[windows]
+    @inbounds for pair in haplotype_set[windows]
         push!(next_pair[windows], 0)
         push!(subtree_err[windows], 0.0)
     end
 
     # search for best haplotype pair in each window bottom-up 
-    for w in Iterators.reverse(1:(windows - 1))
+    @inbounds for w in Iterators.reverse(1:(windows - 1))
         win_best_err = Inf
 
         # first pass to compute each pair's optimal error
@@ -136,7 +136,7 @@ function connect_happairs!(
 
     # find best solution path by forward-tracing
     best_err, cur_idx = findmin(subtree_err[1])
-    for w in 1:windows
+    @inbounds for w in 1:windows
         sol_path[w] = haplotype_set[w][cur_idx]
         cur_idx = next_pair[w][cur_idx]
     end
