@@ -36,7 +36,7 @@ means indexing off `CompressedHaplotypes.CW`
 
 - `CW`: Vector of `CompressedWindow`. `CW[i]` stores unique haplotypes filtered with respect to all SNPs in `CWrange[i]`
 - `CW_typed`: Vector of `CompressedWindow`. `CW_typed[i]` stores unique haplotypes filtered with respect to typed SNPs in `CWrange[i]`
-- `CWrange`: `CWrange[i]` is the range of H's SNPs that are in window `i`. 
+- `CWrange`: `CWrange[i]` is the range of H's SNPs that are in window `i`. It includes all SNP until the first typed snp of window `i + 1`. 
 - `sampleID`: Sample names for every pair of haplotypes as listed in the VCF file
 - `width`: Number of typed SNPs per window
 """
@@ -113,7 +113,9 @@ function compress_haplotypes(H::AbstractMatrix, X::AbstractMatrix, outfile::Abst
         Xw_idx_start = (w - 1) * width + 1
         Xw_idx_end = (w == windows ? length(X_pos) : w * width)
         Xw_pos_end = X_pos[Xw_idx_end]
-        Hw_idx_end = (w == windows ? length(H_pos) : something(findnext(x -> x == Xw_pos_end, H_pos, Hw_idx_start)))
+        Xw_pos_next = X_pos[w * width + 1]
+        Hw_idx_end = (w == windows ? length(H_pos) : 
+            something(findnext(x -> x == Xw_pos_next, H_pos, Hw_idx_start)) - 1)
         compressed_Hunique.CWrange[w] = Hw_idx_start:Hw_idx_end
 
         # get current window of H
@@ -130,11 +132,11 @@ function compress_haplotypes(H::AbstractMatrix, X::AbstractMatrix, outfile::Abst
         compressed_Hunique.CW[w] = MendelImpute.CompressedWindow(unique_idx, hapmap, complete_to_unique, uniqueH)
 
         # find unique haplotypes on typed SNPs
-        hapmap = groupslices(Hw_typed, dims = 2)
-        unique_idx = unique(hapmap)
-        complete_to_unique = indexin(hapmap, unique_idx)
-        uniqueH = Hw_typed[:, unique_idx]
-        compressed_Hunique.CW_typed[w] = MendelImpute.CompressedWindow(unique_idx, hapmap, complete_to_unique, uniqueH)
+        hapmap_typed = groupslices(Hw_typed, dims = 2)
+        unique_idx_typed = unique(hapmap_typed)
+        complete_to_unique_typed = indexin(hapmap_typed, unique_idx_typed)
+        uniqueH_typed = Hw_typed[:, unique_idx_typed]
+        compressed_Hunique.CW_typed[w] = MendelImpute.CompressedWindow(unique_idx_typed, hapmap_typed, complete_to_unique_typed, uniqueH_typed)
 
         # update Hw_idx_start
         Hw_idx_start = Hw_idx_end + 1

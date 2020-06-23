@@ -104,12 +104,11 @@ preserve phase information.
 """
 function impute_discard_phase!(
     X::AbstractMatrix,
-    compressed_haplotypes::CompressedHaplotypes,
+    compressed_Hunique::CompressedHaplotypes,
     phase::Vector{HaplotypeMosaicPair}
     )
 
     p, n = size(X)
-    width = compressed_haplotypes.width
 
     @inbounds for person in 1:n, snp in 1:p
         if ismissing(X[snp, person])
@@ -122,12 +121,12 @@ function impute_discard_phase!(
             h2 = phase[person].strand2.haplotypelabel[hap2_segment]
             w1 = phase[person].strand1.window[hap1_segment]
             w2 = phase[person].strand2.window[hap2_segment]
-            i1 = snp - (w1 - 1) * width
-            i2 = snp - (w2 - 1) * width
+            i1 = snp - first(compressed_Hunique.CWrange[w1]) + 1
+            i2 = snp - first(compressed_Hunique.CWrange[w2]) + 1
 
             # imputation step
-            H1 = compressed_haplotypes.CW[w1].uniqueH
-            H2 = compressed_haplotypes.CW[w2].uniqueH
+            H1 = compressed_Hunique.CW[w1].uniqueH
+            H2 = compressed_Hunique.CW[w2].uniqueH
             X[snp, person] = H1[i1, h1] + H2[i2, h2]
         end
     end
