@@ -39,7 +39,7 @@ function impute!(
     (bytesavailable(pb) > (16*1024)) && write(io, take!(pb))
 
     pmeter = Progress(size(X, 1), 5, "Writing to file...")
-    for i in 1:size(X, 1)
+    @inbounds for i in 1:size(X, 1)
         # write meta info (chrom/pos/id/ref/alt)
         print(pb, chr[i], "\t", string(pos[i]), "\t", ids[i][1], "\t", ref[i], "\t", alt[i][1], "\t.\tPASS\t.\tGT")
         
@@ -96,7 +96,7 @@ function impute!(
 end
 
 """
-    impute2!(X, H, phase)
+    impute_discard_phase!(X, H, phase)
 
 Imputes missing entries of `X` using corresponding haplotypes `H` via `phase` information. 
 Non-missing entries in `X` will not change, but X and H has to be aligned. This does NOT 
@@ -104,12 +104,11 @@ preserve phase information.
 """
 function impute_discard_phase!(
     X::AbstractMatrix,
-    compressed_haplotypes::CompressedHaplotypes,
+    compressed_Hunique::CompressedHaplotypes,
     phase::Vector{HaplotypeMosaicPair}
     )
 
     p, n = size(X)
-    width = compressed_haplotypes.width
 
     @inbounds for person in 1:n, snp in 1:p
         if ismissing(X[snp, person])
@@ -122,14 +121,46 @@ function impute_discard_phase!(
             h2 = phase[person].strand2.haplotypelabel[hap2_segment]
             w1 = phase[person].strand1.window[hap1_segment]
             w2 = phase[person].strand2.window[hap2_segment]
-            i1 = snp - (w1 - 1) * width
-            i2 = snp - (w2 - 1) * width
+            i1 = snp - compressed_Hunique.start[w1] + 1
+            i2 = snp - compressed_Hunique.start[w2] + 1
 
             # imputation step
-            H1 = compressed_haplotypes[w1].uniqueH
-            H2 = compressed_haplotypes[w2].uniqueH
+            H1 = compressed_Hunique.CW[w1].uniqueH
+            H2 = compressed_Hunique.CW[w2].uniqueH
             X[snp, person] = H1[i1, h1] + H2[i2, h2]
         end
+    end
+
+    return nothing
+end
+
+"""
+    update_marker_position!(phaseinfo, tgtfile, reffile)
+Converts `phaseinfo`'s strand1 and strand2's starting position in 
+terms of matrix rows of `X` to starting position in terms matrix
+rows in `H`. 
+"""
+function update_marker_position!(
+    phaseinfo::Vector{HaplotypeMosaicPair},
+    XtoH_idx::AbstractVector, 
+    )
+    people = length(phaseinfo)
+
+    for j in 1:people
+        # update strand1's starting position
+        for (i, idx) in enumerate(phaseinfo[j].strand1.start)
+            phaseinfo[j].strand1.start[i] = XtoH_idx[idx]
+        end
+        # update strand2's starting position
+        for (i, idx) in enumerate(phaseinfo[j].strand2.start)
+            phaseinfo[j].strand2.start[i] = XtoH_idx[idx]
+        end
+    end
+
+    # update first starting position
+    for j in 1:people
+        phaseinfo[j].strand1.start[1] = 1
+        phaseinfo[j].strand2.start[1] = 1
     end
 
     return nothing

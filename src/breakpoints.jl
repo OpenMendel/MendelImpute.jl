@@ -1,7 +1,11 @@
+"""
+`X` is a genotype vector spanning 2 windows. Haplotype pair for first window is 
+`happair_prev`, the next 2 haplotype pair is `happair_next`. This function searches 
+the breakpoint between them.
+"""
 function continue_haplotype(
     X::AbstractVector,
     compressed_Hunique::CompressedHaplotypes,
-    typed_snps::Vector{Vector{Int}},
     window::Int,
     happair_prev::Tuple{Int, Int},
     happair_next::Tuple{Int, Int}
@@ -19,65 +23,63 @@ function continue_haplotype(
         return (l, k), (-1, -1)
     end
 
-    Hprev = compressed_Hunique[window - 1].uniqueH # unique haplotypes in window - 1
-    Hcurr = compressed_Hunique[window].uniqueH     # unique haplotypes in window
-    curr_idx = typed_snps[window]     # typed snps in window
-    prev_idx = typed_snps[window - 1] # typed snps in window - 1
+    Hprev = compressed_Hunique.CW_typed[window - 1].uniqueH # unique haplotypes with only typed snps in window - 1
+    Hcurr = compressed_Hunique.CW_typed[window].uniqueH     # unique haplotypes with only typed snps in window
 
     # only one strand matches
     if i == k && j ≠ l
-        iu = complete_idx_to_unique_idx(i, window - 1, compressed_Hunique)
-        ku = complete_idx_to_unique_idx(k, window, compressed_Hunique)
-        ju1 = complete_idx_to_unique_idx(j, window - 1, compressed_Hunique)
-        ju2 = complete_idx_to_unique_idx(j, window, compressed_Hunique)
-        lu1 = complete_idx_to_unique_idx(l, window - 1, compressed_Hunique)
-        lu2 = complete_idx_to_unique_idx(l, window, compressed_Hunique)
+        iu = complete_idx_to_unique_typed_idx(i, window - 1, compressed_Hunique)
+        ku = complete_idx_to_unique_typed_idx(k, window, compressed_Hunique)
+        ju1 = complete_idx_to_unique_typed_idx(j, window - 1, compressed_Hunique)
+        ju2 = complete_idx_to_unique_typed_idx(j, window, compressed_Hunique)
+        lu1 = complete_idx_to_unique_typed_idx(l, window - 1, compressed_Hunique)
+        lu2 = complete_idx_to_unique_typed_idx(l, window, compressed_Hunique)
 
-        s1  = vcat(Hprev[prev_idx, iu], Hcurr[curr_idx, ku])
-        s21 = vcat(Hprev[prev_idx, ju1], Hcurr[curr_idx, ju2])
-        s22 = vcat(Hprev[prev_idx, lu1], Hcurr[curr_idx, lu2])
+        s1  = vcat(Hprev[:, iu], Hcurr[:, ku])
+        s21 = vcat(Hprev[:, ju1], Hcurr[:, ju2])
+        s22 = vcat(Hprev[:, lu1], Hcurr[:, lu2])
 
         breakpt, errors = search_breakpoint(X, s1, s21, s22)
         return (k, l), (-1, breakpt)
     elseif i == l && j ≠ k
-        iu = complete_idx_to_unique_idx(i, window - 1, compressed_Hunique)
-        lu = complete_idx_to_unique_idx(l, window, compressed_Hunique)
-        ju1 = complete_idx_to_unique_idx(j, window - 1, compressed_Hunique)
-        ju2 = complete_idx_to_unique_idx(j, window, compressed_Hunique)
-        ku1 = complete_idx_to_unique_idx(k, window - 1, compressed_Hunique)
-        ku2 = complete_idx_to_unique_idx(k, window, compressed_Hunique)
+        iu = complete_idx_to_unique_typed_idx(i, window - 1, compressed_Hunique)
+        lu = complete_idx_to_unique_typed_idx(l, window, compressed_Hunique)
+        ju1 = complete_idx_to_unique_typed_idx(j, window - 1, compressed_Hunique)
+        ju2 = complete_idx_to_unique_typed_idx(j, window, compressed_Hunique)
+        ku1 = complete_idx_to_unique_typed_idx(k, window - 1, compressed_Hunique)
+        ku2 = complete_idx_to_unique_typed_idx(k, window, compressed_Hunique)
 
-        s1  = vcat(Hprev[prev_idx, iu], Hcurr[curr_idx, lu])
-        s21 = vcat(Hprev[prev_idx, ju1], Hcurr[curr_idx, ju2])
-        s22 = vcat(Hprev[prev_idx, ku1], Hcurr[curr_idx, ku2])
+        s1  = vcat(Hprev[:, iu], Hcurr[:, lu])
+        s21 = vcat(Hprev[:, ju1], Hcurr[:, ju2])
+        s22 = vcat(Hprev[:, ku1], Hcurr[:, ku2])
 
         breakpt, errors = search_breakpoint(X, s1, s21, s22)
         return (l, k), (-1, breakpt)
     elseif j == k && i ≠ l
-        ju = complete_idx_to_unique_idx(j, window - 1, compressed_Hunique)
-        ku = complete_idx_to_unique_idx(k, window, compressed_Hunique)
-        iu1 = complete_idx_to_unique_idx(i, window - 1, compressed_Hunique)
-        iu2 = complete_idx_to_unique_idx(i, window, compressed_Hunique)
-        lu1 = complete_idx_to_unique_idx(l, window - 1, compressed_Hunique)
-        lu2 = complete_idx_to_unique_idx(l, window, compressed_Hunique)
+        ju = complete_idx_to_unique_typed_idx(j, window - 1, compressed_Hunique)
+        ku = complete_idx_to_unique_typed_idx(k, window, compressed_Hunique)
+        iu1 = complete_idx_to_unique_typed_idx(i, window - 1, compressed_Hunique)
+        iu2 = complete_idx_to_unique_typed_idx(i, window, compressed_Hunique)
+        lu1 = complete_idx_to_unique_typed_idx(l, window - 1, compressed_Hunique)
+        lu2 = complete_idx_to_unique_typed_idx(l, window, compressed_Hunique)
 
-        s1  = vcat(Hprev[prev_idx, ju], Hcurr[curr_idx, ku])
-        s21 = vcat(Hprev[prev_idx, iu1], Hcurr[curr_idx, iu2])
-        s22 = vcat(Hprev[prev_idx, lu1], Hcurr[curr_idx, lu2])
+        s1  = vcat(Hprev[:, ju], Hcurr[:, ku])
+        s21 = vcat(Hprev[:, iu1], Hcurr[:, iu2])
+        s22 = vcat(Hprev[:, lu1], Hcurr[:, lu2])
 
         breakpt, errors = search_breakpoint(X, s1, s21, s22)
         return (l, k), (breakpt, -1)
     elseif j == l && i ≠ k
-        ju = complete_idx_to_unique_idx(j, window - 1, compressed_Hunique)
-        lu = complete_idx_to_unique_idx(l, window, compressed_Hunique)
-        iu1 = complete_idx_to_unique_idx(i, window - 1, compressed_Hunique)
-        iu2 = complete_idx_to_unique_idx(i, window, compressed_Hunique)
-        ku1 = complete_idx_to_unique_idx(k, window - 1, compressed_Hunique)
-        ku2 = complete_idx_to_unique_idx(k, window, compressed_Hunique)
+        ju = complete_idx_to_unique_typed_idx(j, window - 1, compressed_Hunique)
+        lu = complete_idx_to_unique_typed_idx(l, window, compressed_Hunique)
+        iu1 = complete_idx_to_unique_typed_idx(i, window - 1, compressed_Hunique)
+        iu2 = complete_idx_to_unique_typed_idx(i, window, compressed_Hunique)
+        ku1 = complete_idx_to_unique_typed_idx(k, window - 1, compressed_Hunique)
+        ku2 = complete_idx_to_unique_typed_idx(k, window, compressed_Hunique)
 
-        s1  = vcat(Hprev[prev_idx, ju], Hcurr[curr_idx, lu])
-        s21 = vcat(Hprev[prev_idx, iu1], Hcurr[curr_idx, iu2])
-        s22 = vcat(Hprev[prev_idx, ku1], Hcurr[curr_idx, ku2])
+        s1  = vcat(Hprev[:, ju], Hcurr[:, lu])
+        s21 = vcat(Hprev[:, iu1], Hcurr[:, iu2])
+        s22 = vcat(Hprev[:, ku1], Hcurr[:, ku2])
 
         breakpt, errors = search_breakpoint(X, s1, s21, s22)
         return (k, l), (breakpt, -1)
@@ -112,7 +114,7 @@ function search_breakpoint(
 
     # count number of errors if second haplotype is all from s22
     errors = 0
-    for pos in 1:n
+    @inbounds for pos in 1:n
         if !ismissing(X[pos])
             errors += X[pos] ≠ s1[pos] + s22[pos]
         end

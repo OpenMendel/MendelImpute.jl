@@ -14,9 +14,6 @@ Helper function to calculate the squared Hamming difference between 2 unordered 
 - `pair_error((1, 2), (3, 4)) = 4λ`
 """
 function pair_error(pair1::T, pair2::T; λ::Real = 1.0) where T <: Tuple{Int, Int}
-    if pair1 == (-1, -1) || pair2 == (-1, -1)
-        return 0.0 # skip windows with too little typed SNPs
-    end
     # parallel connections
     # a b
     # | |
@@ -92,24 +89,10 @@ function connect_happairs!(
     ) where T <: Tuple{Int, Int}
 
     windows = length(haplotype_set)
-    originally_empty = falses(windows)
 
     # reset storage
     empty!.(next_pair) 
     empty!.(subtree_err)
-
-    # if a window had too little typed SNPs, find nearest window with enough typed snps and copy its happairs
-    @inbounds for w in 1:windows
-        if haplotype_set[w][1] == (-1, -1)
-            originally_empty[w] = true
-        end
-    end
-    @inbounds for w in 1:windows
-        if originally_empty[w]
-            nearest_w = nearest_window_with_sufficient_typed_snps(w, haplotype_set, originally_empty)
-            haplotype_set[w] = copy(haplotype_set[nearest_w])
-        end
-    end
 
     # base case: last window induces no error and connects to nothing
     @inbounds for pair in haplotype_set[windows]
@@ -161,46 +144,46 @@ function connect_happairs!(
     return best_err
 end
 
-function nearest_window_with_sufficient_typed_snps(
-    cur_win::Int, 
-    haplotype_set::Vector{Vector{T}},
-    originally_empty::BitVector
-    ) where T <: Tuple{Int, Int}
+# function nearest_window_with_sufficient_typed_snps(
+#     cur_win::Int, 
+#     haplotype_set::Vector{Vector{T}},
+#     originally_empty::BitVector
+#     ) where T <: Tuple{Int, Int}
 
-    # quick return
-    if haplotype_set[cur_win][1] != (-1, -1)
-        return cur_win
-    end
+#     # quick return
+#     if haplotype_set[cur_win][1] != (-1, -1)
+#         return cur_win
+#     end
 
-    total_windows = length(haplotype_set)
-    right_windows = total_windows - cur_win
-    left_windows  = cur_win - 1
+#     total_windows = length(haplotype_set)
+#     right_windows = total_windows - cur_win
+#     left_windows  = cur_win - 1
 
-    #extend to the right until we find a window with feasible happair
-    right = typemax(Int)
-    for w in 1:right_windows
-        next_win = cur_win + w
-        if haplotype_set[next_win][1] != (-1, -1) && !originally_empty[next_win]
-            right = next_win
-            break
-        end
-    end
+#     #extend to the right until we find a window with feasible happair
+#     right = typemax(Int)
+#     for w in 1:right_windows
+#         next_win = cur_win + w
+#         if haplotype_set[next_win][1] != (-1, -1) && !originally_empty[next_win]
+#             right = next_win
+#             break
+#         end
+#     end
 
-    #extend to the left until we find a window with feasible happair
-    left = typemax(Int)
-    for w in 1:left_windows
-        next_win = cur_win - w
-        if haplotype_set[next_win][1] != (-1, -1) && !originally_empty[next_win]
-            left = next_win
-            break
-        end
-    end 
+#     #extend to the left until we find a window with feasible happair
+#     left = typemax(Int)
+#     for w in 1:left_windows
+#         next_win = cur_win - w
+#         if haplotype_set[next_win][1] != (-1, -1) && !originally_empty[next_win]
+#             left = next_win
+#             break
+#         end
+#     end 
 
-    right == left == typemax(Int) && error("No window contains feasible haplotype pairs!")
+#     right == left == typemax(Int) && error("No window contains feasible haplotype pairs!")
     
-    if abs(cur_win - right) < abs(cur_win - left)
-        return right
-    else
-        return left
-    end
-end
+#     if abs(cur_win - right) < abs(cur_win - left)
+#         return right
+#     else
+#         return left
+#     end
+# end

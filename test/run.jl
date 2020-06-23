@@ -2065,10 +2065,154 @@ width = 2048
 Random.seed!(2020)
 tgtfile = "target.chr$chr.typedOnly.maf$maf.masked.vcf.gz"
 reffile = "ref.chr$chr.excludeTarget.jlso"
-outfile = "mendel.imputed.dp$width.maf$maf.vcf.gz"
+outfile = "mendel.imputed.dp$width.chr$chr.maf$maf.vcf.gz"
 @time ph, hs = phase(tgtfile, reffile, outfile=outfile, impute=true, width=width)
 
 X_complete = convert_gt(UInt8, "target.chr$chr.full.vcf.gz")
 n, p = size(X_complete)
 X_mendel = convert_gt(UInt8, outfile)
 println("error overall = $(sum(X_mendel .!= X_complete) / n / p) \n")
+
+
+
+
+# try different window width to see number of haplotypes per window
+
+using Revise
+using VCFTools
+using MendelImpute
+using GeneticVariation
+using Random
+using StatsBase
+using CodecZlib
+using ProgressMeter
+using JLD2, FileIO, JLSO
+using BenchmarkTools
+using GroupSlices
+
+vcffile = "ref.chr21.excludeTarget.vcf.gz"
+widths  = [128, 256, 512, 1024]
+dims = 2
+flankwidth = 0
+trans = (dims == 2 ? true : error("currently VCFTools only import chr/pos...info when H transposed"))
+H, H_sampleID, H_chr, H_pos, H_ids, H_ref, H_alt = convert_ht(Bool, vcffile, trans=trans, save_snp_info=true, msg="importing vcf data...")
+
+for width in widths
+    outfile = "ref.chr21.w$width.excludeTarget.jlso"
+
+    snps = (dims == 2 ? size(H, 1) : size(H, 2))
+    windows = floor(Int, snps / width)
+    compressed_Hunique = MendelImpute.CompressedHaplotypes(windows, width, snps, H_sampleID, H_chr, H_pos, H_ids, H_ref, H_alt)
+
+    avg_uniqhaps = 0
+    for w in 1:windows
+        if w == 1
+            cur_range = 1:(width + flankwidth)
+        elseif w == windows
+            cur_range = ((windows - 1) * width - flankwidth + 1):snps
+        else
+            cur_range = ((w - 1) * width - flankwidth + 1):(w * width + flankwidth)
+        end
+        compressed_Hunique.CWrange[w] = cur_range
+
+        H_cur_window = (dims == 2 ? view(H, cur_range, :) : view(H, :, cur_range))
+        hapmap = groupslices(H_cur_window, dims=dims)
+        unique_idx = unique(hapmap)
+        complete_to_unique = indexin(hapmap, unique_idx)
+        uniqueH = (dims == 2 ? H_cur_window[:, unique_idx] : H_cur_window[unique_idx, :])
+        compressed_Hunique[w] = MendelImpute.CompressedWindow(unique_idx, hapmap, complete_to_unique, uniqueH)
+        avg_uniqhaps += length(unique_idx)
+    end
+    avg_uniqhaps /= windows
+    println("Width = $width averages $avg_uniqhaps haplotype per window. Total win = $windows")
+
+    # save using JLSO or JLD2
+    endswith(outfile, ".jld2") && JLD2.@save outfile compressed_Hunique
+    endswith(outfile, ".jlso") && JLSO.save(outfile, :compressed_Hunique => compressed_Hunique, format=:julia_serialize, compression=:gzip)
+
+end
+
+
+
+
+function test(storage, a, b)
+    UpperTriangular(storage) .= UpperTriangular(a .* b')
+end
+
+storage = zeros(1000, 1000);
+a = rand(1000);
+b = rand(1000);
+
+@time test(storage, a, b);
+
+
+
+
+using BenchmarkTools, Random
+
+"""
+Find minimum of `M_jk - N_ij - N_ik` for each i. M is upper triangular. 
+
+Saves minimum value in `best_err` and `j, k` index in `row` and `col`. 
+"""
+function best_index!(
+    best_err::Vector{T},
+    row::Vector{Int},
+    col::Vector{Int},
+    M::AbstractMatrix{T},
+    N::AbstractMatrix{T},
+    ) where T <: Real
+
+    n, d = size(N)
+
+    @inbounds for k in 1:d, j in 1:k 
+        @simd for i in 1:n
+            score = M[j, k] - N[i, j] - N[i, k]
+
+            # save minimum value and index
+            if score < best_err[i]
+                best_err[i], row[i], col[i] = score, j, k
+            end
+        end
+    end
+end
+
+Random.seed!(2020)
+n = 100
+p = 100
+d = 5000
+
+row_index, col_index = ones(Int, n), ones(Int, n)
+best_err = [typemax(Float64) for _ in 1:n]
+M = rand(d, d)
+N = rand(n, d)
+
+@btime best_index!($best_err, $row_index, $col_index, $M, $N)
+
+
+
+using Revise
+using VCFTools
+using MendelImpute
+using GeneticVariation
+using Random
+using StatsBase
+using CodecZlib
+using ProgressMeter
+using JLD2, FileIO, JLSO
+using BenchmarkTools
+using GroupSlices
+
+tgtfile = "target.chr18.typedOnly.maf0.1.masked.vcf.gz"
+reffile = "ref.chr18.excludeTarget.vcf.gz"
+outfile = "ref.chr18.excludeTarget.jlso"
+width = 512
+
+compress_haplotypes(reffile, tgtfile, outfile, width)
+
+
+
+
+
+
+
