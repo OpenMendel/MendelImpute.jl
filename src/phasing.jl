@@ -12,8 +12,8 @@ of haplotypes `reffile` by sliding windows and saves result in `outfile`.
 - `outfile`: output filename ending in `.vcf.gz` or `.vcf`. Output genotypes will have no missing data.
 - `impute`: If `true`, untyped SNPs will be imputed, otherwise only missing snps in `tgtfile` will be imputed.  (default `false`)
 - `width`: number of SNPs (markers) in each haplotype window. (default `2048`)
-- `flankwidth`: Number of SNPs flanking the sliding window (defaults to 10% of `width`)
-- `min_typed_snps`: Number of typed SNPs required in each window. Below this threshold means optimal haplotype pair will be copied from the nearest window with enough typed SNPs
+- `rescreen`: This option saves a number of top haplotype pairs when solving the least squares objective, and re-minimize least squares on just observed data.
+- `thinning_factor`: This option solves the least squares objective on only "thining_factor" unique haplotypes.
 """
 function phase(
     tgtfile::AbstractString,
@@ -21,7 +21,8 @@ function phase(
     outfile::AbstractString = "imputed." * tgtfile,
     impute::Bool = true,
     width::Int = 2048,
-    screen::Bool = false, 
+    rescreen::Bool = false, 
+    thinning_factor::Union{Nothing, Int} = nothing
     )
 
     # decide how to partition the data based on available memory 
@@ -72,7 +73,7 @@ function phase(
     tgt_snps = size(X, 1)
     ref_snps = length(compressed_Hunique.pos)
     windows = floor(Int, tgt_snps / width)
-    quad_timers = [zeros(4) for _ in 1:Threads.nthreads()]
+    quad_timers = zeros(4)
 
     #
     # compute redundant haplotype sets
@@ -81,7 +82,8 @@ function phase(
     pmeter = Progress(windows, 5, "Computing optimal haplotype pairs...")
     redundant_haplotypes = [[Tuple{Int, Int}[] for i in 1:windows] for j in 1:people]
     [[sizehint!(redundant_haplotypes[j][i], 1000) for i in 1:windows] for j in 1:people] # don't save >1000 redundant happairs
-    num_unique_haps = zeros(Threads.nthreads())
+    num_unique_haps = 0
+    mutex = Threads.SpinLock()
     Threads.@threads for w in 1:windows
         Hw_aligned = compressed_Hunique.CW_typed[w].uniqueH
         Xw_idx_start = (w - 1) * width + 1
@@ -89,25 +91,31 @@ function phase(
         Xw_aligned = X[Xw_idx_start:Xw_idx_end, :]
 
         # computational routine
-        happairs, hapscore, t1, t2, t3 = (screen ? haplopair_screen(Xw_aligned, Hw_aligned) : haplopair(Xw_aligned, Hw_aligned))
-        # happairs, hapscore, t1, t2, t3 = (size(Hw_aligned, 2) < 1000 ? haplopair(Xw_aligned, Hw_aligned) :  
-        #     haplopair_thin(Xw_aligned, Hw_aligned, keep=1000))
-        
+        if !isnothing(thinning_factor)
+            happairs, hapscore, t1, t2, t3 = haplopair_thin(Xw_aligned, Hw_aligned, keep=thinning_factor)
+        elseif rescreen
+            happairs, hapscore, t1, t2, t3 = haplopair_screen(Xw_aligned, Hw_aligned)
+        else
+            happairs, hapscore, t1, t2, t3 = haplopair(Xw_aligned, Hw_aligned)
+        end
+
         # convert happairs (which index off unique haplotypes) to indices of full haplotype pool, and find all matching happairs
         t4 = @elapsed compute_redundant_haplotypes!(redundant_haplotypes, compressed_Hunique, happairs, w)
 
-        # record timings
-        id = Threads.threadid()
-        quad_timers[id][1] += t1
-        quad_timers[id][2] += t2
-        quad_timers[id][3] += t3
-        quad_timers[id][4] += t4
-        num_unique_haps[id] += size(Hw_aligned, 2)
+        # record timings and haplotypes
+        lock(mutex)
+        quad_timers[1] += t1
+        quad_timers[2] += t2
+        quad_timers[3] += t3
+        quad_timers[4] += t4
+        num_unique_haps += size(Hw_aligned, 2)
+        unlock(mutex)
 
         # update progress
         next!(pmeter)
     end
     avg_num_unique_haps = sum(num_unique_haps) / windows
+    quad_timers ./= Threads.nthreads()
     calculate_happairs_time = time() - calculate_happairs_start
 
     #
@@ -143,10 +151,14 @@ function phase(
     println("Timings: ")
     println("    Data import                     = ", round(import_data_time, sigdigits=6), " seconds")
     println("    Computing haplotype pair        = ", round(calculate_happairs_time, sigdigits=6), " seconds")
-    println("        BLAS3 mul! to get M and N      = ", round(quad_timers[1][1], sigdigits=6), " seconds (on thread 1)")
-    println("        haplopair search               = ", round(quad_timers[1][2], sigdigits=6), " seconds (on thread 1)")
-    println("        min least sq on observed data  = ", round(quad_timers[1][3], sigdigits=6), " seconds (on thread 1)")
-    println("        finding redundant happairs     = ", round(quad_timers[1][4], sigdigits=6), " seconds (on thread 1)")
+    println("        BLAS3 mul! to get M and N      = ", round(quad_timers[1], sigdigits=6), " seconds per thread")
+    println("        haplopair search               = ", round(quad_timers[2], sigdigits=6), " seconds per thread")
+    if rescreen
+        println("        min least sq on observed data  = ", round(quad_timers[3], sigdigits=6), " seconds per thread")
+    else
+        println("        supplying constant terms       = ", round(quad_timers[3], sigdigits=6), " seconds per thread")
+    end
+    println("        finding redundant happairs     = ", round(quad_timers[4], sigdigits=6), " seconds per thread")
     println("    Phasing by dynamic programming  = ", round(phase_time, sigdigits=6), " seconds")
     println("    Imputation                      = ", round(impute_time, sigdigits=6), " seconds\n")
 

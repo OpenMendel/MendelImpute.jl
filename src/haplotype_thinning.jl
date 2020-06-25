@@ -1,3 +1,7 @@
+######## THIS FILE IS THE SAME AS `hpalotype_pair.jl`
+######## except it solves the least squares objective on only "thining_factor" unique haplotypes.
+######## where the top haplotypes are selected by minimizing dist(x, h). 
+
 function haplopair_thin(
     X::AbstractMatrix,
     H::AbstractMatrix;
