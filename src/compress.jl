@@ -155,7 +155,7 @@ in the complete reference pool for the specified window.
 
 This is only needed for the typed SNPs!
 """
-function unique_idx_to_complete_idx(unique_idx::Int, window::Int, Hunique::CompressedHaplotypes)
+function unique_idx_to_complete_idx(unique_idx, window, Hunique::CompressedHaplotypes)
     return Hunique.CW_typed[window].uniqueindex[unique_idx]
 end
 
@@ -163,7 +163,7 @@ end
 For an index in the complete haplotype pool, find its index in the unique haplotype pool 
 of all SNPs (typed + untyped) in specified window. 
 """
-function complete_idx_to_unique_all_idx(complete_idx::Int, window::Int, Hunique::CompressedHaplotypes)
+function complete_idx_to_unique_all_idx(complete_idx, window, Hunique::CompressedHaplotypes)
     return Hunique.CW[window].to_unique[complete_idx]
 end
 
@@ -171,6 +171,6 @@ end
 For an index in the complete haplotype pool, find its index in the unique haplotype pool 
 of just the typed SNPs in specified window. 
 """
-function complete_idx_to_unique_typed_idx(complete_idx::Int, window::Int, Hunique::CompressedHaplotypes)
+function complete_idx_to_unique_typed_idx(complete_idx, window, Hunique::CompressedHaplotypes)
     return Hunique.CW_typed[window].to_unique[complete_idx]
 end

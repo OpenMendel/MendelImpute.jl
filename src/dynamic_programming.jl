@@ -13,7 +13,7 @@ Helper function to calculate the squared Hamming difference between 2 unordered 
 - `pair_error((2, 5), (5, 2)  = 0` 
 - `pair_error((1, 2), (3, 4)) = 4λ`
 """
-function pair_error(pair1::T, pair2::T; λ::Real = 1.0) where T <: Tuple{Int, Int}
+function pair_error(pair1::T, pair2::T; λ::Real = 1.0) where T <: Tuple{Int32, Int32}
     # parallel connections
     # a b
     # | |
@@ -47,12 +47,12 @@ window containing feasible haplotype pairs.
 function connect_happairs!(
     haplotype_set::Vector{Vector{T}};
     λ::Float64 = 1.0
-    ) where T <: Tuple{Int, Int}
+    ) where T <: Tuple{Int32, Int32}
 
     # allocate working arrays
     windows  = length(haplotype_set)
     sol_path = Vector{T}(undef, windows)
-    next_pair = [Int[] for i in 1:windows]
+    next_pair = [Int32[] for i in 1:windows]
     subtree_err = [Float64[] for i in 1:windows]
 
     # computational routine
@@ -82,11 +82,11 @@ window containing feasible haplotype pairs.
 """
 function connect_happairs!(
     sol_path::Vector{T},
-    next_pair::Vector{Vector{Int}}, 
+    next_pair::Vector{Vector{Int32}}, 
     subtree_err::Vector{Vector{Float64}},
     haplotype_set::Vector{Vector{T}};
     λ::Float64 = 1.0,
-    ) where T <: Tuple{Int, Int}
+    ) where T <: Tuple{Int32, Int32}
 
     windows = length(haplotype_set)
 

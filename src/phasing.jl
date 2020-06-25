@@ -80,7 +80,7 @@ function phase(
     #
     calculate_happairs_start = time()
     pmeter = Progress(windows, 5, "Computing optimal haplotype pairs...")
-    redundant_haplotypes = [[Tuple{Int, Int}[] for i in 1:windows] for j in 1:people]
+    redundant_haplotypes = [[Tuple{Int32, Int32}[] for i in 1:windows] for j in 1:people]
     [[sizehint!(redundant_haplotypes[j][i], 1000) for i in 1:windows] for j in 1:people] # don't save >1000 redundant happairs
     num_unique_haps = 0
     mutex = Threads.SpinLock()
@@ -182,7 +182,7 @@ function phase!(
     ph::Vector{HaplotypeMosaicPair},
     X::AbstractMatrix{Union{Missing, T}},
     compressed_Hunique::CompressedHaplotypes,
-    redundant_haplotypes::Vector{Vector{Vector{Tuple{Int, Int}}}},
+    redundant_haplotypes::Vector{Vector{Vector{Tuple{Int32, Int32}}}},
     X_pos::Vector{Int};
     chunk_offset::Int = 0,
     ) where T <: Real
@@ -198,8 +198,8 @@ function phase!(
     XtoH_idx = indexin(X_pos, H_pos)
 
     # allocate working arrays
-    sol_path = [Vector{Tuple{Int, Int}}(undef, windows) for i in 1:Threads.nthreads()]
-    nxt_pair = [[Int[] for i in 1:windows] for i in 1:Threads.nthreads()]
+    sol_path = [Vector{Tuple{Int32, Int32}}(undef, windows) for i in 1:Threads.nthreads()]
+    nxt_pair = [[Int32[] for i in 1:windows] for i in 1:Threads.nthreads()]
     tree_err = [[Float64[] for i in 1:windows] for i in 1:Threads.nthreads()]
     pmeter   = Progress(people, 5, "Merging breakpoints...")
 
@@ -279,7 +279,7 @@ since we can have the previous and next window both extend into the current one,
 this is extremely rare.
 """
 function update_phase!(ph::HaplotypeMosaic, compressed_Hunique::CompressedHaplotypes,
-    bkpt::Int, hap_prev::Int, hap_curr::Int, w::Int, width::Int, chunk_offset::Int,
+    bkpt::Int, hap_prev::Int32, hap_curr::Int32, w::Int, width::Int, chunk_offset::Int,
     XtoH_idx::AbstractVector, Xwi_start::Int, Xwi_end::Int)
 
     # no breakpoints

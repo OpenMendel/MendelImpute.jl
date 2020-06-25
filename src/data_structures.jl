@@ -8,9 +8,9 @@ struct HaplotypeMosaic
     length::Int
     start::Vector{Int}
     window::Vector{Int}
-    haplotypelabel::Vector{Int}
+    haplotypelabel::Vector{Int32}
 end
-HaplotypeMosaic(len) = HaplotypeMosaic(len, Int[], Int[], Int[])
+HaplotypeMosaic(len) = HaplotypeMosaic(len, Int[], Int[], Int32[])
 
 # data structure for recording haplotype mosaic of two strands
 struct HaplotypeMosaicPair

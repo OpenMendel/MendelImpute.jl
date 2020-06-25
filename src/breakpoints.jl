@@ -7,8 +7,8 @@ function continue_haplotype(
     X::AbstractVector,
     compressed_Hunique::CompressedHaplotypes,
     window::Int,
-    happair_prev::Tuple{Int, Int},
-    happair_next::Tuple{Int, Int}
+    happair_prev::Tuple{Int32, Int32},
+    happair_next::Tuple{Int32, Int32}
     )
 
     # indices for complete reference panel

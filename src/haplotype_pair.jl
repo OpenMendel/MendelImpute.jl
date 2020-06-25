@@ -11,11 +11,11 @@ function compute_redundant_haplotypes!(
     happairs::Tuple{AbstractVector, AbstractVector},
     window::Int;
     fast_method::Bool = false,
-    ) where T <: Tuple{Int, Int}
+    ) where T <: Tuple{Int32, Int32}
     
     people = length(redundant_haplotypes)
-    h1_set = Int[]
-    h2_set = Int[]
+    h1_set = Int32[]
+    h2_set = Int32[]
 
     @inbounds for k in 1:people
         Hi_idx = unique_idx_to_complete_idx(happairs[1][k], window, Hunique)
