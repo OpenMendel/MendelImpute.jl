@@ -21,7 +21,7 @@ function phase(
     outfile::AbstractString = "imputed." * tgtfile,
     impute::Bool = true,
     width::Int = 2048,
-    min_typed_snps = 50, 
+    screen::Bool = false, 
     )
 
     # decide how to partition the data based on available memory 
@@ -89,7 +89,7 @@ function phase(
         Xw_aligned = X[Xw_idx_start:Xw_idx_end, :]
 
         # computational routine
-        happairs, hapscore, t1, t2, t3 = haplopair(Xw_aligned, Hw_aligned)
+        happairs, hapscore, t1, t2, t3 = (screen ? haplopair_screen(Xw_aligned, Hw_aligned) : haplopair(Xw_aligned, Hw_aligned))
         # happairs, hapscore, t1, t2, t3 = (size(Hw_aligned, 2) < 1000 ? haplopair(Xw_aligned, Hw_aligned) :  
         #     haplopair_thin(Xw_aligned, Hw_aligned, keep=1000))
         
@@ -145,7 +145,7 @@ function phase(
     println("    Computing haplotype pair        = ", round(calculate_happairs_time, sigdigits=6), " seconds")
     println("        BLAS3 mul! to get M and N      = ", round(quad_timers[1][1], sigdigits=6), " seconds (on thread 1)")
     println("        haplopair search               = ", round(quad_timers[1][2], sigdigits=6), " seconds (on thread 1)")
-    println("        supplying constant terms       = ", round(quad_timers[1][3], sigdigits=6), " seconds (on thread 1)")
+    println("        min least sq on observed data  = ", round(quad_timers[1][3], sigdigits=6), " seconds (on thread 1)")
     println("        finding redundant happairs     = ", round(quad_timers[1][4], sigdigits=6), " seconds (on thread 1)")
     println("    Phasing by dynamic programming  = ", round(phase_time, sigdigits=6), " seconds")
     println("    Imputation                      = ", round(impute_time, sigdigits=6), " seconds\n")

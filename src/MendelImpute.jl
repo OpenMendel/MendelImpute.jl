@@ -18,7 +18,7 @@ module MendelImpute
     using Distances
 
     export continue_haplotype, haplopair!, haplopair, haploimpute!
-    export impute!, impute_discard_phase!, search_breakpoint, unique_haplotypes
+    export impute!, impute_discard_phase!, search_breakpoint
     export unique_haplotype_idx
     export compute_redundant_haplotypes!, redundant_haplotypes
     export HaplotypeMosaicPair, HaplotypeMosaic, UniqueHaplotypeMaps
@@ -27,7 +27,7 @@ module MendelImpute
     export simulate_phased_genotypes
     export connect_happairs
     export phase!, phase_fast!, nearest_window_with_sufficient_typed_snps
-    export haplopair_thin, haplopair_thin2
+    export haplopair_thin, haplopair_thin2, haplopair_screen
 
     # main functions that users are exposed to
     export phase
@@ -47,6 +47,7 @@ module MendelImpute
     include("data_structures.jl")
     include("phasing.jl")
     include("haplotype_pair.jl")
+    include("haplotype_pair_screen.jl")
     include("simulate_utilities.jl")
     include("dynamic_programming.jl")
     include("impute.jl")
