@@ -17,29 +17,37 @@ function compute_redundant_haplotypes!(
     h1_set = Int32[]
     h2_set = Int32[]
 
+    t1 = t2 = t3 = 0
+
     @inbounds for k in 1:people
-        Hi_idx = unique_idx_to_complete_idx(happairs[1][k], window, Hunique)
-        Hj_idx = unique_idx_to_complete_idx(happairs[2][k], window, Hunique)
+        t1 += @elapsed begin
+            Hi_idx = unique_idx_to_complete_idx(happairs[1][k], window, Hunique)
+            Hj_idx = unique_idx_to_complete_idx(happairs[2][k], window, Hunique)
+        end
 
         # loop through all haplotypes and find ones that match either of the optimal haplotypes 
-        empty!(h1_set)
-        empty!(h2_set)
-        for (idx, hap) in enumerate(Hunique.CW_typed[window].hapmap)
-            hap == Hi_idx && push!(h1_set, idx)
-            hap == Hj_idx && push!(h2_set, idx)
+        t2 += @elapsed begin
+            empty!(h1_set)
+            empty!(h2_set)
+            for (idx, hap) in enumerate(Hunique.CW_typed[window].hapmap)
+                hap == Hi_idx && push!(h1_set, idx)
+                hap == Hj_idx && push!(h2_set, idx)
+            end
         end
 
         # save first 1000 haplotype pairs
-        for h1 in h1_set, h2 in h2_set
-            if length(redundant_haplotypes[k][window]) <= 1000 
-                push!(redundant_haplotypes[k][window], (h1, h2))
-            else
-                break
+        t3 += @elapsed begin 
+            for h1 in h1_set, h2 in h2_set
+                if length(redundant_haplotypes[k][window]) < 1000 
+                    push!(redundant_haplotypes[k][window], (h1, h2))
+                else
+                    break
+                end
             end
         end
     end
 
-    return nothing
+    return t1, t2, t3
 end
 
 """
@@ -171,7 +179,10 @@ function haplopair!(
             score = Mjk - N[i, j] - N[i, k]
 
             # keep best happair (original code)
-            if score < hapmin[i]
+            # NOTE: it is important that this is a "<=" and not a "<".
+            #       Since many pairs are equally good, picking the last occurance drastically
+            #       reduce t2's time in `compute_redundant_haplotypes!`
+            if score <= hapmin[i]
                 hapmin[i], happair1[i], happair2[i] = score, j, k
             end
 
