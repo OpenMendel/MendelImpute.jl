@@ -113,9 +113,9 @@ function compress_haplotypes(H::AbstractMatrix, X::AbstractMatrix, outfile::Abst
         Xw_idx_start = (w - 1) * width + 1
         Xw_idx_end = (w == windows ? length(X_pos) : w * width)
         Xw_pos_end = X_pos[Xw_idx_end]
-        Xw_pos_next = X_pos[w * width + 1]
+        Xw_pos_next_start = (w == windows ? X_pos[end] : X_pos[w * width + 1])
         Hw_idx_end = (w == windows ? length(H_pos) : 
-            something(findnext(x -> x == Xw_pos_next, H_pos, Hw_idx_start)) - 1)
+            something(findnext(x -> x == Xw_pos_next_start, H_pos, Hw_idx_start)) - 1)
         compressed_Hunique.start[w] = Hw_idx_start
 
         # get current window of H

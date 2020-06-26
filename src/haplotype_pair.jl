@@ -179,10 +179,7 @@ function haplopair!(
             score = Mjk - N[i, j] - N[i, k]
 
             # keep best happair (original code)
-            # NOTE: it is important that this is a "<=" and not a "<".
-            #       Since many pairs are equally good, picking the last occurance drastically
-            #       reduce t2's time in `compute_redundant_haplotypes!`
-            if score <= hapmin[i]
+            if score < hapmin[i]
                 hapmin[i], happair1[i], happair2[i] = score, j, k
             end
 
