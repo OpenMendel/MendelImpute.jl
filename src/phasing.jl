@@ -1,5 +1,5 @@
 """
-    phase(tgtfile, reffile; [outfile], [width], [flankwidth], [fast_method])
+    phase(tgtfile, reffile; [outfile], [impute], [width], [recreen], [thinning_factor], [dynamic_programming])
 
 Main function of MendelImpute program. Phasing (haplotying) of `tgtfile` from a pool 
 of haplotypes `reffile` by sliding windows and saves result in `outfile`. 
@@ -22,7 +22,8 @@ function phase(
     impute::Bool = true,
     width::Int = 2048,
     rescreen::Bool = false, 
-    thinning_factor::Union{Nothing, Int} = nothing
+    thinning_factor::Union{Nothing, Int} = nothing,
+    dynamic_programming::Bool = true
     )
 
     # decide how to partition the data based on available memory 
@@ -80,11 +81,15 @@ function phase(
     #
     calculate_happairs_start = time()
     pmeter = Progress(windows, 5, "Computing optimal haplotype pairs...")
-    redundant_haplotypes = [[Tuple{Int32, Int32}[] for i in 1:windows] for j in 1:people]
-    [[sizehint!(redundant_haplotypes[j][i], 1000) for i in 1:windows] for j in 1:people] # don't save >1000 redundant happairs
+    if dynamic_programming
+        redundant_haplotypes = [[Tuple{Int32, Int32}[] for i in 1:windows] for j in 1:people]
+        [[sizehint!(redundant_haplotypes[j][i], 1000) for i in 1:windows] for j in 1:people] # don't save >1000 redundant happairs
+    else
+        redundant_haplotypes = [OptimalHaplotypeSet(windows, nhaplotypes(compressed_Hunique)) for i in 1:people]
+    end
     num_unique_haps = 0
     mutex = Threads.SpinLock()
-    ThreadPools.@qthreads for w in 1:windows
+    Threads.@threads for w in 1:windows
         Hw_aligned = compressed_Hunique.CW_typed[w].uniqueH
         Xw_idx_start = (w - 1) * width + 1
         Xw_idx_end = (w == windows ? length(X_pos) : w * width)
@@ -100,7 +105,7 @@ function phase(
         end
 
         # convert happairs (which index off unique haplotypes) to indices of full haplotype pool, and find all matching happairs
-        t4 = @elapsed compute_redundant_haplotypes!(redundant_haplotypes, compressed_Hunique, happairs, w)
+        t4 = @elapsed compute_redundant_haplotypes!(redundant_haplotypes, compressed_Hunique, happairs, w, dp = dynamic_programming)
 
         # record timings and haplotypes
         lock(mutex)
@@ -124,7 +129,11 @@ function phase(
     # offset = (chunks - 1) * snps_per_chunk
     phase_start = time()
     ph = [HaplotypeMosaicPair(ref_snps) for i in 1:people]
-    phase!(ph, X, compressed_Hunique, redundant_haplotypes, X_pos) # phase by dynamic programming + breakpoint search
+    if dynamic_programming
+        phase!(ph, X, compressed_Hunique, redundant_haplotypes, X_pos) # phase by dynamic programming + breakpoint search
+    else
+        phase_fast!(ph, X, compressed_Hunique, redundant_haplotypes, X_pos, 0) # phase by dynamic programming + breakpoint search
+    end
     phase_time = time() - phase_start
 
     #
@@ -162,7 +171,7 @@ function phase(
     println("    Phasing by dynamic programming  = ", round(phase_time, sigdigits=6), " seconds")
     println("    Imputation                      = ", round(impute_time, sigdigits=6), " seconds\n")
 
-    return ph, redundant_haplotypes
+    return redundant_haplotypes, ph
 end
 
 """
@@ -189,12 +198,10 @@ function phase!(
 
     # declare some constants
     people = size(X, 2)
-    haplotypes = nhaplotypes(compressed_Hunique)
     snps = size(X, 1)
     width = compressed_Hunique.width
     windows = floor(Int, snps / width)
     H_pos = compressed_Hunique.pos
-    last_window_width = snps - (windows - 1) * width 
     XtoH_idx = indexin(X_pos, H_pos)
 
     # allocate working arrays
@@ -279,7 +286,7 @@ since we can have the previous and next window both extend into the current one,
 this is extremely rare.
 """
 function update_phase!(ph::HaplotypeMosaic, compressed_Hunique::CompressedHaplotypes,
-    bkpt::Int, hap_prev::Int32, hap_curr::Int32, w::Int, width::Int, chunk_offset::Int,
+    bkpt::Int, hap_prev, hap_curr, w::Int, width::Int, chunk_offset::Int,
     XtoH_idx::AbstractVector, Xwi_start::Int, Xwi_end::Int)
 
     # no breakpoints
@@ -331,4 +338,288 @@ function update_phase!(ph::HaplotypeMosaic, compressed_Hunique::CompressedHaplot
     end
 
     return nothing
+end
+
+function phase_fast!(
+    ph::Vector{HaplotypeMosaicPair},
+    X::AbstractMatrix{Union{Missing, T}},
+    compressed_Hunique::CompressedHaplotypes,
+    hapset::Vector{OptimalHaplotypeSet},
+    X_pos::Vector{Int},
+    chunk_offset::Int = 0,
+    ) where T <: Real
+
+    # declare some constants
+    people = size(X, 2)
+    snps = size(X, 1)
+    haplotypes = nhaplotypes(compressed_Hunique)
+    width = compressed_Hunique.width
+    windows = floor(Int, snps / width)
+    H_pos = compressed_Hunique.pos
+    XtoH_idx = indexin(X_pos, H_pos)
+
+    # allocate working arrays
+    haplo_chain = ([copy(hapset[i].strand1[1]) for i in 1:people], [copy(hapset[i].strand2[1]) for i in 1:people])
+    chain_next  = (BitVector(undef, haplotypes), BitVector(undef, haplotypes))
+    window_span = (ones(Int, people), ones(Int, people))
+    pmeter      = Progress(people, 5, "Intersecting haplotypes...")
+
+    # begin intersecting haplotypes window by window
+    @inbounds for i in 1:people
+        for w in 2:windows
+            # Decide whether to cross over based on the larger intersection
+            # A   B      A   B
+            # |   |  or    X
+            # C   D      C   D
+            chain_next[1] .= haplo_chain[1][i] .& hapset[i].strand1[w] # not crossing over
+            chain_next[2] .= haplo_chain[1][i] .& hapset[i].strand2[w] # crossing over
+            AC = sum(chain_next[1])
+            AD = sum(chain_next[2])
+            chain_next[1] .= haplo_chain[2][i] .& hapset[i].strand1[w] # crossing over
+            chain_next[2] .= haplo_chain[2][i] .& hapset[i].strand2[w] # not crossing over
+            BC = sum(chain_next[1])
+            BD = sum(chain_next[2])
+            if AC + BD < AD + BC
+                hapset[i].strand1[w], hapset[i].strand2[w] = hapset[i].strand2[w], hapset[i].strand1[w]
+            end
+
+            # intersect all surviving haplotypes with next window
+            chain_next[1] .= haplo_chain[1][i] .& hapset[i].strand1[w]
+            chain_next[2] .= haplo_chain[2][i] .& hapset[i].strand2[w]
+
+            # strand 1 becomes empty
+            if sum(chain_next[1]) == 0
+                # delete all nonmatching haplotypes in previous windows
+                for ww in (w - window_span[1][i]):(w - 1)
+                    hapset[i].strand1[ww] .= haplo_chain[1][i]
+                end
+
+                # reset counters and storage
+                haplo_chain[1][i] .= hapset[i].strand1[w]
+                window_span[1][i] = 1
+            else
+                haplo_chain[1][i] .= chain_next[1]
+                window_span[1][i] += 1
+            end
+
+            # strand 2 becomes empty
+            if sum(chain_next[2]) == 0
+                # delete all nonmatching haplotypes in previous windows
+                for ww in (w - window_span[2][i]):(w - 1)
+                    hapset[i].strand2[ww] .= haplo_chain[2][i]
+                end
+
+                # reset counters and storage
+                haplo_chain[2][i] .= hapset[i].strand2[w]
+                window_span[2][i] = 1
+            else
+                haplo_chain[2][i] .= chain_next[2]
+                window_span[2][i] += 1
+            end
+        end
+        next!(pmeter) #update progress
+    end
+
+    # get rid of redundant haplotypes in last few windows separately, since intersection may not become empty
+    for i in 1:people
+        for ww in (windows - window_span[1][i] + 1):windows
+            hapset[i].strand1[ww] .= haplo_chain[1][i]
+        end
+
+        for ww in (windows - window_span[2][i] + 1):windows
+            hapset[i].strand2[ww] .= haplo_chain[2][i]
+        end
+    end
+
+    # phase first window 
+    for i in 1:people
+        # complete haplotype idx
+        hap1 = something(findfirst(hapset[i].strand1[1]))
+        hap2 = something(findfirst(hapset[i].strand2[1]))
+
+        # convert hap1 & hap2 to unique index
+        h1 = complete_idx_to_unique_all_idx(hap1, 1, compressed_Hunique)
+        h2 = complete_idx_to_unique_all_idx(hap2, 1, compressed_Hunique)
+        push!(ph[i].strand1.start, 1 + chunk_offset)
+        push!(ph[i].strand1.window, 1) 
+        push!(ph[i].strand1.haplotypelabel, h1)
+        push!(ph[i].strand2.start, 1 + chunk_offset)
+        push!(ph[i].strand2.window, 1)
+        push!(ph[i].strand2.haplotypelabel, h2)
+    end
+
+    # find optimal break points and record info to phase
+    # first  1/3: ((w - 2) * width + 1):((w - 1) * width)
+    # middle 1/3: ((w - 1) * width + 1):(      w * width)
+    # last   1/3: (      w * width + 1):((w + 1) * width)
+    pmeter = Progress(people, 5, "Merging breakpoints...")
+    strand1_intersect = [copy(chain_next[1]) for i in 1:Threads.nthreads()]
+    strand2_intersect = [copy(chain_next[2]) for i in 1:Threads.nthreads()]
+    Threads.@threads for i in 1:people
+        id = Threads.threadid()
+
+        # search breakpoints 
+        for w in 2:windows
+            # get genotype vector spanning 2 windows
+            Xwi_start = (w - 2) * width + 1
+            Xwi_end = (w == windows ? snps : w * width)
+            Xwi = view(X, Xwi_start:Xwi_end, i)
+
+            # let first surviving haplotype be phase
+            hap1_curr = something(findfirst(strand1_intersect[id]))
+            hap2_curr = something(findfirst(strand2_intersect[id]))
+            hap1_prev = ph[i].strand1.haplotypelabel[end]
+            hap2_prev = ph[i].strand2.haplotypelabel[end]
+
+            # convert hap1 & hap2 to unique index
+            h1_curr = complete_idx_to_unique_all_idx(hap1_curr, w, compressed_Hunique)
+            h2_curr = complete_idx_to_unique_all_idx(hap2_curr, w, compressed_Hunique)
+            h1_prev = complete_idx_to_unique_all_idx(hap1_prev, w, compressed_Hunique)
+            h2_prev = complete_idx_to_unique_all_idx(hap2_prev, w, compressed_Hunique)
+
+            # find optimal breakpoint if there is one
+            _, bkpts = continue_haplotype(Xwi, compressed_Hunique, 
+                w, (h1_prev, h2_prev), (h1_curr, h2_curr))
+
+            # record strand 1 info
+            update_phase!(ph[i].strand1, compressed_Hunique, bkpts[1], h1_prev, 
+                h1_curr, w, width, chunk_offset, XtoH_idx, Xwi_start, Xwi_end)
+            # record strand 2 info
+            update_phase!(ph[i].strand2, compressed_Hunique, bkpts[2], h2_prev, 
+                h2_curr, w, width, chunk_offset, XtoH_idx, Xwi_start, Xwi_end)
+        end
+
+
+
+
+        # for w in 2:windows
+        #     Xi = view(X, ((w - 2) * width + 1):(w * width), i)
+        #     Hprev = compressed_Hunique.CW_typed[window - 1].uniqueH # unique haplotypes with only typed snps in window - 1
+        #     Hcurr = compressed_Hunique.CW_typed[window].uniqueH     # unique haplotypes with only typed snps in window
+
+        #     strand1_intersect[id] .= hapset[i].strand1[w - 1] .& hapset[i].strand1[w]
+        #     strand2_intersect[id] .= hapset[i].strand2[w - 1] .& hapset[i].strand2[w]
+
+        #     # double haplotype switch
+        #     # if sum(strand1_intersect[id]) == sum(strand2_intersect[id]) == 0
+        #     #     s1_prev = ph[i].strand1.haplotypelabel[end]
+        #     #     s2_prev = ph[i].strand2.haplotypelabel[end]
+        #     #     w1_prev = ph[i].strand1.window[end]
+        #     #     w2_prev = ph[i].strandw.window[end]
+        #     #     # search breakpoints when choosing first pair
+        #     #     # s1_next = findfirst(hapset[i].strand1[w]) :: Int64
+        #     #     # s2_next = findfirst(hapset[i].strand2[w]) :: Int64
+        #     #     # bkpt, err_optim = search_breakpoint(Xi, Hi, (s1_prev, s1_next), (s2_prev, s2_next))
+        #     #     # # record info into phase
+        #     #     # push!(ph[i].strand1.start, chunk_offset + w_start + bkpt[1])
+        #     #     # push!(ph[i].strand2.start, chunk_offset + w_start + bkpt[2])
+        #     #     # push!(ph[i].strand1.haplotypelabel, s1_next)
+        #     #     # push!(ph[i].strand2.haplotypelabel, s2_next)
+        #     # end
+
+        #     # no breakpoints
+        #     if sum(strand1_intersect[id]) ≠ 0 ≠ sum(strand2_intersect[id])
+        #         # let first surviving haplotype be phase
+        #         hap1 = something(findfirst(strand1_intersect[id]))
+        #         hap2 = something(findfirst(strand2_intersect[id]))
+        #         # convert hap1 & hap2 to unique index
+        #         h1 = complete_idx_to_unique_all_idx(hap1, w, compressed_Hunique)
+        #         h2 = complete_idx_to_unique_all_idx(hap2, w, compressed_Hunique)
+        #         push!(ph[i].strand1.start, chunk_offset + (w - 1) * width + 1)
+        #         push!(ph[i].strand1.window, w) 
+        #         push!(ph[i].strand1.haplotypelabel, h1)
+        #         push!(ph[i].strand2.start, chunk_offset + (w - 1) * width + 1)
+        #         push!(ph[i].strand2.window, w)
+        #         push!(ph[i].strand2.haplotypelabel, h2)
+        #         continue
+        #     end
+
+        #     # strand 1 breakpoint
+        #     if sum(strand1_intersect[id]) == 0
+        #         # first record strand 2 info
+        #         hap2 = something(findfirst(strand2_intersect[id]))
+        #         h2 = complete_idx_to_unique_all_idx(hap2, w, compressed_Hunique)
+        #         push!(ph[i].strand2.start, chunk_offset + (w - 1) * width + 1)
+        #         push!(ph[i].strand2.window, w)
+        #         push!(ph[i].strand2.haplotypelabel, h2)
+
+        #         # find haplotypes that needs breakpoint searching
+        #         s1_prev = ph[i].strand1.haplotypelabel[end]
+        #         s2_prev = ph[i].strand2.haplotypelabel[end]
+        #         s2_curr = something(findfirst(hapset[i].strand2[w]))
+        #         s1_win_next = findall(hapset[i].strand1[w])
+
+        #         # form strand 2 (without bkpts) and extend previous strand 1 into current window
+        #         iu = complete_idx_to_unique_typed_idx(s2_prev, w - 1, compressed_Hunique)
+        #         ku = complete_idx_to_unique_typed_idx(s2_curr, w, compressed_Hunique)
+        #         ju1 = complete_idx_to_unique_typed_idx(s1_prev, w - 1, compressed_Hunique)
+        #         ju2 = complete_idx_to_unique_typed_idx(s1_prev, w, compressed_Hunique)
+        #         s2  = vcat(Hprev[:, iu], Hcurr[:, ku])
+        #         s11 = vcat(Hprev[:, ju1], Hcurr[:, ju2])
+
+        #         best_bktp = 0
+        #         best_err  = typemax(Int)
+        #         best_s1_next = 0
+        #         for s1_next in s1_win_next
+        #             # extend strand 1 to previous window
+        #             lu1 = complete_idx_to_unique_typed_idx(s1_next, w - 1, compressed_Hunique)
+        #             lu2 = complete_idx_to_unique_typed_idx(s1_next, w, compressed_Hunique)
+        #             s12 = vcat(Hprev[:, lu1], Hcurr[:, lu2])
+
+        #             bkpt, err_optim = search_breakpoint(X, s2, s11, s12)
+        #             if err_optim < best_err
+        #                 best_bktp, best_err, best_s1_next = bkpt, err_optim, s1_next
+        #             end
+        #         end
+
+        #         # record strand 1 info into phase
+        #         if (w - 1) * width + 1 <= best_bktp <= w * width
+        #             # previous window extends to current window 
+        #             h1 = complete_idx_to_unique_all_idx(hap_prev, w, compressed_Hunique)
+        #             push!(ph.start, chunk_offset + Xwi_mid)
+        #             push!(ph.haplotypelabel, h1)
+        #             push!(ph.window, w)
+        #             # 2nd part of current window
+        #             h2 = complete_idx_to_unique_all_idx(hap_curr, w, compressed_Hunique)
+        #             push!(ph.start, chunk_offset + X_bkpt_end)
+        #             push!(ph.haplotypelabel, h2)
+        #             push!(ph.window, w)
+        #         elseif best_bktp < (w - 1) * width + 1
+        #             # current window extends to previous window
+        #             h1 = complete_idx_to_unique_all_idx(hap_curr, w - 1, compressed_Hunique)
+        #             push!(ph.start, chunk_offset + X_bkpt_end)
+        #             push!(ph.haplotypelabel, h1)
+        #             push!(ph.window, w - 1)
+        #             # update current window
+        #             h2 = complete_idx_to_unique_all_idx(hap_curr, w, compressed_Hunique)
+        #             push!(ph.start, chunk_offset + Xwi_mid)
+        #             push!(ph.haplotypelabel, h2)
+        #             push!(ph.window, w)
+        #         else
+        #             error("shouldn't have reached here")
+        #         end
+        #     end
+
+        #     # strand 2 breakpoint
+        #     if sum(strand2_intersect[id]) == 0
+        #         # search breakpoints among all possible haplotypes
+        #         s2_prev = ph[i].strand2.haplotypelabel[end]
+        #         s2_win_next = findall(hapset[i].strand2[w])
+        #         s1_win_next = findall(hapset[i].strand1[w])
+        #         best_bktp = 0
+        #         best_err  = typemax(Int)
+        #         best_s2_next = 0
+        #         for s2_next in s2_win_next, s1_next in s1_win_next
+        #             bkpt, err_optim = search_breakpoint(Xi, Hi, s1_next, (s2_prev, s2_next))
+        #             if err_optim < best_err
+        #                 best_bktp, best_err, best_s2_next = bkpt, err_optim, s2_next
+        #             end
+        #         end
+        #         # record info into phase
+        #         push!(ph[i].strand2.start, chunk_offset + w_start + best_bktp)
+        #         push!(ph[i].strand2.haplotypelabel, best_s2_next)
+        #     end
+        # end
+        next!(pmeter) #update progress
+    end
 end
