@@ -1,7 +1,6 @@
 """
 Records optimal-redundant haplotypes for each window. Currently, only the first 1000
 haplotype pairs will be saved to reduce search space for dynamic programming. 
-
 Warning: This function is called in a multithreaded loop. If you modify this function
 you must check whether imputation accuracy is affected (when run with >1 threads).
 """
@@ -10,66 +9,51 @@ function compute_redundant_haplotypes!(
     Hunique::CompressedHaplotypes, 
     happairs::Tuple{AbstractVector, AbstractVector},
     window::Int;
-    dp::Bool = false,
+    dp::Bool = false, # dynamic programming
     ) where T <: Tuple{Int32, Int32}
     
     people = length(redundant_haplotypes)
-    h1_set = Int32[]
-    h2_set = Int32[]
-    sizehint!(h1_set, 100_000)
-    sizehint!(h1_set, 100_000)
-
-    t1 = t2 = t3 = 0
 
     if dp
         @inbounds for k in 1:people
-            t1 += @elapsed begin
-                Hi_idx = unique_idx_to_complete_idx(happairs[1][k], window, Hunique)
-                Hj_idx = unique_idx_to_complete_idx(happairs[2][k], window, Hunique)
-            end
+            Hi_idx = unique_idx_to_complete_idx(happairs[1][k], window, Hunique)
+            Hj_idx = unique_idx_to_complete_idx(happairs[2][k], window, Hunique)
 
-            # loop through all haplotypes and find ones that match either of the optimal haplotypes 
-            t2 += @elapsed begin
-                empty!(h1_set)
-                empty!(h2_set)
-                for (idx, hap) in enumerate(Hunique.CW_typed[window].hapmap)
-                    hap == Hi_idx && push!(h1_set, idx)
-                    hap == Hj_idx && push!(h2_set, idx)
-                end
-            end
+            # find haplotypes that match Hi_idx and Hj_idx on typed snps
+            h1_set = Hunique.CW_typed[window].hapmap[Hi_idx]
+            h2_set = Hunique.CW_typed[window].hapmap[Hj_idx]
 
             # save first 1000 haplotype pairs
-            t3 += @elapsed begin 
-                for h1 in h1_set, h2 in h2_set
-                    if length(redundant_haplotypes[k][window]) < 1000 
-                        push!(redundant_haplotypes[k][window], (h1, h2))
-                    else
-                        break
-                    end
+            for h1 in h1_set, h2 in h2_set
+                if length(redundant_haplotypes[k][window]) < 1000 
+                    push!(redundant_haplotypes[k][window], (h1, h2))
+                else
+                    break
                 end
             end
         end
     else
         @inbounds for k in 1:people
-            t1 += @elapsed begin
-                Hi_idx = unique_idx_to_complete_idx(happairs[1][k], window, Hunique)
-                Hj_idx = unique_idx_to_complete_idx(happairs[2][k], window, Hunique)
-            end
+            Hi_idx = unique_idx_to_complete_idx(happairs[1][k], window, Hunique)
+            Hj_idx = unique_idx_to_complete_idx(happairs[2][k], window, Hunique)
 
-            # loop through all haplotypes and find ones that match either of the optimal haplotypes 
-            t2 += @elapsed begin 
-                mapping = Hunique.CW_typed[window].hapmap
-                redunhaps_bitvec1 = redundant_haplotypes[k].strand1[window]
-                redunhaps_bitvec2 = redundant_haplotypes[k].strand2[window]
-                for jj in eachindex(mapping)
-                    mapping[jj] == Hi_idx && (redunhaps_bitvec1[jj] = true)
-                    mapping[jj] == Hj_idx && (redunhaps_bitvec2[jj] = true)
-                end
+            # find haplotypes that match Hi_idx and Hj_idx on typed snps
+            h1_set = Hunique.CW_typed[window].hapmap[Hi_idx]
+            h2_set = Hunique.CW_typed[window].hapmap[Hj_idx]
+
+            # record matching haplotypes into bitvector
+            redunhaps_bitvec1 = redundant_haplotypes[k].strand1[window]
+            redunhaps_bitvec2 = redundant_haplotypes[k].strand2[window]
+            for i in h1_set
+                redunhaps_bitvec1[i] = true
+            end
+            for i in h2_set
+                redunhaps_bitvec2[i] = true
             end
         end
     end
 
-    return t1, t2, t3
+    return nothing
 end
 
 """
