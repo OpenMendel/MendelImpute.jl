@@ -2,9 +2,9 @@
 Data structure for keeping track of unique haplotypes in a window. 
 
 - `uniqueindex`: the unique haplotype indices in a window.
-- `hapmap`: information to map every haplotype to the first appearance of the same haplotype
 - `to_unique`: map every haplotype index to the unique haplotype index
 - `uniqueH`: A BitMatrix storing unique haplotypes in columns or rows, depending on `dims` argument of `compress_haplotypes`
+- `hapmap`: Dictionary that maps every unique haplotype to all the same haplotypes
 
 # Example:
 
@@ -14,18 +14,18 @@ Suppose in window `w` there are 9 haplotypes (represented by different letters):
 
 then
 
-    uniqueindex = [1 2 4 6]
-    hapmap = [1 2 2 4 2 6 1 6 1]
-    to_unique = [1 2 2 3 2 4 1 4 1]
+    uniqueindex = [1, 2, 4, 6]
+    to_unique = [1, 2, 2, 3, 2, 4, 1, 4, 1]
     uniqueH = [a b c d]
-
-`hapmap` is used to find the set of matching haplotypes after identifying the best
-haplotype pair. If (b, c) is the optimal haplotype pair in the current window, then 
-the set of haplotypes that matches (b, c) is in columns {2, 3, 4, 5}
+    hapmap = `Dict{Int64,Array{Int64,1}} with 4 entry:
+        1 => [1, 7, 9]
+        2 => [2, 3, 5]
+        4 => [4]
+        6 => [6, 8]`
 """
 struct CompressedWindow
     uniqueindex::Vector{Int}
-    hapmap::Vector{Int}
+    hapmap::Dict{Int64, Vector{Int64}}
     to_unique::Vector{Int}
     uniqueH::BitMatrix
 end
@@ -125,16 +125,24 @@ function compress_haplotypes(H::AbstractMatrix, X::AbstractMatrix, outfile::Abst
         Hw_typed = H[XwtoH_idx, :]         # including only typed snps
 
         # find unique haplotypes on all SNPs
-        hapmap = groupslices(Hw, dims = 2)
-        unique_idx = unique(hapmap)
-        complete_to_unique = indexin(hapmap, unique_idx)
+        mapping = groupslices(Hw, dims = 2)
+        unique_idx = unique(mapping)
+        hapmap = Dict{Int, Vector{Int}}()
+        for idx in unique_idx
+            hapmap[idx] = findall(x -> x == idx, mapping)
+        end
+        complete_to_unique = indexin(mapping, unique_idx)
         uniqueH = Hw[:, unique_idx]
         compressed_Hunique.CW[w] = MendelImpute.CompressedWindow(unique_idx, hapmap, complete_to_unique, uniqueH)
 
         # find unique haplotypes on typed SNPs
-        hapmap_typed = groupslices(Hw_typed, dims = 2)
-        unique_idx_typed = unique(hapmap_typed)
-        complete_to_unique_typed = indexin(hapmap_typed, unique_idx_typed)
+        mapping_typed = groupslices(Hw_typed, dims = 2)
+        unique_idx_typed = unique(mapping_typed)
+        hapmap_typed = Dict{Int, Vector{Int}}()
+        for idx in unique_idx_typed
+            hapmap_typed[idx] = findall(x -> x == idx, mapping_typed)
+        end
+        complete_to_unique_typed = indexin(mapping_typed, unique_idx_typed)
         uniqueH_typed = Hw_typed[:, unique_idx_typed]
         compressed_Hunique.CW_typed[w] = MendelImpute.CompressedWindow(unique_idx_typed, hapmap_typed, complete_to_unique_typed, uniqueH_typed)
 

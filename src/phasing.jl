@@ -89,7 +89,7 @@ function phase(
     end
     num_unique_haps = 0
     mutex = Threads.SpinLock()
-    Threads.@threads for w in 1:windows
+    ThreadPools.@qthreads for w in 1:windows
         Hw_aligned = compressed_Hunique.CW_typed[w].uniqueH
         Xw_idx_start = (w - 1) * width + 1
         Xw_idx_end = (w == windows ? length(X_pos) : w * width)
@@ -436,7 +436,7 @@ function phase_fast!(
     # middle 1/3: ((w - 1) * width + 1):(      w * width)
     # last   1/3: (      w * width + 1):((w + 1) * width)
     pmeter = Progress(people, 5, "Merging breakpoints...")
-    for i in 1:people
+    ThreadPools.@qthreads for i in 1:people
         id = Threads.threadid()
 
         # phase first window
