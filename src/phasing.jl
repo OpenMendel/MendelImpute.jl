@@ -86,7 +86,7 @@ function phase(
     else
         redundant_haplotypes = [OptimalHaplotypeSet(windows, nhaplotypes(compressed_Hunique)) for i in 1:people]
     end
-    num_unique_haps = [0 for _ in 1:Threads.nthreads()]
+    num_unique_haps = zeros(Int, Threads.nthreads())
     quad_timers = [zeros(4) for _ in 1:Threads.nthreads()]
     ThreadPools.@qthreads for w in 1:windows
         Hw_aligned = compressed_Hunique.CW_typed[w].uniqueH
@@ -95,8 +95,12 @@ function phase(
         Xw_aligned = X[Xw_idx_start:Xw_idx_end, :]
 
         # computational routine
-        if !isnothing(thinning_factor)
-            happairs, hapscore, t1, t2, t3 = haplopair_thin(Xw_aligned, Hw_aligned, keep=thinning_factor)
+        if !isnothing(thinning_factor) 
+            if size(Hw_aligned, 2) > thinning_factor
+                happairs, hapscore, t1, t2, t3 = haplopair_thin(Xw_aligned, Hw_aligned, keep=thinning_factor)
+            else
+                happairs, hapscore, t1, t2, t3 = haplopair(Xw_aligned, Hw_aligned)
+            end
         elseif rescreen
             happairs, hapscore, t1, t2, t3 = haplopair_screen(Xw_aligned, Hw_aligned)
         else
