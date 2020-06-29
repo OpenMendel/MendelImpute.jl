@@ -4,7 +4,7 @@ Data structure for keeping track of unique haplotypes in a window.
 - `uniqueindex`: the unique haplotype indices in a window.
 - `to_unique`: map every haplotype index to the unique haplotype index
 - `uniqueH`: A BitMatrix storing unique haplotypes in columns or rows, depending on `dims` argument of `compress_haplotypes`
-- `hapmap`: Dictionary that maps every unique haplotype to all the same haplotypes
+- `hapmap`: Dictionary that maps every unique haplotype to all the same haplotypes. If a haplotype is unique, it will not be recorded in `hapmap` to conserve memory.
 
 # Example:
 
@@ -17,11 +17,12 @@ then
     uniqueindex = [1, 2, 4, 6]
     to_unique = [1, 2, 2, 3, 2, 4, 1, 4, 1]
     uniqueH = [a b c d]
-    hapmap = `Dict{Int64,Array{Int64,1}} with 4 entry:
+    hapmap = `Dict{Int64,Array{Int64,1}} with 3 entry:
         1 => [1, 7, 9]
         2 => [2, 3, 5]
-        4 => [4]
         6 => [6, 8]`
+
+where `4 => [4]` in `hapmap` has been skipped since it is a singleton.
 """
 struct CompressedWindow
     uniqueindex::Vector{Int}
@@ -129,7 +130,12 @@ function compress_haplotypes(H::AbstractMatrix, X::AbstractMatrix, outfile::Abst
         unique_idx = unique(mapping)
         hapmap = Dict{Int, Vector{Int}}()
         for idx in unique_idx
-            hapmap[idx] = findall(x -> x == idx, mapping)
+            redundant_haplotypes = findall(x -> x == idx, mapping)
+            if length(redundant_haplotypes) == 1
+                continue # skip singletons
+            else
+                hapmap[idx] = redundant_haplotypes
+            end
         end
         complete_to_unique = indexin(mapping, unique_idx)
         uniqueH = Hw[:, unique_idx]
@@ -140,7 +146,12 @@ function compress_haplotypes(H::AbstractMatrix, X::AbstractMatrix, outfile::Abst
         unique_idx_typed = unique(mapping_typed)
         hapmap_typed = Dict{Int, Vector{Int}}()
         for idx in unique_idx_typed
-            hapmap_typed[idx] = findall(x -> x == idx, mapping_typed)
+            redundant_haplotypes = findall(x -> x == idx, mapping_typed)
+            if length(redundant_haplotypes) == 1
+                continue # skip singletons
+            else
+                hapmap_typed[idx] = redundant_haplotypes
+            end
         end
         complete_to_unique_typed = indexin(mapping_typed, unique_idx_typed)
         uniqueH_typed = Hw_typed[:, unique_idx_typed]

@@ -74,7 +74,6 @@ function phase(
     tgt_snps = size(X, 1)
     ref_snps = length(compressed_Hunique.pos)
     windows = floor(Int, tgt_snps / width)
-    quad_timers = zeros(4)
 
     #
     # compute redundant haplotype sets
@@ -87,8 +86,8 @@ function phase(
     else
         redundant_haplotypes = [OptimalHaplotypeSet(windows, nhaplotypes(compressed_Hunique)) for i in 1:people]
     end
-    num_unique_haps = 0
-    mutex = Threads.SpinLock()
+    num_unique_haps = [0 for _ in 1:Threads.nthreads()]
+    quad_timers = [zeros(4) for _ in 1:Threads.nthreads()]
     ThreadPools.@qthreads for w in 1:windows
         Hw_aligned = compressed_Hunique.CW_typed[w].uniqueH
         Xw_idx_start = (w - 1) * width + 1
@@ -108,19 +107,18 @@ function phase(
         t4 = @elapsed compute_redundant_haplotypes!(redundant_haplotypes, compressed_Hunique, happairs, w, dp = dynamic_programming)
 
         # record timings and haplotypes
-        lock(mutex)
-        quad_timers[1] += t1
-        quad_timers[2] += t2
-        quad_timers[3] += t3
-        quad_timers[4] += t4
-        num_unique_haps += size(Hw_aligned, 2)
-        unlock(mutex)
+        id = Threads.threadid()
+        quad_timers[id][1] += t1
+        quad_timers[id][2] += t2
+        quad_timers[id][3] += t3
+        quad_timers[id][4] += t4
+        num_unique_haps[id] += size(Hw_aligned, 2)
 
         # update progress
         next!(pmeter)
     end
     avg_num_unique_haps = sum(num_unique_haps) / windows
-    quad_timers ./= Threads.nthreads()
+    quad_timers = sum(quad_timers) ./ Threads.nthreads()
     calculate_happairs_time = time() - calculate_happairs_start
 
     #

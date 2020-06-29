@@ -20,8 +20,8 @@ function compute_redundant_haplotypes!(
             Hj_idx = unique_idx_to_complete_idx(happairs[2][k], window, Hunique)
 
             # find haplotypes that match Hi_idx and Hj_idx on typed snps
-            h1_set = Hunique.CW_typed[window].hapmap[Hi_idx]
-            h2_set = Hunique.CW_typed[window].hapmap[Hj_idx]
+            h1_set = get(Hunique.CW_typed[window].hapmap, Hi_idx, Hi_idx)
+            h2_set = get(Hunique.CW_typed[window].hapmap, Hj_idx, Hj_idx)
 
             # save first 1000 haplotype pairs
             for h1 in h1_set, h2 in h2_set
@@ -38,8 +38,8 @@ function compute_redundant_haplotypes!(
             Hj_idx = unique_idx_to_complete_idx(happairs[2][k], window, Hunique)
 
             # find haplotypes that match Hi_idx and Hj_idx on typed snps
-            h1_set = Hunique.CW_typed[window].hapmap[Hi_idx]
-            h2_set = Hunique.CW_typed[window].hapmap[Hj_idx]
+            h1_set = get(Hunique.CW_typed[window].hapmap, Hi_idx, Hi_idx)
+            h2_set = get(Hunique.CW_typed[window].hapmap, Hj_idx, Hj_idx)
 
             # record matching haplotypes into bitvector
             redunhaps_bitvec1 = redundant_haplotypes[k].strand1[window]
