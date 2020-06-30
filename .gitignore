@@ -3,5 +3,25 @@
 *.jl.mem
 .DS_Store
 .ipynb_checkpoints
+biona001@hoffman2.idre.ucla.edu
+
+# don't track real data
 AFRped_geno.txt
 GBR_data.csv
+
+# don't track simulations 
+*.gz
+*.vcf
+*.vcf.gz
+*.m3vcf
+*.m3vcf.gz
+*.info
+*.log
+*.jar
+*eagle
+*.tbi
+*.jld2
+*.jlso
+*.bson
+*.h5
+*.bref3
