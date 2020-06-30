@@ -179,24 +179,11 @@ function haplopair!(
     n, d = size(N)
     perm = zeros(Int, d)
     fill!(hapmin, typemax(T))
+    keep > d && (keep = d)
 
     for i in 1:n
         # find top matching haplotypes for sample i
         partialsortperm!(perm, view(R, :, i), keep) # perm[1:keep] = hap indices that best matches xi 
-        
-        # @inbounds for (idx1, k) in enumerate(perm)
-        #     idx1 > keep && break
-        #     for (idx2, j) in enumerate(perm)
-        #         idx2 > keep && break
-        #         idx2 < idx1 && continue
-        #         Mkj = k > j ? M[j, k] : M[k, j] # since M upper triangular
-
-        #         score = Mkj - N[i, k] - N[i, j]
-        #         if score < hapmin[i]
-        #             hapmin[i], happair1[i], happair2[i] = score, k, j
-        #         end
-        #     end
-        # end
 
         @inbounds for (idx1, k) in enumerate(perm)
             idx1 > keep && break
@@ -210,13 +197,6 @@ function haplopair!(
                 end
             end
         end
-        # for (k, j) in Iterators.product(perm[1:keep], perm[1:keep])
-        #     k > j && continue # since M upper triangular
-        #     score = M[k, j] - N[i, k] - N[i, j]
-        #     if score < hapmin[i]
-        #         hapmin[i], happair1[i], happair2[i] = score, k, j
-        #     end
-        # end
     end
 
     return nothing
