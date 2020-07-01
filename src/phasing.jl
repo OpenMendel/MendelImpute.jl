@@ -96,13 +96,13 @@ function phase(
 
         # computational routine
         if !isnothing(thinning_factor) 
-            # if size(Hw_aligned, 2) > thinning_factor
-            #     # happairs, hapscore, t1, t2, t3 = haplopair_thin(Xw_aligned, Hw_aligned, keep=thinning_factor)
-            #     happairs, hapscore, t1, t2, t3 = haplopair_thin2(Xw_aligned, Hw_aligned, keep=thinning_factor)
-            # else
-            #     happairs, hapscore, t1, t2, t3 = haplopair(Xw_aligned, Hw_aligned)
-            # end
-            happairs, hapscore, t1, t2, t3 = haplopair_thin2(Xw_aligned, Hw_aligned, keep=thinning_factor)
+            if size(Hw_aligned, 2) > thinning_factor
+                # happairs, hapscore, t1, t2, t3 = haplopair_thin(Xw_aligned, Hw_aligned, keep=thinning_factor)
+                happairs, hapscore, t1, t2, t3 = haplopair_thin2(Xw_aligned, Hw_aligned, keep=thinning_factor)
+            else
+                happairs, hapscore, t1, t2, t3 = haplopair(Xw_aligned, Hw_aligned)
+            end
+            # happairs, hapscore, t1, t2, t3 = haplopair_thin2(Xw_aligned, Hw_aligned, keep=thinning_factor)
         elseif rescreen
             happairs, hapscore, t1, t2, t3 = haplopair_screen(Xw_aligned, Hw_aligned)
         else

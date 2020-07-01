@@ -98,6 +98,10 @@ function haplopair!(
     return hapmin, hap1, hap2
 end
 
+"""
+Same as `haplopair_thin` but internally it uses only BLAS 3 calls and does not recompute `M`
+for every sample. But this implies the search routine in `haplopair!` is not cache aware.  
+"""
 function haplopair_thin2(
     X::AbstractMatrix,
     H::AbstractMatrix;
