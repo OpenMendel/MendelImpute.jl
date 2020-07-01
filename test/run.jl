@@ -2213,6 +2213,34 @@ compress_haplotypes(reffile, tgtfile, outfile, width)
 
 
 
+using Revise
+using VCFTools
+using MendelImpute
+using GeneticVariation
+using Random
+using StatsBase
+using CodecZlib
+using ProgressMeter
+using JLD2, FileIO, JLSO
+using BenchmarkTools
+using GroupSlices
+
+Random.seed!(2020)
+n = 1000
+p = 512
+d = 1000
+
+X = rand(UInt8, p, n)
+H = bitrand(p, d)
+
+@btime haplopair_thin(X, H, keep=100)  #224.270 ms (5478 allocations: 8.17 MiB)
+@btime haplopair_thin2(X, H, keep=100) #69.389 ms (5018 allocations: 15.55 MiB)
+
+
+@btime haplopair_thin(X, H, keep=600)  #1.708 s (6507 allocations: 10.50 MiB)
+@btime haplopair_thin2(X, H, keep=600) #1.159 s (5019 allocations: 15.55 MiB)
+
+
 
 
 
