@@ -72,8 +72,10 @@ does not have missing data. Missing data is initialized as 2x alternate allele f
 * `hapscore`: haplotyping score. 0 means best. Larger means worse.
 """
 function haplopair(
-    X::AbstractMatrix{Union{UInt8, Missing}},
-    H::BitMatrix
+    # X::AbstractMatrix{Union{UInt8, Missing}},
+    # H::BitMatrix
+    X::AbstractMatrix,
+    H::AbstractMatrix
     )
 
     Xwork = zeros(Float32, size(X, 1), size(X, 2))

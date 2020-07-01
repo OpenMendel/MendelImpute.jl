@@ -1,6 +1,6 @@
-######## THIS FILE IS THE SAME AS `hpalotype_pair.jl`
-######## except it solves the least squares objective on only "thining_factor" unique haplotypes.
-######## where the top haplotypes are selected by minimizing dist(x, h). 
+######## THIS FILE IS THE SAME AS `haplotype_pair.jl`
+######## except it solves the least squares objective on only `keep (default 100)` unique 
+######## haplotypes, where the top haplotypes are selected by minimizing dist(x, h). 
 
 function haplopair_thin(
     X::AbstractMatrix,
@@ -19,13 +19,13 @@ function haplopair_thin(
     happairs = ones(Int, n), ones(Int, n)
     hapscore = zeros(Float32, n)
 
-    t1, t2, t3 = haplopair!(Xwork, Hwork, M, N, happairs, hapscore, keep)
-    t4 = 0 # no rescreening or 
+    t1, t2, t3 = haplopair_thin!(Xwork, Hwork, M, N, happairs, hapscore, keep)
+    t4 = 0 # no haplotype rescreening
 
     return happairs, hapscore, t1, t2, t3, t4
 end
 
-function haplopair!(
+function haplopair_thin!(
     X::AbstractMatrix,
     H::AbstractMatrix,
     M::AbstractMatrix,
@@ -58,7 +58,7 @@ function haplopair!(
     end
 
     # computational routine
-    t3 = @elapsed haplopair!(happairs[1], happairs[2], hapscore, M, N, R, keep)
+    t3 = @elapsed haplopair_thin!(happairs[1], happairs[2], hapscore, M, N, R, keep)
 
     # supplement the constant terms in objective
     t3 += @elapsed begin @inbounds for j in 1:n
@@ -71,7 +71,7 @@ function haplopair!(
     return t1, t2, t3
 end
 
-function haplopair!(
+function haplopair_thin!(
     happair1::AbstractVector{Int},
     happair2::AbstractVector{Int},
     hapmin::AbstractVector{T},

@@ -2148,7 +2148,7 @@ b = rand(1000);
 
 
 
-using BenchmarkTools, Random
+using BenchmarkTools, Random, Lasso
 
 """
 Find minimum of `M_jk - N_ij - N_ik` for each i. M is upper triangular. 
@@ -2157,8 +2157,8 @@ Saves minimum value in `best_err` and `j, k` index in `row` and `col`.
 """
 function best_index!(
     best_err::Vector{T},
-    row::Vector{Int},
-    col::Vector{Int},
+    row::Vector{Int32},
+    col::Vector{Int32},
     M::AbstractMatrix{T},
     N::AbstractMatrix{T},
     ) where T <: Real
@@ -2182,13 +2182,16 @@ n = 100
 p = 100
 d = 5000
 
-row_index, col_index = ones(Int, n), ones(Int, n)
-best_err = [typemax(Float64) for _ in 1:n]
-M = rand(d, d)
-N = rand(n, d)
+row_index, col_index = ones(Int32, n), ones(Int32, n)
+best_err = [typemax(Float32) for _ in 1:n]
+M = rand(Float32, d, d)
+N = rand(Float32, n, d)
 
-@btime best_index!($best_err, $row_index, $col_index, $M, $N)
+# use Int64: 886.923 ms (0 allocations: 0 bytes)
+@btime best_index!($best_err, $row_index, $col_index, $M, $N) setup=(fill!(best_err, Inf32); row_index = ones(Int, n); col_index = ones(Int, n))
 
+# use Int32: 892.310 ms (0 allocations: 0 bytes)
+@btime best_index!($best_err, $row_index, $col_index, $M, $N) setup=(fill!(best_err, Inf32); row_index = ones(Int32, n); col_index = ones(Int32, n))
 
 
 using Revise
@@ -2240,6 +2243,44 @@ H = bitrand(p, d)
 @btime haplopair_thin(X, H, keep=600)  #1.708 s (6507 allocations: 10.50 MiB)
 @btime haplopair_thin2(X, H, keep=600) #1.159 s (5019 allocations: 15.55 MiB)
 
+
+
+
+
+
+using Revise
+using VCFTools
+using MendelImpute
+using GeneticVariation
+using Random
+using StatsBase
+using CodecZlib
+using ProgressMeter
+using JLD2, FileIO, JLSO
+using BenchmarkTools
+using GroupSlices
+using Lasso
+
+Random.seed!(2020)
+n = 1000
+p = 512
+d = 1000
+
+X = rand(p, n)
+H = rand(0.:1., p, d)
+happairs, hapscore = haplopair(X, H)
+
+# try lasso on x1
+x1 = X[:, 1];
+path = fit(LassoPath, H, x1, Normal(), IdentityLink(), λ=collect(0.035:0.001:0.039))
+path.coefs[:, 3] # picks 335 and 443
+happairs[1][1], happairs[2][1] # our code picks (453, 543)
+
+# try lasso on x2
+x2 = X[:, 2];
+path = fit(LassoPath, H, x2, Normal(), IdentityLink(), λ=collect(0.035:0.001:0.039))
+path.coefs[:, 3] # picks 139 and 983
+happairs[1][2], happairs[2][2] # our code picks (428, 518)
 
 
 
