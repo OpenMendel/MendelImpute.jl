@@ -1,4 +1,4 @@
-######## THIS FILE IS THE SAME AS `hpalotype_pair.jl`
+######## THIS FILE IS THE SAME AS `haplotype_pair.jl`
 ######## except it computes a number of top matching haplotype pairs
 ######## and then screens them each based on the observed entries. 
 
@@ -81,12 +81,14 @@ function haplopair_screen(
     sizehint!.(happairs, 100) # will not save > 100 unique haplotype pairs to conserve memory
 
     # compute top haplotype pairs for each genotype vector
-    t1, t2 = haplopair!(Xwork, Hwork, M, N, happairs, hapscore)
+    t2, t3 = haplopair!(Xwork, Hwork, M, N, happairs, hapscore)
     
     # screen for best haplotype pair based on observed entries
-    t3 = @elapsed choose_happair!(X, H, happairs, hapscore)
+    t4 = @elapsed choose_happair!(X, H, happairs, hapscore)
 
-    return happairs, hapscore, t1, t2, t3
+    t1 = 0 # no time spent on haplotype thinning
+
+    return happairs, hapscore, t1, t2, t3, t4
 end
 
 """
@@ -118,7 +120,7 @@ function haplopair!(
     p, n, d = size(X, 1), size(X, 2), size(H, 2)
 
     # assemble M (upper triangular only)
-    t1 = @elapsed begin 
+    t2 = @elapsed begin 
         mul!(M, Transpose(H), H)
         for j in 1:d, i in 1:(j - 1) # off-diagonal
             M[i, j] = 2M[i, j] + M[i, i] + M[j, j]
@@ -135,17 +137,17 @@ function haplopair!(
     end
 
     # computational routine
-    t2 = @elapsed haplopair!(happairs, hapscore, M, N)
+    t3 = @elapsed haplopair!(happairs, hapscore, M, N)
 
     # supplement the constant terms in objective
-    t2 += @elapsed begin @inbounds for j in 1:n
+    t3 += @elapsed begin @inbounds for j in 1:n
             @simd for i in 1:p
                 hapscore[j] += abs2(X[i, j])
             end
         end
     end
 
-    return t1, t2
+    return t2, t3
 end
 
 """

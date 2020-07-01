@@ -6,7 +6,6 @@ module MendelImpute
     
     using LinearAlgebra
     using StatsBase
-    using ElasticArrays
     using GeneticVariation
     using VCFTools
     using SnpArrays

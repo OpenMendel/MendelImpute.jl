@@ -76,7 +76,13 @@ function phase(
     windows = floor(Int, tgt_snps / width)
 
     #
-    # compute redundant haplotype sets
+    # compute redundant haplotype sets. 
+    # There are 5 timers (some may be 0):
+    #     t1 = computing dist(X, H)
+    #     t2 = BLAS3 mul! to get M and N
+    #     t3 = haplopair search
+    #     t4 = rescreen time
+    #     t5 = finding redundant happairs
     #
     calculate_happairs_start = time()
     pmeter = Progress(windows, 5, "Computing optimal haplotype pairs...")
@@ -87,7 +93,7 @@ function phase(
         redundant_haplotypes = [OptimalHaplotypeSet(windows, nhaplotypes(compressed_Hunique)) for i in 1:people]
     end
     num_unique_haps = zeros(Int, Threads.nthreads())
-    quad_timers = [zeros(4) for _ in 1:Threads.nthreads()]
+    timers = [zeros(5) for _ in 1:Threads.nthreads()]
     Threads.@threads for w in 1:windows
         Hw_aligned = compressed_Hunique.CW_typed[w].uniqueH
         Xw_idx_start = (w - 1) * width + 1
@@ -97,34 +103,35 @@ function phase(
         # computational routine
         if !isnothing(thinning_factor) 
             # if size(Hw_aligned, 2) > thinning_factor
-            #     # happairs, hapscore, t1, t2, t3 = haplopair_thin(Xw_aligned, Hw_aligned, keep=thinning_factor)
-            #     happairs, hapscore, t1, t2, t3 = haplopair_thin2(Xw_aligned, Hw_aligned, keep=thinning_factor)
+            #     # happairs, hapscore, t1, t2, t3, t4 = haplopair_thin(Xw_aligned, Hw_aligned, keep=thinning_factor)
+            #     happairs, hapscore, t1, t2, t3, t4 = haplopair_thin2(Xw_aligned, Hw_aligned, keep=thinning_factor)
             # else
-            #     happairs, hapscore, t1, t2, t3 = haplopair(Xw_aligned, Hw_aligned)
+            #     happairs, hapscore, t1, t2, t3, t4 = haplopair(Xw_aligned, Hw_aligned)
             # end
-            happairs, hapscore, t1, t2, t3 = haplopair_thin(Xw_aligned, Hw_aligned, keep=thinning_factor)
+            happairs, hapscore, t1, t2, t3, t4 = haplopair_thin(Xw_aligned, Hw_aligned, keep=thinning_factor)
         elseif rescreen
-            happairs, hapscore, t1, t2, t3 = haplopair_screen(Xw_aligned, Hw_aligned)
+            happairs, hapscore, t1, t2, t3, t4 = haplopair_screen(Xw_aligned, Hw_aligned)
         else
-            happairs, hapscore, t1, t2, t3 = haplopair(Xw_aligned, Hw_aligned)
+            happairs, hapscore, t1, t2, t3, t4 = haplopair(Xw_aligned, Hw_aligned)
         end
 
         # convert happairs (which index off unique haplotypes) to indices of full haplotype pool, and find all matching happairs
-        t4 = @elapsed compute_redundant_haplotypes!(redundant_haplotypes, compressed_Hunique, happairs, w, dp = dynamic_programming)
+        t5 = @elapsed compute_redundant_haplotypes!(redundant_haplotypes, compressed_Hunique, happairs, w, dp = dynamic_programming)
 
         # record timings and haplotypes
         id = Threads.threadid()
-        quad_timers[id][1] += t1
-        quad_timers[id][2] += t2
-        quad_timers[id][3] += t3
-        quad_timers[id][4] += t4
+        timers[id][1] += t1
+        timers[id][2] += t2
+        timers[id][3] += t3
+        timers[id][4] += t4
+        timers[id][5] += t5
         num_unique_haps[id] += size(Hw_aligned, 2)
 
         # update progress
         next!(pmeter)
     end
     avg_num_unique_haps = sum(num_unique_haps) / windows
-    quad_timers = sum(quad_timers) ./ Threads.nthreads()
+    timers = sum(timers) ./ Threads.nthreads()
     calculate_happairs_time = time() - calculate_happairs_start
 
     #
@@ -164,15 +171,13 @@ function phase(
     println("Timings: ")
     println("    Data import                     = ", round(import_data_time, sigdigits=6), " seconds")
     println("    Computing haplotype pair        = ", round(calculate_happairs_time, sigdigits=6), " seconds")
-    println("        BLAS3 mul! to get M and N      = ", round(quad_timers[1], sigdigits=6), " seconds per thread")
-    println("        haplopair search               = ", round(quad_timers[2], sigdigits=6), " seconds per thread")
-    if rescreen
-        println("        min least sq on observed data  = ", round(quad_timers[3], sigdigits=6), " seconds per thread")
-    else
-        println("        supplying constant terms       = ", round(quad_timers[3], sigdigits=6), " seconds per thread")
-    end
-    println("        finding redundant happairs     = ", round(quad_timers[4], sigdigits=6), " seconds per thread")
-    println("    Phasing by dynamic programming  = ", round(phase_time, sigdigits=6), " seconds")
+    timers[1] != 0 && println("        computing dist(X, H)           = ", round(timers[1], sigdigits=6), " seconds per thread")
+    println("        BLAS3 mul! to get M and N      = ", round(timers[2], sigdigits=6), " seconds per thread")
+    println("        haplopair search               = ", round(timers[3], sigdigits=6), " seconds per thread")
+    timers[4] != 0 && println("        min least sq on observed data  = ", round(timers[4], sigdigits=6), " seconds per thread")
+    println("        finding redundant happairs     = ", round(timers[5], sigdigits=6), " seconds per thread")
+    dynamic_programming ? println("    Phasing by dynamic programming  = ", round(phase_time, sigdigits=6), " seconds") :
+                          println("    Phasing by win-win intersection = ", round(phase_time, sigdigits=6), " seconds")
     println("    Imputation                      = ", round(impute_time, sigdigits=6), " seconds\n")
 
     return redundant_haplotypes, ph

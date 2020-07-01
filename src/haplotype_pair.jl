@@ -1,6 +1,7 @@
 """
 Records optimal-redundant haplotypes for each window. Currently, only the first 1000
 haplotype pairs will be saved to reduce search space for dynamic programming. 
+
 Warning: This function is called in a multithreaded loop. If you modify this function
 you must check whether imputation accuracy is affected (when run with >1 threads).
 """
@@ -85,9 +86,10 @@ function haplopair(
     N        = zeros(Float32, n, d)
     happairs = ones(Int, n), ones(Int, n)
     hapscore = zeros(Float32, n)
-    t1, t2, t3 = haplopair!(Xwork, Hwork, M, N, happairs, hapscore)
+    t2, t3 = haplopair!(Xwork, Hwork, M, N, happairs, hapscore)
+    t1 = t4 = 0 # no time spent on haplotype thinning rescreening
 
-    return happairs, hapscore, t1, t2, t3
+    return happairs, hapscore, t1, t2, t3, t4
 end
 
 """
@@ -119,7 +121,7 @@ function haplopair!(
     p, n, d = size(X, 1), size(X, 2), size(H, 2)
 
     # assemble M (upper triangular only)
-    t1 = @elapsed begin 
+    t2 = @elapsed begin 
         mul!(M, Transpose(H), H)
         for j in 1:d, i in 1:(j - 1) # off-diagonal
             M[i, j] = 2M[i, j] + M[i, i] + M[j, j]
@@ -136,17 +138,17 @@ function haplopair!(
     end
 
     # computational routine
-    t2 = @elapsed haplopair!(happairs[1], happairs[2], hapscore, M, N)
+    t3 = @elapsed haplopair!(happairs[1], happairs[2], hapscore, M, N)
 
     # supplement the constant terms in objective
-    t3 = @elapsed begin @inbounds for j in 1:n
+    t3 += @elapsed begin @inbounds for j in 1:n
             @simd for i in 1:p
                 hapscore[j] += abs2(X[i, j])
             end
         end
     end
 
-    return t1, t2, t3
+    return t2, t3
 end
 
 """

@@ -20,8 +20,9 @@ function haplopair_thin(
     hapscore = zeros(Float32, n)
 
     t1, t2, t3 = haplopair!(Xwork, Hwork, M, N, happairs, hapscore, keep)
+    t4 = 0 # no rescreening or 
 
-    return happairs, hapscore, t1, t2, t3
+    return happairs, hapscore, t1, t2, t3, t4
 end
 
 function haplopair!(
@@ -40,7 +41,7 @@ function haplopair!(
     t1 = @elapsed R = pairwise(Euclidean(), H, X, dims=2) # Rij = d(H[:, i], X[:, j])
 
     # assemble M (upper triangular only)
-    t1 += @elapsed begin 
+    t2 = @elapsed begin 
         mul!(M, Transpose(H), H)
         for j in 1:d, i in 1:(j - 1) # off-diagonal
             M[i, j] = 2M[i, j] + M[i, i] + M[j, j]
@@ -57,10 +58,10 @@ function haplopair!(
     end
 
     # computational routine
-    t2 = @elapsed haplopair!(happairs[1], happairs[2], hapscore, M, N, R, keep)
+    t3 = @elapsed haplopair!(happairs[1], happairs[2], hapscore, M, N, R, keep)
 
     # supplement the constant terms in objective
-    t3 = @elapsed begin @inbounds for j in 1:n
+    t3 += @elapsed begin @inbounds for j in 1:n
             @simd for i in 1:p
                 hapscore[j] += abs2(X[i, j])
             end
