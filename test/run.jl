@@ -2283,5 +2283,24 @@ path.coefs[:, 3] # picks 139 and 983
 happairs[1][2], happairs[2][2] # our code picks (428, 518)
 
 
+# find λ so that only 2 β is non-zero
+function bisection()
+    λtop = 1.0
+    λlow = 0.0
+    while true
+        λmid = (λtop + λlow) / 2
+        path = fit(LassoPath, H, x2, Normal(), IdentityLink(), λ=[λmid])
 
-
+        nz = count(!iszero, path.coefs)
+        if nz == 2
+            println(path.coefs.rowval)
+            println("λtop = $λtop, λlow = $λlow, λmid = $λmid, nz = $nz")
+            break
+        else
+            # bisection search
+            nz < 2 ? (λtop = λmid) : (λlow = λmid)
+        end
+        println("λtop = $λtop, λlow = $λlow, λmid = $λmid, nz = $nz")
+    end
+end
+bisection()

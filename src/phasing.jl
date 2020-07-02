@@ -23,7 +23,8 @@ function phase(
     width::Int = 2048,
     rescreen::Bool = false, 
     thinning_factor::Union{Nothing, Int} = nothing,
-    dynamic_programming::Bool = true
+    dynamic_programming::Bool = true,
+    lasso = false
     )
 
     # decide how to partition the data based on available memory 
@@ -101,7 +102,9 @@ function phase(
         Xw_aligned = X[Xw_idx_start:Xw_idx_end, :]
 
         # computational routine
-        if !isnothing(thinning_factor) 
+        if lasso
+            happairs, hapscore, t1, t2, t3, t4 = haplopair_lasso(Xw_aligned, Hw_aligned)
+        elseif !isnothing(thinning_factor) 
             # if size(Hw_aligned, 2) > thinning_factor
             #     # happairs, hapscore, t1, t2, t3, t4 = haplopair_thin(Xw_aligned, Hw_aligned, keep=thinning_factor)
             #     happairs, hapscore, t1, t2, t3, t4 = haplopair_thin2(Xw_aligned, Hw_aligned, keep=thinning_factor)

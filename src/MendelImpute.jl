@@ -16,6 +16,7 @@ module MendelImpute
     using JLSO
     using Distances
     using ThreadPools
+    using Lasso
 
     export continue_haplotype, haplopair!, haplopair, haploimpute!
     export impute!, impute_discard_phase!, search_breakpoint
@@ -27,7 +28,7 @@ module MendelImpute
     export simulate_phased_genotypes
     export connect_happairs
     export phase!, phase_fast!, nearest_window_with_sufficient_typed_snps
-    export haplopair_thin, haplopair_screen
+    export haplopair_thin, haplopair_screen, haplopair_lasso
 
     # main functions that users are exposed to
     export phase
@@ -48,10 +49,11 @@ module MendelImpute
     include("phasing.jl")
     include("haplotype_pair.jl")
     include("haplotype_pair_screen.jl")
+    include("haplotype_thinning.jl")
+    include("haplotype_lasso.jl")
     include("simulate_utilities.jl")
     include("dynamic_programming.jl")
     include("impute.jl")
     include("breakpoints.jl")
-    include("haplotype_thinning.jl")
 
 end # module
