@@ -32,9 +32,10 @@ function haplopair_lasso!(
     )
 
     p, n, d = size(X, 1), size(X, 2), size(H, 2)
+    x = zeros(Float32, p)
 
     for i in 1:n
-        x = X[:, i]
+        copyto!(x, @view(X[:, i]))
         
         # find λ so that only 2 β is non-zero
         λtop = 1.0

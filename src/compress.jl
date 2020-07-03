@@ -56,6 +56,15 @@ end
 CompressedHaplotypes(windows::Int, width, sampleID, chr, pos, SNPid, ref, alt) = CompressedHaplotypes(Vector{CompressedWindow}(undef, windows), Vector{CompressedWindow}(undef, windows), zeros(windows), width, sampleID, chr, pos, SNPid, ref, alt)
 
 nhaplotypes(x::CompressedHaplotypes) = 2length(x.sampleID)
+windows(x::CompressedHaplotypes) = length(x.CW)
+function count_haplotypes_per_window(Hunique)
+    win = windows(Hunique)
+    unique_haplotype_counts = zeros(Int, win)
+    for w in 1:win
+        unique_haplotype_counts[w] = length(Hunique.CW_typed[w].uniqueindex)
+    end
+    return unique_haplotype_counts
+end
 
 """
     compress_haplotypes(vcffile, tgtfile, outfile, width, [dims], [flankwidth])

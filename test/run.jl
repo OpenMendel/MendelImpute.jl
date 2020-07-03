@@ -2304,3 +2304,14 @@ function bisection()
     end
 end
 bisection()
+
+
+
+
+using MendelImpute, JLSO, UnicodePlots, StatsBase
+
+@time loaded = JLSO.load("ref.chr20.w256.maf0.01.excludeTarget.jlso")
+compressed_Hunique = loaded[:compressed_Hunique];
+x = count_haplotypes_per_window(compressed_Hunique)
+UnicodePlots.histogram(x, nbins=50)
+
