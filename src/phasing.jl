@@ -106,15 +106,20 @@ function phase(
         if lasso
             happairs, hapscore, t1, t2, t3, t4 = haplopair_lasso(Xw_aligned, Hw_aligned)
         elseif !isnothing(thinning_factor) 
+            if thinning_check_allelefreq
+                Hw_range = compressed_Hunique.start[w]:(w == windows ? ref_snps : compressed_Hunique.start[w + 1] - 1)
+                Hw_snp_pos = indexin(X_pos[Xw_idx_start:Xw_idx_end], compressed_Hunique.pos[Hw_range])
+                altfreq = compressed_Hunique.altfreq[Hw_snp_pos]
+            else
+                altfreq = nothing
+            end
             # if size(Hw_aligned, 2) > thinning_factor
             #     # happairs, hapscore, t1, t2, t3, t4 = haplopair_thin(Xw_aligned, Hw_aligned, keep=thinning_factor)
             #     happairs, hapscore, t1, t2, t3, t4 = haplopair_thin2(Xw_aligned, Hw_aligned, keep=thinning_factor)
             # else
             #     happairs, hapscore, t1, t2, t3, t4 = haplopair(Xw_aligned, Hw_aligned)
             # end
-            Hw_range = compressed_Hunique.start[w]:(w == windows ? ref_snps : compressed_Hunique.start[w + 1] - 1)
-            Hw_snp_pos = indexin(X_pos[Xw_idx_start:Xw_idx_end], compressed_Hunique.pos[Hw_range])
-            happairs, hapscore, t1, t2, t3, t4 = haplopair_thin(Xw_aligned, Hw_aligned, compressed_Hunique.altfreq[Hw_snp_pos], check_freq = thinning_check_allelefreq, keep=thinning_factor)
+            happairs, hapscore, t1, t2, t3, t4 = haplopair_thin(Xw_aligned, Hw_aligned, altfreq, keep=thinning_factor)
         elseif rescreen
             happairs, hapscore, t1, t2, t3, t4 = haplopair_screen(Xw_aligned, Hw_aligned)
         else
