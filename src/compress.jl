@@ -40,6 +40,7 @@ means indexing off `CompressedHaplotypes.CW`
 - `start`: `start[i]` to `start[i + 1]` is the range of H's SNPs that are in window `i`. It includes all SNP until the first typed snp of window `i + 1`. 
 - `sampleID`: Sample names for every pair of haplotypes as listed in the VCF file
 - `width`: Number of typed SNPs per window
+- `altfreq`: Alternate allele frequency (frequency of "1" in VCF file)
 """
 struct CompressedHaplotypes
     CW::Vector{CompressedWindow}
@@ -52,8 +53,9 @@ struct CompressedHaplotypes
     SNPid::Vector{Vector{String}}
     refallele::Vector{String}
     altallele::Vector{Vector{String}}
+    altfreq::Vector{Float32}
 end
-CompressedHaplotypes(windows::Int, width, sampleID, chr, pos, SNPid, ref, alt) = CompressedHaplotypes(Vector{CompressedWindow}(undef, windows), Vector{CompressedWindow}(undef, windows), zeros(windows), width, sampleID, chr, pos, SNPid, ref, alt)
+CompressedHaplotypes(windows::Int, width, sampleID, chr, pos, SNPid, ref, alt, altfreq) = CompressedHaplotypes(Vector{CompressedWindow}(undef, windows), Vector{CompressedWindow}(undef, windows), zeros(windows), width, sampleID, chr, pos, SNPid, ref, alt, altfreq)
 
 nhaplotypes(x::CompressedHaplotypes) = 2length(x.sampleID)
 windows(x::CompressedHaplotypes) = length(x.CW)
@@ -101,6 +103,9 @@ function compress_haplotypes(
     return nothing
 end
 
+"""
+`X` and `H` stores genotypes/haplotypes in columns. 
+"""
 function compress_haplotypes(H::AbstractMatrix, X::AbstractMatrix, outfile::AbstractString,
     X_pos::AbstractVector, H_sampleID::AbstractVector, H_chr::AbstractVector, 
     H_pos::AbstractVector, H_ids::AbstractVector, H_ref::AbstractVector, H_alt::AbstractVector,
@@ -115,7 +120,8 @@ function compress_haplotypes(H::AbstractMatrix, X::AbstractMatrix, outfile::Abst
     Hw_idx_start = 1
 
     # initialize compressed haplotype object
-    compressed_Hunique = MendelImpute.CompressedHaplotypes(windows, width, H_sampleID, H_chr, H_pos, H_ids, H_ref, H_alt)
+    alt_freq = reshape(sum(H, dims=2), size(H, 1)) ./ size(H, 2)
+    compressed_Hunique = MendelImpute.CompressedHaplotypes(windows, width, H_sampleID, H_chr, H_pos, H_ids, H_ref, H_alt, convert(Vector{Float32}, alt_freq))
 
     # record unique haplotypes and mappings window by window
     for w in 1:windows
