@@ -6,6 +6,7 @@ function haplopair_thin(
     X::AbstractMatrix,
     H::AbstractMatrix,
     alt_allele_freq::AbstractVector{Float32};
+    check_freq::Bool = false,
     keep::Int = 100
     )
 
@@ -20,7 +21,7 @@ function haplopair_thin(
     happairs = ones(Int, n), ones(Int, n)
     hapscore = zeros(Float32, n)
 
-    t1, t2, t3 = haplopair_thin!(Xwork, Hwork, M, N, happairs, hapscore, alt_allele_freq, keep)
+    t1, t2, t3 = haplopair_thin!(Xwork, Hwork, M, N, happairs, hapscore, alt_allele_freq, check_freq, keep)
     t4 = 0 # no haplotype rescreening
 
     return happairs, hapscore, t1, t2, t3, t4
@@ -34,6 +35,7 @@ function haplopair_thin!(
     happairs::Tuple{AbstractVector, AbstractVector},
     hapscore::AbstractVector,
     alt_allele_freq::AbstractVector{Float32},
+    check_freq::Bool,
     keep::Int
     )
 
@@ -41,11 +43,13 @@ function haplopair_thin!(
 
     # compute distances between each column of H and each column of X
     t1 =  @elapsed R = pairwise(Euclidean(), H, X, dims=2) # Rij = ||Hᵢ - Xⱼ||²
-    t1 += @elapsed R .+= Transpose(H) * alt_allele_freq # supply 2∑pᵢh₁ᵢ
-    t1 += @elapsed R .-= 2Transpose(alt_allele_freq) * X .+ sum(alt_allele_freq) # supply ∑pᵢ(1 - 2gᵢ)
+    if check_freq
+        t1 += @elapsed R .+= Transpose(H) * alt_allele_freq # supply 2∑pᵢh₁ᵢ
+        t1 += @elapsed R .-= 2Transpose(alt_allele_freq) * X .+ sum(alt_allele_freq) # supply ∑pᵢ(1 - 2gᵢ)
+    end
 
-    # assemble M (upper triangular only)
     t2 = @elapsed begin 
+        # assemble M (upper triangular only)
         mul!(M, Transpose(H), H)
         for j in 1:d, i in 1:(j - 1) # off-diagonal
             M[i, j] = 2M[i, j] + M[i, i] + M[j, j]

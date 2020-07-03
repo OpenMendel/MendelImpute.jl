@@ -23,6 +23,7 @@ function phase(
     width::Int = 2048,
     rescreen::Bool = false, 
     thinning_factor::Union{Nothing, Int} = nothing,
+    thinning_check_allelefreq::Bool = false,
     dynamic_programming::Bool = true,
     lasso = false
     )
@@ -95,7 +96,7 @@ function phase(
     end
     num_unique_haps = zeros(Int, Threads.nthreads())
     timers = [zeros(5) for _ in 1:Threads.nthreads()]
-    Threads.@threads for w in 1:windows
+    ThreadPools.@qthreads for w in 1:windows
         Hw_aligned = compressed_Hunique.CW_typed[w].uniqueH
         Xw_idx_start = (w - 1) * width + 1
         Xw_idx_end = (w == windows ? length(X_pos) : w * width)
@@ -113,7 +114,7 @@ function phase(
             # end
             Hw_range = compressed_Hunique.start[w]:(w == windows ? ref_snps : compressed_Hunique.start[w + 1] - 1)
             Hw_snp_pos = indexin(X_pos[Xw_idx_start:Xw_idx_end], compressed_Hunique.pos[Hw_range])
-            happairs, hapscore, t1, t2, t3, t4 = haplopair_thin(Xw_aligned, Hw_aligned, compressed_Hunique.altfreq[Hw_snp_pos], keep=thinning_factor)
+            happairs, hapscore, t1, t2, t3, t4 = haplopair_thin(Xw_aligned, Hw_aligned, compressed_Hunique.altfreq[Hw_snp_pos], check_freq = thinning_check_allelefreq, keep=thinning_factor)
         elseif rescreen
             happairs, hapscore, t1, t2, t3, t4 = haplopair_screen(Xw_aligned, Hw_aligned)
         else
