@@ -9,6 +9,112 @@ function haplopair_thin(
     keep::Int = 100
     )
 
+    p, n = size(X)
+    d    = size(H, 2)
+    keep > d && (keep = d) # safety check
+
+    Xwork = zeros(Float32, p, n)
+    Hwork = convert(Matrix{Float32}, H)
+    initXfloat!(X, Xwork)
+
+    M    = zeros(Float32, keep, keep)
+    N    = zeros(Float32, keep)
+    perm = zeros(Int, d)
+    Hk   = zeros(Float32, p, keep)
+    Xi   = zeros(Float32, p)
+    happairs = ones(Int, n), ones(Int, n)
+    hapscore = zeros(Float32, n)
+    t4 = 0 # no haplotype rescreening
+
+    # compute distances between each column of H and each column of X
+    t1 = @elapsed R = pairwise(Euclidean(), Hwork, Xwork, dims=2) # Rij = d(H[:, i], X[:, j])
+    if !isnothing(alt_allele_freq)
+        t1 += @elapsed R .+= Transpose(Hwork) * alt_allele_freq # supply 2∑pᵢh₁ᵢ
+        t1 += @elapsed R .-= 2Transpose(alt_allele_freq) * Xwork .+ sum(alt_allele_freq) # supply ∑pᵢ(1 - 2gᵢ)
+    end
+
+    t2 = t3 = 0
+    for i in 1:n
+        # find top matching haplotypes for sample i
+        partialsortperm!(perm, view(R, :, i), keep) # perm[1:keep] = hap indices that best matches xi 
+        
+        # sync Hk, Xi, M, N
+        t2 += @elapsed begin
+            for k in 1:keep
+                col = perm[k]
+                for j in 1:p
+                    Hk[j, k] = Hwork[j, col]
+                end
+            end
+            for j in eachindex(Xi)
+                Xi[j] = Xwork[j, i]
+            end
+            update_M!(M, Hk)
+            update_N!(N, Xi, Hk)
+        end
+
+        # computational routine
+        t3 += @elapsed begin
+            hapscore[i], h1, h2 = haplopair!(M, N)
+            happairs[1][i], happairs[2][i] = perm[h1], perm[h2]
+        end
+
+        # supply constant term in objective
+        t2 += @elapsed hapscore[i] += dot(Xi, Xi)
+    end
+
+    return happairs, hapscore, t1, t2, t3, t4
+end
+
+function update_M!(M::AbstractMatrix, H::AbstractMatrix)
+    d = size(M, 1)
+    mul!(M, Transpose(H), H)
+    for j in 1:d, i in 1:(j - 1) # off-diagonal
+        M[i, j] = 2M[i, j] + M[i, i] + M[j, j]
+    end
+    for j in 1:d # diagonal
+        M[j, j] *= 4
+    end
+    return nothing
+end
+
+function update_N!(N::AbstractVector, x::AbstractVector, H::AbstractMatrix)
+    mul!(N, Transpose(H), x)
+    @simd for I in eachindex(N)
+        N[I] *= 2
+    end
+    return nothing
+end
+
+function haplopair!(
+    M::AbstractMatrix{T},
+    N::AbstractVector{T},
+    ) where T <: Real
+
+    d = length(N)
+    hapmin, hap1, hap2 = typemax(T), 1, 1
+
+    @inbounds for k in 1:d, j in 1:k
+        score = M[j, k] - N[j] - N[k]
+        if score < hapmin
+            hapmin, hap1, hap2 = score, j, k
+        end
+    end
+
+    return hapmin, hap1, hap2
+end
+
+"""
+Same as `haplopair_thin` but internally it uses only BLAS 3 calls and does not recompute `M`
+for every sample. But this implies the search routine in `haplopair!` is not cache aware.  
+"""
+function haplopair_thin2(
+    X::AbstractMatrix,
+    H::AbstractMatrix;
+    alt_allele_freq::Union{Nothing, AbstractVector{Float32}} = nothing, 
+    keep::Int = 100
+    )
+
     Xwork = zeros(Float32, size(X, 1), size(X, 2))
     Hwork = convert(Matrix{Float32}, H)
     initXfloat!(X, Xwork)
@@ -20,13 +126,13 @@ function haplopair_thin(
     happairs = ones(Int, n), ones(Int, n)
     hapscore = zeros(Float32, n)
 
-    t1, t2, t3 = haplopair_thin!(Xwork, Hwork, M, N, happairs, hapscore, alt_allele_freq, keep)
+    t1, t2, t3 = haplopair_thin2!(Xwork, Hwork, M, N, happairs, hapscore, alt_allele_freq, keep)
     t4 = 0 # no haplotype rescreening
 
     return happairs, hapscore, t1, t2, t3, t4
 end
 
-function haplopair_thin!(
+function haplopair_thin2!(
     X::AbstractMatrix{Float32},
     H::AbstractMatrix{Float32},
     M::AbstractMatrix{Float32},
@@ -64,7 +170,7 @@ function haplopair_thin!(
     end
 
     # computational routine
-    t3 = @elapsed haplopair_thin!(happairs[1], happairs[2], hapscore, M, N, R, keep)
+    t3 = @elapsed haplopair_thin2!(happairs[1], happairs[2], hapscore, M, N, R, keep)
 
     # supplement the constant terms in objective
     t3 += @elapsed begin @inbounds for j in 1:n
@@ -77,7 +183,7 @@ function haplopair_thin!(
     return t1, t2, t3
 end
 
-function haplopair_thin!(
+function haplopair_thin2!(
     happair1::AbstractVector{Int},
     happair2::AbstractVector{Int},
     hapmin::AbstractVector{T},

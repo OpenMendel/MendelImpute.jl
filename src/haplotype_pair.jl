@@ -77,13 +77,12 @@ function haplopair(
     X::AbstractMatrix,
     H::AbstractMatrix
     )
-
-    Xwork = zeros(Float32, size(X, 1), size(X, 2))
+    p, n  = size(X)
+    d     = size(H, 2)
+    Xwork = zeros(Float32, p, n)
     Hwork = convert(Matrix{Float32}, H)
-    initXfloat!(X, Xwork)
+    initXfloat!(X, Xwork) # initializes missing
 
-    p, n     = size(X)
-    d        = size(H, 2)
     M        = zeros(Float32, d, d)
     N        = zeros(Float32, n, d)
     happairs = ones(Int, n), ones(Int, n)

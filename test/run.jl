@@ -2315,3 +2315,76 @@ compressed_Hunique = loaded[:compressed_Hunique];
 x = count_haplotypes_per_window(compressed_Hunique)
 UnicodePlots.histogram(x, nbins=50)
 
+
+
+
+
+using Revise
+using VCFTools
+using MendelImpute
+using JLSO, JLD2, FileIO
+using LinearAlgebra
+cd("/home/biona001/HRC")
+
+# to load:
+@load "example_data.jld2" Ms Ns
+Ms[1] # M for width = 64
+Ms[2] # M for width = 128
+Ns[1] # N for width = 64 ... etc 
+
+
+# width = 64 averages 873 haplotype per window. Total win =2789
+# width = 128 averages 2497 haplotype per window. Total win = 1394
+# width = 256 averages 6985 haplotype per window. Total win =697
+# width = 512 averages 17234 haplotype per window. Total win = 348
+# width = 1024 averages 32428 haplotype per window. Total win = 174
+
+function create_M_and_N()
+    w = 1 # choose a window
+    widths = [64, 128, 256, 512, 1024]
+    Ms = Vector{Matrix{Float32}}(undef, 5)
+    Ns = Vector{Matrix{Float32}}(undef, 5)
+
+    # genotype data
+    tgtfile = "target.chr20.typedOnly.maf0.01.masked.vcf.gz"
+    X, X_sampleID, X_chr, X_pos, X_ids, X_ref, X_alt = VCFTools.convert_gt(UInt8, tgtfile, trans=true, save_snp_info=true, msg = "Importing genotype file...")
+
+    for (i, width) in enumerate(widths)
+        # load data (takes roughly 30 sec)
+        @time loaded = JLSO.load("ref.chr20.w$width.maf0.01.excludeTarget.jlso")
+        compressed_Hunique = loaded[:compressed_Hunique];
+        Hw_aligned = compressed_Hunique.CW_typed[w].uniqueH
+        Xw_idx_start = (w - 1) * width + 1
+        Xw_idx_end = (w == windows ? length(X_pos) : w * width)
+        Xw_aligned = X[Xw_idx_start:Xw_idx_end, :]
+
+        # haplopair and haplopair! in haplotype_pair.jl 
+        p, n  = size(Xw_aligned)
+        d     = size(Hw_aligned, 2)
+        Xwork = zeros(Float32, p, n)
+        Hwork = convert(Matrix{Float32}, Hw_aligned)
+        MendelImpute.initXfloat!(Xw_aligned, Xwork) # initializes missing
+        M = zeros(Float32, d, d)
+        N = zeros(Float32, n, d)
+
+        # assemble M
+        mul!(M, Transpose(Hwork), Hwork)
+        for j in 1:d, i in 1:(j - 1) # off-diagonal
+            M[i, j] = 2M[i, j] + M[i, i] + M[j, j]
+        end
+        for j in 1:d # diagonal
+            M[j, j] *= 4
+        end
+        # assemble N
+        mul!(N, Transpose(Xwork), Hwork)
+        @simd for I in eachindex(N)
+            N[I] *= 2
+        end
+
+        Ms[i] = M
+        Ns[i] = N
+    end
+    return Ms, Ns
+end
+Ms, Ns = create_M_and_N()
+@save "example_data.jld2" Ms Ns
