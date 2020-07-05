@@ -20,7 +20,7 @@ function haplopair_lasso(
     # assemble M (symmetric)
     t2 = @elapsed begin
         M = zeros(Float32, d, d)
-        mul!(M, Transpose(H), H)
+        mul!(M, Transpose(Hwork), Hwork)
         for j in 1:d, i in 1:(j - 1) # off-diagonal
             M[i, j] = 2M[i, j] + M[i, i] + M[j, j]
         end
@@ -32,7 +32,8 @@ function haplopair_lasso(
 
     # assemble N
     t2 += @elapsed begin
-        Nt = Transpose(Hwork) * Xwork
+        Nt = zeros(Float32, d, n)
+        mul!(Nt, Transpose(Hwork), Xwork)
         @simd for I in eachindex(Nt)
             Nt[I] *= 2
         end
