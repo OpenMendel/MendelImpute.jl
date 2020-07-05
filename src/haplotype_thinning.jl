@@ -27,10 +27,13 @@ function haplopair_thin(
     t4 = 0 # no haplotype rescreening
 
     # compute distances between each column of H and each column of X
-    t1 = @elapsed R = pairwise(Euclidean(), Hwork, Xwork, dims=2) # Rij = d(H[:, i], X[:, j])
-    if !isnothing(alt_allele_freq)
-        t1 += @elapsed R .+= Transpose(Hwork) * alt_allele_freq # supply 2∑pᵢh₁ᵢ
-        t1 += @elapsed R .-= 2Transpose(alt_allele_freq) * Xwork .+ sum(alt_allele_freq) # supply ∑pᵢ(1 - 2gᵢ)
+    t1 = @elapsed begin
+        if !isnothing(alt_allele_freq)
+            map!(x -> 1 / (2 * x * (1 - x)), alt_allele_freq, alt_allele_freq) # scale by 1 / 2p(1-p)
+            R = pairwise(WeightedEuclidean(alt_allele_freq), Hwork, Xwork, dims=2)
+        else 
+            R = pairwise(Euclidean(), Hwork, Xwork, dims=2) # Rij = d(H[:, i], X[:, j])
+        end 
     end
 
     t2 = t3 = 0

@@ -52,7 +52,7 @@ function haplopair_lasso(
     # supplement the constant terms in objective
     t3 += @elapsed begin @inbounds for j in 1:n
             @simd for i in 1:p
-                hapscore[j] += abs2(X[i, j])
+                hapscore[j] += abs2(Xwork[i, j])
             end
         end
     end
