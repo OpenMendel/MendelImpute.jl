@@ -149,10 +149,13 @@ function haplopair_thin2!(
     p, n, d = size(X, 1), size(X, 2), size(H, 2)
 
     # compute distances between each column of H and each column of X
-    t1 =  @elapsed R = pairwise(Euclidean(), H, X, dims=2) # Rij = ||Hᵢ - Xⱼ||²
-    if !isnothing(alt_allele_freq)
-        t1 += @elapsed R .+= Transpose(H) * alt_allele_freq # supply 2∑pᵢh₁ᵢ
-        t1 += @elapsed R .-= 2Transpose(alt_allele_freq) * X .+ sum(alt_allele_freq) # supply ∑pᵢ(1 - 2gᵢ)
+    t1 = @elapsed begin
+        if !isnothing(alt_allele_freq)
+            map!(x -> 1 / (2 * x * (1 - x)), alt_allele_freq, alt_allele_freq) # scale by 1 / 2p(1-p)
+            R = pairwise(WeightedEuclidean(alt_allele_freq), H, X, dims=2)
+        else 
+            R = pairwise(Euclidean(), H, X, dims=2) # Rij = d(H[:, i], X[:, j])
+        end 
     end
 
     t2 = @elapsed begin 
@@ -201,14 +204,14 @@ function haplopair_thin2!(
     fill!(hapmin, typemax(T))
     keep > d && (keep = d)
 
-    for i in 1:n
+    @inbounds for i in 1:n
         # find top matching haplotypes for sample i
         partialsortperm!(perm, view(R, :, i), keep) # perm[1:keep] = hap indices that best matches xi 
 
-        @inbounds for (idx1, k) in enumerate(perm)
-            idx1 > keep && break
-            for (idx2, j) in enumerate(perm)
-                idx2 > keep && break
+        for iter1 in 1:keep
+            k = perm[iter1]
+            for iter2 in 1:keep
+                j = perm[iter2]
                 k > j && continue # since M upper triangular
                 
                 score = M[k, j] - N[i, k] - N[i, j]
