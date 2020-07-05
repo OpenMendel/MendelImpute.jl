@@ -25,7 +25,7 @@ function phase(
     thinning_factor::Union{Nothing, Int} = nothing,
     thinning_scale_allelefreq::Bool = false,
     dynamic_programming::Bool = true,
-    lasso = false
+    lasso::Union{Nothing, Int} = nothing
     )
 
     # decide how to partition the data based on available memory 
@@ -87,7 +87,6 @@ function phase(
     #     t5 = finding redundant happairs
     #
     calculate_happairs_start = time()
-    pmeter = Progress(windows, 5, "Computing optimal haplotype pairs...")
     if dynamic_programming
         redundant_haplotypes = [[Tuple{Int32, Int32}[] for i in 1:windows] for j in 1:people]
         [[sizehint!(redundant_haplotypes[j][i], 1000) for i in 1:windows] for j in 1:people] # don't save >1000 redundant happairs
@@ -96,6 +95,7 @@ function phase(
     end
     num_unique_haps = zeros(Int, Threads.nthreads())
     timers = [zeros(5) for _ in 1:Threads.nthreads()]
+    pmeter = Progress(windows, 5, "Computing optimal haplotype pairs...")
     ThreadPools.@qthreads for w in 1:windows
         Hw_aligned = compressed_Hunique.CW_typed[w].uniqueH
         Xw_idx_start = (w - 1) * width + 1
@@ -103,8 +103,8 @@ function phase(
         Xw_aligned = X[Xw_idx_start:Xw_idx_end, :]
 
         # computational routine
-        if lasso
-            happairs, hapscore, t1, t2, t3, t4 = haplopair_lasso(Xw_aligned, Hw_aligned)
+        if !isnothing(lasso)
+            happairs, hapscore, t1, t2, t3, t4 = haplopair_lasso(Xw_aligned, Hw_aligned, r = lasso)
         elseif !isnothing(thinning_factor) 
             if thinning_scale_allelefreq
                 Hw_range = compressed_Hunique.start[w]:(w == windows ? ref_snps : compressed_Hunique.start[w + 1] - 1)

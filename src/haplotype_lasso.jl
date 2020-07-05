@@ -4,11 +4,12 @@
 
 function haplopair_lasso(
     X::AbstractMatrix,
-    H::AbstractMatrix,
+    H::AbstractMatrix;
     r::Int = 1
     )
     
     p, n  = size(X)
+    d     = size(H, 2)
     Xwork = zeros(Float32, p, n)
     Hwork = convert(Matrix{Float32}, H)
     initXfloat!(X, Xwork)
@@ -44,7 +45,7 @@ function haplopair_lasso(
         t3 += @elapsed haplopair_topr!(happairs[1], happairs[2], hapscore, M, Nt, r = r)
     end
 
-    t1 = t4 = 0 # no haplotype rescreening
+    t1 = t4 = 0 # no haplotype rescreening or computing dist(X, H)
 
     return happairs, hapscore, t1, t2, t3, t4
 end 
@@ -88,7 +89,7 @@ function haplopair_topr!(
     happair2 :: AbstractVector{<:Integer},
     hapmin   :: AbstractVector{T},
     M        :: AbstractMatrix{T}, # d x d
-    Nt       :: AbstractMatrix{T}, # d x n
+    Nt       :: AbstractMatrix{T}; # d x n
     r        :: Integer = 5
     ) where T <: Real
     d, n = size(Nt)
