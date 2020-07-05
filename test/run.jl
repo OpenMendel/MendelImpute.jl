@@ -2310,7 +2310,7 @@ bisection()
 
 using MendelImpute, JLSO, UnicodePlots, StatsBase
 
-@time loaded = JLSO.load("ref.chr20.w256.maf0.01.excludeTarget.jlso")
+@time loaded = JLSO.load("ref.chr20.w64.maf0.01.excludeTarget.jlso") # roughly 30 sec
 compressed_Hunique = loaded[:compressed_Hunique];
 x = count_haplotypes_per_window(compressed_Hunique)
 UnicodePlots.histogram(x, nbins=50)

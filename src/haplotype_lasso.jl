@@ -10,6 +10,8 @@ function haplopair_lasso(
     
     p, n  = size(X)
     d     = size(H, 2)
+    r > d && (r = d) #safety check
+
     Xwork = zeros(Float32, p, n)
     Hwork = convert(Matrix{Float32}, H)
     initXfloat!(X, Xwork)
@@ -39,11 +41,20 @@ function haplopair_lasso(
         end
     end
 
+    # computational routine
     t3 = 0
     if r == 1
         t3 += @elapsed haplopair_stepwise!(happairs[1], happairs[2], hapscore, M, Nt)
     else 
         t3 += @elapsed haplopair_topr!(happairs[1], happairs[2], hapscore, M, Nt, r = r)
+    end
+
+    # supplement the constant terms in objective
+    t3 += @elapsed begin @inbounds for j in 1:n
+            @simd for i in 1:p
+                hapscore[j] += abs2(X[i, j])
+            end
+        end
     end
 
     t1 = t4 = 0 # no haplotype rescreening or computing dist(X, H)
@@ -102,8 +113,9 @@ function haplopair_topr!(
         # for each top haplotype, find the optimal second one
         for riter in 1:r
             i1 = idx[riter]
+            Nt_i1k = Nt[i1, k]
             for i in 1:d
-                score = M[i, i1] - Nt[i1, k] - Nt[i, k]
+                score = M[i, i1] - Nt_i1k - Nt[i, k]
                 if score < hapmin[k]
                     hapmin[k] = score
                     happair1[k] = i1
