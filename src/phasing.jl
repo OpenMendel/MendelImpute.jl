@@ -22,6 +22,7 @@ function phase(
     impute::Bool = true,
     width::Int = 2048,
     rescreen::Bool = false, 
+    max_haplotypes::Int = 2000,
     thinning_factor::Union{Nothing, Int} = nothing,
     thinning_scale_allelefreq::Bool = false,
     dynamic_programming::Bool = true,
@@ -104,8 +105,13 @@ function phase(
 
         # computational routine
         if !isnothing(lasso)
-            happairs, hapscore, t1, t2, t3, t4 = haplopair_lasso(Xw_aligned, Hw_aligned, r = lasso)
-        elseif !isnothing(thinning_factor) 
+            if size(Hw_aligned, 2) > max_haplotypes
+                happairs, hapscore, t1, t2, t3, t4 = haplopair_lasso(Xw_aligned, Hw_aligned, r = lasso)
+            else
+                happairs, hapscore, t1, t2, t3, t4 = haplopair(Xw_aligned, Hw_aligned)
+            end
+        elseif !isnothing(thinning_factor)
+            # weight each snp by frequecy if requested
             if thinning_scale_allelefreq
                 Hw_range = compressed_Hunique.start[w]:(w == windows ? ref_snps : compressed_Hunique.start[w + 1] - 1)
                 Hw_snp_pos = indexin(X_pos[Xw_idx_start:Xw_idx_end], compressed_Hunique.pos[Hw_range])
@@ -113,13 +119,14 @@ function phase(
             else
                 altfreq = nothing
             end
-            # if size(Hw_aligned, 2) > thinning_factor
-            #     happairs, hapscore, t1, t2, t3, t4 = haplopair_thin(Xw_aligned, Hw_aligned, alt_allele_freq = altfreq, keep=thinning_factor)
-            # else
-            #     happairs, hapscore, t1, t2, t3, t4 = haplopair(Xw_aligned, Hw_aligned)
-            # end
+            # run haplotype thinning 
+            if size(Hw_aligned, 2) > max_haplotypes
+                happairs, hapscore, t1, t2, t3, t4 = haplopair_thin2(Xw_aligned, Hw_aligned, alt_allele_freq = altfreq, keep=thinning_factor)
+            else
+                happairs, hapscore, t1, t2, t3, t4 = haplopair(Xw_aligned, Hw_aligned)
+            end
             # happairs, hapscore, t1, t2, t3, t4 = haplopair_thin(Xw_aligned, Hw_aligned, alt_allele_freq = altfreq, keep=thinning_factor)
-            happairs, hapscore, t1, t2, t3, t4 = haplopair_thin2(Xw_aligned, Hw_aligned, alt_allele_freq = altfreq, keep=thinning_factor)
+            # happairs, hapscore, t1, t2, t3, t4 = haplopair_thin2(Xw_aligned, Hw_aligned, alt_allele_freq = altfreq, keep=thinning_factor)
         elseif rescreen
             happairs, hapscore, t1, t2, t3, t4 = haplopair_screen(Xw_aligned, Hw_aligned)
         else

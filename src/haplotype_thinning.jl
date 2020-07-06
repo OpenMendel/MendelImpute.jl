@@ -37,7 +37,7 @@ function haplopair_thin(
     end
 
     t2 = t3 = 0
-    for i in 1:n
+    @inbounds for i in 1:n
         # find top matching haplotypes for sample i
         partialsortperm!(perm, view(R, :, i), keep) # perm[1:keep] = hap indices that best matches xi 
         
