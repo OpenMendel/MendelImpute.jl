@@ -2,7 +2,7 @@
 ######## except it solves the least squares objective on only `keep (default 100)` unique 
 ######## haplotypes, where the top haplotypes are selected by minimizing dist(x, h). 
 
-function haplopair_thin(
+function haplopair_thin_BLAS2(
     X::AbstractMatrix,
     H::AbstractMatrix;
     alt_allele_freq::Union{Nothing, AbstractVector{Float32}} = nothing, 
@@ -108,10 +108,10 @@ function haplopair!(
 end
 
 """
-Same as `haplopair_thin` but internally it uses only BLAS 3 calls and does not recompute `M`
+Same as `haplopair_thin_BLAS2` but internally it uses only BLAS 3 calls and does not recompute `M`
 for every sample. But this implies the search routine in `haplopair!` is not cache aware.  
 """
-function haplopair_thin2(
+function haplopair_thin_BLAS3(
     X::AbstractMatrix,
     H::AbstractMatrix;
     alt_allele_freq::Union{Nothing, AbstractVector{Float32}} = nothing, 
@@ -135,7 +135,7 @@ function haplopair_thin2(
     return happairs, hapscore, t1, t2, t3, t4
 end
 
-function haplopair_thin2!(
+function haplopair_thin_BLAS3!(
     X::AbstractMatrix{Float32},
     H::AbstractMatrix{Float32},
     M::AbstractMatrix{Float32},
@@ -189,7 +189,7 @@ function haplopair_thin2!(
     return t1, t2, t3
 end
 
-function haplopair_thin2!(
+function haplopair_thin_BLAS3!(
     happair1::AbstractVector{Int},
     happair2::AbstractVector{Int},
     hapmin::AbstractVector{T},

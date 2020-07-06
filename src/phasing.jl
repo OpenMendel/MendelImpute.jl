@@ -121,12 +121,12 @@ function phase(
             end
             # run haplotype thinning 
             if size(Hw_aligned, 2) > max_haplotypes
-                happairs, hapscore, t1, t2, t3, t4 = haplopair_thin2(Xw_aligned, Hw_aligned, alt_allele_freq = altfreq, keep=thinning_factor)
+                happairs, hapscore, t1, t2, t3, t4 = haplopair_thin_BLAS2(Xw_aligned, Hw_aligned, alt_allele_freq = altfreq, keep=thinning_factor)
             else
                 happairs, hapscore, t1, t2, t3, t4 = haplopair(Xw_aligned, Hw_aligned)
             end
-            # happairs, hapscore, t1, t2, t3, t4 = haplopair_thin(Xw_aligned, Hw_aligned, alt_allele_freq = altfreq, keep=thinning_factor)
-            # happairs, hapscore, t1, t2, t3, t4 = haplopair_thin2(Xw_aligned, Hw_aligned, alt_allele_freq = altfreq, keep=thinning_factor)
+            # happairs, hapscore, t1, t2, t3, t4 = haplopair_thin_BLAS2(Xw_aligned, Hw_aligned, alt_allele_freq = altfreq, keep=thinning_factor)
+            # happairs, hapscore, t1, t2, t3, t4 = haplopair_thin_BLAS3(Xw_aligned, Hw_aligned, alt_allele_freq = altfreq, keep=thinning_factor)
         elseif rescreen
             happairs, hapscore, t1, t2, t3, t4 = haplopair_screen(Xw_aligned, Hw_aligned)
         else
