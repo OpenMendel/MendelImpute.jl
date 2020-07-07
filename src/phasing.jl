@@ -73,7 +73,9 @@ function phase(
     avg_num_unique_haps = round(Int, avg_haplotypes_per_window(compressed_Hunique))
     max_windows_per_chunks = nchunks(avg_num_unique_haps, width, people, Threads.nthreads(), Base.summarysize(X), Base.summarysize(compressed_Hunique))
     num_windows_per_chunks = min(tot_windows, max_windows_per_chunks)
+
     num_windows_per_chunks = 10
+
     chunks = ceil(Int, tot_windows / num_windows_per_chunks)
     snps_per_chunk = num_windows_per_chunks * width
     last_chunk_windows = tot_windows - (chunks - 1) * num_windows_per_chunks
@@ -85,6 +87,12 @@ function phase(
 
     # working arrays
     ph = [HaplotypeMosaicPair(ref_snps) for i in 1:people]
+    if dynamic_programming
+        redundant_haplotypes = [[Tuple{Int32, Int32}[] for i in 1:num_windows_per_chunks] for j in 1:people]
+        [[sizehint!(redundant_haplotypes[j][i], 1000) for i in 1:num_windows_per_chunks] for j in 1:people] # don't save >1000 redundant happairs
+    else
+        redundant_haplotypes = [OptimalHaplotypeSet(num_windows_per_chunks, nhaplotypes(compressed_Hunique)) for i in 1:people]
+    end
 
     for chunk in 1:chunks
         #
@@ -94,14 +102,11 @@ function phase(
         windows = (chunk == chunks ? last_chunk_windows : num_windows_per_chunks)
         w_start = (chunk - 1) * num_windows_per_chunks + 1
         w_end = (chunk == chunks ? tot_windows : chunk * num_windows_per_chunks)
-        if dynamic_programming
-            redundant_haplotypes = [[Tuple{Int32, Int32}[] for i in 1:windows] for j in 1:people]
-            [[sizehint!(redundant_haplotypes[j][i], 1000) for i in 1:windows] for j in 1:people] # don't save >1000 redundant happairs
-        else
-            redundant_haplotypes = [OptimalHaplotypeSet(windows, nhaplotypes(compressed_Hunique)) for i in 1:people]
-        end
+        # reset hapset for next chunk
+        initialize!(redundant_haplotypes)
+        chunk == chunks && resize!(redundant_haplotypes, last_chunk_windows)
 
-        println("chunk = $chunk, windows = $windows, w_start = $w_start, w_end = $w_end")
+        println("chunk = $chunk, windows = $windows, start window = $w_start, end window = $w_end")
 
         pmeter = Progress(tot_windows, 5, "Computing optimal haplotype pairs...")
         # find happairs for each window in current chunk
@@ -350,21 +355,60 @@ function phase_fast!(
     window_span = (ones(Int, people), ones(Int, people))
     pmeter      = Progress(people, 5, "Intersecting haplotypes...")
 
-    # begin intersecting haplotypes window by window
     @inbounds for i in 1:people
+        # in window 1, check for last chunk's surviving haplotypes
+        # strand1_survivors = hapset[i].carryover1
+        # strand2_survivors = hapset[i].carryover2
+        # # decide whether to cross over in window 1 based on larger intersection
+        # # A   B      A   B
+        # # |   |  or    X
+        # # C   D      C   D
+        # chain_next[1] .= strand1_survivors .& hapset[i].strand1[1] # AC
+        # chain_next[2] .= strand2_survivors .& hapset[i].strand2[1] # BD
+        # AC = sum(chain_next[1])
+        # BD = sum(chain_next[2])
+        # chain_next[1] .= strand2_survivors .& hapset[i].strand1[1] # BC
+        # chain_next[2] .= strand1_survivors .& hapset[i].strand2[1] # AD
+        # BC = sum(chain_next[1])
+        # AD = sum(chain_next[2])
+        # if AC + BD < AD + BC # cross over
+        #     # flip strand1 and strand2 
+        #     hapset[i].strand1[1], hapset[i].strand2[1] = hapset[i].strand2[1], hapset[i].strand1[1]
+        #     haplo_chain[1][i], haplo_chain[2][i] = haplo_chain[2][i], haplo_chain[1][i]
+        #     # intersect window 1 haplotypes with previous chunk survivors if there are survivors
+        #     if AD > 0
+        #         hapset[i].strand1[1] .&= strand1_survivors
+        #         haplo_chain[1][i] .&= strand1_survivors
+        #     end
+        #     if BC > 0
+        #         hapset[i].strand2[1] .&= strand2_survivors
+        #         haplo_chain[2][i] .&= strand2_survivors
+        #     end
+        # elseif AC + BD > AD + BC # no need to cross over
+        #     # intersect window 1 haplotypes with previous chunk survivors if doing so produces survivors
+        #     if AC > 0
+        #         hapset[i].strand1[1] .&= strand1_survivors
+        #         haplo_chain[1][i] .&= strand1_survivors
+        #     end
+        #     if BD > 0
+        #         hapset[i].strand2[1] .&= strand2_survivors
+        #         haplo_chain[2][i] .&= strand2_survivors
+        #     end
+        # end
+
         for w in 2:windows
             # Decide whether to cross over based on the larger intersection
             # A   B      A   B
             # |   |  or    X
             # C   D      C   D
-            chain_next[1] .= haplo_chain[1][i] .& hapset[i].strand1[w] # not crossing over
-            chain_next[2] .= haplo_chain[1][i] .& hapset[i].strand2[w] # crossing over
+            chain_next[1] .= haplo_chain[1][i] .& hapset[i].strand1[w] # AC
+            chain_next[2] .= haplo_chain[2][i] .& hapset[i].strand2[w] # BD
             AC = sum(chain_next[1])
-            AD = sum(chain_next[2])
-            chain_next[1] .= haplo_chain[2][i] .& hapset[i].strand1[w] # crossing over
-            chain_next[2] .= haplo_chain[2][i] .& hapset[i].strand2[w] # not crossing over
-            BC = sum(chain_next[1])
             BD = sum(chain_next[2])
+            chain_next[1] .= haplo_chain[2][i] .& hapset[i].strand1[w] # BC
+            chain_next[2] .= haplo_chain[1][i] .& hapset[i].strand2[w] # AD
+            BC = sum(chain_next[1])
+            AD = sum(chain_next[2])
             if AC + BD < AD + BC
                 hapset[i].strand1[w], hapset[i].strand2[w] = hapset[i].strand2[w], hapset[i].strand1[w]
             end
@@ -422,7 +466,7 @@ function phase_fast!(
     # middle 1/3: ((w - 1) * width + 1):(      w * width)
     # last   1/3: (      w * width + 1):((w + 1) * width)
     pmeter = Progress(people, 5, "Merging breakpoints...")
-    Threads.@threads for i in 1:people
+    for i in 1:people
         id = Threads.threadid()
 
         # phase first window

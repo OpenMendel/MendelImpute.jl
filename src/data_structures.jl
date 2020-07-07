@@ -57,10 +57,38 @@ UniqueHaplotypeMaps(windows::Int, haps::Int) = UniqueHaplotypeMaps(Vector{Vector
 """
 Data structure for storing all haplotypes that match the optimal haplotype in each window for a person, keeping track of strand.
 
-+ strand1[w] stores a BitVector for window `w`. length(strand1[w]) = number of haplotypes. Entries of this BitVector is 1 if that haplotype matches the optimal haplotype.
++ `strand1[w]` stores a BitVector for window `w`. length(strand1[w]) = number of haplotypes. Entries of this BitVector is 1 if that haplotype matches the optimal haplotype.
++ `carryover1` and `carryover2` are the surviving haplotypes of the previous chunk.
 """
 struct OptimalHaplotypeSet
     strand1::Vector{BitVector}
     strand2::Vector{BitVector}
+    carryover1::BitVector
+    carryover2::BitVector
 end
-OptimalHaplotypeSet(windows::Int, haps::Int) = OptimalHaplotypeSet([falses(haps) for i in 1:windows], [falses(haps) for i in 1:windows])
+OptimalHaplotypeSet(windows::Int, haps::Int) = OptimalHaplotypeSet([falses(haps) for i in 1:windows], [falses(haps) for i in 1:windows], falses(haps), falses(haps))
+
+function initialize!(x::Vector{OptimalHaplotypeSet})
+    n = length(x)
+    windows = length(x[1].strand1)
+    for i in 1:n
+        # save last window's surviving haplotypes to carryover
+        x[i].carryover1 .= x[i].strand1[windows]
+        x[i].carryover2 .= x[i].strand2[windows]
+        # reinitialize all windows to falses
+        for w in 1:windows
+            x[i].strand2[w] .= false
+            x[i].strand2[w] .= false
+        end
+    end
+end
+
+function resize!(x::Vector{OptimalHaplotypeSet}, windows::Int)
+    n = length(x)
+    for i in 1:n
+        Base.resize!(x[i].strand1, windows)
+        Base.resize!(x[i].strand2, windows)
+        sizehint!(x[i].strand1, windows)
+        sizehint!(x[i].strand2, windows)
+    end
+end
