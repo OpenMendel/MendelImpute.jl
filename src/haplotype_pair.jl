@@ -32,7 +32,7 @@ function haplochunk!(
     width = compressed_Hunique.width
     windows = length(winrange)
 
-    ThreadPools.@qthreads for absolute_w in winrange
+    Threads.@threads for absolute_w in winrange
         Hw_aligned = compressed_Hunique.CW_typed[absolute_w].uniqueH
         Xw_idx_start = (absolute_w - 1) * width + 1
         Xw_idx_end = (absolute_w == total_window ? length(X_pos) : absolute_w * width)
@@ -109,17 +109,17 @@ function compute_redundant_haplotypes!(
 
     if dp
         @inbounds for k in 1:people
-            Hi_idx = unique_idx_to_complete_idx(happairs[1][k], window, Hunique)
-            Hj_idx = unique_idx_to_complete_idx(happairs[2][k], window, Hunique)
+            Hi_idx = unique_idx_to_complete_idx(happairs[1][k], window_overall, Hunique)
+            Hj_idx = unique_idx_to_complete_idx(happairs[2][k], window_overall, Hunique)
 
             # find haplotypes that match Hi_idx and Hj_idx on typed snps
-            h1_set = get(Hunique.CW_typed[window].hapmap, Hi_idx, Hi_idx)
-            h2_set = get(Hunique.CW_typed[window].hapmap, Hj_idx, Hj_idx)
+            h1_set = get(Hunique.CW_typed[window_overall].hapmap, Hi_idx, Hi_idx)
+            h2_set = get(Hunique.CW_typed[window_overall].hapmap, Hj_idx, Hj_idx)
 
             # save first 1000 haplotype pairs
             for h1 in h1_set, h2 in h2_set
-                if length(redundant_haplotypes[k][window]) < 1000 
-                    push!(redundant_haplotypes[k][window], (h1, h2))
+                if length(redundant_haplotypes[k][window_idx]) < 1000 
+                    push!(redundant_haplotypes[k][window_idx], (h1, h2))
                 else
                     break
                 end
