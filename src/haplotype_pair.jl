@@ -1,7 +1,8 @@
 """
-    happair!(redundant_haplotypes, compressed_Hunique, X, ...)
+    haplochunk!(redundant_haplotypes, compressed_Hunique, X, ...)
 
 Wrapper function that computes the best haplotype pair `(hᵢ, hⱼ)` for each genotype vector
+in a given chunk.
 
 # There are 5 timers (some may be 0):
 t1 = computing dist(X, H)
@@ -10,7 +11,7 @@ t3 = haplopair search
 t4 = rescreen time
 t5 = finding redundant happairs
 """
-function happair!(
+function haplochunk!(
     redundant_haplotypes::AbstractVector,
     compressed_Hunique::CompressedHaplotypes,
     X::AbstractMatrix,
@@ -31,7 +32,7 @@ function happair!(
     width = compressed_Hunique.width
     windows = length(winrange)
 
-    for (w, absolute_w) in zip(1:windows, winrange)
+    ThreadPools.@qthreads for absolute_w in winrange
         Hw_aligned = compressed_Hunique.CW_typed[absolute_w].uniqueH
         Xw_idx_start = (absolute_w - 1) * width + 1
         Xw_idx_end = (absolute_w == total_window ? length(X_pos) : absolute_w * width)
@@ -47,7 +48,7 @@ function happair!(
         elseif !isnothing(thinning_factor)
             # weight each snp by frequecy if requested
             if thinning_scale_allelefreq
-                Hw_range = compressed_Hunique.start[w]:(w == total_window ? ref_snps : compressed_Hunique.start[w + 1] - 1)
+                Hw_range = compressed_Hunique.start[absolute_w]:(absolute_w == total_window ? ref_snps : compressed_Hunique.start[absolute_w + 1] - 1)
                 Hw_snp_pos = indexin(X_pos[Xw_idx_start:Xw_idx_end], compressed_Hunique.pos[Hw_range])
                 altfreq = compressed_Hunique.altfreq[Hw_snp_pos]
             else
@@ -68,6 +69,7 @@ function happair!(
         end
 
         # convert happairs (which index off unique haplotypes) to indices of full haplotype pool, and find all matching happairs
+        w = something(findfirst(x -> x == absolute_w, winrange)) # window index of current chunk
         t5 = @elapsed compute_redundant_haplotypes!(redundant_haplotypes, compressed_Hunique, happairs, w, absolute_w, dp = dynamic_programming)
 
         # record timings and haplotypes

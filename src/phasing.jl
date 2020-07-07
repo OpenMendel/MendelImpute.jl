@@ -74,7 +74,7 @@ function phase(
     max_windows_per_chunks = nchunks(avg_num_unique_haps, width, people, Threads.nthreads(), Base.summarysize(X), Base.summarysize(compressed_Hunique))
     num_windows_per_chunks = min(tot_windows, max_windows_per_chunks)
 
-    num_windows_per_chunks = 10
+    # num_windows_per_chunks = 1
 
     chunks = ceil(Int, tot_windows / num_windows_per_chunks)
     snps_per_chunk = num_windows_per_chunks * width
@@ -107,7 +107,7 @@ function phase(
 
         pmeter = Progress(tot_windows, 5, "Computing optimal haplotype pairs...")
         # find happairs for each window in current chunk
-        happair!(redundant_haplotypes, compressed_Hunique, X, X_pos, 
+        haplochunk!(redundant_haplotypes, compressed_Hunique, X, X_pos, 
             dynamic_programming, lasso, thinning_factor, thinning_scale_allelefreq, 
             max_haplotypes, rescreen, w_start:w_end, tot_windows, pmeter, haptimers)
         calculate_happairs_time += time() - calculate_happairs_start
@@ -275,52 +275,52 @@ since we can have the previous and next window both extend into the current one,
 this is extremely rare.
 """
 function update_phase!(ph::HaplotypeMosaic, compressed_Hunique::CompressedHaplotypes,
-    bkpt::Int, hap_prev, hap_curr, w::Int, width::Int, chunk_offset::Int,
+    bkpt::Int, hap_prev, hap_curr, window::Int, width::Int, chunk_offset::Int,
     Xwi_start::Int, Xwi_end::Int)
 
     # no breakpoints
     if bkpt == -1
-        h = complete_idx_to_unique_all_idx(hap_curr, w, compressed_Hunique)
-        push!(ph.start, chunk_offset + (w - 1) * width + 1)
+        h = complete_idx_to_unique_all_idx(hap_curr, window, compressed_Hunique)
+        push!(ph.start, (window - 1) * width + 1)
         push!(ph.haplotypelabel, h)
-        push!(ph.window, w)
+        push!(ph.window, window)
         return nothing
     end
 
     # previous window's haplotype completely covers current window 
     if bkpt == length(Xwi_start:Xwi_end)
-        h = complete_idx_to_unique_all_idx(hap_prev, w, compressed_Hunique)
-        push!(ph.start, chunk_offset + (w - 1) * width + 1)
+        h = complete_idx_to_unique_all_idx(hap_prev, window, compressed_Hunique)
+        push!(ph.start, (window - 1) * width + 1)
         push!(ph.haplotypelabel, h)
-        push!(ph.window, w)
+        push!(ph.window, window)
         return nothing
     end
 
     X_bkpt_end = Xwi_start + bkpt
-    Xwi_mid = (w - 1) * width + 1
+    Xwi_mid = (window - 1) * width + 1
 
     if Xwi_mid <= X_bkpt_end <= Xwi_end
         # previous window extends to current window 
-        h1 = complete_idx_to_unique_all_idx(hap_prev, w, compressed_Hunique)
-        push!(ph.start, chunk_offset + Xwi_mid)
+        h1 = complete_idx_to_unique_all_idx(hap_prev, window, compressed_Hunique)
+        push!(ph.start, Xwi_mid)
         push!(ph.haplotypelabel, h1)
-        push!(ph.window, w)
+        push!(ph.window, window)
         # 2nd part of current window
-        h2 = complete_idx_to_unique_all_idx(hap_curr, w, compressed_Hunique)
-        push!(ph.start, chunk_offset + X_bkpt_end)
+        h2 = complete_idx_to_unique_all_idx(hap_curr, window, compressed_Hunique)
+        push!(ph.start, X_bkpt_end)
         push!(ph.haplotypelabel, h2)
-        push!(ph.window, w)
+        push!(ph.window, window)
     elseif X_bkpt_end < Xwi_mid
         # current window extends to previous window
-        h1 = complete_idx_to_unique_all_idx(hap_curr, w - 1, compressed_Hunique)
-        push!(ph.start, chunk_offset + X_bkpt_end)
+        h1 = complete_idx_to_unique_all_idx(hap_curr, window - 1, compressed_Hunique)
+        push!(ph.start, X_bkpt_end)
         push!(ph.haplotypelabel, h1)
-        push!(ph.window, w - 1)
+        push!(ph.window, window - 1)
         # update current window
-        h2 = complete_idx_to_unique_all_idx(hap_curr, w, compressed_Hunique)
-        push!(ph.start, chunk_offset + Xwi_mid)
+        h2 = complete_idx_to_unique_all_idx(hap_curr, window, compressed_Hunique)
+        push!(ph.start, Xwi_mid)
         push!(ph.haplotypelabel, h2)
-        push!(ph.window, w)
+        push!(ph.window, window)
     else
         # println("H_bkpt_pos = $H_bkpt_pos, Hw_start=$Hw_start, Hw_mid=$Hw_mid, Hw_end=$Hw_end ")
         error("update_phase!: bkpt does not satisfy -1 <= bkpt <= 2width! Shouldn't be possible")
@@ -355,7 +355,7 @@ function phase_fast!(
     pmeter      = Progress(people, 5, "Intersecting haplotypes...")
 
     # begin intersecting haplotypes window by window
-    for i in 1:people
+    @inbounds for i in 1:people
         for w in 2:windows
             # Decide whether to cross over based on the larger intersection
             # A   B      A   B
@@ -426,7 +426,7 @@ function phase_fast!(
     # middle 1/3: ((w - 1) * width + 1):(      w * width)
     # last   1/3: (      w * width + 1):((w + 1) * width)
     pmeter = Progress(people, 5, "Merging breakpoints...")
-    for i in 1:people
+    ThreadPools.@qthreads for i in 1:people
         id = Threads.threadid()
 
         # phase first window

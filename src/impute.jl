@@ -146,7 +146,7 @@ function update_marker_position!(
     )
     people = length(phaseinfo)
 
-    for j in 1:people
+    @inbounds for j in 1:people
         # update strand1's starting position
         for (i, idx) in enumerate(phaseinfo[j].strand1.start)
             phaseinfo[j].strand1.start[i] = XtoH_idx[idx]
@@ -158,7 +158,7 @@ function update_marker_position!(
     end
 
     # update first starting position
-    for j in 1:people
+    @inbounds for j in 1:people
         phaseinfo[j].strand1.start[1] = 1
         phaseinfo[j].strand2.start[1] = 1
     end
