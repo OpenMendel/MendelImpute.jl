@@ -73,6 +73,8 @@ function count_haplotypes_per_window(reffile::String)
     compressed_Hunique = loaded[:compressed_Hunique]
     return count_haplotypes_per_window(compressed_Hunique)
 end
+avg_haplotypes_per_window(Hunique::CompressedHaplotypes) = mean(count_haplotypes_per_window(Hunique))
+avg_haplotypes_per_window(reffile::String) = mean(count_haplotypes_per_window(reffile))
 
 """
     compress_haplotypes(vcffile, tgtfile, outfile, width, [dims], [flankwidth])

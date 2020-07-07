@@ -29,14 +29,6 @@ function phase(
     lasso::Union{Nothing, Int} = nothing
     )
 
-    # decide how to partition the data based on available memory 
-    # people = nsamples(tgtfile)
-    # haplotypes = 2nsamples(reffile_aligned)
-    # snps_per_chunk = chunk_size(people, haplotypes)
-    # chunks = ceil(Int, tgt_snps / snps_per_chunk)
-    # remaining_snps = tgt_snps - ((chunks - 1) * snps_per_chunk)
-    # println("Running chunk $chunks / $chunks")
-
     # import reference data
     import_data_start = time()
     if endswith(reffile, ".jld2")
@@ -72,98 +64,53 @@ function phase(
     end
     import_data_time = time() - import_data_start
 
-    # declare some constants
+    # declare some constants and decide how to partition chunks
     people = size(X, 2)
     tgt_snps = size(X, 1)
     ref_snps = length(compressed_Hunique.pos)
-    windows = floor(Int, tgt_snps / width)
+    tot_windows = floor(Int, tgt_snps / width)
+    avg_num_unique_haps = round(Int, avg_haplotypes_per_window(compressed_Hunique))
+    num_windows_per_chunks = nchunks(avg_num_unique_haps, width, people, Threads.nthreads(), Base.summarysize(X), Base.summarysize(compressed_Hunique))
+    chunks = ceil(Int, tot_windows / num_windows_per_chunks)
+    
+    # timers for phasing and computing haplotype pairs
+    haptimers = [zeros(5) for _ in 1:Threads.nthreads()]
+    phase_time = 0
+    calculate_happairs_time = 0
 
-    #
-    # compute redundant haplotype sets. 
-    # There are 5 timers (some may be 0):
-    #     t1 = computing dist(X, H)
-    #     t2 = BLAS3 mul! to get M and N
-    #     t3 = haplopair search
-    #     t4 = rescreen time
-    #     t5 = finding redundant happairs
-    #
-    calculate_happairs_start = time()
-    if dynamic_programming
-        redundant_haplotypes = [[Tuple{Int32, Int32}[] for i in 1:windows] for j in 1:people]
-        [[sizehint!(redundant_haplotypes[j][i], 1000) for i in 1:windows] for j in 1:people] # don't save >1000 redundant happairs
-    else
-        redundant_haplotypes = [OptimalHaplotypeSet(windows, nhaplotypes(compressed_Hunique)) for i in 1:people]
-    end
-    num_unique_haps = zeros(Int, Threads.nthreads())
-    timers = [zeros(5) for _ in 1:Threads.nthreads()]
-    pmeter = Progress(windows, 5, "Computing optimal haplotype pairs...")
-    ThreadPools.@qthreads for w in 1:windows
-        Hw_aligned = compressed_Hunique.CW_typed[w].uniqueH
-        Xw_idx_start = (w - 1) * width + 1
-        Xw_idx_end = (w == windows ? length(X_pos) : w * width)
-        Xw_aligned = X[Xw_idx_start:Xw_idx_end, :]
-
-        # computational routine
-        if !isnothing(lasso)
-            if size(Hw_aligned, 2) > max_haplotypes
-                happairs, hapscore, t1, t2, t3, t4 = haplopair_lasso(Xw_aligned, Hw_aligned, r = lasso)
-            else
-                happairs, hapscore, t1, t2, t3, t4 = haplopair(Xw_aligned, Hw_aligned)
-            end
-        elseif !isnothing(thinning_factor)
-            # weight each snp by frequecy if requested
-            if thinning_scale_allelefreq
-                Hw_range = compressed_Hunique.start[w]:(w == windows ? ref_snps : compressed_Hunique.start[w + 1] - 1)
-                Hw_snp_pos = indexin(X_pos[Xw_idx_start:Xw_idx_end], compressed_Hunique.pos[Hw_range])
-                altfreq = compressed_Hunique.altfreq[Hw_snp_pos]
-            else
-                altfreq = nothing
-            end
-            # run haplotype thinning 
-            if size(Hw_aligned, 2) > max_haplotypes
-                happairs, hapscore, t1, t2, t3, t4 = haplopair_thin_BLAS2(Xw_aligned, Hw_aligned, alt_allele_freq = altfreq, keep=thinning_factor)
-            else
-                happairs, hapscore, t1, t2, t3, t4 = haplopair(Xw_aligned, Hw_aligned)
-            end
-            # happairs, hapscore, t1, t2, t3, t4 = haplopair_thin_BLAS2(Xw_aligned, Hw_aligned, alt_allele_freq = altfreq, keep=thinning_factor)
-            # happairs, hapscore, t1, t2, t3, t4 = haplopair_thin_BLAS3(Xw_aligned, Hw_aligned, alt_allele_freq = altfreq, keep=thinning_factor)
-        elseif rescreen
-            happairs, hapscore, t1, t2, t3, t4 = haplopair_screen(Xw_aligned, Hw_aligned)
-        else
-            happairs, hapscore, t1, t2, t3, t4 = haplopair(Xw_aligned, Hw_aligned)
-        end
-
-        # convert happairs (which index off unique haplotypes) to indices of full haplotype pool, and find all matching happairs
-        t5 = @elapsed compute_redundant_haplotypes!(redundant_haplotypes, compressed_Hunique, happairs, w, dp = dynamic_programming)
-
-        # record timings and haplotypes
-        id = Threads.threadid()
-        timers[id][1] += t1
-        timers[id][2] += t2
-        timers[id][3] += t3
-        timers[id][4] += t4
-        timers[id][5] += t5
-        num_unique_haps[id] += size(Hw_aligned, 2)
-
-        # update progress
-        next!(pmeter)
-    end
-    avg_num_unique_haps = sum(num_unique_haps) / windows
-    timers = sum(timers) ./ Threads.nthreads()
-    calculate_happairs_time = time() - calculate_happairs_start
-
-    #
-    # phasing (haplotyping) step
-    #
-    # offset = (chunks - 1) * snps_per_chunk
-    phase_start = time()
+    # return variable (stores phase for each sample)
     ph = [HaplotypeMosaicPair(ref_snps) for i in 1:people]
-    if dynamic_programming
-        phase!(ph, X, compressed_Hunique, redundant_haplotypes, X_pos) # phase by dynamic programming + breakpoint search
-    else
-        phase_fast!(ph, X, compressed_Hunique, redundant_haplotypes, X_pos, 0) # phase by dynamic programming + breakpoint search
+
+    for chunk in chunks
+        #
+        # compute redundant haplotype sets. 
+        #
+        calculate_happairs_start = time()
+        windows = tot_windows
+        if dynamic_programming
+            redundant_haplotypes = [[Tuple{Int32, Int32}[] for i in 1:windows] for j in 1:people]
+            [[sizehint!(redundant_haplotypes[j][i], 1000) for i in 1:windows] for j in 1:people] # don't save >1000 redundant happairs
+        else
+            redundant_haplotypes = [OptimalHaplotypeSet(windows, nhaplotypes(compressed_Hunique)) for i in 1:people]
+        end
+        pmeter = Progress(tot_windows, 5, "Computing optimal haplotype pairs...")
+        happair!(redundant_haplotypes, compressed_Hunique, X, X_pos, 
+            dynamic_programming, lasso, thinning_factor, thinning_scale_allelefreq, 
+            max_haplotypes, rescreen, windows, pmeter, haptimers)
+        calculate_happairs_time += time() - calculate_happairs_start
+
+        #
+        # phasing (haplotyping) step
+        #
+        # offset = (chunks - 1) * snps_per_chunk
+        phase_start = time()
+        if dynamic_programming
+            phase!(ph, X, compressed_Hunique, redundant_haplotypes, X_pos) # phase by dynamic programming + breakpoint search
+        else
+            phase_fast!(ph, X, compressed_Hunique, redundant_haplotypes, X_pos, 0) # phase by dynamic programming + breakpoint search
+        end
+        phase_time += time() - phase_start
     end
-    phase_time = time() - phase_start
 
     #
     # impute step
@@ -185,20 +132,21 @@ function phase(
     end
     impute_time = time() - impute_start
 
-    println("Total windows = $windows, averaging ~ $(round(Int, avg_num_unique_haps)) unique haplotypes per window.\n")
+    haptimers = sum(haptimers) ./ Threads.nthreads()
+    println("Total windows = $windows, averaging ~ $avg_num_unique_haps unique haplotypes per window.\n")
     println("Timings: ")
     println("    Data import                     = ", round(import_data_time, sigdigits=6), " seconds")
     println("    Computing haplotype pair        = ", round(calculate_happairs_time, sigdigits=6), " seconds")
-    timers[1] != 0 && println("        computing dist(X, H)           = ", round(timers[1], sigdigits=6), " seconds per thread")
-    println("        BLAS3 mul! to get M and N      = ", round(timers[2], sigdigits=6), " seconds per thread")
-    println("        haplopair search               = ", round(timers[3], sigdigits=6), " seconds per thread")
-    timers[4] != 0 && println("        min least sq on observed data  = ", round(timers[4], sigdigits=6), " seconds per thread")
-    println("        finding redundant happairs     = ", round(timers[5], sigdigits=6), " seconds per thread")
+    haptimers[1] != 0 && println("        computing dist(X, H)           = ", round(haptimers[1], sigdigits=6), " seconds per thread")
+    println("        BLAS3 mul! to get M and N      = ", round(haptimers[2], sigdigits=6), " seconds per thread")
+    println("        haplopair search               = ", round(haptimers[3], sigdigits=6), " seconds per thread")
+    haptimers[4] != 0 && println("        min least sq on observed data  = ", round(haptimers[4], sigdigits=6), " seconds per thread")
+    println("        finding redundant happairs     = ", round(haptimers[5], sigdigits=6), " seconds per thread")
     dynamic_programming ? println("    Phasing by dynamic programming  = ", round(phase_time, sigdigits=6), " seconds") :
                           println("    Phasing by win-win intersection = ", round(phase_time, sigdigits=6), " seconds")
     println("    Imputation                      = ", round(impute_time, sigdigits=6), " seconds\n")
 
-    return redundant_haplotypes, ph
+    return ph
 end
 
 """

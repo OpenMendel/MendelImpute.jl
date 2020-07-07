@@ -1,4 +1,86 @@
 """
+    happair!(redundant_haplotypes, compressed_Hunique, X, ...)
+
+Wrapper function that computes the best haplotype pair `(hᵢ, hⱼ)` for each genotype vector
+
+# There are 5 timers (some may be 0):
+t1 = computing dist(X, H)
+t2 = BLAS3 mul! to get M and N
+t3 = haplopair search
+t4 = rescreen time
+t5 = finding redundant happairs
+"""
+function happair!(
+    redundant_haplotypes::AbstractVector,
+    compressed_Hunique::CompressedHaplotypes,
+    X::AbstractMatrix,
+    X_pos::AbstractVector,
+    dynamic_programming::Bool,
+    lasso::Union{Nothing, Int},
+    thinning_factor::Union{Nothing, Int},
+    thinning_scale_allelefreq::Bool,
+    max_haplotypes::Int,
+    rescreen::Bool,
+    windows::Int,
+    pmeter::Progress,
+    timers::AbstractVector
+    )
+    people = size(X, 2)
+    width = compressed_Hunique.width
+
+    Threads.@threads for w in 1:windows
+        Hw_aligned = compressed_Hunique.CW_typed[w].uniqueH
+        Xw_idx_start = (w - 1) * width + 1
+        Xw_idx_end = (w == windows ? length(X_pos) : w * width)
+        Xw_aligned = X[Xw_idx_start:Xw_idx_end, :]
+
+        # computational routine
+        if !isnothing(lasso)
+            if size(Hw_aligned, 2) > max_haplotypes
+                happairs, hapscore, t1, t2, t3, t4 = haplopair_lasso(Xw_aligned, Hw_aligned, r = lasso)
+            else
+                happairs, hapscore, t1, t2, t3, t4 = haplopair(Xw_aligned, Hw_aligned)
+            end
+        elseif !isnothing(thinning_factor)
+            # weight each snp by frequecy if requested
+            if thinning_scale_allelefreq
+                Hw_range = compressed_Hunique.start[w]:(w == windows ? ref_snps : compressed_Hunique.start[w + 1] - 1)
+                Hw_snp_pos = indexin(X_pos[Xw_idx_start:Xw_idx_end], compressed_Hunique.pos[Hw_range])
+                altfreq = compressed_Hunique.altfreq[Hw_snp_pos]
+            else
+                altfreq = nothing
+            end
+            # run haplotype thinning 
+            if size(Hw_aligned, 2) > max_haplotypes
+                happairs, hapscore, t1, t2, t3, t4 = haplopair_thin_BLAS2(Xw_aligned, Hw_aligned, alt_allele_freq = altfreq, keep=thinning_factor)
+            else
+                happairs, hapscore, t1, t2, t3, t4 = haplopair(Xw_aligned, Hw_aligned)
+            end
+            # happairs, hapscore, t1, t2, t3, t4 = haplopair_thin_BLAS2(Xw_aligned, Hw_aligned, alt_allele_freq = altfreq, keep=thinning_factor)
+            # happairs, hapscore, t1, t2, t3, t4 = haplopair_thin_BLAS3(Xw_aligned, Hw_aligned, alt_allele_freq = altfreq, keep=thinning_factor)
+        elseif rescreen
+            happairs, hapscore, t1, t2, t3, t4 = haplopair_screen(Xw_aligned, Hw_aligned)
+        else
+            happairs, hapscore, t1, t2, t3, t4 = haplopair(Xw_aligned, Hw_aligned)
+        end
+
+        # convert happairs (which index off unique haplotypes) to indices of full haplotype pool, and find all matching happairs
+        t5 = @elapsed compute_redundant_haplotypes!(redundant_haplotypes, compressed_Hunique, happairs, w, dp = dynamic_programming)
+
+        # record timings and haplotypes
+        id = Threads.threadid()
+        timers[id][1] += t1
+        timers[id][2] += t2
+        timers[id][3] += t3
+        timers[id][4] += t4
+        timers[id][5] += t5
+
+        # update progress
+        next!(pmeter)
+    end
+end
+
+"""
 Records optimal-redundant haplotypes for each window. Currently, only the first 1000
 haplotype pairs will be saved to reduce search space for dynamic programming. 
 
@@ -322,18 +404,48 @@ function initXfloat!(
 end
 
 """
-    chunk_size(people, haplotypes)
+    chunks(people, haplotypes)
 
-Figures out how many SNPs can be loaded into memory (capped at 2/3 total RAM) 
-at once, given the data size. Assumes genotype data are Float32 (4 byte per entry) 
-and haplotype panels are BitArrays (1 bit per entry).
+Determines how many windows per chunk will be processed at once based on 
+estimated memory. Total memory usage will be roughly 80% of total RAM.
+
+# Inputs
+- `d`: average number of unique haplotypes per window
+- `p`: number of typed SNPs per window
+- `n`: number of samples
+- `threads`: number of threads (this affects `M` and `N` only)
+- `Xbytes`: number of bytes to store genotype matrix
+- `Hbytes`: number of bytes to store compressed haplotypes
+
+# Output
+- Maximum windows per chunk
+
+# Memory intensive items:
+- `M`: requires `d × d × 4` bytes per thread
+- `N`: requires `d × p × 4` bytes per thread
+- `redundant_haplotypes`: requires `2windows × d × n` bits where `windows` is number of windows per chunk
 """
-function chunk_size(people::Int, haplotypes::Int)
+function nchunks(
+    d::Int, 
+    p::Int,
+    n::Int,
+    threads::Int = Threads.nthreads(),
+    Xbytes::Int = 0,
+    Hbytes::Int = 0
+    )
+    # system info
     system_memory_gb = Sys.total_memory() / 2^30
     system_memory_bits = 8000000000 * system_memory_gb
-    usable_bits = round(Int, system_memory_bits * 2 / 3) # use 2/3 of memory for genotype and haplotype matrix per chunk
-    max_chunk_size = round(Int, usable_bits / (haplotypes + 32people))
-    return max_chunk_size
+    usable_bits = round(Int, system_memory_bits * 0.8) # use 80% of total memory
 
-    # return 1000 # for testing in compare1
+    # estimate memory usage per window
+    Mbits_per_win = 32d * d * threads
+    Nbits_per_win = 32d * p * threads
+    Rbits_per_win = 2 * d * n
+
+    # subtract X and H's memory from usable bits if supplied
+    Xbits = 4Xbytes
+    Hbits = 4Hbytes
+
+    return round(Int, (usable_bits - Hbits - Xbits) / (Rbits_per_win + Nbits_per_win + Mbits_per_win))
 end
