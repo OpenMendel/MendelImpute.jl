@@ -21,17 +21,20 @@ function happair!(
     thinning_scale_allelefreq::Bool,
     max_haplotypes::Int,
     rescreen::Bool,
-    windows::Int,
+    winrange::UnitRange,
+    total_window::Int,
     pmeter::Progress,
     timers::AbstractVector
     )
     people = size(X, 2)
+    ref_snps = size(X, 1)
     width = compressed_Hunique.width
+    windows = length(winrange)
 
-    Threads.@threads for w in 1:windows
-        Hw_aligned = compressed_Hunique.CW_typed[w].uniqueH
-        Xw_idx_start = (w - 1) * width + 1
-        Xw_idx_end = (w == windows ? length(X_pos) : w * width)
+    for (w, absolute_w) in zip(1:windows, winrange)
+        Hw_aligned = compressed_Hunique.CW_typed[absolute_w].uniqueH
+        Xw_idx_start = (absolute_w - 1) * width + 1
+        Xw_idx_end = (absolute_w == total_window ? length(X_pos) : absolute_w * width)
         Xw_aligned = X[Xw_idx_start:Xw_idx_end, :]
 
         # computational routine
@@ -44,7 +47,7 @@ function happair!(
         elseif !isnothing(thinning_factor)
             # weight each snp by frequecy if requested
             if thinning_scale_allelefreq
-                Hw_range = compressed_Hunique.start[w]:(w == windows ? ref_snps : compressed_Hunique.start[w + 1] - 1)
+                Hw_range = compressed_Hunique.start[w]:(w == total_window ? ref_snps : compressed_Hunique.start[w + 1] - 1)
                 Hw_snp_pos = indexin(X_pos[Xw_idx_start:Xw_idx_end], compressed_Hunique.pos[Hw_range])
                 altfreq = compressed_Hunique.altfreq[Hw_snp_pos]
             else
@@ -65,7 +68,7 @@ function happair!(
         end
 
         # convert happairs (which index off unique haplotypes) to indices of full haplotype pool, and find all matching happairs
-        t5 = @elapsed compute_redundant_haplotypes!(redundant_haplotypes, compressed_Hunique, happairs, w, dp = dynamic_programming)
+        t5 = @elapsed compute_redundant_haplotypes!(redundant_haplotypes, compressed_Hunique, happairs, w, absolute_w, dp = dynamic_programming)
 
         # record timings and haplotypes
         id = Threads.threadid()
@@ -86,12 +89,17 @@ haplotype pairs will be saved to reduce search space for dynamic programming.
 
 Warning: This function is called in a multithreaded loop. If you modify this function
 you must check whether imputation accuracy is affected (when run with >1 threads).
+
+# Arguments:
+- `window_idx`: window in current chunk
+- `window_overall`: window index in terms of every windows
 """
 function compute_redundant_haplotypes!(
     redundant_haplotypes::Union{Vector{Vector{Vector{T}}}, Vector{OptimalHaplotypeSet}}, 
     Hunique::CompressedHaplotypes, 
     happairs::Tuple{AbstractVector, AbstractVector},
-    window::Int;
+    window_idx::Int,
+    window_overall::Int;
     dp::Bool = false, # dynamic programming
     ) where T <: Tuple{Int32, Int32}
     
@@ -117,16 +125,16 @@ function compute_redundant_haplotypes!(
         end
     else
         @inbounds for k in 1:people
-            Hi_idx = unique_idx_to_complete_idx(happairs[1][k], window, Hunique)
-            Hj_idx = unique_idx_to_complete_idx(happairs[2][k], window, Hunique)
+            Hi_idx = unique_idx_to_complete_idx(happairs[1][k], window_overall, Hunique)
+            Hj_idx = unique_idx_to_complete_idx(happairs[2][k], window_overall, Hunique)
 
             # find haplotypes that match Hi_idx and Hj_idx on typed snps
-            h1_set = get(Hunique.CW_typed[window].hapmap, Hi_idx, Hi_idx)
-            h2_set = get(Hunique.CW_typed[window].hapmap, Hj_idx, Hj_idx)
+            h1_set = get(Hunique.CW_typed[window_overall].hapmap, Hi_idx, Hi_idx)
+            h2_set = get(Hunique.CW_typed[window_overall].hapmap, Hj_idx, Hj_idx)
 
             # record matching haplotypes into bitvector
-            redunhaps_bitvec1 = redundant_haplotypes[k].strand1[window]
-            redunhaps_bitvec2 = redundant_haplotypes[k].strand2[window]
+            redunhaps_bitvec1 = redundant_haplotypes[k].strand1[window_idx]
+            redunhaps_bitvec2 = redundant_haplotypes[k].strand2[window_idx]
             for i in h1_set
                 redunhaps_bitvec1[i] = true
             end
