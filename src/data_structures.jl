@@ -67,17 +67,18 @@ struct OptimalHaplotypeSet
     carryover2::BitVector
 end
 OptimalHaplotypeSet(windows::Int, haps::Int) = OptimalHaplotypeSet([falses(haps) for i in 1:windows], [falses(haps) for i in 1:windows], falses(haps), falses(haps))
+windows(x::OptimalHaplotypeSet) = length(x.strand1)
 
 function initialize!(x::Vector{OptimalHaplotypeSet})
     n = length(x)
-    windows = length(x[1].strand1)
+    win = windows(x[1])
     for i in 1:n
         # save last window's surviving haplotypes to carryover
-        x[i].carryover1 .= x[i].strand1[windows]
-        x[i].carryover2 .= x[i].strand2[windows]
+        x[i].carryover1 .= x[i].strand1[win]
+        x[i].carryover2 .= x[i].strand2[win]
         # reinitialize all windows to falses
-        for w in 1:windows
-            x[i].strand2[w] .= false
+        for w in 1:win
+            x[i].strand1[w] .= false
             x[i].strand2[w] .= false
         end
     end

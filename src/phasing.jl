@@ -357,44 +357,44 @@ function phase_fast!(
 
     @inbounds for i in 1:people
         # in window 1, check for last chunk's surviving haplotypes
-        # strand1_survivors = hapset[i].carryover1
-        # strand2_survivors = hapset[i].carryover2
-        # # decide whether to cross over in window 1 based on larger intersection
-        # # A   B      A   B
-        # # |   |  or    X
-        # # C   D      C   D
-        # chain_next[1] .= strand1_survivors .& hapset[i].strand1[1] # AC
-        # chain_next[2] .= strand2_survivors .& hapset[i].strand2[1] # BD
-        # AC = sum(chain_next[1])
-        # BD = sum(chain_next[2])
-        # chain_next[1] .= strand2_survivors .& hapset[i].strand1[1] # BC
-        # chain_next[2] .= strand1_survivors .& hapset[i].strand2[1] # AD
-        # BC = sum(chain_next[1])
-        # AD = sum(chain_next[2])
-        # if AC + BD < AD + BC # cross over
-        #     # flip strand1 and strand2 
-        #     hapset[i].strand1[1], hapset[i].strand2[1] = hapset[i].strand2[1], hapset[i].strand1[1]
-        #     haplo_chain[1][i], haplo_chain[2][i] = haplo_chain[2][i], haplo_chain[1][i]
-        #     # intersect window 1 haplotypes with previous chunk survivors if there are survivors
-        #     if AD > 0
-        #         hapset[i].strand1[1] .&= strand1_survivors
-        #         haplo_chain[1][i] .&= strand1_survivors
-        #     end
-        #     if BC > 0
-        #         hapset[i].strand2[1] .&= strand2_survivors
-        #         haplo_chain[2][i] .&= strand2_survivors
-        #     end
-        # elseif AC + BD > AD + BC # no need to cross over
-        #     # intersect window 1 haplotypes with previous chunk survivors if doing so produces survivors
-        #     if AC > 0
-        #         hapset[i].strand1[1] .&= strand1_survivors
-        #         haplo_chain[1][i] .&= strand1_survivors
-        #     end
-        #     if BD > 0
-        #         hapset[i].strand2[1] .&= strand2_survivors
-        #         haplo_chain[2][i] .&= strand2_survivors
-        #     end
-        # end
+        strand1_survivors = hapset[i].carryover1
+        strand2_survivors = hapset[i].carryover2
+        # decide whether to cross over in window 1 based on larger intersection
+        # A   B      A   B
+        # |   |  or    X
+        # C   D      C   D
+        chain_next[1] .= strand1_survivors .& hapset[i].strand1[1] # AC
+        chain_next[2] .= strand2_survivors .& hapset[i].strand2[1] # BD
+        AC = sum(chain_next[1])
+        BD = sum(chain_next[2])
+        chain_next[1] .= strand2_survivors .& hapset[i].strand1[1] # BC
+        chain_next[2] .= strand1_survivors .& hapset[i].strand2[1] # AD
+        BC = sum(chain_next[1])
+        AD = sum(chain_next[2])
+        if AC + BD < AD + BC # cross over
+            # flip strand1 and strand2 
+            hapset[i].strand1[1], hapset[i].strand2[1] = hapset[i].strand2[1], hapset[i].strand1[1]
+            haplo_chain[1][i], haplo_chain[2][i] = haplo_chain[2][i], haplo_chain[1][i]
+            # intersect window 1 haplotypes with previous chunk survivors if there are survivors
+            if AD > 0
+                hapset[i].strand1[1] .&= strand1_survivors
+                haplo_chain[1][i] .&= strand1_survivors
+            end
+            if BC > 0
+                hapset[i].strand2[1] .&= strand2_survivors
+                haplo_chain[2][i] .&= strand2_survivors
+            end
+        elseif AC + BD > AD + BC # no need to cross over
+            # intersect window 1 haplotypes with previous chunk survivors if doing so produces survivors
+            if AC > 0
+                hapset[i].strand1[1] .&= strand1_survivors
+                haplo_chain[1][i] .&= strand1_survivors
+            end
+            if BD > 0
+                hapset[i].strand2[1] .&= strand2_survivors
+                haplo_chain[2][i] .&= strand2_survivors
+            end
+        end
 
         for w in 2:windows
             # Decide whether to cross over based on the larger intersection
