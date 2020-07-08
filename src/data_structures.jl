@@ -1,8 +1,12 @@
+# This file stores data structures used in imputation and phasing.
+# For JLSO/JLD2 compression, the relevant data structures are in compress.jl
+
 """
 Data structure for recording haplotype mosaic of one strand:
 `start[i]` to `start[i+1]` has haplotype `haplotypelabel[i]`
-in window `window[i]` of a `CompressedWindow`. `start[end]` to
-`length` has haplotype `haplotypelabel[end]` in `window[end]`
+in `window[i]`. The haplotype label is the column index of
+`CW_typed[window[i]].uniqueH`. `start[end]` to`length` has 
+haplotype `haplotypelabel[end]` in `window[end]`
 """
 struct HaplotypeMosaic
     length::Int
@@ -69,10 +73,11 @@ end
 OptimalHaplotypeSet(windows::Int, haps::Int) = OptimalHaplotypeSet([falses(haps) for i in 1:windows], [falses(haps) for i in 1:windows], falses(haps), falses(haps))
 windows(x::OptimalHaplotypeSet) = length(x.strand1)
 
+# reset function for window-by-window intersection phasing
 function initialize!(x::Vector{OptimalHaplotypeSet})
     n = length(x)
     win = windows(x[1])
-    for i in 1:n
+    @inbounds for i in 1:n
         # save last window's surviving haplotypes to carryover
         x[i].carryover1 .= x[i].strand1[win]
         x[i].carryover2 .= x[i].strand2[win]
@@ -84,12 +89,31 @@ function initialize!(x::Vector{OptimalHaplotypeSet})
     end
 end
 
+# reset function for dynamic programming phasing
+function initialize!(x::Vector{Vector{Vector{Tuple{Int32, Int32}}}})
+    n = length(x)
+    win = length(x[1])
+    @inbounds for i in 1:n, w in 1:win
+        empty!(x[i][w])
+    end
+end
+
+# resize function for window-by-window intersection phasing
 function resize!(x::Vector{OptimalHaplotypeSet}, windows::Int)
     n = length(x)
-    for i in 1:n
+    @inbounds for i in 1:n
         Base.resize!(x[i].strand1, windows)
         Base.resize!(x[i].strand2, windows)
         sizehint!(x[i].strand1, windows)
         sizehint!(x[i].strand2, windows)
+    end
+end
+
+# resize function for dynamic programming phasing
+function resize!(x::Vector{Vector{Vector{Tuple{Int32, Int32}}}}, windows::Int)
+    n = length(x)
+    @inbounds for i in 1:n
+        Base.resize!(x[i], windows)
+        sizehint!(x[i], windows)
     end
 end

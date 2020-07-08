@@ -20,9 +20,9 @@ function phase(
     reffile::AbstractString;
     outfile::AbstractString = "imputed." * tgtfile,
     impute::Bool = true,
-    width::Int = 2048,
+    width::Int = 512,
     rescreen::Bool = false, 
-    max_haplotypes::Int = 2000,
+    max_haplotypes::Int = 800,
     thinning_factor::Union{Nothing, Int} = nothing,
     thinning_scale_allelefreq::Bool = false,
     dynamic_programming::Bool = true,
@@ -73,9 +73,6 @@ function phase(
     avg_num_unique_haps = round(Int, avg_haplotypes_per_window(compressed_Hunique))
     max_windows_per_chunks = nchunks(avg_num_unique_haps, width, people, Threads.nthreads(), Base.summarysize(X), Base.summarysize(compressed_Hunique))
     num_windows_per_chunks = min(tot_windows, max_windows_per_chunks)
-
-    num_windows_per_chunks = 10
-
     chunks = ceil(Int, tot_windows / num_windows_per_chunks)
     snps_per_chunk = num_windows_per_chunks * width
     last_chunk_windows = tot_windows - (chunks - 1) * num_windows_per_chunks
@@ -105,9 +102,8 @@ function phase(
         # reset hapset for next chunk
         initialize!(redundant_haplotypes)
         chunk == chunks && resize!(redundant_haplotypes, last_chunk_windows)
-
-        println("chunk = $chunk, windows = $windows, start window = $w_start, end window = $w_end")
-
+        # println("chunk = $chunk, windows = $windows, start window = $w_start, end window = $w_end")
+        
         pmeter = Progress(tot_windows, 5, "Computing optimal haplotype pairs...")
         # find happairs for each window in current chunk
         haplochunk!(redundant_haplotypes, compressed_Hunique, X, X_pos, 
@@ -466,7 +462,7 @@ function phase_fast!(
     # middle 1/3: ((w - 1) * width + 1):(      w * width)
     # last   1/3: (      w * width + 1):((w + 1) * width)
     pmeter = Progress(people, 5, "Merging breakpoints...")
-    for i in 1:people
+    ThreadPools.@qthreads for i in 1:people
         id = Threads.threadid()
 
         # window 1

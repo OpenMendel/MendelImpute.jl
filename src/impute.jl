@@ -110,24 +110,26 @@ function impute_discard_phase!(
 
     p, n = size(X)
 
-    @inbounds for person in 1:n, snp in 1:p
-        if ismissing(X[snp, person])
-            #find which segment the snp is located
-            hap1_segment = searchsortedlast(phase[person].strand1.start, snp)
-            hap2_segment = searchsortedlast(phase[person].strand2.start, snp)
+    ThreadPools.@qthreads for person in 1:n
+        @inbounds for snp in 1:p
+            if ismissing(X[snp, person])
+                #find which segment the snp is located
+                hap1_segment = searchsortedlast(phase[person].strand1.start, snp)
+                hap2_segment = searchsortedlast(phase[person].strand2.start, snp)
 
-            #find haplotype pair in corresponding window for this segment
-            h1 = phase[person].strand1.haplotypelabel[hap1_segment]
-            h2 = phase[person].strand2.haplotypelabel[hap2_segment]
-            w1 = phase[person].strand1.window[hap1_segment]
-            w2 = phase[person].strand2.window[hap2_segment]
-            i1 = snp - compressed_Hunique.start[w1] + 1
-            i2 = snp - compressed_Hunique.start[w2] + 1
+                #find haplotype pair in corresponding window for this segment
+                h1 = phase[person].strand1.haplotypelabel[hap1_segment]
+                h2 = phase[person].strand2.haplotypelabel[hap2_segment]
+                w1 = phase[person].strand1.window[hap1_segment]
+                w2 = phase[person].strand2.window[hap2_segment]
+                i1 = snp - compressed_Hunique.start[w1] + 1
+                i2 = snp - compressed_Hunique.start[w2] + 1
 
-            # imputation step
-            H1 = compressed_Hunique.CW[w1].uniqueH
-            H2 = compressed_Hunique.CW[w2].uniqueH
-            X[snp, person] = H1[i1, h1] + H2[i2, h2]
+                # imputation step
+                H1 = compressed_Hunique.CW[w1].uniqueH
+                H2 = compressed_Hunique.CW[w2].uniqueH
+                X[snp, person] = H1[i1, h1] + H2[i2, h2]
+            end
         end
     end
 

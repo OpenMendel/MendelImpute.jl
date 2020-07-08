@@ -32,7 +32,7 @@ function haplochunk!(
     width = compressed_Hunique.width
     windows = length(winrange)
 
-    Threads.@threads for absolute_w in winrange
+    ThreadPools.@qthreads for absolute_w in winrange
         Hw_aligned = compressed_Hunique.CW_typed[absolute_w].uniqueH
         Xw_idx_start = (absolute_w - 1) * width + 1
         Xw_idx_end = (absolute_w == total_window ? length(X_pos) : absolute_w * width)
