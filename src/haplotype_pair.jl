@@ -441,7 +441,7 @@ function nchunks(
     n::Int,
     threads::Int = Threads.nthreads(),
     Xbytes::Int = 0,
-    Hbytes::Int = 0
+    compressed_Hunique::Union{Nothing, CompressedHaplotypes} = nothing
     )
     # system info
     system_memory_gb = Sys.total_memory() / 2^30
@@ -453,9 +453,17 @@ function nchunks(
     Nbits_per_win = 32d * p * threads
     Rbits_per_win = 2 * d * n
 
-    # subtract X and H's memory from usable bits if supplied
+    # calculate X and H's memory requirement in bits
     Xbits = 4Xbytes
-    Hbits = 4Hbytes
+    Hbits = 0
+    if !isnothing(compressed_Hunique)
+        # avoid computing sizes for vector of strings because they are slow
+        Hbits += Base.summarysize(compressed_Hunique.CW)
+        Hbits += Base.summarysize(compressed_Hunique.CW_typed)
+        Hbits += Base.summarysize(compressed_Hunique.start)
+        Hbits += Base.summarysize(compressed_Hunique.pos)
+        Hbits += Base.summarysize(compressed_Hunique.altfreq)
+    end
 
-    return round(Int, (usable_bits - Hbits - Xbits) / (Rbits_per_win + Nbits_per_win + Mbits_per_win))
+    return round(Int, (usable_bits - Hbits - Xbits - Nbits_per_win - Mbits_per_win) / Rbits_per_win)
 end

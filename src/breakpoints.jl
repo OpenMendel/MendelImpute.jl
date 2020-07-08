@@ -110,7 +110,7 @@ function search_breakpoint(
     )
 
     n = length(X)
-    length(s1) == length(s21) == length(s22) == n || error("search_breakpoint: all vectors should have same length")
+    length(s1) == length(s21) == length(s22) == n || error("search_breakpoint: all vectors should have same length but length X = $n, s1 = $(length(s1)), s21 = $(length(s21)), s22 = $(length(s22))")
 
     # count number of errors if second haplotype is all from s22
     errors = 0

@@ -30,7 +30,7 @@ function phase(
     )
 
     # import reference data
-    @info "Importing reference haplotype data..."
+    println("Importing reference haplotype data...")
     import_data_start = time()
     if endswith(reffile, ".jld2")
         @load reffile compressed_Hunique 
@@ -71,9 +71,9 @@ function phase(
     ref_snps = length(compressed_Hunique.pos)
     tot_windows = floor(Int, tgt_snps / width)
     avg_num_unique_haps = round(Int, avg_haplotypes_per_window(compressed_Hunique))
-    max_windows_per_chunks = nchunks(avg_num_unique_haps, width, people, Threads.nthreads(), Base.summarysize(X), Base.summarysize(compressed_Hunique))
-    num_windows_per_chunks = min(tot_windows, max_windows_per_chunks)
-    chunks = ceil(Int, tot_windows / num_windows_per_chunks)
+    max_windows_per_chunks = nchunks(avg_num_unique_haps, width, people, Threads.nthreads(), Base.summarysize(X), compressed_Hunique)
+    chunks = ceil(Int, tot_windows / min(tot_windows, max_windows_per_chunks))
+    num_windows_per_chunks = round(Int, tot_windows / chunks)
     snps_per_chunk = num_windows_per_chunks * width
     last_chunk_windows = tot_windows - (chunks - 1) * num_windows_per_chunks
 
@@ -104,7 +104,7 @@ function phase(
         chunk == chunks && resize!(redundant_haplotypes, last_chunk_windows)
         # println("chunk = $chunk, windows = $windows, start window = $w_start, end window = $w_end")
         
-        pmeter = Progress(tot_windows, 5, "Computing optimal haplotype pairs...")
+        pmeter = Progress(windows, 5, "Phasing chunk $chunk/$chunks...")
         # find happairs for each window in current chunk
         haplochunk!(redundant_haplotypes, compressed_Hunique, X, X_pos, 
             dynamic_programming, lasso, thinning_factor, thinning_scale_allelefreq, 
@@ -195,7 +195,6 @@ function phase!(
     sol_path = [Vector{Tuple{Int32, Int32}}(undef, windows) for i in 1:Threads.nthreads()]
     nxt_pair = [[Int32[] for i in 1:windows] for i in 1:Threads.nthreads()]
     tree_err = [[Float64[] for i in 1:windows] for i in 1:Threads.nthreads()]
-    pmeter   = Progress(people, 5, "Merging breakpoints...")
 
     # loop over each person
     # first  1/3: ((w - 2) * width + 1):((w - 1) * width)
@@ -257,9 +256,6 @@ function phase!(
             update_phase!(ph[i].strand2, compressed_Hunique, bkpts[2], sol_path[id][w - 1][2], 
                 sol_path[id][w][2], absolute_w, width, Xwi_start, Xwi_end)
         end
-
-        # update progress
-        next!(pmeter)
     end
 end
 
@@ -461,12 +457,12 @@ function phase_fast!(
     # first  1/3: ((w - 2) * width + 1):((w - 1) * width)
     # middle 1/3: ((w - 1) * width + 1):(      w * width)
     # last   1/3: (      w * width + 1):((w + 1) * width)
-    pmeter = Progress(people, 5, "Merging breakpoints...")
     ThreadPools.@qthreads for i in 1:people
         id = Threads.threadid()
 
         # window 1
-        if first(winrange) == 1 # choose first haplotype for first ever window
+        if first(winrange) == 1 # first ever window
+            # choose first haplotype
             hap1 = something(findfirst(hapset[i].strand1[1])) # complete idx
             hap2 = something(findfirst(hapset[i].strand2[1])) # complete idx
             h1 = complete_idx_to_unique_all_idx(hap1, 1, compressed_Hunique) #unique haplotype idx in window 1
@@ -481,18 +477,18 @@ function phase_fast!(
             # get genotype vector spanning 2 windows
             w = first(winrange)
             Xwi_start = (w - 2) * width + 1
-            Xwi_end = w * width
+            Xwi_end = (w == total_window ? size(X, 1) : w * width) # last chunk may contain only 1 window
             Xwi = view(X, Xwi_start:Xwi_end, i)
-            # previous chunk's last window's surviving haplotypes
-            chain_next[1] .= hapset[i].carryover1 .& hapset[i].strand1[1]
-            chain_next[2] .= hapset[i].carryover2 .& hapset[i].strand2[1]
-            sum(chain_next[1]) > 0 && (hapset[i].carryover1 .&= hapset[i].strand1[1])
-            sum(chain_next[2]) > 0 && (hapset[i].carryover2 .&= hapset[i].strand2[1])
-            hap1_prev = something(findfirst(hapset[i].carryover1))
-            hap2_prev = something(findfirst(hapset[i].carryover2))
             # haplotypes of window 1
             hap1_curr = something(findfirst(hapset[i].strand1[1])) # complete idx
             hap2_curr = something(findfirst(hapset[i].strand2[1])) # complete idx
+            # previous chunk's last window's surviving haplotypes
+            haplo_chain[1][id] .= hapset[i].carryover1 .& hapset[i].strand1[1]
+            haplo_chain[2][id] .= hapset[i].carryover2 .& hapset[i].strand2[1]
+            sum(haplo_chain[1][id]) > 0 && copyto!(hapset[i].carryover1, haplo_chain[1][id])
+            sum(haplo_chain[2][id]) > 0 && copyto!(hapset[i].carryover2, haplo_chain[2][id])
+            hap1_prev = something(findfirst(hapset[i].carryover1)) # complete idx
+            hap2_prev = something(findfirst(hapset[i].carryover2)) # complete idx
             # find optimal breakpoint if there is one
             _, bkpts = continue_haplotype(Xwi, compressed_Hunique, 
                 w, (hap1_prev, hap2_prev), (hap1_curr, hap2_curr))
@@ -528,7 +524,5 @@ function phase_fast!(
             update_phase!(ph[i].strand2, compressed_Hunique, bkpts[2], hap2_prev, 
                 hap2_curr, absolute_w, width, Xwi_start, Xwi_end)
         end
-
-        next!(pmeter) #update progress
     end
 end
