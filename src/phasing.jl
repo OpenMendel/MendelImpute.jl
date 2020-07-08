@@ -375,7 +375,7 @@ function phase_fast!(
             # flip strand1 and strand2 
             hapset[i].strand1[1], hapset[i].strand2[1] = hapset[i].strand2[1], hapset[i].strand1[1]
             haplo_chain[1][i], haplo_chain[2][i] = haplo_chain[2][i], haplo_chain[1][i]
-            # intersect window 1 haplotypes with previous chunk survivors if there are survivors
+            # intersect window 1 haplotypes with previous chunk survivors if doing so produces survivors
             if AD > 0
                 hapset[i].strand1[1] .&= strand1_survivors
                 haplo_chain[1][i] .&= strand1_survivors
@@ -384,7 +384,7 @@ function phase_fast!(
                 hapset[i].strand2[1] .&= strand2_survivors
                 haplo_chain[2][i] .&= strand2_survivors
             end
-        elseif AC + BD > AD + BC # no need to cross over
+        elseif AC + BD > AD + BC # no cross over
             # intersect window 1 haplotypes with previous chunk survivors if doing so produces survivors
             if AC > 0
                 hapset[i].strand1[1] .&= strand1_survivors
@@ -469,19 +469,46 @@ function phase_fast!(
     for i in 1:people
         id = Threads.threadid()
 
-        # phase first window
-        hap1 = something(findfirst(hapset[i].strand1[1])) # complete idx
-        hap2 = something(findfirst(hapset[i].strand2[1])) # complete idx
-        h1 = complete_idx_to_unique_all_idx(hap1, first(winrange), compressed_Hunique) #unique haplotype idx in cur window
-        h2 = complete_idx_to_unique_all_idx(hap2, first(winrange), compressed_Hunique) #unique haplotype idx in cur window
-        push!(ph[i].strand1.start, 1 + chunk_offset)
-        push!(ph[i].strand1.window, first(winrange)) 
-        push!(ph[i].strand1.haplotypelabel, h1)
-        push!(ph[i].strand2.start, 1 + chunk_offset)
-        push!(ph[i].strand2.window, first(winrange))
-        push!(ph[i].strand2.haplotypelabel, h2)
+        # window 1
+        if first(winrange) == 1 # choose first haplotype for first ever window
+            hap1 = something(findfirst(hapset[i].strand1[1])) # complete idx
+            hap2 = something(findfirst(hapset[i].strand2[1])) # complete idx
+            h1 = complete_idx_to_unique_all_idx(hap1, 1, compressed_Hunique) #unique haplotype idx in window 1
+            h2 = complete_idx_to_unique_all_idx(hap2, 1, compressed_Hunique) #unique haplotype idx in window 1
+            push!(ph[i].strand1.start, 1)
+            push!(ph[i].strand1.window, 1) 
+            push!(ph[i].strand1.haplotypelabel, h1)
+            push!(ph[i].strand2.start, 1)
+            push!(ph[i].strand2.window, 1)
+            push!(ph[i].strand2.haplotypelabel, h2)
+        else # search bkpt between chunks
+            # get genotype vector spanning 2 windows
+            w = first(winrange)
+            Xwi_start = (w - 2) * width + 1
+            Xwi_end = w * width
+            Xwi = view(X, Xwi_start:Xwi_end, i)
+            # previous chunk's last window's surviving haplotypes
+            chain_next[1] .= hapset[i].carryover1 .& hapset[i].strand1[1]
+            chain_next[2] .= hapset[i].carryover2 .& hapset[i].strand2[1]
+            sum(chain_next[1]) > 0 && (hapset[i].carryover1 .&= hapset[i].strand1[1])
+            sum(chain_next[2]) > 0 && (hapset[i].carryover2 .&= hapset[i].strand2[1])
+            hap1_prev = something(findfirst(hapset[i].carryover1))
+            hap2_prev = something(findfirst(hapset[i].carryover2))
+            # haplotypes of window 1
+            hap1_curr = something(findfirst(hapset[i].strand1[1])) # complete idx
+            hap2_curr = something(findfirst(hapset[i].strand2[1])) # complete idx
+            # find optimal breakpoint if there is one
+            _, bkpts = continue_haplotype(Xwi, compressed_Hunique, 
+                w, (hap1_prev, hap2_prev), (hap1_curr, hap2_curr))
+            # record strand 1 info
+            update_phase!(ph[i].strand1, compressed_Hunique, bkpts[1], hap1_prev, 
+                hap1_curr, w, width, Xwi_start, Xwi_end)
+            # record strand 2 info
+            update_phase!(ph[i].strand2, compressed_Hunique, bkpts[2], hap2_prev, 
+                hap2_curr, w, width, Xwi_start, Xwi_end)
+        end
 
-        # search breakpoints 
+        # search breakpoints for remaining windows
         for (w, absolute_w) in zip(2:windows, winrange[2:windows])
             # get genotype vector spanning 2 windows
             Xwi_start = (absolute_w - 2) * width + 1
