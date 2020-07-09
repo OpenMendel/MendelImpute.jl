@@ -422,6 +422,7 @@ estimated memory. Total memory usage will be roughly 80% of total RAM.
 
 # Inputs
 - `d`: average number of unique haplotypes per window
+- `td`: total number of haplotypes
 - `p`: number of typed SNPs per window
 - `n`: number of samples
 - `threads`: number of threads (this affects `M` and `N` only)
@@ -434,10 +435,11 @@ estimated memory. Total memory usage will be roughly 80% of total RAM.
 # Memory intensive items:
 - `M`: requires `d × d × 4` bytes per thread
 - `N`: requires `d × p × 4` bytes per thread
-- `redundant_haplotypes`: requires `2windows × d × n` bits where `windows` is number of windows per chunk
+- `redundant_haplotypes`: requires `windows × 2td × n` bits where `windows` is number of windows per chunk
 """
 function nchunks(
     d::Int, 
+    td::Int, 
     p::Int,
     n::Int,
     threads::Int = Threads.nthreads(),
@@ -452,7 +454,7 @@ function nchunks(
     # estimate memory usage per window
     Mbits_per_win = 32d * d * threads
     Nbits_per_win = 32d * p * threads
-    Rbits_per_win = 2 * d * n
+    Rbits_per_win = 2 * td * n
 
     # calculate X and H's memory requirement in bits
     Xbits = 4Xbytes

@@ -11,7 +11,7 @@ of haplotypes `reffile` by sliding windows and saves result in `outfile`.
 # Optional Inputs
 - `outfile`: output filename ending in `.vcf.gz` or `.vcf`. Output genotypes will have no missing data.
 - `impute`: If `true`, untyped SNPs will be imputed, otherwise only missing snps in `tgtfile` will be imputed.  (default `false`)
-- `width`: number of SNPs (markers) in each haplotype window. (default `2048`)
+- `width`: number of SNPs (markers) in each haplotype window. (default `512`)
 - `rescreen`: This option saves a number of top haplotype pairs when solving the least squares objective, and re-minimize least squares on just observed data.
 - `thinning_factor`: This option solves the least squares objective on only "thining_factor" unique haplotypes.
 """
@@ -71,7 +71,7 @@ function phase(
     ref_snps = length(compressed_Hunique.pos)
     tot_windows = floor(Int, tgt_snps / width)
     avg_num_unique_haps = round(Int, avg_haplotypes_per_window(compressed_Hunique))
-    max_windows_per_chunks = nchunks(avg_num_unique_haps, width, people, Threads.nthreads(), Base.summarysize(X), compressed_Hunique)
+    max_windows_per_chunks = nchunks(avg_num_unique_haps, nhaplotypes(compressed_Hunique), width, people, Threads.nthreads(), Base.summarysize(X), compressed_Hunique)
     chunks = ceil(Int, tot_windows / min(tot_windows, max_windows_per_chunks))
     num_windows_per_chunks = round(Int, tot_windows / chunks)
     snps_per_chunk = num_windows_per_chunks * width
