@@ -20,42 +20,44 @@ function haplopair_lasso(
     hapscore = zeros(Float32, n)
 
     # assemble M (symmetric)
-    t2 = @elapsed begin
-        M = zeros(Float32, d, d)
-        mul!(M, Transpose(Hwork), Hwork)
-        for j in 1:d, i in 1:(j - 1) # off-diagonal
-            M[i, j] = 2M[i, j] + M[i, i] + M[j, j]
-        end
-        for j in 1:d # diagonal
-            M[j, j] *= 4
-        end
-        LinearAlgebra.copytri!(M, 'U')
+    stamp = time()
+    M = zeros(Float32, d, d)
+    mul!(M, Transpose(Hwork), Hwork)
+    for j in 1:d, i in 1:(j - 1) # off-diagonal
+        M[i, j] = 2M[i, j] + M[i, i] + M[j, j]
     end
+    for j in 1:d # diagonal
+        M[j, j] *= 4
+    end
+    LinearAlgebra.copytri!(M, 'U')
+    t2 = time() - stamp
 
     # assemble N
-    t2 += @elapsed begin
-        Nt = zeros(Float32, d, n)
-        mul!(Nt, Transpose(Hwork), Xwork)
-        @simd for I in eachindex(Nt)
-            Nt[I] *= 2
-        end
+    stamp = time()
+    Nt = zeros(Float32, d, n)
+    mul!(Nt, Transpose(Hwork), Xwork)
+    @simd for I in eachindex(Nt)
+        Nt[I] *= 2
     end
+    t2 += time() - stamp
 
     # computational routine
-    t3 = 0
+    stamp = time()
     if r == 1
-        t3 += @elapsed haplopair_stepwise!(happairs[1], happairs[2], hapscore, M, Nt)
+        haplopair_stepwise!(happairs[1], happairs[2], hapscore, M, Nt)
     else 
-        t3 += @elapsed haplopair_topr!(happairs[1], happairs[2], hapscore, M, Nt, r = r)
+        haplopair_topr!(happairs[1], happairs[2], hapscore, M, Nt, r = r)
     end
+    t3 = time() - stamp
 
     # supplement the constant terms in objective
-    t3 += @elapsed begin @inbounds for j in 1:n
-            @simd for i in 1:p
-                hapscore[j] += abs2(Xwork[i, j])
-            end
+    stamp = time()
+    @inbounds for j in 1:n
+        @simd for i in 1:p
+            hapscore[j] += abs2(Xwork[i, j])
         end
     end
+    t2 += time() - stamp
 
     t1 = t4 = 0 # no haplotype rescreening or computing dist(X, H)
 

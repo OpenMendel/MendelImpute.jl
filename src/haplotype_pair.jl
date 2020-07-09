@@ -73,9 +73,11 @@ function haplochunk!(
         end
 
         # convert happairs (which index off unique haplotypes) to indices of full haplotype pool, and find all matching happairs
+        stamp = time()
         w = something(findfirst(x -> x == absolute_w, winrange)) # window index of current chunk
-        t5 = @elapsed compute_redundant_haplotypes!(redundant_haplotypes, compressed_Hunique, happairs, w, absolute_w, dp = dynamic_programming)
-
+        compute_redundant_haplotypes!(redundant_haplotypes, compressed_Hunique, happairs, w, absolute_w, dp = dynamic_programming)
+        t5 = time() - stamp
+         
         # record timings and haplotypes
         id = Threads.threadid()
         timers[id][1] += t1
