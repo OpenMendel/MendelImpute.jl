@@ -5,7 +5,7 @@ Wrapper function that computes the best haplotype pair `(hᵢ, hⱼ)` for each g
 in a given chunk.
 
 # There are 5 timers (some may be 0):
-t1 = computing dist(X, H)
+t1 = screening for top haplotypes
 t2 = BLAS3 mul! to get M and N
 t3 = haplopair search
 t4 = rescreen time
@@ -41,10 +41,13 @@ function haplochunk!(
         # computational routine
         if !isnothing(lasso)
             if size(Hw_aligned, 2) > max_haplotypes
-                happairs, hapscore, t1, t2, t3, t4 = haplopair_lasso(Xw_aligned, Hw_aligned, r = lasso)
+                happairs, hapscore, t1, t2, t3, t4 = isnothing(thinning_factor) ? 
+                    haplopair_lasso(Xw_aligned, Hw_aligned, r = lasso) :
+                    haplopair_lasso_thin(Xw_aligned, Hw_aligned, r = thinning_factor)
             else
                 happairs, hapscore, t1, t2, t3, t4 = haplopair(Xw_aligned, Hw_aligned)
             end
+            # happairs, hapscore, t1, t2, t3, t4 = haplopair_lasso_thin(Xw_aligned, Hw_aligned, r = thinning_factor)
         elseif !isnothing(thinning_factor)
             # weight each snp by frequecy if requested
             if thinning_scale_allelefreq

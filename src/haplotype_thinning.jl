@@ -39,7 +39,7 @@ function haplopair_thin_BLAS2(
     t2 = t3 = 0
     @inbounds for i in 1:n
         # find top matching haplotypes for sample i
-        partialsortperm!(perm, view(R, :, i), keep) # perm[1:keep] = hap indices that best matches xi 
+        t1 += @elapsed partialsortperm!(perm, view(R, :, i), keep) # perm[1:keep] = hap indices that best matches xi 
         
         # sync Hk, Xi, M, N
         t2 += @elapsed begin
@@ -97,10 +97,13 @@ function haplopair!(
     d = length(N)
     hapmin, hap1, hap2 = typemax(T), 1, 1
 
-    @inbounds for k in 1:d, j in 1:k
-        score = M[j, k] - N[j] - N[k]
-        if score < hapmin
-            hapmin, hap1, hap2 = score, j, k
+    @inbounds for k in 1:d
+        Nk = N[k]
+        for j in 1:k
+            score = M[j, k] - N[j] - Nk
+            if score < hapmin
+                hapmin, hap1, hap2 = score, j, k
+            end
         end
     end
 

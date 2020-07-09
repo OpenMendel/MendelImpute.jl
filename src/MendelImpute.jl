@@ -29,6 +29,7 @@ module MendelImpute
     export connect_happairs
     export phase!, phase_fast!, nearest_window_with_sufficient_typed_snps
     export haplopair_thin_BLAS2, haplopair_thin_BLAS3, haplopair_screen, haplopair_lasso
+    export haplopair_lasso_thin
 
     # main functions that users are exposed to
     export phase
@@ -52,6 +53,7 @@ module MendelImpute
     include("haplotype_pair_screen.jl")
     include("haplotype_thinning.jl")
     include("haplotype_lasso.jl")
+    include("haplotype_lasso_thin.jl")
     include("simulate_utilities.jl")
     include("dynamic_programming.jl")
     include("impute.jl")

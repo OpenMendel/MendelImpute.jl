@@ -148,7 +148,7 @@ function phase(
     println("Timings: ")
     println("    Data import                     = ", round(import_data_time, sigdigits=6), " seconds")
     println("    Computing haplotype pair        = ", round(calculate_happairs_time, sigdigits=6), " seconds")
-    haptimers[1] != 0 && println("        computing dist(X, H)           = ", round(haptimers[1], sigdigits=6), " seconds per thread")
+    haptimers[1] != 0 && println("        screening for top haplotypes   = ", round(haptimers[1], sigdigits=6), " seconds per thread")
     println("        BLAS3 mul! to get M and N      = ", round(haptimers[2], sigdigits=6), " seconds per thread")
     println("        haplopair search               = ", round(haptimers[3], sigdigits=6), " seconds per thread")
     haptimers[4] != 0 && println("        min least sq on observed data  = ", round(haptimers[4], sigdigits=6), " seconds per thread")
@@ -345,7 +345,6 @@ function phase_fast!(
     haplo_chain = ([copy(hapset[i].strand1[1]) for i in 1:people], [copy(hapset[i].strand2[1]) for i in 1:people])
     chain_next  = (BitVector(undef, haplotypes), BitVector(undef, haplotypes))
     window_span = (ones(Int, people), ones(Int, people))
-    pmeter      = Progress(people, 5, "Intersecting haplotypes...")
 
     @inbounds for i in 1:people
         # in window 1, check for last chunk's surviving haplotypes
@@ -439,7 +438,6 @@ function phase_fast!(
                 window_span[2][i] += 1
             end
         end
-        next!(pmeter) #update progress
     end
 
     # get rid of redundant haplotypes in last few windows separately, since intersection may not become empty
