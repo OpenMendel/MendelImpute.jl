@@ -2388,3 +2388,17 @@ function create_M_and_N()
 end
 Ms, Ns = create_M_and_N()
 @save "example_data.jld2" Ms Ns
+
+
+
+using Random
+using SparseArrays
+using DataFrames
+
+Random.seed!(2020)
+x = sprandn(1_000_000, 10_000, 0.1)
+I, J, V = findnz(x)
+df = DataFrame([:I => I, :J => J, :V => V])
+CSV.write("/tmp/spmatrix.csv", df)
+
+

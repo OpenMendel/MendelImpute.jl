@@ -28,7 +28,7 @@ function haplochunk!(
     timers::AbstractVector
     )
     people = size(X, 2)
-    ref_snps = size(X, 1)
+    ref_snps = length(compressed_Hunique.pos)
     width = compressed_Hunique.width
     windows = length(winrange)
 
@@ -48,7 +48,8 @@ function haplochunk!(
         elseif !isnothing(thinning_factor)
             # weight each snp by frequecy if requested
             if thinning_scale_allelefreq
-                Hw_range = compressed_Hunique.start[absolute_w]:(absolute_w == total_window ? ref_snps : compressed_Hunique.start[absolute_w + 1] - 1)
+                Hw_range = compressed_Hunique.start[absolute_w]:(absolute_w == total_window ? 
+                    ref_snps : compressed_Hunique.start[absolute_w + 1] - 1)
                 Hw_snp_pos = indexin(X_pos[Xw_idx_start:Xw_idx_end], compressed_Hunique.pos[Hw_range])
                 altfreq = compressed_Hunique.altfreq[Hw_snp_pos]
             else

@@ -29,10 +29,10 @@ function haplopair_thin_BLAS2(
     # compute distances between each column of H and each column of X
     t1 = @elapsed begin
         if !isnothing(alt_allele_freq)
-            map!(x -> 1 / (2 * x * (1 - x)), alt_allele_freq, alt_allele_freq) # scale by 1 / 2p(1-p)
-            R = pairwise(WeightedEuclidean(alt_allele_freq), Hwork, Xwork, dims=2)
+            map!(x -> x < 0.5 ? 1 - x : x, alt_allele_freq, alt_allele_freq) # scale by 1 - p
+            R = pairwise(WeightedSqEuclidean(alt_allele_freq), Hwork, Xwork, dims=2)
         else 
-            R = pairwise(Euclidean(), Hwork, Xwork, dims=2) # Rij = d(H[:, i], X[:, j])
+            R = pairwise(SqEuclidean(), Hwork, Xwork, dims=2) # Rij = || H[:, i] - X[:, j] ||²
         end 
     end
 
