@@ -53,7 +53,6 @@ module MendelImpute
     include("haplotype_pair_screen.jl")
     include("haplotype_thinning.jl")
     include("haplotype_lasso.jl")
-    include("haplotype_lasso_thin.jl")
     include("simulate_utilities.jl")
     include("dynamic_programming.jl")
     include("impute.jl")

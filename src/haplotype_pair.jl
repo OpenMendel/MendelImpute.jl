@@ -36,18 +36,16 @@ function haplochunk!(
         Hw_aligned = compressed_Hunique.CW_typed[absolute_w].uniqueH
         Xw_idx_start = (absolute_w - 1) * width + 1
         Xw_idx_end = (absolute_w == total_window ? length(X_pos) : absolute_w * width)
-        Xw_aligned = X[Xw_idx_start:Xw_idx_end, :]
+        Xw_aligned = view(X, Xw_idx_start:Xw_idx_end, :)
 
         # computational routine
         if !isnothing(lasso)
-            if size(Hw_aligned, 2) > max_haplotypes
-                happairs, hapscore, t1, t2, t3, t4 = isnothing(thinning_factor) ? 
-                    haplopair_lasso(Xw_aligned, Hw_aligned, r = lasso) :
-                    haplopair_lasso_thin(Xw_aligned, Hw_aligned, r = thinning_factor)
+            if r > size(Hw_aligned, 2) || size(Hw_aligned, 2) <= max_haplotypes
+                # global search
+                happairs, hapscore, t1, t2, t3, t4 =  haplopair(Xw_aligned, Hw_aligned)
             else
-                happairs, hapscore, t1, t2, t3, t4 = haplopair(Xw_aligned, Hw_aligned)
+                happairs, hapscore, t1, t2, t3, t4 = haplopair_lasso(Xw_aligned, Hw_aligned, r = lasso)
             end
-            # happairs, hapscore, t1, t2, t3, t4 = haplopair_lasso_thin(Xw_aligned, Hw_aligned, r = thinning_factor)
         elseif !isnothing(thinning_factor)
             # weight each snp by frequecy if requested
             if thinning_scale_allelefreq
@@ -58,17 +56,17 @@ function haplochunk!(
             else
                 altfreq = nothing
             end
-            # run haplotype thinning 
-            if size(Hw_aligned, 2) > max_haplotypes
+            # run haplotype thinning (i.e. search all (hi, hj) pairs where hi, hj ≈ x)
+            if thinning_factor < size(Hw_aligned, 2) ||size(Hw_aligned, 2) > max_haplotypes
                 happairs, hapscore, t1, t2, t3, t4 = haplopair_thin_BLAS2(Xw_aligned, Hw_aligned, alt_allele_freq = altfreq, keep=thinning_factor)
             else
                 happairs, hapscore, t1, t2, t3, t4 = haplopair(Xw_aligned, Hw_aligned)
             end
-            # happairs, hapscore, t1, t2, t3, t4 = haplopair_thin_BLAS2(Xw_aligned, Hw_aligned, alt_allele_freq = altfreq, keep=thinning_factor)
-            # happairs, hapscore, t1, t2, t3, t4 = haplopair_thin_BLAS3(Xw_aligned, Hw_aligned, alt_allele_freq = altfreq, keep=thinning_factor)
         elseif rescreen
+            # global search to find many (hi, hj) pairs, then reminimize ||x - hi - hj|| on observed entries
             happairs, hapscore, t1, t2, t3, t4 = haplopair_screen(Xw_aligned, Hw_aligned)
         else
+            # global search
             happairs, hapscore, t1, t2, t3, t4 = haplopair(Xw_aligned, Hw_aligned)
         end
 
