@@ -31,18 +31,25 @@ function haplochunk!(
     ref_snps = length(compressed_Hunique.pos)
     width = compressed_Hunique.width
     windows = length(winrange)
+    threads = Threads.nthreads()
 
-    ThreadPools.@qthreads for absolute_w in winrange
+    # working arrys 
+    happair1 = [ones(Int32, people) for _ in 1:threads]
+    happair2 = [ones(Int32, people) for _ in 1:threads]
+    hapscore = [zeros(Float32, size(X, 2)) for _ in 1:threads]
+
+    Threads.@threads for absolute_w in winrange
         Hw_aligned = compressed_Hunique.CW_typed[absolute_w].uniqueH
         Xw_idx_start = (absolute_w - 1) * width + 1
         Xw_idx_end = (absolute_w == total_window ? length(X_pos) : absolute_w * width)
         Xw_aligned = view(X, Xw_idx_start:Xw_idx_end, :)
+        id = Threads.threadid()
 
         # computational routine
         if !isnothing(lasso)
             if r > size(Hw_aligned, 2) || size(Hw_aligned, 2) <= max_haplotypes
                 # global search
-                happairs, hapscore, t1, t2, t3, t4 =  haplopair(Xw_aligned, Hw_aligned)
+                t1, t2, t3, t4 = haplopair!(Xw_aligned, Hw_aligned, happair1=happair1[id], happair2=happair2[id], hapscore=hapscore[id])
             else
                 happairs, hapscore, t1, t2, t3, t4 = haplopair_lasso(Xw_aligned, Hw_aligned, r = lasso)
             end
@@ -60,20 +67,20 @@ function haplochunk!(
             if thinning_factor < size(Hw_aligned, 2) ||size(Hw_aligned, 2) > max_haplotypes
                 happairs, hapscore, t1, t2, t3, t4 = haplopair_thin_BLAS2(Xw_aligned, Hw_aligned, alt_allele_freq = altfreq, keep=thinning_factor)
             else
-                happairs, hapscore, t1, t2, t3, t4 = haplopair(Xw_aligned, Hw_aligned)
+                t1, t2, t3, t4 = haplopair!(Xw_aligned, Hw_aligned, happair1=happair1[id], happair2=happair2[id], hapscore=hapscore[id])
             end
         elseif rescreen
             # global search to find many (hi, hj) pairs, then reminimize ||x - hi - hj|| on observed entries
             happairs, hapscore, t1, t2, t3, t4 = haplopair_screen(Xw_aligned, Hw_aligned)
         else
             # global search
-            happairs, hapscore, t1, t2, t3, t4 = haplopair(Xw_aligned, Hw_aligned)
+            t1, t2, t3, t4 = haplopair!(Xw_aligned, Hw_aligned, happair1=happair1[id], happair2=happair2[id], hapscore=hapscore[id])
         end
 
         # convert happairs (which index off unique haplotypes) to indices of full haplotype pool, and find all matching happairs
         stamp = time()
         w = something(findfirst(x -> x == absolute_w, winrange)) # window index of current chunk
-        compute_redundant_haplotypes!(redundant_haplotypes, compressed_Hunique, happairs, w, absolute_w, dp = dynamic_programming)
+        compute_redundant_haplotypes!(redundant_haplotypes, compressed_Hunique, happair1[id], happair2[id], w, absolute_w, dp = dynamic_programming)
         t5 = time() - stamp
          
         # record timings and haplotypes
@@ -103,7 +110,8 @@ you must check whether imputation accuracy is affected (when run with >1 threads
 function compute_redundant_haplotypes!(
     redundant_haplotypes::Union{Vector{Vector{Vector{T}}}, Vector{OptimalHaplotypeSet}}, 
     Hunique::CompressedHaplotypes, 
-    happairs::Tuple{AbstractVector, AbstractVector},
+    happair1::AbstractVector,
+    happair2::AbstractVector,
     window_idx::Int,
     window_overall::Int;
     dp::Bool = false, # dynamic programming
@@ -113,8 +121,8 @@ function compute_redundant_haplotypes!(
 
     if dp
         @inbounds for k in 1:people
-            Hi_idx = unique_idx_to_complete_idx(happairs[1][k], window_overall, Hunique)
-            Hj_idx = unique_idx_to_complete_idx(happairs[2][k], window_overall, Hunique)
+            Hi_idx = unique_idx_to_complete_idx(happair1[k], window_overall, Hunique)
+            Hj_idx = unique_idx_to_complete_idx(happair2[k], window_overall, Hunique)
 
             # find haplotypes that match Hi_idx and Hj_idx on typed snps
             h1_set = get(Hunique.CW_typed[window_overall].hapmap, Hi_idx, Hi_idx)
@@ -131,8 +139,8 @@ function compute_redundant_haplotypes!(
         end
     else
         @inbounds for k in 1:people
-            Hi_idx = unique_idx_to_complete_idx(happairs[1][k], window_overall, Hunique)
-            Hj_idx = unique_idx_to_complete_idx(happairs[2][k], window_overall, Hunique)
+            Hi_idx = unique_idx_to_complete_idx(happair1[k], window_overall, Hunique)
+            Hj_idx = unique_idx_to_complete_idx(happair2[k], window_overall, Hunique)
 
             # find haplotypes that match Hi_idx and Hj_idx on typed snps
             h1_set = get(Hunique.CW_typed[window_overall].hapmap, Hi_idx, Hi_idx)
@@ -142,7 +150,7 @@ function compute_redundant_haplotypes!(
             redunhaps_bitvec1 = redundant_haplotypes[k].strand1[window_idx]
             redunhaps_bitvec2 = redundant_haplotypes[k].strand2[window_idx]
             for i in h1_set
-                redunhaps_bitvec1[i] = true
+                redunhaps_bitvec1[i] = true # does this induce false sharing?
             end
             for i in h2_set
                 redunhaps_bitvec2[i] = true
@@ -167,26 +175,34 @@ does not have missing data. Missing data is initialized as 2x alternate allele f
 * `happair`: optimal haplotype pairs. `X[:, k] ≈ H[:, happair[1][k]] + H[:, happair[2][k]]`.
 * `hapscore`: haplotyping score. 0 means best. Larger means worse.
 """
-function haplopair(
+function haplopair!(
     # X::AbstractMatrix{Union{UInt8, Missing}},
     # H::BitMatrix
-    X::AbstractMatrix,
-    H::AbstractMatrix
+    X::AbstractMatrix, # p × n
+    H::AbstractMatrix; # p × d
+    N::AbstractMatrix{Float32} = zeros(Float32, size(X, 2), size(H, 2)), # n × d
+    # N::ElasticArray{Float32} = ElasticArray{Float32}(undef, size(X, 2), size(H, 2)), # n × d
+    happair1::AbstractVector = ones(Int, size(X, 2)),     # length n 
+    happair2::AbstractVector = ones(Int, size(X, 2)),     # length n
+    hapscore::AbstractVector = zeros(Float32, size(X, 2)) # length n
     )
     p, n  = size(X)
     d     = size(H, 2)
     Xwork = zeros(Float32, p, n)
     Hwork = convert(Matrix{Float32}, H)
-    initXfloat!(X, Xwork) # initializes missing
+    # ElasticArrays.resize!(N, n, d)
 
-    M        = zeros(Float32, d, d)
-    N        = zeros(Float32, n, d)
-    happairs = ones(Int, n), ones(Int, n)
-    hapscore = zeros(Float32, n)
-    t2, t3 = haplopair!(Xwork, Hwork, M, N, happairs, hapscore)
+    # initializes missing
+    initXfloat!(Xwork, X)
+
+    # N        = zeros(Float32, n, d)
+    # happairs = ones(Int, n), ones(Int, n)
+    # hapscore = zeros(Float32, n)
+    M = zeros(Float32, d, d)
+    t2, t3 = haplopair!(Xwork, Hwork, M, N, happair1, happair2, hapscore)
     t1 = t4 = 0 # no time spent on haplotype thinning rescreening
 
-    return happairs, hapscore, t1, t2, t3, t4
+    return t1, t2, t3, t4
 end
 
 """
@@ -207,12 +223,13 @@ objective value from the optimal haplotype pair.
 * `hapscore`: haplotyping score. 0 means best. Larger means worse.
 """
 function haplopair!(
-    X::AbstractMatrix,
-    H::AbstractMatrix,
-    M::AbstractMatrix,
-    N::AbstractMatrix,
-    happairs::Tuple{AbstractVector, AbstractVector},
-    hapscore::AbstractVector
+    X::AbstractMatrix{Float32},
+    H::AbstractMatrix{Float32},
+    M::AbstractMatrix{Float32},
+    N::AbstractMatrix{Float32},
+    happair1::AbstractVector{Int32},
+    happair2::AbstractVector{Int32},
+    hapscore::AbstractVector{Float32}
     )
 
     p, n, d = size(X, 1), size(X, 2), size(H, 2)
@@ -235,7 +252,7 @@ function haplopair!(
     end
 
     # computational routine
-    t3 = @elapsed haplopair!(happairs[1], happairs[2], hapscore, M, N)
+    t3 = @elapsed haplopair!(happair1, happair2, hapscore, M, N)
 
     # supplement the constant terms in objective
     t3 += @elapsed begin @inbounds for j in 1:n
@@ -267,15 +284,15 @@ The best haplotype pairs are column indices of the filtered haplotype panels.
     in columns.
 """
 function haplopair!(
-    happair1::AbstractVector{Int},
-    happair2::AbstractVector{Int},
-    hapmin::AbstractVector{T},
-    M::AbstractMatrix{T},
-    N::AbstractMatrix{T},
-    ) where T <: Real
+    happair1::AbstractVector{Int32},
+    happair2::AbstractVector{Int32},
+    hapmin::AbstractVector{Float32},
+    M::AbstractMatrix{Float32},
+    N::AbstractMatrix{Float32},
+    )
 
     n, d = size(N)
-    fill!(hapmin, typemax(T))
+    fill!(hapmin, Inf32)
 
     @inbounds for k in 1:d, j in 1:k
         Mjk = M[j, k]
@@ -372,7 +389,7 @@ function fillmissing!(
 end
 
 """
-    initXfloat!(X, Xfloat)
+    initXfloat!(Xfloat, X)
 
 Initializes the matrix `Xfloat` where missing values of matrix `X` by `2 x` allele frequency
 and nonmissing entries of `X` are converted to type `Float32` for subsequent BLAS routines. 
@@ -382,8 +399,8 @@ and nonmissing entries of `X` are converted to type `Float32` for subsequent BLA
 * `Xfloat` is the `p x n` matrix of X where missing values are filled by 2x allele frequency. 
 """
 function initXfloat!(
-    X::AbstractMatrix,
-    Xfloat::AbstractMatrix
+    Xfloat::AbstractMatrix,
+    X::AbstractMatrix
     )
     
     T = Float32

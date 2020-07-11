@@ -15,7 +15,7 @@ function haplopair_thin_BLAS2(
 
     Xwork = zeros(Float32, p, n)
     Hwork = convert(Matrix{Float32}, H)
-    initXfloat!(X, Xwork)
+    initXfloat!(Xwork, X)
 
     M    = zeros(Float32, keep, keep)
     N    = zeros(Float32, keep)
@@ -123,7 +123,7 @@ function haplopair_thin_BLAS3(
 
     Xwork = zeros(Float32, size(X, 1), size(X, 2))
     Hwork = convert(Matrix{Float32}, H)
-    initXfloat!(X, Xwork)
+    initXfloat!(Xwork, X)
 
     p, n     = size(X)
     d        = size(H, 2)

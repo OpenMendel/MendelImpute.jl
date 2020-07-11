@@ -14,7 +14,7 @@ function haplopair_lasso(
 
     Xwork = zeros(Float32, p, n)
     Hwork = convert(Matrix{Float32}, H)
-    initXfloat!(X, Xwork)
+    initXfloat!(Xwork, X)
 
     happairs = ones(Int, n), ones(Int, n)
     hapscore = zeros(Float32, n)
