@@ -97,6 +97,44 @@ function haplopair_stepwise!(
     return nothing
 end
 
+"""
+    findtopr!(A, col, maxval, index)
+
+Find the largest `length(index)` elements of column `A[:, col]`. `maxval` is 
+filled with the found largest `r` elements in sorted order and `index` is filled
+with their corresponding indices. 
+"""
+@inline function findtopr!(
+    A      :: AbstractMatrix{T}, 
+    col    :: Integer,
+    maxval :: AbstractVector{T}, 
+    index  :: AbstractVector{<:Integer}
+    ) where T <: Real
+    fill!(maxval, typemin(T))
+    @inbounds for row in 1:size(A, 1)
+        a = A[row, col]
+        k = searchsortedfirst(maxval, a)
+        if k > 1
+            popinsert!(maxval, k-1, a)
+            popinsert!(index, k-1, row)
+        end
+    end
+    nothing
+end
+
+"""
+    popinsert!(v, k, vk)
+
+Move elements in `v[2:k]` to `v[1:k-1]` and insert `vk` at position `k` of vector `v`.
+"""
+@inline function popinsert!(v::AbstractVector, k::Integer, vk)
+    @inbounds for i in 1:k-1
+        v[i] = v[i+1]
+    end
+    v[k] = vk
+    v
+end
+
 # same as haplopair_stepwise! but searches top `r` haplotypes with largest gradient
 function haplopair_topr!(
     happair1 :: AbstractVector{<:Integer},
@@ -104,20 +142,20 @@ function haplopair_topr!(
     hapmin   :: AbstractVector{T},
     M        :: AbstractMatrix{T}, # d x d
     Nt       :: AbstractMatrix{T}; # d x n
-    r        :: Integer = 5
+    r        :: Integer = 5,
+    maxindx  :: Vector{<:Integer} = Vector{Int}(undef, r),
+    maxgrad  :: Vector{T} = Vector{T}(undef, r)
     ) where T <: Real
     d, n = size(Nt)
     fill!(hapmin, typemax(T))
-    idx = Vector{Int}(undef, d)
     @inbounds for k in 1:n
         # find the top r haplotypes
-        @views sortperm!(idx, Nt[:, k]; alg = PartialQuickSort(r), rev = true)
+        findtopr!(Nt, k, maxgrad, maxindx)
         # for each top haplotype, find the optimal second one
         for riter in 1:r
-            i1 = idx[riter]
-            Nt_i1k = Nt[i1, k]
+            i1 = maxindx[riter]
             for i in 1:d
-                score = M[i, i1] - Nt_i1k - Nt[i, k]
+                score = M[i, i1] - maxgrad[riter] - Nt[i, k]
                 if score < hapmin[k]
                     hapmin[k] = score
                     happair1[k] = i1
