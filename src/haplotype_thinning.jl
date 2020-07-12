@@ -2,11 +2,19 @@
 ######## except it solves the least squares objective on only `keep (default 100)` unique 
 ######## haplotypes, where the top haplotypes are selected by minimizing dist(x, h). 
 
-function haplopair_thin_BLAS2(
+function haplopair_thin_BLAS2!(
     X::AbstractMatrix,
     H::AbstractMatrix;
     alt_allele_freq::Union{Nothing, AbstractVector{Float32}} = nothing, 
-    keep::Int = 100
+    keep::Int = 100,
+    happair1::AbstractVector = ones(Int, size(X, 2)),        # length n 
+    happair2::AbstractVector = ones(Int, size(X, 2)),        # length n
+    hapscore::AbstractVector = zeros(Float32, size(X, 2)),   # length n
+    maxindx :: Vector{<:Integer} = Vector{Int}(undef, keep), # length keep
+    maxgrad :: Vector{Float32} = zeros(Float32, keep),       # length keep
+    Hk::AbstractMatrix{Float32} = zeros(Float32, size(H, 1), keep), # p × keep 
+    Xi::AbstractVector{Float32} = zeros(Float32, size(H, 1)),       # length p
+    N::AbstractVector{Float32} = zeros(Float32, keep),              # length keep
     )
 
     p, n = size(X)
@@ -17,15 +25,9 @@ function haplopair_thin_BLAS2(
     Hwork = convert(Matrix{Float32}, H)
     initXfloat!(Xwork, X)
 
-    M    = zeros(Float32, keep, keep)
-    N    = zeros(Float32, keep)
-    perm = zeros(Int, d)
-    Hk   = zeros(Float32, p, keep)
-    Xi   = zeros(Float32, p)
-    happairs = ones(Int, n), ones(Int, n)
-    hapscore = zeros(Float32, n)
-    t4 = 0 # no haplotype rescreening
+    M = zeros(Float32, keep, keep)
 
+    # TODO: preallocate R
     # compute distances between each column of H and each column of X
     t1 = @elapsed begin
         if !isnothing(alt_allele_freq)
@@ -39,12 +41,12 @@ function haplopair_thin_BLAS2(
     t2 = t3 = 0
     @inbounds for i in 1:n
         # find top matching haplotypes for sample i
-        t1 += @elapsed partialsortperm!(perm, view(R, :, i), keep) # perm[1:keep] = hap indices that best matches xi 
-        
+        t1 += @elapsed findbotr!(R, i, maxgrad, maxindx)
+
         # sync Hk, Xi, M, N
         t2 += @elapsed begin
             for k in 1:keep
-                col = perm[k]
+                col = maxindx[k]
                 for j in 1:p
                     Hk[j, k] = Hwork[j, col]
                 end
@@ -59,14 +61,54 @@ function haplopair_thin_BLAS2(
         # computational routine
         t3 += @elapsed begin
             hapscore[i], h1, h2 = haplopair!(M, N)
-            happairs[1][i], happairs[2][i] = perm[h1], perm[h2]
+            happair1[i], happair2[i] = maxindx[h1], maxindx[h2]
         end
 
         # supply constant term in objective
         t2 += @elapsed hapscore[i] += dot(Xi, Xi)
     end
 
-    return happairs, hapscore, t1, t2, t3, t4
+    t4 = 0 # no haplotype rescreening
+
+    return t1, t2, t3, t4
+end
+
+"""
+    findbotr!(A, col, maxval, index)
+
+Find the smallest `length(index)` elements of column `A[:, col]`. `val` is 
+filled with the found smallest `r` elements in sorted order and `idx` is filled
+with their corresponding indices. 
+"""
+@inline function findbotr!(
+    A      :: AbstractMatrix{T}, 
+    col    :: Integer,
+    minval :: AbstractVector{T}, 
+    index  :: AbstractVector{<:Integer}
+    ) where T <: Real
+    fill!(minval, typemax(T))
+    @inbounds for row in 1:size(A, 1)
+        a = A[row, col]
+        k = searchsortedlast(minval, a)
+        if k < length(index)
+            popinsert_rev!(minval, k+1, a)
+            popinsert_rev!(index, k+1, row)
+        end
+    end
+    nothing
+end
+
+"""
+    popinsert_rev!(v, k, vk)
+
+Move elements in `v[k:end-1]` to `v[k+1:end]` and insert `vk` at position `k` of vector `v`.
+"""
+@inline function popinsert_rev!(v::AbstractVector, k::Integer, vk)
+    @inbounds for i in Iterators.reverse(k+1:length(v))
+        v[i] = v[i-1]
+    end
+    v[k] = vk
+    v
 end
 
 function update_M!(M::AbstractMatrix, H::AbstractMatrix)
@@ -114,11 +156,15 @@ end
 Same as `haplopair_thin_BLAS2` but internally it uses only BLAS 3 calls and does not recompute `M`
 for every sample. But this implies the search routine in `haplopair!` is not cache aware.  
 """
-function haplopair_thin_BLAS3(
+function haplopair_thin_BLAS3!(
     X::AbstractMatrix,
     H::AbstractMatrix;
     alt_allele_freq::Union{Nothing, AbstractVector{Float32}} = nothing, 
-    keep::Int = 100
+    keep::Int = 100,
+    # N::ElasticArray{Float32} = ElasticArray{Float32}(undef, size(X, 2), size(H, 2)), # n × d
+    happair1::AbstractVector = ones(Int, size(X, 2)),     # length n 
+    happair2::AbstractVector = ones(Int, size(X, 2)),     # length n
+    hapscore::AbstractVector = zeros(Float32, size(X, 2)) # length n
     )
 
     Xwork = zeros(Float32, size(X, 1), size(X, 2))
@@ -138,7 +184,7 @@ function haplopair_thin_BLAS3(
     return happairs, hapscore, t1, t2, t3, t4
 end
 
-function haplopair_thin_BLAS3!(
+function haplopair_thin_BLAS3(
     X::AbstractMatrix{Float32},
     H::AbstractMatrix{Float32},
     M::AbstractMatrix{Float32},

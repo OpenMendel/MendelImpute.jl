@@ -37,6 +37,10 @@ function haplochunk!(
     happair1 = [ones(Int32, people) for _ in 1:threads]
     happair2 = [ones(Int32, people) for _ in 1:threads]
     hapscore = [zeros(Float32, size(X, 2)) for _ in 1:threads]
+    if !isnothing(thinning_factor)
+        maxindx = [zeros(Int, thinning_factor) for _ in 1:threads]
+        maxgrad = [zeros(Float32, thinning_factor) for _ in 1:threads]
+    end
 
     Threads.@threads for absolute_w in winrange
         Hw_aligned = compressed_Hunique.CW_typed[absolute_w].uniqueH
@@ -49,9 +53,11 @@ function haplochunk!(
         if !isnothing(lasso)
             if r > size(Hw_aligned, 2) || size(Hw_aligned, 2) <= max_haplotypes
                 # global search
-                t1, t2, t3, t4 = haplopair!(Xw_aligned, Hw_aligned, happair1=happair1[id], happair2=happair2[id], hapscore=hapscore[id])
+                t1, t2, t3, t4 = haplopair!(Xw_aligned, Hw_aligned, happair1=happair1[id], 
+                    happair2=happair2[id], hapscore=hapscore[id])
             else
-                happairs, hapscore, t1, t2, t3, t4 = haplopair_lasso(Xw_aligned, Hw_aligned, r = lasso)
+                happairs, hapscore, t1, t2, t3, t4 = haplopair_lasso(Xw_aligned, Hw_aligned, 
+                    r = lasso)
             end
         elseif !isnothing(thinning_factor)
             # weight each snp by frequecy if requested
@@ -64,24 +70,30 @@ function haplochunk!(
                 altfreq = nothing
             end
             # run haplotype thinning (i.e. search all (hi, hj) pairs where hi, hj ≈ x)
-            if thinning_factor < size(Hw_aligned, 2) ||size(Hw_aligned, 2) > max_haplotypes
-                happairs, hapscore, t1, t2, t3, t4 = haplopair_thin_BLAS2(Xw_aligned, Hw_aligned, alt_allele_freq = altfreq, keep=thinning_factor)
+            if thinning_factor < size(Hw_aligned, 2) || size(Hw_aligned, 2) > max_haplotypes
+                t1, t2, t3, t4 = haplopair_thin_BLAS2!(Xw_aligned, Hw_aligned, 
+                    alt_allele_freq = altfreq, keep=thinning_factor, happair1=happair1[id], 
+                    happair2=happair2[id], hapscore=hapscore[id], maxindx=maxindx[id], 
+                    maxgrad=maxgrad[id])
             else
-                t1, t2, t3, t4 = haplopair!(Xw_aligned, Hw_aligned, happair1=happair1[id], happair2=happair2[id], hapscore=hapscore[id])
+                t1, t2, t3, t4 = haplopair!(Xw_aligned, Hw_aligned, happair1=happair1[id], 
+                    happair2=happair2[id], hapscore=hapscore[id])
             end
         elseif rescreen
             # global search to find many (hi, hj) pairs, then reminimize ||x - hi - hj|| on observed entries
             happairs, hapscore, t1, t2, t3, t4 = haplopair_screen(Xw_aligned, Hw_aligned)
         else
             # global search
-            t1, t2, t3, t4 = haplopair!(Xw_aligned, Hw_aligned, happair1=happair1[id], happair2=happair2[id], hapscore=hapscore[id])
+            t1, t2, t3, t4 = haplopair!(Xw_aligned, Hw_aligned, happair1=happair1[id], 
+                happair2=happair2[id], hapscore=hapscore[id])
         end
 
         # convert happairs (which index off unique haplotypes) to indices of full haplotype pool, and find all matching happairs
-        stamp = time()
-        w = something(findfirst(x -> x == absolute_w, winrange)) # window index of current chunk
-        compute_redundant_haplotypes!(redundant_haplotypes, compressed_Hunique, happair1[id], happair2[id], w, absolute_w, dp = dynamic_programming)
-        t5 = time() - stamp
+        t5 = @elapsed begin
+            w = something(findfirst(x -> x == absolute_w, winrange)) # window index of current chunk
+            compute_redundant_haplotypes!(redundant_haplotypes, compressed_Hunique, happair1[id], 
+                happair2[id], w, absolute_w, dp = dynamic_programming)
+        end
          
         # record timings and haplotypes
         id = Threads.threadid()

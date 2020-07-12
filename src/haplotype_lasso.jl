@@ -2,10 +2,14 @@
 ######## except it solves the least squares objective using a 
 ######## heuristic stepwise search
 
-function haplopair_lasso(
+function haplopair_lasso!(
     X::AbstractMatrix,
     H::AbstractMatrix;
-    r::Int = 1
+    r::Int = 1,
+    # N::ElasticArray{Float32} = ElasticArray{Float32}(undef, size(X, 2), size(H, 2)), # n × d
+    happair1::AbstractVector = ones(Int, size(X, 2)),     # length n 
+    happair2::AbstractVector = ones(Int, size(X, 2)),     # length n
+    hapscore::AbstractVector = zeros(Float32, size(X, 2)) # length n
     )
     
     p, n  = size(X)
@@ -100,8 +104,8 @@ end
 """
     findtopr!(A, col, maxval, index)
 
-Find the largest `length(index)` elements of column `A[:, col]`. `maxval` is 
-filled with the found largest `r` elements in sorted order and `index` is filled
+Find the largest `length(index)` elements of column `A[:, col]`. `val` is 
+filled with the found largest `r` elements in sorted order and `idx` is filled
 with their corresponding indices. 
 """
 @inline function findtopr!(
