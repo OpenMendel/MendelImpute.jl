@@ -49,7 +49,7 @@ function haplochunk!(
         # Hwork = [ElasticArray{Float32}(undef, width, avghaps)  for _ in 1:threads]
     end
 
-    Threads.@threads for absolute_w in winrange
+    ThreadPools.@qthreads for absolute_w in winrange
         Hw_aligned = compressed_Hunique.CW_typed[absolute_w].uniqueH
         Xw_idx_start = (absolute_w - 1) * width + 1
         Xw_idx_end = (absolute_w == total_window ? length(X_pos) : absolute_w * width)
@@ -138,6 +138,7 @@ function compute_redundant_haplotypes!(
     ) where T <: Tuple{Int32, Int32}
     
     people = length(redundant_haplotypes)
+    haplotypes = nhaplotypes(Hunique)
 
     if dp
         @inbounds for k in 1:people
@@ -158,6 +159,8 @@ function compute_redundant_haplotypes!(
             end
         end
     else
+        redunhaps_bitvec1 = falses(haplotypes)
+        redunhaps_bitvec2 = falses(haplotypes)
         @inbounds for k in 1:people
             Hi_idx = unique_idx_to_complete_idx(happair1[k], window_overall, Hunique)
             Hj_idx = unique_idx_to_complete_idx(happair2[k], window_overall, Hunique)
@@ -167,14 +170,16 @@ function compute_redundant_haplotypes!(
             h2_set = get(Hunique.CW_typed[window_overall].hapmap, Hj_idx, Hj_idx)
 
             # record matching haplotypes into bitvector
-            redunhaps_bitvec1 = redundant_haplotypes[k].strand1[window_idx]
-            redunhaps_bitvec2 = redundant_haplotypes[k].strand2[window_idx]
+            redunhaps_bitvec1 .= false
+            redunhaps_bitvec2 .= false
             for i in h1_set
-                redunhaps_bitvec1[i] = true # does this induce false sharing?
+                redunhaps_bitvec1[i] = true
             end
             for i in h2_set
                 redunhaps_bitvec2[i] = true
             end
+            redundant_haplotypes[k].strand1[window_idx] = copy(redunhaps_bitvec1) # avoids false sharing
+            redundant_haplotypes[k].strand2[window_idx] = copy(redunhaps_bitvec2)
         end
     end
 

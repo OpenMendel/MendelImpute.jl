@@ -30,7 +30,7 @@ function phase(
     )
 
     # import reference data
-    println("Importing reference haplotype data...")
+    println("Importing reference haplotype data..."); flush(stdout)
     import_data_start = time()
     if endswith(reffile, ".jld2")
         @load reffile compressed_Hunique 

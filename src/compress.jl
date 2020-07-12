@@ -76,6 +76,33 @@ end
 avg_haplotypes_per_window(Hunique::CompressedHaplotypes) = mean(count_haplotypes_per_window(Hunique))
 avg_haplotypes_per_window(reffile::String) = mean(count_haplotypes_per_window(reffile))
 
+
+"""
+For an index in unique haplotype (of typed snps), finds the first occurance of that haplotype 
+in the complete reference pool for the specified window. 
+
+This is only needed for the typed SNPs!
+"""
+@inline function unique_idx_to_complete_idx(unique_idx, window, Hunique::CompressedHaplotypes)
+    return Hunique.CW_typed[window].uniqueindex[unique_idx]
+end
+
+"""
+For an index in the complete haplotype pool, find its index in the unique haplotype pool 
+of all SNPs (typed + untyped) in specified window. 
+"""
+@inline function complete_idx_to_unique_all_idx(complete_idx, window, Hunique::CompressedHaplotypes)
+    return Hunique.CW[window].to_unique[complete_idx]
+end
+
+"""
+For an index in the complete haplotype pool, find its index in the unique haplotype pool 
+of just the typed SNPs in specified window. 
+"""
+@inline function complete_idx_to_unique_typed_idx(complete_idx, window, Hunique::CompressedHaplotypes)
+    return Hunique.CW_typed[window].to_unique[complete_idx]
+end
+
 """
     compress_haplotypes(vcffile, tgtfile, outfile, width, [dims], [flankwidth])
 
@@ -189,30 +216,4 @@ function compress_haplotypes(H::AbstractMatrix, X::AbstractMatrix, outfile::Abst
     endswith(outfile, ".jlso") && JLSO.save(outfile, :compressed_Hunique => compressed_Hunique, format=:julia_serialize, compression=:gzip)
 
     return nothing
-end
-
-"""
-For an index in unique haplotype (of typed snps), finds the first occurance of that haplotype 
-in the complete reference pool for the specified window. 
-
-This is only needed for the typed SNPs!
-"""
-function unique_idx_to_complete_idx(unique_idx, window, Hunique::CompressedHaplotypes)
-    return Hunique.CW_typed[window].uniqueindex[unique_idx]
-end
-
-"""
-For an index in the complete haplotype pool, find its index in the unique haplotype pool 
-of all SNPs (typed + untyped) in specified window. 
-"""
-function complete_idx_to_unique_all_idx(complete_idx, window, Hunique::CompressedHaplotypes)
-    return Hunique.CW[window].to_unique[complete_idx]
-end
-
-"""
-For an index in the complete haplotype pool, find its index in the unique haplotype pool 
-of just the typed SNPs in specified window. 
-"""
-function complete_idx_to_unique_typed_idx(complete_idx, window, Hunique::CompressedHaplotypes)
-    return Hunique.CW_typed[window].to_unique[complete_idx]
 end
