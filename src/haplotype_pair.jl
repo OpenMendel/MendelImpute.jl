@@ -32,14 +32,21 @@ function haplochunk!(
     width = compressed_Hunique.width
     windows = length(winrange)
     threads = Threads.nthreads()
+    avghaps = nhaplotypes(compressed_Hunique)
 
     # working arrys 
-    happair1 = [ones(Int32, people) for _ in 1:threads]
-    happair2 = [ones(Int32, people) for _ in 1:threads]
+    happair1 = [ones(Int32, people)        for _ in 1:threads]
+    happair2 = [ones(Int32, people)        for _ in 1:threads]
     hapscore = [zeros(Float32, size(X, 2)) for _ in 1:threads]
     if !isnothing(thinning_factor)
-        maxindx = [zeros(Int, thinning_factor) for _ in 1:threads]
-        maxgrad = [zeros(Float32, thinning_factor) for _ in 1:threads]
+        maxindx = [zeros(Int, thinning_factor)                 for _ in 1:threads]
+        maxgrad = [zeros(Float32, thinning_factor)             for _ in 1:threads]
+        Hk = [zeros(Float32, width, thinning_factor)           for _ in 1:threads]
+        Xi = [zeros(Float32, width)                            for _ in 1:threads]
+        M  = [zeros(Float32, thinning_factor, thinning_factor) for _ in 1:threads]
+        N  = [zeros(Float32, thinning_factor)                  for _ in 1:threads]
+        Xwork = [zeros(Float32, width, people)                 for _ in 1:threads]
+        # Hwork = [ElasticArray{Float32}(undef, width, avghaps)  for _ in 1:threads]
     end
 
     Threads.@threads for absolute_w in winrange
@@ -72,9 +79,10 @@ function haplochunk!(
             # run haplotype thinning (i.e. search all (hi, hj) pairs where hi, hj ≈ x)
             if thinning_factor < size(Hw_aligned, 2) || size(Hw_aligned, 2) > max_haplotypes
                 t1, t2, t3, t4 = haplopair_thin_BLAS2!(Xw_aligned, Hw_aligned, 
-                    alt_allele_freq = altfreq, keep=thinning_factor, happair1=happair1[id], 
+                    alt_allele_freq=altfreq, keep=thinning_factor, happair1=happair1[id], 
                     happair2=happair2[id], hapscore=hapscore[id], maxindx=maxindx[id], 
-                    maxgrad=maxgrad[id])
+                    maxgrad=maxgrad[id], Xi=Xi[id], N=N[id], Hk=Hk[id], M=M[id], 
+                    Xwork=Xwork[id])
             else
                 t1, t2, t3, t4 = haplopair!(Xw_aligned, Hw_aligned, happair1=happair1[id], 
                     happair2=happair2[id], hapscore=hapscore[id])

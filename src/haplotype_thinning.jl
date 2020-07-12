@@ -7,34 +7,47 @@ function haplopair_thin_BLAS2!(
     H::AbstractMatrix;
     alt_allele_freq::Union{Nothing, AbstractVector{Float32}} = nothing, 
     keep::Int = 100,
+    # preallocated vectors
     happair1::AbstractVector = ones(Int, size(X, 2)),        # length n 
     happair2::AbstractVector = ones(Int, size(X, 2)),        # length n
     hapscore::AbstractVector = zeros(Float32, size(X, 2)),   # length n
     maxindx :: Vector{<:Integer} = Vector{Int}(undef, keep), # length keep
-    maxgrad :: Vector{Float32} = zeros(Float32, keep),       # length keep
-    Hk::AbstractMatrix{Float32} = zeros(Float32, size(H, 1), keep), # p × keep 
-    Xi::AbstractVector{Float32} = zeros(Float32, size(H, 1)),       # length p
-    N::AbstractVector{Float32} = zeros(Float32, keep),              # length keep
+    maxgrad :: Vector{Float32}  = zeros(Float32, keep),      # length keep
+    Xi :: AbstractVector{Float32} = zeros(Float32, size(H, 1)), # length p
+    N  :: AbstractVector{Float32} = zeros(Float32, keep),       # length keep
+    # preallocated matrices
+    Hk    :: AbstractMatrix{Float32} = zeros(Float32, size(H, 1), keep),       # p × keep 
+    M     :: AbstractMatrix{Float32} = zeros(Float32, keep, keep),             # keep × keep
+    Xwork :: AbstractMatrix{Float32} = zeros(Float32, size(X, 1), size(X, 2)), # p × n
+    Hwork :: AbstractMatrix{Float32} = convert(Matrix{Float32}, H),            # p × d
+    R     :: AbstractMatrix{Float32} = zeros(Float32, size(H, 2), size(X, 2)), # d × p
     )
 
     p, n = size(X)
     d    = size(H, 2)
     keep > d && (keep = d) # safety check
 
-    Xwork = zeros(Float32, p, n)
-    Hwork = convert(Matrix{Float32}, H)
+    # reallocate matrices for last window
+    if size(Hk, 1) != size(H, 1)
+        Hk = zeros(Float32, size(H, 1), keep)
+        Xi = zeros(Float32, size(H, 1))
+        Xwork = zeros(Float32, p, n)
+
+        # TODO: 
+        # Hwork =
+        # R = 
+    end
+
+    # sync Xwork and Hwork
     initXfloat!(Xwork, X)
 
-    M = zeros(Float32, keep, keep)
-
-    # TODO: preallocate R
     # compute distances between each column of H and each column of X
     t1 = @elapsed begin
         if !isnothing(alt_allele_freq)
             map!(x -> x < 0.5 ? 1 - x : x, alt_allele_freq, alt_allele_freq) # scale by 1 - p
-            R = pairwise(WeightedSqEuclidean(alt_allele_freq), Hwork, Xwork, dims=2)
+            pairwise!(R, WeightedSqEuclidean(alt_allele_freq), Hwork, Xwork, dims=2)
         else 
-            R = pairwise(SqEuclidean(), Hwork, Xwork, dims=2) # Rij = || H[:, i] - X[:, j] ||²
+            pairwise!(R, SqEuclidean(), Hwork, Xwork, dims=2) # Rij = || H[:, i] - X[:, j] ||²
         end 
     end
 
