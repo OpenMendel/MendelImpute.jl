@@ -2402,3 +2402,35 @@ df = DataFrame([:I => I, :J => J, :V => V])
 CSV.write("/tmp/spmatrix.csv", df)
 
 
+
+using Random
+using BenchmarkTools
+
+function set_index!(x, idx)
+    x .= false
+    for i in idx
+        x[i] = true
+    end
+end
+
+x = bitrand(10000)
+idx = rand(1:10000, 1000)
+
+@benchmark set_index!($x, $idx) setup=(idx = rand(1:10000, 1000))
+
+
+
+struct bitv 
+    v::BitVector
+end
+
+function set_index!(x::bitv, idx)
+    x.v .= false
+    @inbounds for i in idx
+        x.v[i] = true
+    end
+end
+x = bitv(bitrand(10000))
+idx = rand(1:10000, 1000)
+
+@benchmark set_index!($x, $idx) setup=(idx = rand(1:10000, 1000))
