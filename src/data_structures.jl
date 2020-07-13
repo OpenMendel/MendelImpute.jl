@@ -79,13 +79,14 @@ function initialize!(x::Vector{OptimalHaplotypeSet})
     win = windows(x[1])
     @inbounds for i in 1:n
         # save last window's surviving haplotypes to carryover
-        isdefined(x[i].strand1, win) && copyto!(x[i].carryover1, x[i].strand1[win])
-        isdefined(x[i].strand2, win) && copyto!(x[i].carryover2, x[i].strand2[win])
+        isassigned(x[i].strand1, win) && copyto!(x[i].carryover1, x[i].strand1[win])
+        isassigned(x[i].strand2, win) && copyto!(x[i].carryover2, x[i].strand2[win])
+
         # reinitialize all windows to falses
-        # for w in 1:win
-        #     x[i].strand1[w] .= false
-        #     x[i].strand2[w] .= false
-        # end
+        for w in 1:win
+            isassigned(x[i].strand1, w) && fill!(x[i].strand1[w], false)
+            isassigned(x[i].strand1, w) && fill!(x[i].strand2[w], false)
+        end
     end
 end
 
@@ -100,13 +101,15 @@ end
 
 # resize function for window-by-window intersection phasing
 function resize!(x::Vector{OptimalHaplotypeSet}, windows::Int)
-    # n = length(x)
-    # @inbounds for i in 1:n
-    #     Base.resize!(x[i].strand1, windows)
-    #     Base.resize!(x[i].strand2, windows)
-    #     sizehint!(x[i].strand1, windows)
-    #     sizehint!(x[i].strand2, windows)
-    # end
+    n = length(x)
+    @inbounds for i in 1:n
+        if isassigned(x, i)
+            Base.resize!(x[i].strand1, windows)
+            Base.resize!(x[i].strand2, windows)
+            sizehint!(x[i].strand1, windows)
+            sizehint!(x[i].strand2, windows)
+        end
+    end
 end
 
 # resize function for dynamic programming phasing

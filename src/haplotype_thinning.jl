@@ -241,7 +241,8 @@ function haplopair_thin_BLAS3(
     t3 = @elapsed haplopair_thin2!(happairs[1], happairs[2], hapscore, M, N, R, keep)
 
     # supplement the constant terms in objective
-    t3 += @elapsed begin @inbounds for j in 1:n
+    t3 += @elapsed begin
+        @inbounds for j in 1:n
             @simd for i in 1:p
                 hapscore[j] += abs2(X[i, j])
             end
