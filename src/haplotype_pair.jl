@@ -35,9 +35,12 @@ function haplochunk!(
     avghaps = nhaplotypes(compressed_Hunique)
 
     # working arrys 
-    happair1 = [ones(Int32, people)        for _ in 1:threads]
-    happair2 = [ones(Int32, people)        for _ in 1:threads]
-    hapscore = [zeros(Float32, size(X, 2)) for _ in 1:threads]
+    happair1 = [ones(Int32, people)           for _ in 1:threads]
+    happair2 = [ones(Int32, people)           for _ in 1:threads]
+    hapscore = [zeros(Float32, size(X, 2))    for _ in 1:threads]
+    Xwork    = [zeros(Float32, width, people) for _ in 1:threads]
+    # N        = [ElasticArray{Float32}(undef, people, avghaps) for _ in 1:threads]
+    # Hwork    = [ElasticArray{Float32}(undef, width, avghaps)  for _ in 1:threads]
     if !isnothing(thinning_factor)
         maxindx = [zeros(Int, thinning_factor)                 for _ in 1:threads]
         maxgrad = [zeros(Float32, thinning_factor)             for _ in 1:threads]
@@ -45,8 +48,6 @@ function haplochunk!(
         Xi = [zeros(Float32, width)                            for _ in 1:threads]
         M  = [zeros(Float32, thinning_factor, thinning_factor) for _ in 1:threads]
         N  = [zeros(Float32, thinning_factor)                  for _ in 1:threads]
-        Xwork = [zeros(Float32, width, people)                 for _ in 1:threads]
-        # Hwork = [ElasticArray{Float32}(undef, width, avghaps)  for _ in 1:threads]
     end
 
     ThreadPools.@qthreads for absolute_w in winrange
@@ -93,7 +94,7 @@ function haplochunk!(
         else
             # global search
             t1, t2, t3, t4 = haplopair!(Xw_aligned, Hw_aligned, happair1=happair1[id], 
-                happair2=happair2[id], hapscore=hapscore[id])
+                happair2=happair2[id], hapscore=hapscore[id], Xwork=Xwork[id])
         end
 
         # convert happairs (which index off unique haplotypes) to indices of full haplotype pool, and find all matching happairs
@@ -193,7 +194,7 @@ Calculate the best pair of haplotypes in `H` for each individual in `X`. Missing
 does not have missing data. Missing data is initialized as 2x alternate allele freq.
 
 # Input
-* `X`: `p x n` genotype matrix. Each column is an individual.
+* `X`: `p x n` genotype matrix possibly with missings. Each column is an individual.
 * `H`: `p * d` haplotype matrix. Each column is a haplotype.
 
 # Output
@@ -201,31 +202,39 @@ does not have missing data. Missing data is initialized as 2x alternate allele f
 * `hapscore`: haplotyping score. 0 means best. Larger means worse.
 """
 function haplopair!(
-    # X::AbstractMatrix{Union{UInt8, Missing}},
-    # H::BitMatrix
     X::AbstractMatrix, # p × n
     H::AbstractMatrix; # p × d
-    N::AbstractMatrix{Float32} = zeros(Float32, size(X, 2), size(H, 2)), # n × d
-    # N::ElasticArray{Float32} = ElasticArray{Float32}(undef, size(X, 2), size(H, 2)), # n × d
-    happair1::AbstractVector = ones(Int, size(X, 2)),     # length n 
-    happair2::AbstractVector = ones(Int, size(X, 2)),     # length n
-    hapscore::AbstractVector = zeros(Float32, size(X, 2)) # length n
+    # preallocated vectors
+    happair1::AbstractVector = ones(Int, size(X, 2)),      # length n 
+    happair2::AbstractVector = ones(Int, size(X, 2)),      # length n
+    hapscore::AbstractVector = zeros(Float32, size(X, 2)), # length n
+    # preallocated matrices
+    M     :: Matrix{Float32} = zeros(Float32, size(H, 2), size(H, 2)), # cannot be preallocated until Julia 2.0
+    Xwork :: AbstractMatrix{Float32} = zeros(Float32, size(X, 1), size(X, 2)), # p × n
+    Hwork :: AbstractMatrix{Float32} = convert(Matrix{Float32}, H),            # p × d
+    N     :: AbstractMatrix{Float32} = zeros(Float32, size(X, 2), size(H, 2)), # n × d
+    # Hwork :: ElasticArray{Float32} = convert(ElasticArrays{Float32}, H),            # p × d
+    # N     :: ElasticArray{Float32} = ElasticArrays{Float32}(undef, size(X, 2), size(H, 2)), # n × d
     )
     p, n  = size(X)
     d     = size(H, 2)
-    Xwork = zeros(Float32, p, n)
-    Hwork = convert(Matrix{Float32}, H)
+
+    # reallocate matrices for last window (TODO: Hwork)
+    if size(Xwork, 1) != p
+        Xwork = zeros(Float32, p, n)
+        # Hwork = ElasticArray{Float32}(undef, p, d)
+    end
+
+    # resize N
     # ElasticArrays.resize!(N, n, d)
+    # ElasticArrays.resize!(Hwork, p, d)
+    # copyto!(Hwork, H)
 
     # initializes missing
     initXfloat!(Xwork, X)
 
-    # N        = zeros(Float32, n, d)
-    # happairs = ones(Int, n), ones(Int, n)
-    # hapscore = zeros(Float32, n)
-    M = zeros(Float32, d, d)
     t2, t3 = haplopair!(Xwork, Hwork, M, N, happair1, happair2, hapscore)
-    t1 = t4 = 0 # no time spent on haplotype thinning rescreening
+    t1 = t4 = 0 # no time spent on haplotype thinning or rescreening
 
     return t1, t2, t3, t4
 end
