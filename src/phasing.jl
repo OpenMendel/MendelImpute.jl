@@ -73,6 +73,7 @@ function phase(
     avg_num_unique_haps = round(Int, avg_haplotypes_per_window(compressed_Hunique))
     max_windows_per_chunks = nchunks(avg_num_unique_haps, nhaplotypes(compressed_Hunique), width, people, Threads.nthreads(), Base.summarysize(X), compressed_Hunique)
     chunks = ceil(Int, tot_windows / min(tot_windows, max_windows_per_chunks))
+    # chunks = 3
     num_windows_per_chunks = round(Int, tot_windows / chunks)
     snps_per_chunk = num_windows_per_chunks * width
     last_chunk_windows = tot_windows - (chunks - 1) * num_windows_per_chunks

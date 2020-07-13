@@ -5,7 +5,7 @@
 function haplopair_thin_BLAS2!(
     X::AbstractMatrix,
     H::AbstractMatrix;
-    alt_allele_freq::Union{Nothing, AbstractVector{Float32}} = nothing, 
+    allele_freq::Union{AbstractVector, Nothing} = nothing,
     keep::Int = 100,
     # preallocated vectors
     happair1::AbstractVector = ones(Int, size(X, 2)),        # length n 
@@ -25,27 +25,28 @@ function haplopair_thin_BLAS2!(
 
     p, n = size(X)
     d    = size(H, 2)
-    keep > d && (keep = d) # safety check
 
-    # reallocate matrices for last window
+    # do global search for small problems 
+    if keep > d
+        return haplopair!(Xw_aligned, Hw_aligned, happair1=happair1, 
+            happair2=happair2, hapscore=hapscore, Xwork=Xwork)
+    end
+
+    # reallocate matrices for last window. TODO = Hwork, R
     if size(Hk, 1) != size(H, 1)
         Hk = zeros(Float32, size(H, 1), keep)
         Xi = zeros(Float32, size(H, 1))
         Xwork = zeros(Float32, p, n)
-
-        # TODO: 
-        # Hwork =
-        # R = 
     end
 
-    # sync Xwork and Hwork
+    # initialize missing
     initXfloat!(Xwork, X)
 
     # compute distances between each column of H and each column of X
     t1 = @elapsed begin
-        if !isnothing(alt_allele_freq)
-            map!(x -> x < 0.5 ? 1 - x : x, alt_allele_freq, alt_allele_freq) # scale by 1 - p
-            pairwise!(R, WeightedSqEuclidean(alt_allele_freq), Hwork, Xwork, dims=2)
+        if !isnothing(allele_freq)
+            map!(x -> x < 0.5 ? 1 - x : x, allele_freq, allele_freq) # scale by 1 - p
+            pairwise!(R, WeightedSqEuclidean(allele_freq), Hwork, Xwork, dims=2)
         else 
             pairwise!(R, SqEuclidean(), Hwork, Xwork, dims=2) # Rij = || H[:, i] - X[:, j] ||²
         end 

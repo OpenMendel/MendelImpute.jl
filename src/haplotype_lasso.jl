@@ -6,26 +6,39 @@ function haplopair_lasso!(
     X::AbstractMatrix,
     H::AbstractMatrix;
     r::Int = 1,
+    # preallocated vectors
+    happair1::AbstractVector  = ones(Int, size(X, 2)),      # length n 
+    happair2::AbstractVector  = ones(Int, size(X, 2)),      # length n
+    hapscore::AbstractVector  = zeros(Float32, size(X, 2)), # length n
+    maxindx ::Vector{<:Int}   = Vector{Int}(undef, r),      # length r
+    maxgrad ::Vector{Float32} = zeros(Float32, r),        # length r
+    # preallocated matrices
+    Xwork :: AbstractMatrix{Float32} = zeros(Float32, size(X, 1), size(X, 2)), # p × n
+    Hwork :: AbstractMatrix{Float32} = convert(Matrix{Float32}, H),            # p × d
+    M     :: AbstractMatrix{Float32} = zeros(Float32, size(H, 2), size(H, 2)), # cannot be preallocated until Julia 2.0
+    Nt    :: AbstractMatrix{Float32} = zeros(Float32, size(H, 2), size(X, 2)), # d × n
     # N::ElasticArray{Float32} = ElasticArray{Float32}(undef, size(X, 2), size(H, 2)), # n × d
-    happair1::AbstractVector = ones(Int, size(X, 2)),     # length n 
-    happair2::AbstractVector = ones(Int, size(X, 2)),     # length n
-    hapscore::AbstractVector = zeros(Float32, size(X, 2)) # length n
     )
     
     p, n  = size(X)
     d     = size(H, 2)
-    r > d && (r = d) #safety check
 
-    Xwork = zeros(Float32, p, n)
-    Hwork = convert(Matrix{Float32}, H)
+    # global search
+    if r > d
+        return haplopair!(Xw_aligned, Hw_aligned, happair1=happair1, 
+            happair2=happair2, hapscore=hapscore, Xwork=Xwork)
+    end
+
+    # reallocate matrices for last window. TODO = Hwork, R
+    if size(Xwork, 1) != size(H, 1)
+        Xwork = zeros(Float32, p, n)
+    end
+
+    # initialize missing data
     initXfloat!(Xwork, X)
-
-    happairs = ones(Int, n), ones(Int, n)
-    hapscore = zeros(Float32, n)
 
     # assemble M (symmetric)
     stamp = time()
-    M = zeros(Float32, d, d)
     mul!(M, Transpose(Hwork), Hwork)
     for j in 1:d, i in 1:(j - 1) # off-diagonal
         M[i, j] = 2M[i, j] + M[i, i] + M[j, j]
@@ -38,7 +51,6 @@ function haplopair_lasso!(
 
     # assemble N
     stamp = time()
-    Nt = zeros(Float32, d, n)
     mul!(Nt, Transpose(Hwork), Xwork)
     @simd for I in eachindex(Nt)
         Nt[I] *= 2
@@ -48,9 +60,9 @@ function haplopair_lasso!(
     # computational routine
     stamp = time()
     if r == 1
-        haplopair_stepwise!(happairs[1], happairs[2], hapscore, M, Nt)
+        haplopair_stepwise!(happair1, happair2, hapscore, M, Nt)
     else 
-        haplopair_topr!(happairs[1], happairs[2], hapscore, M, Nt, r = r)
+        haplopair_topr!(happair1, happair2, hapscore, M, Nt, r=r, maxindx=maxindx, maxgrad=maxgrad)
     end
     t3 = time() - stamp
 
@@ -65,7 +77,7 @@ function haplopair_lasso!(
 
     t1 = t4 = 0 # no haplotype rescreening or computing dist(X, H)
 
-    return happairs, hapscore, t1, t2, t3, t4
+    return t1, t2, t3, t4
 end 
 
 function haplopair_stepwise!(
@@ -158,8 +170,9 @@ function haplopair_topr!(
         # for each top haplotype, find the optimal second one
         for riter in 1:r
             i1 = maxindx[riter]
+            gmax = maxgrad[riter]
             for i in 1:d
-                score = M[i, i1] - maxgrad[riter] - Nt[i, k]
+                score = M[i, i1] - gmax - Nt[i, k]
                 if score < hapmin[k]
                     hapmin[k] = score
                     happair1[k] = i1

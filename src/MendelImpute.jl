@@ -28,8 +28,7 @@ module MendelImpute
     export simulate_phased_genotypes
     export connect_happairs
     export phase!, phase_fast!, nearest_window_with_sufficient_typed_snps
-    export haplopair_thin_BLAS2!, haplopair_thin_BLAS3!, haplopair_screen, haplopair_lasso
-    export haplopair_lasso_thin
+    export haplopair_thin_BLAS2!, haplopair_thin_BLAS3!, haplopair_screen!, haplopair_lasso!
 
     # main functions that users are exposed to
     export phase

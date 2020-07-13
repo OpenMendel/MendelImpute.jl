@@ -49,45 +49,39 @@ function haplochunk!(
         M  = [zeros(Float32, thinning_factor, thinning_factor) for _ in 1:threads]
         N  = [zeros(Float32, thinning_factor)                  for _ in 1:threads]
     end
+    if !isnothing(lasso)
+        maxindx = [zeros(Int,     lasso) for _ in 1:threads]
+        maxgrad = [zeros(Float32, lasso) for _ in 1:threads]
+    end
 
-    ThreadPools.@qthreads for absolute_w in winrange
+    for absolute_w in winrange
         Hw_aligned = compressed_Hunique.CW_typed[absolute_w].uniqueH
         Xw_idx_start = (absolute_w - 1) * width + 1
         Xw_idx_end = (absolute_w == total_window ? length(X_pos) : absolute_w * width)
         Xw_aligned = view(X, Xw_idx_start:Xw_idx_end, :)
+        d  = size(Hw_aligned, 2)
         id = Threads.threadid()
 
         # computational routine
-        if !isnothing(lasso)
-            if r > size(Hw_aligned, 2) || size(Hw_aligned, 2) <= max_haplotypes
-                # global search
-                t1, t2, t3, t4 = haplopair!(Xw_aligned, Hw_aligned, happair1=happair1[id], 
-                    happair2=happair2[id], hapscore=hapscore[id])
-            else
-                happairs, hapscore, t1, t2, t3, t4 = haplopair_lasso(Xw_aligned, Hw_aligned, 
-                    r = lasso)
-            end
-        elseif !isnothing(thinning_factor)
-            # weight each snp by frequecy if requested
+        if !isnothing(lasso) && d > max_haplotypes
+            t1, t2, t3, t4 = haplopair_lasso!(Xw_aligned, Hw_aligned, r=lasso, 
+                happair1=happair1[id], happair2=happair2[id], hapscore=hapscore[id], 
+                maxindx=maxindx[id], maxgrad=maxgrad[id], Xwork=Xwork[id])
+        elseif !isnothing(thinning_factor) && d > max_haplotypes
+            # weight snp by frequecy if requested
+            alt_allele_freq = nothing
             if thinning_scale_allelefreq
                 Hw_range = compressed_Hunique.start[absolute_w]:(absolute_w == total_window ? 
                     ref_snps : compressed_Hunique.start[absolute_w + 1] - 1)
                 Hw_snp_pos = indexin(X_pos[Xw_idx_start:Xw_idx_end], compressed_Hunique.pos[Hw_range])
-                altfreq = compressed_Hunique.altfreq[Hw_snp_pos]
-            else
-                altfreq = nothing
+                alt_allele_freq = compressed_Hunique.altfreq[Hw_snp_pos]
             end
             # run haplotype thinning (i.e. search all (hi, hj) pairs where hi, hj ≈ x)
-            if thinning_factor < size(Hw_aligned, 2) || size(Hw_aligned, 2) > max_haplotypes
-                t1, t2, t3, t4 = haplopair_thin_BLAS2!(Xw_aligned, Hw_aligned, 
-                    alt_allele_freq=altfreq, keep=thinning_factor, happair1=happair1[id], 
-                    happair2=happair2[id], hapscore=hapscore[id], maxindx=maxindx[id], 
-                    maxgrad=maxgrad[id], Xi=Xi[id], N=N[id], Hk=Hk[id], M=M[id], 
-                    Xwork=Xwork[id])
-            else
-                t1, t2, t3, t4 = haplopair!(Xw_aligned, Hw_aligned, happair1=happair1[id], 
-                    happair2=happair2[id], hapscore=hapscore[id])
-            end
+            t1, t2, t3, t4 = haplopair_thin_BLAS2!(Xw_aligned, Hw_aligned, 
+                allele_freq=alt_allele_freq, keep=thinning_factor, 
+                happair1=happair1[id], happair2=happair2[id], hapscore=hapscore[id], 
+                maxindx=maxindx[id], maxgrad=maxgrad[id], Xi=Xi[id], N=N[id], Hk=Hk[id], 
+                M=M[id], Xwork=Xwork[id])
         elseif rescreen
             # global search to find many (hi, hj) pairs, then reminimize ||x - hi - hj|| on observed entries
             happairs, hapscore, t1, t2, t3, t4 = haplopair_screen(Xw_aligned, Hw_aligned)
@@ -105,7 +99,6 @@ function haplochunk!(
         end
          
         # record timings and haplotypes
-        id = Threads.threadid()
         timers[id][1] += t1
         timers[id][2] += t2
         timers[id][3] += t3
@@ -209,7 +202,7 @@ function haplopair!(
     happair2::AbstractVector = ones(Int, size(X, 2)),      # length n
     hapscore::AbstractVector = zeros(Float32, size(X, 2)), # length n
     # preallocated matrices
-    M     :: Matrix{Float32} = zeros(Float32, size(H, 2), size(H, 2)), # cannot be preallocated until Julia 2.0
+    M     :: AbstractMatrix{Float32} = zeros(Float32, size(H, 2), size(H, 2)), # cannot be preallocated until Julia 2.0
     Xwork :: AbstractMatrix{Float32} = zeros(Float32, size(X, 1), size(X, 2)), # p × n
     Hwork :: AbstractMatrix{Float32} = convert(Matrix{Float32}, H),            # p × d
     N     :: AbstractMatrix{Float32} = zeros(Float32, size(X, 2), size(H, 2)), # n × d
