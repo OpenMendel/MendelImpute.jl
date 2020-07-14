@@ -228,12 +228,12 @@ function haplopair!(
     # preallocated vectors
     happair1::AbstractVector = ones(Int, size(X, 2)),      # length n 
     happair2::AbstractVector = ones(Int, size(X, 2)),      # length n
-    hapscore::AbstractVector = zeros(Float32, size(X, 2)), # length n
+    hapscore::AbstractVector = Vector{Float32}(undef, size(X, 2)), # length n
     # preallocated matrices
-    M     :: AbstractMatrix{Float32} = zeros(Float32, size(H, 2), size(H, 2)), # cannot be preallocated until Julia 2.0
-    Xwork :: AbstractMatrix{Float32} = zeros(Float32, size(X, 1), size(X, 2)), # p × n
-    Hwork :: AbstractMatrix{Float32} = convert(Matrix{Float32}, H),            # p × d
-    N     :: AbstractMatrix{Float32} = zeros(Float32, size(X, 2), size(H, 2)), # n × d
+    M     :: AbstractMatrix{Float32} = Matrix{Float32}(undef, size(H, 2), size(H, 2)), # cannot be preallocated until Julia 2.0
+    Xwork :: AbstractMatrix{Float32} = Matrix{Float32}(undef, size(X, 1), size(X, 2)), # p × n
+    Hwork :: AbstractMatrix{Float32} = convert(Matrix{Float32}, H),                    # p × d (not preallocated)
+    N     :: AbstractMatrix{Float32} = Matrix{Float32}(undef, size(X, 2), size(H, 2)), # n × d (not preallocated)
     # Hwork :: ElasticArray{Float32} = convert(ElasticArrays{Float32}, H),            # p × d
     # N     :: ElasticArray{Float32} = ElasticArrays{Float32}(undef, size(X, 2), size(H, 2)), # n × d
     )
@@ -255,7 +255,7 @@ function haplopair!(
     initXfloat!(Xwork, X)
 
     t2, t3 = haplopair!(Xwork, Hwork, M, N, happair1, happair2, hapscore)
-    t1 = t4 = 0 # no time spent on haplotype thinning or rescreening
+    t1 = t4 = 0.0 # no time spent on haplotype thinning or rescreening
 
     return t1, t2, t3, t4
 end
@@ -310,7 +310,8 @@ function haplopair!(
     t3 = @elapsed haplopair!(happair1, happair2, hapscore, M, N)
 
     # supplement the constant terms in objective
-    t3 += @elapsed begin @inbounds for j in 1:n
+    t3 += @elapsed begin
+        @inbounds for j in 1:n
             @simd for i in 1:p
                 hapscore[j] += abs2(X[i, j])
             end

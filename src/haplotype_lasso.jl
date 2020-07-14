@@ -7,17 +7,16 @@ function haplopair_lasso!(
     H::AbstractMatrix;
     r::Int = 1,
     # preallocated vectors
-    happair1::AbstractVector  = ones(Int, size(X, 2)),      # length n 
-    happair2::AbstractVector  = ones(Int, size(X, 2)),      # length n
-    hapscore::AbstractVector  = zeros(Float32, size(X, 2)), # length n
-    maxindx ::Vector{<:Int}   = Vector{Int}(undef, r),      # length r
-    maxgrad ::Vector{Float32} = zeros(Float32, r),        # length r
+    happair1::AbstractVector          = ones(Int, size(X, 2)),              # length n 
+    happair2::AbstractVector          = ones(Int, size(X, 2)),              # length n
+    hapscore::AbstractVector          = Vector{Float32}(undef, size(X, 2)), # length n
+    maxindx ::AbstractVector{Int}     = Vector{Int}(undef, r),              # length r
+    maxgrad ::AbstractVector{Float32} = Vector{Float32}(undef, r),          # length r
     # preallocated matrices
-    Xwork :: AbstractMatrix{Float32} = zeros(Float32, size(X, 1), size(X, 2)), # p × n
-    Hwork :: AbstractMatrix{Float32} = convert(Matrix{Float32}, H),            # p × d
-    M     :: AbstractMatrix{Float32} = zeros(Float32, size(H, 2), size(H, 2)), # cannot be preallocated until Julia 2.0
-    Nt    :: AbstractMatrix{Float32} = zeros(Float32, size(H, 2), size(X, 2)), # d × n
-    # N::ElasticArray{Float32} = ElasticArray{Float32}(undef, size(X, 2), size(H, 2)), # n × d
+    Xwork :: AbstractMatrix{Float32} = Matrix{Float32}(undef, size(X, 1), size(X, 2)), # p × n
+    Hwork :: AbstractMatrix{Float32} = convert(Matrix{Float32}, H),                    # p × d (not preallocated)
+    M     :: AbstractMatrix{Float32} = Matrix{Float32}(undef, size(H, 2), size(H, 2)), # cannot be preallocated until Julia 2.0
+    Nt    :: AbstractMatrix{Float32} = Matrix{Float32}(undef, size(H, 2), size(X, 2)), # d × n (not preallocated)
     )
     
     p, n  = size(X)
@@ -26,7 +25,7 @@ function haplopair_lasso!(
     # global search
     if r > d
         return haplopair!(Xw_aligned, Hw_aligned, happair1=happair1, 
-            happair2=happair2, hapscore=hapscore, Xwork=Xwork)
+            happair2=happair2, hapscore=hapscore, Xwork=Xwork, Hwork=Hwork, M=M)
     end
 
     # reallocate matrices for last window. TODO = Hwork, R
@@ -38,44 +37,44 @@ function haplopair_lasso!(
     initXfloat!(Xwork, X)
 
     # assemble M (symmetric)
-    stamp = time()
-    mul!(M, Transpose(Hwork), Hwork)
-    for j in 1:d, i in 1:(j - 1) # off-diagonal
-        M[i, j] = 2M[i, j] + M[i, i] + M[j, j]
+    t2 = @elapsed begin
+        mul!(M, Transpose(Hwork), Hwork)
+        for j in 1:d, i in 1:(j - 1) # off-diagonal
+            M[i, j] = 2M[i, j] + M[i, i] + M[j, j]
+        end
+        for j in 1:d # diagonal
+            M[j, j] *= 4
+        end
+        LinearAlgebra.copytri!(M, 'U')
     end
-    for j in 1:d # diagonal
-        M[j, j] *= 4
-    end
-    LinearAlgebra.copytri!(M, 'U')
-    t2 = time() - stamp
 
     # assemble N
-    stamp = time()
-    mul!(Nt, Transpose(Hwork), Xwork)
-    @simd for I in eachindex(Nt)
-        Nt[I] *= 2
-    end
-    t2 += time() - stamp
-
-    # computational routine
-    stamp = time()
-    if r == 1
-        haplopair_stepwise!(happair1, happair2, hapscore, M, Nt)
-    else 
-        haplopair_topr!(happair1, happair2, hapscore, M, Nt, r=r, maxindx=maxindx, maxgrad=maxgrad)
-    end
-    t3 = time() - stamp
-
-    # supplement the constant terms in objective
-    stamp = time()
-    @inbounds for j in 1:n
-        @simd for i in 1:p
-            hapscore[j] += abs2(Xwork[i, j])
+    t2 += @elapsed begin
+        mul!(Nt, Transpose(Hwork), Xwork)
+        @simd for I in eachindex(Nt)
+            Nt[I] *= 2
         end
     end
-    t2 += time() - stamp
 
-    t1 = t4 = 0 # no haplotype rescreening or computing dist(X, H)
+    # computational routine
+    t3 = @elapsed begin
+        if r == 1
+            haplopair_stepwise!(happair1, happair2, hapscore, M, Nt)
+        else 
+            haplopair_topr!(happair1, happair2, hapscore, M, Nt, r, maxindx, maxgrad)
+        end
+    end
+
+    # supplement the constant terms in objective
+    t2 += @elapsed begin
+        @inbounds for j in 1:n
+            @simd for i in 1:p
+                hapscore[j] += abs2(Xwork[i, j])
+            end
+        end
+    end
+
+    t1 = t4 = 0.0 # no haplotype rescreening or computing dist(X, H)
 
     return t1, t2, t3, t4
 end 
@@ -157,7 +156,7 @@ function haplopair_topr!(
     happair2 :: AbstractVector{<:Integer},
     hapmin   :: AbstractVector{T},
     M        :: AbstractMatrix{T}, # d x d
-    Nt       :: AbstractMatrix{T}; # d x n
+    Nt       :: AbstractMatrix{T}, # d x n
     r        :: Integer = 5,
     maxindx  :: Vector{<:Integer} = Vector{Int}(undef, r),
     maxgrad  :: Vector{T} = Vector{T}(undef, r)

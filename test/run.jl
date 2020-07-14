@@ -2434,3 +2434,40 @@ x = bitv(bitrand(10000))
 idx = rand(1:10000, 1000)
 
 @benchmark set_index!($x, $idx) setup=(idx = rand(1:10000, 1000))
+
+
+
+
+using Random
+using BenchmarkTools
+
+function noelapse(n)
+    s = 0.0
+    for i in 1:n
+        s += rand()
+    end
+    s
+end
+
+function elapse(n)
+    s = 0.0
+    t = @elapsed begin
+        for i in 1:n
+            s += rand()
+        end
+    end
+    s, t
+end
+
+function elapse2(n)
+    s = 0.0
+    t = 0.0
+    @inbounds for i in 1:n
+        t += @elapsed s += rand()
+    end
+    s, t
+end
+
+@benchmark x = noelapse(100)
+@benchmark x, t = elapse(100)
+@benchmark x, t = elapse2(100)
