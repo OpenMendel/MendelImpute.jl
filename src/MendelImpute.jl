@@ -16,7 +16,7 @@ module MendelImpute
     using JLSO
     using Distances
     using ThreadPools
-    using ElasticArrays
+    # using ElasticArrays
 
     export continue_haplotype, haplopair!, haplopair, haploimpute!
     export impute!, impute_discard_phase!, search_breakpoint

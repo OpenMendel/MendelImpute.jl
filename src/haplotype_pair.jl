@@ -100,8 +100,8 @@ function haplochunk!(
         t5 = @elapsed begin
             w = something(findfirst(x -> x == absolute_w, winrange)) # window index of current chunk
             compute_redundant_haplotypes!(redundant_haplotypes, compressed_Hunique, 
-                happair1[id], happair2[id], w, absolute_w, storage1=redunhaps_bitvec1[id], 
-                storage2=redunhaps_bitvec2[id])
+                happair1[id], happair2[id], w, absolute_w, redunhaps_bitvec1[id], 
+                redunhaps_bitvec2[id])
         end
          
         # record timings and haplotypes
@@ -132,7 +132,7 @@ function compute_redundant_haplotypes!(
     happair1::AbstractVector,
     happair2::AbstractVector,
     window_idx::Int,
-    window_overall::Int;
+    window_overall::Int,
     storage1 = falses(nhaplotypes(Hunique)),
     storage2 = falses(nhaplotypes(Hunique))
     )
@@ -175,38 +175,40 @@ function compute_redundant_haplotypes!(
 end
 
 # uses dynamic programming. Only the first 1000 haplotype pairs will be saved.
-function compute_redundant_haplotypes!(
-    redundant_haplotypes::Vector{Vector{Vector{T}}}, 
-    Hunique::CompressedHaplotypes, 
-    happair1::AbstractVector,
-    happair2::AbstractVector,
-    window_idx::Int,
-    window_overall::Int
-    ) where T <: Tuple{Int32, Int32}
+# function compute_redundant_haplotypes!(
+#     redundant_haplotypes::Vector{Vector{Vector{T}}}, 
+#     Hunique::CompressedHaplotypes, 
+#     happair1::AbstractVector,
+#     happair2::AbstractVector,
+#     window_idx::Int,
+#     window_overall::Int,
+#     storage1 = falses(nhaplotypes(Hunique)),
+#     storage2 = falses(nhaplotypes(Hunique))
+#     ) where T <: Tuple{Int32, Int32}
     
-    people = length(redundant_haplotypes)
+#     people = length(redundant_haplotypes)
 
-    @inbounds for k in 1:people
-        # convert happairs from unique idx to complete idx
-        Hi_idx = unique_idx_to_complete_idx(happair1[k], window_overall, Hunique)
-        Hj_idx = unique_idx_to_complete_idx(happair2[k], window_overall, Hunique)
+#     @inbounds for k in 1:people
+#         # convert happairs from unique idx to complete idx
+#         Hi_idx = unique_idx_to_complete_idx(happair1[k], window_overall, Hunique)
+#         Hj_idx = unique_idx_to_complete_idx(happair2[k], window_overall, Hunique)
 
-        # find haplotypes that match Hi_idx and Hj_idx on typed snps
-        h1_set = get(Hunique.CW_typed[window_overall].hapmap, Hi_idx, Hi_idx)
-        h2_set = get(Hunique.CW_typed[window_overall].hapmap, Hj_idx, Hj_idx)
+#         # find haplotypes that match Hi_idx and Hj_idx on typed snps
+#         h1_set = get(Hunique.CW_typed[window_overall].hapmap, Hi_idx, Hi_idx)
+#         h2_set = get(Hunique.CW_typed[window_overall].hapmap, Hj_idx, Hj_idx)
 
-        # save first 1000 haplotype pairs
-        for h1 in h1_set, h2 in h2_set
-            if length(redundant_haplotypes[k][window_idx]) < 1000 
-                push!(redundant_haplotypes[k][window_idx], (h1, h2))
-            else
-                break
-            end
-        end
-    end
+#         # save first 1000 haplotype pairs
+#         for h1 in h1_set, h2 in h2_set
+#             if length(redundant_haplotypes[k][window_idx]) < 1000 
+#                 push!(redundant_haplotypes[k][window_idx], (h1, h2))
+#             else
+#                 break
+#             end
+#         end
+#     end
 
-    return nothing
-end
+#     return nothing
+# end
 
 """
     haplopair(X, H)

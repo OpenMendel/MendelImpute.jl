@@ -29,6 +29,13 @@ function phase(
     lasso::Union{Nothing, Int} = nothing
     )
 
+    if dynamic_programming
+        error("Currently dynamic programming routine is broken! Sorry!")
+    end
+    if rescreen
+        error("Currently rescreen routine is broken! Sorry!")
+    end
+
     # import reference data
     println("Importing reference haplotype data..."); flush(stdout)
     import_data_start = time()

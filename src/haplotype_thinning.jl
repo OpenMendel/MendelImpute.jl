@@ -46,6 +46,7 @@ function haplopair_thin_BLAS2!(
     t1 = @elapsed begin
         if !isnothing(allele_freq)
             map!(x -> x < 0.5 ? 1 - x : x, allele_freq, allele_freq) # scale by 1 - p
+            # map!(x -> 1 / sqrt(2*x*(1-x)), allele_freq, allele_freq) # scale by 1/√2x(1-x) (need a routine to check for division by 0)
             pairwise!(R, WeightedSqEuclidean(allele_freq), Hwork, Xwork, dims=2)
         else 
             pairwise!(R, SqEuclidean(), Hwork, Xwork, dims=2) # Rij = || H[:, i] - X[:, j] ||²
