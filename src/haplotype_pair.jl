@@ -151,11 +151,10 @@ function compute_redundant_haplotypes!(
             for i in h1_set
                 storage1[i] = true
             end
-            redundant_haplotypes[k].strand1[window_idx] .= storage1
         else
-            # Hi_idx is singleton (i.e. unique)
-            redundant_haplotypes[k].strand1[window_idx][Hi_idx] = true
+            storage1[Hi_idx] = true # Hi_idx is singleton (i.e. unique)
         end
+        redundant_haplotypes[k].strand1[window_idx] = copy(storage1)
 
         # strand2
         storage2 .= false
@@ -164,11 +163,10 @@ function compute_redundant_haplotypes!(
             for i in h2_set
                 storage2[i] = true
             end
-            redundant_haplotypes[k].strand2[window_idx] .= storage2
         else
-            # Hj_idx is singleton (i.e. unique)
-            redundant_haplotypes[k].strand2[window_idx][Hj_idx] = true
+            storage2[Hj_idx] = true # Hj_idx is singleton (i.e. unique)
         end
+        redundant_haplotypes[k].strand2[window_idx] = copy(storage2)
     end
 
     return nothing
