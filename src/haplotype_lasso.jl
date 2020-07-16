@@ -5,6 +5,7 @@
 function haplopair_lasso!(
     X::AbstractMatrix,
     H::AbstractMatrix;
+    inv_sqrt_allele_var::Union{AbstractVector, Nothing} = nothing,
     r::Int = 1,
     # preallocated vectors
     happair1::AbstractVector          = ones(Int, size(X, 2)),              # length n 
@@ -36,8 +37,19 @@ function haplopair_lasso!(
     # initialize missing data
     initXfloat!(Xwork, X)
 
-    # assemble M (symmetric)
+    # assemble N
     t2 = @elapsed begin
+        mul!(Nt, Transpose(Hwork), Xwork)
+        @simd for I in eachindex(Nt)
+            Nt[I] *= 2
+        end
+    end
+
+    # assemble M (symmetric)
+    t2 += @elapsed begin
+        if !isnothing(inv_sqrt_allele_var)
+            Hwork .*= inv_sqrt_allele_var # weight by frequency
+        end
         mul!(M, Transpose(Hwork), Hwork)
         for j in 1:d, i in 1:(j - 1) # off-diagonal
             M[i, j] = 2M[i, j] + M[i, i] + M[j, j]
@@ -46,14 +58,6 @@ function haplopair_lasso!(
             M[j, j] *= 4
         end
         LinearAlgebra.copytri!(M, 'U')
-    end
-
-    # assemble N
-    t2 += @elapsed begin
-        mul!(Nt, Transpose(Hwork), Xwork)
-        @simd for I in eachindex(Nt)
-            Nt[I] *= 2
-        end
     end
 
     # computational routine

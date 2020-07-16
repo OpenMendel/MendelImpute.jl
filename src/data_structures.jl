@@ -103,7 +103,7 @@ end
 function resize!(x::Vector{OptimalHaplotypeSet}, windows::Int)
     n = length(x)
     @inbounds for i in 1:n
-        if isassigned(x, i)
+        if isassigned(x[i].strand1, 1)
             Base.resize!(x[i].strand1, windows)
             Base.resize!(x[i].strand2, windows)
             sizehint!(x[i].strand1, windows)

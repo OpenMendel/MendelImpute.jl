@@ -19,7 +19,7 @@ function haplochunk!(
     dynamic_programming::Bool,
     lasso::Union{Nothing, Int},
     thinning_factor::Union{Nothing, Int},
-    thinning_scale_allelefreq::Bool,
+    scale_allelefreq::Bool,
     max_haplotypes::Int,
     rescreen::Bool,
     winrange::UnitRange,
@@ -69,17 +69,29 @@ function haplochunk!(
 
         # computational routine
         if !isnothing(lasso) && d > max_haplotypes
+            # weight snp by inverse allele variance if requested
+            inv_sqrt_allele_var = nothing
+            if scale_allelefreq
+                Hw_range = compressed_Hunique.start[absolute_w]:(absolute_w == total_window ? 
+                    ref_snps : compressed_Hunique.start[absolute_w + 1] - 1)
+                Hw_snp_pos = indexin(X_pos[Xw_idx_start:Xw_idx_end], compressed_Hunique.pos[Hw_range])
+                inv_sqrt_allele_var = compressed_Hunique.altfreq[Hw_snp_pos]
+                map!(x -> x < 3 ? 1 : 1 / sqrt(2*x*(1-x)), inv_sqrt_allele_var, inv_sqrt_allele_var) # scale by 1/2p(1-p)
+            end
             t1, t2, t3, t4 = haplopair_lasso!(Xw_aligned, Hw_aligned, r=lasso, 
-                happair1=happair1[id], happair2=happair2[id], hapscore=hapscore[id], 
-                maxindx=maxindx[id], maxgrad=maxgrad[id], Xwork=Xwork[id])
+                inv_sqrt_allele_var=inv_sqrt_allele_var, happair1=happair1[id], 
+                happair2=happair2[id], hapscore=hapscore[id], maxindx=maxindx[id], 
+                maxgrad=maxgrad[id], Xwork=Xwork[id])
         elseif !isnothing(thinning_factor) && d > max_haplotypes
             # weight snp by frequecy if requested
             alt_allele_freq = nothing
-            if thinning_scale_allelefreq
+            if scale_allelefreq
                 Hw_range = compressed_Hunique.start[absolute_w]:(absolute_w == total_window ? 
                     ref_snps : compressed_Hunique.start[absolute_w + 1] - 1)
                 Hw_snp_pos = indexin(X_pos[Xw_idx_start:Xw_idx_end], compressed_Hunique.pos[Hw_range])
                 alt_allele_freq = compressed_Hunique.altfreq[Hw_snp_pos]
+                map!(x -> x < 0.5 ? 1 - x : x, alt_allele_freq, alt_allele_freq) # scale by 1 - p
+                # map!(x -> 1 / sqrt(2*x*(1-x)), alt_allele_freq, alt_allele_freq) # scale by 1/√2x(1-x) (need a routine to check for division by 0)
             end
             # run haplotype thinning (i.e. search all (hi, hj) pairs where hi, hj ≈ x)
             t1, t2, t3, t4 = haplopair_thin_BLAS2!(Xw_aligned, Hw_aligned, 
@@ -154,7 +166,6 @@ function compute_redundant_haplotypes!(
         else
             storage1[Hi_idx] = true # Hi_idx is singleton (i.e. unique)
         end
-        redundant_haplotypes[k].strand1[window_idx] = copy(storage1)
 
         # strand2
         storage2 .= false
@@ -166,7 +177,16 @@ function compute_redundant_haplotypes!(
         else
             storage2[Hj_idx] = true # Hj_idx is singleton (i.e. unique)
         end
-        redundant_haplotypes[k].strand2[window_idx] = copy(storage2)
+
+        # redundant_haplotypes[k].strand1[window_idx] = copy(storage1)
+        # redundant_haplotypes[k].strand2[window_idx] = copy(storage2)
+        if isassigned(redundant_haplotypes[k].strand1, window_idx)
+            redundant_haplotypes[k].strand1[window_idx] .= storage1
+            redundant_haplotypes[k].strand2[window_idx] .= storage2
+        else
+            redundant_haplotypes[k].strand1[window_idx] = copy(storage1)
+            redundant_haplotypes[k].strand2[window_idx] = copy(storage2)
+        end
     end
 
     return nothing

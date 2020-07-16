@@ -24,7 +24,7 @@ function phase(
     rescreen::Bool = false, 
     max_haplotypes::Int = 800,
     thinning_factor::Union{Nothing, Int} = nothing,
-    thinning_scale_allelefreq::Bool = false,
+    scale_allelefreq::Bool = false,
     dynamic_programming::Bool = true,
     lasso::Union{Nothing, Int} = nothing
     )
@@ -115,7 +115,7 @@ function phase(
         pmeter = Progress(windows, 5, "Phasing chunk $chunk/$chunks...")
         # find happairs for each window in current chunk
         haplochunk!(redundant_haplotypes, compressed_Hunique, X, X_pos, 
-            dynamic_programming, lasso, thinning_factor, thinning_scale_allelefreq, 
+            dynamic_programming, lasso, thinning_factor, scale_allelefreq, 
             max_haplotypes, rescreen, w_start:w_end, tot_windows, pmeter, haptimers)
         calculate_happairs_time += time() - calculate_happairs_start
 
