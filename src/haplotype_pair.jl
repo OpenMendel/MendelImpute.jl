@@ -214,11 +214,11 @@ function save_unique_only!(
         Hi_idx = unique_idx_to_complete_idx(happair1[k], window_overall, Hunique)
         Hj_idx = unique_idx_to_complete_idx(happair2[k], window_overall, Hunique)
 
-        # strand1
+        # strand1: save unique index
         storage1 .= false
         storage1[Hi_idx] = true # Hi_idx is singleton (i.e. unique)
 
-        # strand2
+        # strand2: save unique index
         storage2 .= false
         storage2[Hj_idx] = true # Hj_idx is singleton (i.e. unique)
 
@@ -236,6 +236,11 @@ function save_unique_only!(
     return nothing
 end
 
+"""
+For person `i`, find redundant haplotypes matching each haplotype index in
+redundant_haplotypes[i].strand1 and redundant_haplotypes[i].strand2 (which
+should record complete index).
+"""
 function find_redundant_haplotypes!(
     redundant_haplotypes::Vector{OptimalHaplotypeSet},
     Hunique::CompressedHaplotypes,
@@ -247,6 +252,7 @@ function find_redundant_haplotypes!(
     people = length(redundant_haplotypes)
 
     @inbounds for k in 1:people, w in winrange
+        # get complete index
         Hi_idx = something(findfirst(redundant_haplotypes[k].strand1[w]))
         Hj_idx = something(findfirst(redundant_haplotypes[k].strand2[w]))
 
@@ -291,8 +297,7 @@ function screen_flanking_windows!(
     compressed_Hunique::CompressedHaplotypes,
     X::AbstractMatrix,
     winrange::UnitRange,
-    storage1 = falses(nhaplotypes(compressed_Hunique)),
-    storage2 = falses(nhaplotypes(compressed_Hunique))
+    total_window::Int,
     )
 
     people = length(redundant_haplotypes)
@@ -300,43 +305,69 @@ function screen_flanking_windows!(
     width = compressed_Hunique.width
     windows = length(winrange)
 
-    happair1_curr = Vector{Int32}(undef, people)
-    happair2_curr = Vector{Int32}(undef, people)
-    happair1_prev = Vector{Int32}(undef, people)
-    happair2_prev = Vector{Int32}(undef, people)
-    happair1_next = Vector{Int32}(undef, people)
-    happair2_next = Vector{Int32}(undef, people)
-    hapscore_curr = Vector{Float32}(undef, people)
-    redunhaps_bitvec1 = falses(haplotypes)
-    redunhaps_bitvec2 = falses(haplotypes)
-
-    for absolute_w in winrange#[2:end-1]
+    for absolute_w in winrange
         w = something(findfirst(x -> x == absolute_w, winrange))
-
-        if w == 1 || w == windows
-            # todo
-        end
-
         Hw_aligned = compressed_Hunique.CW_typed[absolute_w].uniqueH
         Xw_idx_start = (absolute_w - 1) * width + 1
-        Xw_idx_end = absolute_w * width
+        Xw_idx_end = (absolute_w == total_window ? size(X, 1) : absolute_w * width)
         Xw_aligned = view(X, Xw_idx_start:Xw_idx_end, :)
 
         for i in 1:people
-            # these are complete haplotype index
-            happair1_curr[i] = something(findfirst(redundant_haplotypes[i].strand1[w]))
-            happair2_curr[i] = something(findfirst(redundant_haplotypes[i].strand2[w]))
-            happair1_prev[i] = something(findfirst(redundant_haplotypes[i].strand1[w - 1]))
-            happair2_prev[i] = something(findfirst(redundant_haplotypes[i].strand2[w - 1]))
-            happair1_next[i] = something(findfirst(redundant_haplotypes[i].strand1[w + 1]))
-            happair2_next[i] = something(findfirst(redundant_haplotypes[i].strand2[w + 1]))
-        end
+            # calculate observed error for current pair
+            h1_curr_complete = something(findfirst(redundant_haplotypes[i].strand1[w])) # complete index
+            h2_curr_complete = something(findfirst(redundant_haplotypes[i].strand2[w])) # complete index
+            h1_curr = complete_idx_to_unique_typed_idx(h1_curr_complete, absolute_w, compressed_Hunique) # unique index
+            h2_curr = complete_idx_to_unique_typed_idx(h2_curr_complete, absolute_w, compressed_Hunique) # unique index
+            curr_err = observed_error(Xw_aligned, i, Hw_aligned, h1_curr, h2_curr) # calculate current erro
 
-        choose_happair!(Xw_aligned, Hw_aligned, happair1_curr, happair2_curr,
-            happair1_prev, happair2_prev, hapscore_curr)
+            # consider previous pair
+            if w != 1
+                h1_prev_complete = something(findfirst(redundant_haplotypes[i].strand1[w - 1]))
+                h2_prev_complete = something(findfirst(redundant_haplotypes[i].strand2[w - 1]))
+                h1_prev = complete_idx_to_unique_typed_idx(h1_prev_complete, absolute_w, compressed_Hunique) # unique index
+                h2_prev = complete_idx_to_unique_typed_idx(h2_prev_complete, absolute_w, compressed_Hunique) # unique index
+                prev_err = observed_error(Xw_aligned, i, Hw_aligned, h1_prev, h2_prev)
+                if prev_err < curr_err
+                    h1_curr, h2_curr, curr_err = h1_prev, h2_prev, prev_err
+                end
+            end
+
+            # consider next pair
+            if w != windows
+                h1_next_complete = something(findfirst(redundant_haplotypes[i].strand1[w + 1]))
+                h2_next_complete = something(findfirst(redundant_haplotypes[i].strand2[w + 1]))
+                h1_next = complete_idx_to_unique_typed_idx(h1_next_complete, absolute_w, compressed_Hunique) # unique index
+                h2_next = complete_idx_to_unique_typed_idx(h2_next_complete, absolute_w, compressed_Hunique) # unique index
+                next_err = observed_error(Xw_aligned, i, Hw_aligned, h1_next, h2_next)
+                if next_err < curr_err
+                    h1_curr, h2_curr, curr_err = h1_next, h2_next, next_err
+                end
+            end
+
+            # convert from unique idx to complete idx
+            H1_idx = unique_idx_to_complete_idx(h1_curr, w, compressed_Hunique)
+            H2_idx = unique_idx_to_complete_idx(h2_curr, w, compressed_Hunique)
+            redundant_haplotypes[i].strand1[w][h1_curr_complete] = false # reset
+            redundant_haplotypes[i].strand2[w][h2_curr_complete] = false # reset
+            redundant_haplotypes[i].strand1[w][H1_idx] = true # save best
+            redundant_haplotypes[i].strand2[w][H2_idx] = true # save best
+        end
     end
 
     return nothing
+end
+
+function observed_error(X, col, H, h1, h2)
+    p = size(X, 1)
+    @assert p == size(H, 1)
+    T = promote_type(eltype(X), eltype(H))
+    err = zero(T)
+    @inbounds for i in 1:p
+        if X[i, col] !== missing
+            err += abs2(X[i, col] - H[i, h1] - H[i, h2])
+        end
+    end
+    return err :: T
 end
 
 # uses dynamic programming. Only the first 1000 haplotype pairs will be saved.

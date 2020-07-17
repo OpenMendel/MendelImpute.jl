@@ -120,7 +120,8 @@ function phase(
         calculate_happairs_time += time() - calculate_happairs_start
 
         # check whether flanking windows give better prediction
-        
+        screen_flanking_windows!(redundant_haplotypes, compressed_Hunique, X,
+            w_start:w_end, tot_windows)
 
         # expand to redundant haplotypes
         find_redundant_haplotypes!(redundant_haplotypes, compressed_Hunique,
