@@ -1,22 +1,22 @@
 ######## THIS FILE IS THE SAME AS `haplotype_pair.jl`
 ######## except it computes a number of top matching haplotype pairs
-######## and then screens them each based on the observed entries. 
+######## and then screens them each based on the observed entries.
 
 """
 Records optimal-redundant haplotypes for each window. Currently, only the first 1000
-haplotype pairs will be saved to reduce search space for dynamic programming. 
+haplotype pairs will be saved to reduce search space for dynamic programming.
 
 Warning: This function is called in a multithreaded loop. If you modify this function
 you must check whether imputation accuracy is affected (when run with >1 threads).
 """
 function compute_redundant_haplotypes!(
-    redundant_haplotypes::Union{Vector{Vector{Vector{T}}}, Vector{OptimalHaplotypeSet}}, 
-    Hunique::CompressedHaplotypes, 
-    happairs::Vector{Vector{T}}, 
+    redundant_haplotypes::Union{Vector{Vector{Vector{T}}}, Vector{OptimalHaplotypeSet}},
+    Hunique::CompressedHaplotypes,
+    happairs::Vector{Vector{T}},
     window::Int;
     fast_method::Bool = false,
     ) where T <: Tuple{Int32, Int32}
-    
+
     people = length(redundant_haplotypes)
     h1_set = Int32[]
     h2_set = Int32[]
@@ -26,7 +26,7 @@ function compute_redundant_haplotypes!(
             Hi_idx = unique_idx_to_complete_idx(happair[1], window, Hunique)
             Hj_idx = unique_idx_to_complete_idx(happair[2], window, Hunique)
 
-            # loop through all haplotypes and find ones that match either of the optimal haplotypes 
+            # loop through all haplotypes and find ones that match either of the optimal haplotypes
             empty!(h1_set)
             empty!(h2_set)
             for (idx, hap) in enumerate(Hunique.CW_typed[window].hapmap)
@@ -36,7 +36,7 @@ function compute_redundant_haplotypes!(
 
             # save first 1000 haplotype pairs
             for h1 in h1_set, h2 in h2_set
-                if length(redundant_haplotypes[k][window]) <= 1000 
+                if length(redundant_haplotypes[k][window]) <= 1000
                     push!(redundant_haplotypes[k][window], (h1, h2))
                 else
                     break
@@ -52,7 +52,7 @@ end
 """
     haplopair(X, H)
 
-Calculate the best pair of haplotypes in `H` for each individual in `X`. Missing data in `X` 
+Calculate the best pair of haplotypes in `H` for each individual in `X`. Missing data in `X`
 does not have missing data. Missing data is initialized as 2x alternate allele freq.
 
 # Input
@@ -82,7 +82,7 @@ function haplopair_screen(
 
     # compute top haplotype pairs for each genotype vector
     t2, t3 = haplopair!(Xwork, Hwork, M, N, happairs, hapscore)
-    
+
     # screen for best haplotype pair based on observed entries
     t4 = @elapsed choose_happair!(X, H, happairs, hapscore)
 
@@ -120,7 +120,7 @@ function haplopair!(
     p, n, d = size(X, 1), size(X, 2), size(H, 2)
 
     # assemble M (upper triangular only)
-    t2 = @elapsed begin 
+    t2 = @elapsed begin
         mul!(M, Transpose(H), H)
         for j in 1:d, i in 1:(j - 1) # off-diagonal
             M[i, j] = 2M[i, j] + M[i, i] + M[j, j]
@@ -154,10 +154,10 @@ end
     haplopair!(happair, hapscore, M, N)
 
 Calculate the best pair of haplotypes pairs in the filtered haplotype panel
-for each individual in `X` using sufficient statistics `M` and `N`. 
+for each individual in `X` using sufficient statistics `M` and `N`.
 
 # Note
-The best haplotype pairs are column indices of the filtered haplotype panels. 
+The best haplotype pairs are column indices of the filtered haplotype panels.
 
 # Input
 * `happair`: optimal haplotype pair for each individual.
@@ -245,7 +245,7 @@ end
 """
     haploimpute!(X, H, M, N, happair, hapscore, maxiters=1, tolfun=1e-3)
 
-In a window, performs haplotying of genotype matrix `X` from the pool of 
+In a window, performs haplotying of genotype matrix `X` from the pool of
 haplotypes `H`.
 
 # Input
@@ -298,8 +298,8 @@ end
 """
     choose_happair!(X, H, happairs, hapscore)
 
-Calculates error ||x - hi - hj||^2 only on the observed entries and save 
-observed error in `hapscore`. `happairs` will keep only the best haplotype 
+Calculates error ||x - hi - hj||^2 only on the observed entries and save
+observed error in `hapscore`. `happairs` will keep only the best haplotype
 pairs based on the error of observed entries. All happairs
 that attain the best observed error will be kept.
 """
@@ -325,7 +325,7 @@ function choose_happair!(
             h1, h2 = happair[1], happair[2]
             err = zero(T)
             @inbounds @simd for i in 1:p
-                if X[i, j] !== missing 
+                if X[i, j] !== missing
                     err += abs2(X[i, j] - H[i, h1] - H[i, h2])
                 end
             end
@@ -346,6 +346,51 @@ function choose_happair!(
             end
         end
         hapscore[j] = convert(eltype(hapscore), best_error)
+    end
+
+    return nothing
+end
+
+function choose_happair!(
+    X::AbstractMatrix{Union{Missing, T}},
+    H::AbstractMatrix,
+    happair1_curr = AbstractVector,
+    happair2_curr = AbstractVector,
+    happair1_alt = AbstractVector
+    happair2_alt = AbstractVector,
+    )
+
+    p = size(X, 1)
+    n = size(X, 2)
+    d = size(H, 2)
+    p == size(H, 1) || error("Dimension mismatch: size(X, 1) = $p but size(H, 1) = $(size(H, 1))")
+    T = Float32
+
+    # loop over each person's genotype
+    for j in 1:n
+        # compute current happair errors based on observed entries
+        h1_curr, h2_curr = happair1_curr[j], happair2_curr[j]
+        curr_err = zero(T)
+        @inbounds for i in 1:p
+            if X[i, j] !== missing
+                curr_err += abs2(X[i, j] - H[i, h1] - H[i, h2])
+            end
+        end
+
+        # compute alternative happair errors based on observed entries
+        h1, h2 = happair1_alt[j], happair2_alt[j]
+        alt_err = zero(T)
+        @inbounds for i in 1:p
+            if X[i, j] !== missing
+                alt_err += abs2(X[i, j] - H[i, h1] - H[i, h2])
+            end
+        end
+
+        # keep alternative if it has smaller error
+        if alt_err < curr_err
+            happair1_curr[j] = h1
+            happair2_curr[j] = h2
+        end
     end
 
     return nothing

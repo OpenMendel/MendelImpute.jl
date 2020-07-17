@@ -119,6 +119,13 @@ function phase(
             max_haplotypes, rescreen, w_start:w_end, tot_windows, pmeter, haptimers)
         calculate_happairs_time += time() - calculate_happairs_start
 
+        # check whether flanking windows give better prediction
+        
+
+        # expand to redundant haplotypes
+        find_redundant_haplotypes!(redundant_haplotypes, compressed_Hunique,
+            w_start:w_end)
+
         #
         # phasing (haplotyping) step + breakpoint search
         #
