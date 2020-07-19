@@ -14,7 +14,8 @@ function impute!(
     XtoH_idx::Union{Nothing, AbstractVector} = nothing
     )
     # impute without changing observed entries
-    impute_discard_phase!(X, compressed_haplotypes, phaseinfo)
+    # impute_discard_phase!(X, compressed_haplotypes, phaseinfo)
+    impute!(X, compressed_haplotypes, phaseinfo)
 
     # retrieve reference file information
     chr = (isnothing(XtoH_idx) ? compressed_haplotypes.chr : compressed_haplotypes.chr[XtoH_idx])
@@ -100,26 +101,59 @@ function impute!(
     compressed_Hunique::CompressedHaplotypes,
     phase::Vector{HaplotypeMosaicPair}
     )
-
+    width = compressed_Hunique.width
     fill!(X, 0)
+
     # loop over individuals
     for i in 1:size(X, 2)
+        # strand 1
         for s in 1:(length(phase[i].strand1.start) - 1)
-            idx = phase[i].strand1.start[s]:(phase[i].strand1.start[s + 1] - 1)
-            H = compressed_Hunique.CW[s].uniqueH
-            X[idx, i] = H[idx, phase[i].strand1.haplotypelabel[s]]
+            X_idx = phase[i].strand1.start[s]:(phase[i].strand1.start[s + 1] - 1)
+            w = phase[i].strand1.window[s]
+            H = compressed_Hunique.CW[w].uniqueH
+            H_start = abs(phase[i].strand1.start[s] - (w - 1) * width)
+            H_idx = H_start:(H_start + length(X_idx) - 1)
+            X[X_idx, i] = H[H_idx, phase[i].strand1.haplotypelabel[s]]
+            # if i == 387 && 530 in X_idx
+            #     println(X[530, i])
+            #     println("hi")
+            # end
         end
-        idx = phase[i].strand1.start[end]:phase[i].strand1.length
-        # H = compressed_Hunique.CW[end].uniqueH
-        X[idx, i] = H[idx, phase[i].strand1.haplotypelabel[end]]
+        w = phase[i].strand1.window[end]
+        X_idx = phase[i].strand1.start[end]:phase[i].strand1.length
+        H_start = abs(phase[i].strand1.start[end] - (w - 1) * width)
+        H_idx = H_start:(H_start + length(X_idx) - 1)
+        H = compressed_Hunique.CW[w].uniqueH
+        X[X_idx, i] = H[H_idx, phase[i].strand1.haplotypelabel[end]]
+        # if i == 387 && 530 in X_idx
+        #     println(X[530, i])
+        #     println("hii")
+        # end
+
+        # strand 2
         for s in 1:(length(phase[i].strand2.start) - 1)
-            idx = phase[i].strand2.start[s]:(phase[i].strand2.start[s + 1] - 1)
-            H = compressed_Hunique.CW[s].uniqueH
-            X[idx, i] += H[idx, phase[i].strand2.haplotypelabel[s]]
+            X_idx = phase[i].strand2.start[s]:(phase[i].strand2.start[s + 1] - 1)
+            w = phase[i].strand2.window[s]
+            H = compressed_Hunique.CW[w].uniqueH
+            H_start = abs(phase[i].strand2.start[s] - (w - 1) * width)
+            H_idx = H_start:(H_start + length(X_idx) - 1)
+            X[X_idx, i] += H[H_idx, phase[i].strand2.haplotypelabel[s]]
+            # if i == 387 && 530 in X_idx
+            #     println(X[530, i])
+            #     println("hiii")
+            # end
+            i == 387 && println("X_idx = $X_idx")
         end
-        idx = phase[i].strand2.start[end]:phase[i].strand2.length
-        # H = compressed_Hunique.CW[end].uniqueH
-        X[idx, i] += H[idx, phase[i].strand2.haplotypelabel[end]]
+        X_idx = phase[i].strand2.start[end]:phase[i].strand2.length
+        w = phase[i].strand2.window[end]
+        H = compressed_Hunique.CW[w].uniqueH
+        H_start = abs(phase[i].strand2.start[end] - (w - 1) * width)
+        H_idx = H_start:(H_start + length(X_idx) - 1)
+        X[X_idx, i] += H[H_idx, phase[i].strand2.haplotypelabel[end]]
+        if i == 387 && 530 in X_idx
+            println(X[530, i])
+            fdsa
+        end
     end
 end
 
