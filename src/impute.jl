@@ -2,8 +2,9 @@
     output_unphased!(X, compressed_haplotypes, phaseinfo, outfile, X_sampleID)
 
 Imputes `X` using `phaseinfo` and outputs result in `outfile`. All genotypes
-in `outfile` are non-missing and unphased. If `XtoH_idx == nothing`, all SNPs
-in reference file will be imputed.
+in `outfile` are non-missing and unphased.
+
+If `XtoH_idx == nothing`, all SNPs in reference file will be imputed.
 """
 function Base.write(
     outfile::AbstractString,
@@ -58,8 +59,7 @@ end
 """
     write(outfile, X1, X2, compressed_haplotypes, phaseinfo, X_sampleID)
 
-Same as `output_unphased!` but all genotypes in `outfile` are non-missing and
-phased.
+All genotypes in `outfile` are non-missing and phased.
 """
 function Base.write(
     outfile::AbstractString,
@@ -94,12 +94,17 @@ function Base.write(
     (bytesavailable(pb) > (16*1024)) && write(io, take!(pb))
 
     pmeter = Progress(size(X1, 1), 5, "Writing to file...")
+    X1i = zeros(size(X1, 2))
+    X2i = zeros(size(X2, 2))
     @inbounds for i in 1:size(X1, 1)
         # write meta info (chrom/pos/id/ref/alt)
-        print(pb, chr[i], "\t", string(pos[i]), "\t", ids[i][1], "\t", ref[i], "\t", alt[i][1], "\t.\tPASS\t.\tGT")
+        print(pb, chr[i], "\t", string(pos[i]), "\t", ids[i][1], "\t", ref[i],
+            "\t", alt[i][1], "\t.\tPASS\t.\tGT")
 
         # print ith record
-        write_snp!(pb, @view(X1[i, :]), @view(X2[i, :]))
+        copyto!(X1i, @view(X1[i, :]))
+        copyto!(X2i, @view(X2[i, :]))
+        write_snp!(pb, X1i, X2i)
 
         (bytesavailable(pb) > (16*1024)) && write(io, take!(pb))
         next!(pmeter)
@@ -156,7 +161,7 @@ function write_snp!(pb::IOBuffer, X1::AbstractVector, X2::AbstractVector)
 end
 
 """
-    impute!(X, H, phase)
+    impute!(X1, X2, H, phase)
 
 Imputes `X = X1 + X2` completely using haplotype segments of `H`, where segments
 information are stored in `phase`. `X1` is strand1 and `X2` is strand 2.
@@ -181,49 +186,33 @@ function impute!(
             X_idx = phase[i].strand1.start[s]:(phase[i].strand1.start[s + 1] - 1)
             w = phase[i].strand1.window[s]
             H = compressed_Hunique.CW[w].uniqueH
-            H_start = abs(phase[i].strand1.start[s] - (w - 1) * width)
+            H_start = abs(phase[i].strand1.start[s] - compressed_Hunique.start[w]) + 1
             H_idx = H_start:(H_start + length(X_idx) - 1)
+            # i == 10 && println("X_idx = $X_idx, H_idx = $H_idx")
             X1[X_idx, i] = H[H_idx, phase[i].strand1.haplotypelabel[s]]
-            # if i == 387 && 530 in X_idx
-            #     println(X[530, i])
-            #     println("hi")
-            # end
         end
         w = phase[i].strand1.window[end]
         X_idx = phase[i].strand1.start[end]:phase[i].strand1.length
-        H_start = abs(phase[i].strand1.start[end] - (w - 1) * width)
+        H_start = abs(phase[i].strand1.start[end] - compressed_Hunique.start[w]) + 1
         H_idx = H_start:(H_start + length(X_idx) - 1)
         H = compressed_Hunique.CW[w].uniqueH
         X1[X_idx, i] = H[H_idx, phase[i].strand1.haplotypelabel[end]]
-        # if i == 387 && 530 in X_idx
-        #     println(X[530, i])
-        #     println("hii")
-        # end
 
         # strand 2
         for s in 1:(length(phase[i].strand2.start) - 1)
             X_idx = phase[i].strand2.start[s]:(phase[i].strand2.start[s + 1] - 1)
             w = phase[i].strand2.window[s]
             H = compressed_Hunique.CW[w].uniqueH
-            H_start = abs(phase[i].strand2.start[s] - (w - 1) * width)
+            H_start = abs(phase[i].strand2.start[s] - compressed_Hunique.start[w]) + 1
             H_idx = H_start:(H_start + length(X_idx) - 1)
             X2[X_idx, i] = H[H_idx, phase[i].strand2.haplotypelabel[s]]
-            # if i == 387 && 530 in X_idx
-            #     println(X[530, i])
-            #     println("hiii")
-            # end
-            # i == 387 && println("X_idx = $X_idx")
         end
         X_idx = phase[i].strand2.start[end]:phase[i].strand2.length
         w = phase[i].strand2.window[end]
         H = compressed_Hunique.CW[w].uniqueH
-        H_start = abs(phase[i].strand2.start[end] - (w - 1) * width)
+        H_start = abs(phase[i].strand2.start[end] - compressed_Hunique.start[w]) + 1
         H_idx = H_start:(H_start + length(X_idx) - 1)
         X2[X_idx, i] = H[H_idx, phase[i].strand2.haplotypelabel[end]]
-        # if i == 387 && 530 in X_idx
-        #     println(X[530, i])
-        #     fdsa
-        # end
     end
 end
 
@@ -270,6 +259,7 @@ end
 
 """
     update_marker_position!(phaseinfo, tgtfile, reffile)
+
 Converts `phaseinfo`'s strand1 and strand2's starting position in
 terms of matrix rows of `X` to starting position in terms matrix
 rows in `H`.
