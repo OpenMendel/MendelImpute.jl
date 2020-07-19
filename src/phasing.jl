@@ -11,6 +11,7 @@ of haplotypes `reffile` by sliding windows and saves result in `outfile`.
 # Optional Inputs
 - `outfile`: output filename ending in `.vcf.gz` or `.vcf`. Output genotypes will have no missing data.
 - `impute`: If `true`, untyped SNPs will be imputed, otherwise only missing snps in `tgtfile` will be imputed.  (default `false`)
+- `phase`: If `true`, all output genotypes will be phased. Otherwise all output genotypes will be unphased.
 - `width`: number of SNPs (markers) in each haplotype window. (default `512`)
 - `rescreen`: This option saves a number of top haplotype pairs when solving the least squares objective, and re-minimize least squares on just observed data.
 - `thinning_factor`: This option solves the least squares objective on only "thining_factor" unique haplotypes.
@@ -20,6 +21,7 @@ function phase(
     reffile::AbstractString;
     outfile::AbstractString = "imputed." * tgtfile,
     impute::Bool = true,
+    phase::Bool = false,
     width::Int = 512,
     rescreen::Bool = false,
     max_haplotypes::Int = 800,
@@ -140,19 +142,38 @@ function phase(
     # impute step
     #
     impute_start = time()
-    H_pos = compressed_Hunique.pos
-    XtoH_idx = indexin(X_pos, H_pos) # X_pos[i] == H_pos[XtoH_idx[i]]
-    if impute
-        # initialize whole genotype matrix and copy known entries into it
-        X_full = Matrix{Union{Missing, UInt8}}(missing, ref_snps, people)
-        copyto!(@view(X_full[XtoH_idx, :]), X)
-
+    XtoH_idx = indexin(X_pos, compressed_Hunique.pos) # X_pos[i] == H_pos[XtoH_idx[i]]
+    if impute # imputes typed and untyped SNPs
         # convert phase's starting position from X's index to H's index
         update_marker_position!(ph, XtoH_idx)
 
-        impute!(X_full, compressed_Hunique, ph, outfile, X_sampleID, XtoH_idx=nothing) # imputes X_full and writes to file
-    else
-        impute!(X, compressed_Hunique, ph, outfile, X_sampleID, XtoH_idx=XtoH_idx) # imputes X (only containing typed snps) and writes to file
+        if phase # output genotypes all phased
+            X1 = BitArray(undef, ref_snps, people)
+            X2 = BitArray(undef, ref_snps, people)
+
+            # impute and write to file
+            impute!(X1, X2, compressed_Hunique, ph)
+            write(outfile, X1, X2, compressed_Hunique, ph, X_sampleID)
+        else # output genotypes all unphased
+            X_full = Matrix{Union{Missing, UInt8}}(missing, ref_snps, people)
+            copyto!(@view(X_full[XtoH_idx, :]), X) # keep known entries
+
+            # impute and write to file
+            impute_discard_phase!(X_full, compressed_Hunique, ph)
+            write(outfile, X_full, compressed_Hunique, ph, X_sampleID)
+        end
+    else # impute only missing entries in typed SNPs
+        if phase
+            X1 = BitArray(undef, size(X, 1), size(X, 2))
+            X2 = BitArray(undef, size(X, 1), size(X, 2))
+
+            # impute and write to file
+            impute!(X1, X2, compressed_Hunique, ph)
+            write(outfile, X1, X2, compressed_Hunique, ph, X_sampleID)
+        else
+            impute_discard_phase!(X, compressed_Hunique, ph)
+            write(outfile, X, compressed_Hunique, ph, X_sampleID)
+        end
     end
     impute_time = time() - impute_start
 

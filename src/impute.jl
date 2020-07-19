@@ -1,22 +1,19 @@
 """
-    impute!(X, compressed_haplotypes, phaseinfo, outfile, X_sampleID)
+    output_unphased!(X, compressed_haplotypes, phaseinfo, outfile, X_sampleID)
 
 Imputes `X` using `phaseinfo` and outputs result in `outfile`. All genotypes
-in `outfile` are non-missing. If `XtoH_idx == nothing`, all SNPs in reference
-file will be imputed.
+in `outfile` are non-missing and unphased. If `XtoH_idx == nothing`, all SNPs
+in reference file will be imputed.
 """
-function impute!(
+function Base.write(
+    outfile::AbstractString,
     X::AbstractMatrix,
     compressed_haplotypes::CompressedHaplotypes,
     phaseinfo::Vector{HaplotypeMosaicPair},
-    outfile::AbstractString,
     X_sampleID::AbstractVector;
-    XtoH_idx::Union{Nothing, AbstractVector} = nothing
+    XtoH_idx::Union{Nothing, AbstractVector} = nothing,
+    phase::Bool = false
     )
-    # impute without changing observed entries
-    # impute_discard_phase!(X, compressed_haplotypes, phaseinfo)
-    impute!(X, compressed_haplotypes, phaseinfo)
-
     # retrieve reference file information
     chr = (isnothing(XtoH_idx) ? compressed_haplotypes.chr : compressed_haplotypes.chr[XtoH_idx])
     pos = (isnothing(XtoH_idx) ? compressed_haplotypes.pos : compressed_haplotypes.pos[XtoH_idx])
@@ -42,20 +39,12 @@ function impute!(
     pmeter = Progress(size(X, 1), 5, "Writing to file...")
     @inbounds for i in 1:size(X, 1)
         # write meta info (chrom/pos/id/ref/alt)
-        print(pb, chr[i], "\t", string(pos[i]), "\t", ids[i][1], "\t", ref[i], "\t", alt[i][1], "\t.\tPASS\t.\tGT")
+        print(pb, chr[i], "\t", string(pos[i]), "\t", ids[i][1], "\t", ref[i],
+            "\t", alt[i][1], "\t.\tPASS\t.\tGT")
 
-        for j in 1:size(X, 2)
-            if X[i, j] == 0
-                print(pb, "\t0/0")
-            elseif X[i, j] == 1
-                print(pb, "\t1/0")
-            elseif X[i, j] == 2
-                print(pb, "\t1/1")
-            else
-                error("imputed genotypes can only be 0, 1, 2 but X[$i, $j]) = $(X[i, j])")
-            end
-        end
-        print(pb, "\n")
+        # print ith record
+        write_snp!(pb, @view(X[i, :]))
+
         (bytesavailable(pb) > (16*1024)) && write(io, take!(pb))
         next!(pmeter)
     end
@@ -67,45 +56,126 @@ function impute!(
 end
 
 """
-    impute!(X, H, phase)
+    write(outfile, X1, X2, compressed_haplotypes, phaseinfo, X_sampleID)
 
-Imputes `X` completely using segments of haplotypes `H` where segments are stored in `phase`.
-Non-missing entries in `X` can be different after imputation. Preserves phase information.
+Same as `output_unphased!` but all genotypes in `outfile` are non-missing and
+phased.
 """
-function impute!(
-    X::AbstractMatrix,
-    H::AbstractMatrix,
-    phase::Vector{HaplotypeMosaicPair}
+function Base.write(
+    outfile::AbstractString,
+    X1::AbstractMatrix,
+    X2::AbstractMatrix,
+    compressed_haplotypes::CompressedHaplotypes,
+    phaseinfo::Vector{HaplotypeMosaicPair},
+    X_sampleID::AbstractVector;
+    XtoH_idx::Union{Nothing, AbstractVector} = nothing,
+    phase::Bool = false
     )
+    # retrieve reference file information
+    chr = (isnothing(XtoH_idx) ? compressed_haplotypes.chr : compressed_haplotypes.chr[XtoH_idx])
+    pos = (isnothing(XtoH_idx) ? compressed_haplotypes.pos : compressed_haplotypes.pos[XtoH_idx])
+    ids = (isnothing(XtoH_idx) ? compressed_haplotypes.SNPid : compressed_haplotypes.SNPid[XtoH_idx])
+    ref = (isnothing(XtoH_idx) ? compressed_haplotypes.refallele : compressed_haplotypes.refallele[XtoH_idx])
+    alt = (isnothing(XtoH_idx) ? compressed_haplotypes.altallele : compressed_haplotypes.altallele[XtoH_idx])
 
-    fill!(X, 0)
-    # loop over individuals
-    for i in 1:size(X, 2)
-        for s in 1:(length(phase[i].strand1.start) - 1)
-            idx = phase[i].strand1.start[s]:(phase[i].strand1.start[s + 1] - 1)
-            X[idx, i] = H[idx, phase[i].strand1.haplotypelabel[s]]
-        end
-        idx = phase[i].strand1.start[end]:phase[i].strand1.length
-        X[idx, i] = H[idx, phase[i].strand1.haplotypelabel[end]]
-        for s in 1:(length(phase[i].strand2.start) - 1)
-            idx = phase[i].strand2.start[s]:(phase[i].strand2.start[s + 1] - 1)
-            X[idx, i] += H[idx, phase[i].strand2.haplotypelabel[s]]
-        end
-        idx = phase[i].strand2.start[end]:phase[i].strand2.length
-        X[idx, i] += H[idx, phase[i].strand2.haplotypelabel[end]]
+    # write minimal meta information to outfile
+    io = openvcf(outfile, "w")
+    pb = PipeBuffer()
+    print(pb, "##fileformat=VCFv4.2\n")
+    print(pb, "##source=MendelImpute\n")
+    print(pb, "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n")
+
+    # header line should match reffile (i.e. sample ID's should match)
+    print(pb, "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT")
+    for id in X_sampleID
+        print(pb, "\t", id)
     end
+    print(pb, "\n")
+    (bytesavailable(pb) > (16*1024)) && write(io, take!(pb))
+
+    pmeter = Progress(size(X1, 1), 5, "Writing to file...")
+    @inbounds for i in 1:size(X1, 1)
+        # write meta info (chrom/pos/id/ref/alt)
+        print(pb, chr[i], "\t", string(pos[i]), "\t", ids[i][1], "\t", ref[i], "\t", alt[i][1], "\t.\tPASS\t.\tGT")
+
+        # print ith record
+        write_snp!(pb, @view(X1[i, :]), @view(X2[i, :]))
+
+        (bytesavailable(pb) > (16*1024)) && write(io, take!(pb))
+        next!(pmeter)
+    end
+    write(io, take!(pb))
+
+    # close & return
+    close(io); close(pb)
+    return nothing
 end
 
+"""
+Helper function for saving a record (SNP), not tracking phase information.
+"""
+function write_snp!(pb::IOBuffer, X::AbstractVector)
+    n = length(X)
+    for j in 1:n
+        if X[j] == 0
+            print(pb, "\t0/0")
+        elseif X[j] == 1
+            print(pb, "\t1/0")
+        elseif X[j] == 2
+            print(pb, "\t1/1")
+        else
+            error("imputed genotypes can only be 0, 1, 2 but got $(X[j])")
+        end
+    end
+    print(pb, "\n")
+    nothing
+end
+
+"""
+Helper function for saving a record (SNP), tracking phase information.
+"""
+function write_snp!(pb::IOBuffer, X1::AbstractVector, X2::AbstractVector)
+    n = length(X1)
+    @assert n == length(X2)
+    for j in 1:n
+        if X1[j] == X2[j] == 0
+            print(pb, "\t0|0")
+        elseif X1[j] == 0 && X2[j] == 1
+            print(pb, "\t0|1")
+        elseif X1[j] == 1 && X2[j] == 0
+            print(pb, "\t1|0")
+        elseif X1[j] == 1 && X2[j] == 1
+            print(pb, "\t1|1")
+        else
+            error("phased genotypes can only be 0|0, 0|1, 1|0 or 1|1 but
+                got $(X1[j])|$(X2[j])")
+        end
+    end
+    print(pb, "\n")
+    nothing
+end
+
+"""
+    impute!(X, H, phase)
+
+Imputes `X = X1 + X2` completely using haplotype segments of `H`, where segments
+information are stored in `phase`. `X1` is strand1 and `X2` is strand 2.
+
+Non-missing entries in `X` can be different after imputation.
+"""
 function impute!(
-    X::AbstractMatrix,
+    X1::AbstractMatrix,
+    X2::AbstractMatrix,
     compressed_Hunique::CompressedHaplotypes,
     phase::Vector{HaplotypeMosaicPair}
     )
+
     width = compressed_Hunique.width
-    fill!(X, 0)
+    fill!(X1, 0)
+    fill!(X2, 0)
 
     # loop over individuals
-    for i in 1:size(X, 2)
+    for i in 1:size(X1, 2)
         # strand 1
         for s in 1:(length(phase[i].strand1.start) - 1)
             X_idx = phase[i].strand1.start[s]:(phase[i].strand1.start[s + 1] - 1)
@@ -113,7 +183,7 @@ function impute!(
             H = compressed_Hunique.CW[w].uniqueH
             H_start = abs(phase[i].strand1.start[s] - (w - 1) * width)
             H_idx = H_start:(H_start + length(X_idx) - 1)
-            X[X_idx, i] = H[H_idx, phase[i].strand1.haplotypelabel[s]]
+            X1[X_idx, i] = H[H_idx, phase[i].strand1.haplotypelabel[s]]
             # if i == 387 && 530 in X_idx
             #     println(X[530, i])
             #     println("hi")
@@ -124,7 +194,7 @@ function impute!(
         H_start = abs(phase[i].strand1.start[end] - (w - 1) * width)
         H_idx = H_start:(H_start + length(X_idx) - 1)
         H = compressed_Hunique.CW[w].uniqueH
-        X[X_idx, i] = H[H_idx, phase[i].strand1.haplotypelabel[end]]
+        X1[X_idx, i] = H[H_idx, phase[i].strand1.haplotypelabel[end]]
         # if i == 387 && 530 in X_idx
         #     println(X[530, i])
         #     println("hii")
@@ -137,23 +207,23 @@ function impute!(
             H = compressed_Hunique.CW[w].uniqueH
             H_start = abs(phase[i].strand2.start[s] - (w - 1) * width)
             H_idx = H_start:(H_start + length(X_idx) - 1)
-            X[X_idx, i] += H[H_idx, phase[i].strand2.haplotypelabel[s]]
+            X2[X_idx, i] = H[H_idx, phase[i].strand2.haplotypelabel[s]]
             # if i == 387 && 530 in X_idx
             #     println(X[530, i])
             #     println("hiii")
             # end
-            i == 387 && println("X_idx = $X_idx")
+            # i == 387 && println("X_idx = $X_idx")
         end
         X_idx = phase[i].strand2.start[end]:phase[i].strand2.length
         w = phase[i].strand2.window[end]
         H = compressed_Hunique.CW[w].uniqueH
         H_start = abs(phase[i].strand2.start[end] - (w - 1) * width)
         H_idx = H_start:(H_start + length(X_idx) - 1)
-        X[X_idx, i] += H[H_idx, phase[i].strand2.haplotypelabel[end]]
-        if i == 387 && 530 in X_idx
-            println(X[530, i])
-            fdsa
-        end
+        X2[X_idx, i] = H[H_idx, phase[i].strand2.haplotypelabel[end]]
+        # if i == 387 && 530 in X_idx
+        #     println(X[530, i])
+        #     fdsa
+        # end
     end
 end
 
