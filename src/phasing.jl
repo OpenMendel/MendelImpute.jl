@@ -32,9 +32,6 @@ function phase(
     if dynamic_programming
         error("Currently dynamic programming routine is broken! Sorry!")
     end
-    if rescreen
-        error("Currently rescreen routine is broken! Sorry!")
-    end
 
     # import reference data
     println("Importing reference haplotype data..."); flush(stdout)
@@ -120,15 +117,15 @@ function phase(
         calculate_happairs_time += time() - calculate_happairs_start
 
         # check whether flanking windows give better prediction
-        screen_flanking_windows!(redundant_haplotypes, compressed_Hunique, X,
-            w_start:w_end, tot_windows)
-
-        # expand to redundant haplotypes
-        find_redundant_haplotypes!(redundant_haplotypes, compressed_Hunique,
-            w_start:w_end)
+        # screen_flanking_windows!(redundant_haplotypes, compressed_Hunique, X,
+        #     w_start:w_end, tot_windows)
+        #
+        # # expand to redundant haplotypes
+        # find_redundant_haplotypes!(redundant_haplotypes, compressed_Hunique,
+        #     w_start:w_end)
 
         #
-        # phasing (haplotyping) step + breakpoint search
+        # phasing (haplotyping) + breakpoint search
         #
         phase_start = time()
         if dynamic_programming

@@ -1,9 +1,9 @@
 """
     impute!(X, compressed_haplotypes, phaseinfo, outfile, X_sampleID)
 
-Imputes `X` using `phaseinfo` and outputs result in `outfile`. All genotypes 
+Imputes `X` using `phaseinfo` and outputs result in `outfile`. All genotypes
 in `outfile` are non-missing. If `XtoH_idx == nothing`, all SNPs in reference
-file will be imputed. 
+file will be imputed.
 """
 function impute!(
     X::AbstractMatrix,
@@ -42,7 +42,7 @@ function impute!(
     @inbounds for i in 1:size(X, 1)
         # write meta info (chrom/pos/id/ref/alt)
         print(pb, chr[i], "\t", string(pos[i]), "\t", ids[i][1], "\t", ref[i], "\t", alt[i][1], "\t.\tPASS\t.\tGT")
-        
+
         for j in 1:size(X, 2)
             if X[i, j] == 0
                 print(pb, "\t0/0")
@@ -68,7 +68,7 @@ end
 """
     impute!(X, H, phase)
 
-Imputes `X` completely using segments of haplotypes `H` where segments are stored in `phase`. 
+Imputes `X` completely using segments of haplotypes `H` where segments are stored in `phase`.
 Non-missing entries in `X` can be different after imputation. Preserves phase information.
 """
 function impute!(
@@ -95,12 +95,40 @@ function impute!(
     end
 end
 
+function impute!(
+    X::AbstractMatrix,
+    compressed_Hunique::CompressedHaplotypes,
+    phase::Vector{HaplotypeMosaicPair}
+    )
+
+    fill!(X, 0)
+    # loop over individuals
+    for i in 1:size(X, 2)
+        for s in 1:(length(phase[i].strand1.start) - 1)
+            idx = phase[i].strand1.start[s]:(phase[i].strand1.start[s + 1] - 1)
+            H = compressed_Hunique.CW[s].uniqueH
+            X[idx, i] = H[idx, phase[i].strand1.haplotypelabel[s]]
+        end
+        idx = phase[i].strand1.start[end]:phase[i].strand1.length
+        # H = compressed_Hunique.CW[end].uniqueH
+        X[idx, i] = H[idx, phase[i].strand1.haplotypelabel[end]]
+        for s in 1:(length(phase[i].strand2.start) - 1)
+            idx = phase[i].strand2.start[s]:(phase[i].strand2.start[s + 1] - 1)
+            H = compressed_Hunique.CW[s].uniqueH
+            X[idx, i] += H[idx, phase[i].strand2.haplotypelabel[s]]
+        end
+        idx = phase[i].strand2.start[end]:phase[i].strand2.length
+        # H = compressed_Hunique.CW[end].uniqueH
+        X[idx, i] += H[idx, phase[i].strand2.haplotypelabel[end]]
+    end
+end
+
 """
     impute_discard_phase!(X, H, phase)
 
-Imputes missing entries of `X` using corresponding haplotypes `H` via `phase` information. 
-Non-missing entries in `X` will not change, but X and H has to be aligned. This does NOT 
-preserve phase information. 
+Imputes missing entries of `X` using corresponding haplotypes `H` via `phase` information.
+Non-missing entries in `X` will not change, but X and H has to be aligned. This does NOT
+preserve phase information.
 """
 function impute_discard_phase!(
     X::AbstractMatrix,
@@ -138,13 +166,13 @@ end
 
 """
     update_marker_position!(phaseinfo, tgtfile, reffile)
-Converts `phaseinfo`'s strand1 and strand2's starting position in 
+Converts `phaseinfo`'s strand1 and strand2's starting position in
 terms of matrix rows of `X` to starting position in terms matrix
-rows in `H`. 
+rows in `H`.
 """
 function update_marker_position!(
     phaseinfo::Vector{HaplotypeMosaicPair},
-    XtoH_idx::AbstractVector, 
+    XtoH_idx::AbstractVector,
     )
     people = length(phaseinfo)
 

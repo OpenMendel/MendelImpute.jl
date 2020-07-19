@@ -59,7 +59,7 @@ function haplochunk!(
         redunhaps_bitvec2 = [falses(tothaps) for _ in 1:threads]
     end
 
-    ThreadPools.@qthreads for absolute_w in winrange
+    for absolute_w in winrange
         Hw_aligned = compressed_Hunique.CW_typed[absolute_w].uniqueH
         Xw_idx_start = (absolute_w - 1) * width + 1
         Xw_idx_end = (absolute_w == total_window ? length(X_pos) : absolute_w * width)
@@ -101,7 +101,9 @@ function haplochunk!(
                 M=M[id], Xwork=Xwork[id])
         elseif rescreen
             # global search to find many (hi, hj) pairs, then reminimize ||x - hi - hj|| on observed entries
-            happairs, hapscore, t1, t2, t3, t4 = haplopair_screen(Xw_aligned, Hw_aligned)
+            t1, t2, t3, t4 = haplopair_screen!(Xw_aligned, Hw_aligned,
+                happair1=happair1[id], happair2=happair2[id], hapscore=hapscore[id],
+                Xwork=Xwork[id])
         else
             # global search
             t1, t2, t3, t4 = haplopair!(Xw_aligned, Hw_aligned, happair1=happair1[id],
@@ -111,13 +113,13 @@ function haplochunk!(
         # convert happairs (which index off unique haplotypes) to indices of full haplotype pool, and find all matching happairs
         t5 = @elapsed begin
             w = something(findfirst(x -> x == absolute_w, winrange)) # window index of current chunk
-            # compute_redundant_haplotypes!(redundant_haplotypes, compressed_Hunique,
-            #     happair1[id], happair2[id], w, absolute_w, redunhaps_bitvec1[id],
-            #     redunhaps_bitvec2[id])
-
-            save_unique_only!(redundant_haplotypes, compressed_Hunique,
+            compute_redundant_haplotypes!(redundant_haplotypes, compressed_Hunique,
                 happair1[id], happair2[id], w, absolute_w, redunhaps_bitvec1[id],
                 redunhaps_bitvec2[id])
+
+            # save_unique_only!(redundant_haplotypes, compressed_Hunique,
+            #     happair1[id], happair2[id], w, absolute_w, redunhaps_bitvec1[id],
+            #     redunhaps_bitvec2[id])
         end
 
         # record timings and haplotypes
@@ -355,19 +357,6 @@ function screen_flanking_windows!(
     end
 
     return nothing
-end
-
-function observed_error(X, col, H, h1, h2)
-    p = size(X, 1)
-    @assert p == size(H, 1)
-    T = promote_type(eltype(X), eltype(H))
-    err = zero(T)
-    @inbounds for i in 1:p
-        if X[i, col] !== missing
-            err += abs2(X[i, col] - H[i, h1] - H[i, h2])
-        end
-    end
-    return err :: T
 end
 
 # uses dynamic programming. Only the first 1000 haplotype pairs will be saved.
