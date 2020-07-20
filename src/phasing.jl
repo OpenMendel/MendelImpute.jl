@@ -34,6 +34,9 @@ function phase(
     if dynamic_programming
         error("Currently dynamic programming routine is broken! Sorry!")
     end
+    if !impute
+        error("Currently one cannot impute only typed SNPs! Sorry!")
+    end
 
     # import reference data
     println("Importing reference haplotype data..."); flush(stdout)
@@ -112,7 +115,7 @@ function phase(
         # println("chunk = $chunk, windows = $windows, start window = $w_start, end window = $w_end")
 
         pmeter = Progress(windows, 5, "Phasing chunk $chunk/$chunks...")
-        # find happairs for each window in current chunk
+        # find best happairs for each window in current chunk
         haplochunk!(redundant_haplotypes, compressed_Hunique, X, X_pos,
             dynamic_programming, lasso, thinning_factor, scale_allelefreq,
             max_haplotypes, rescreen, w_start:w_end, tot_windows, pmeter, haptimers)
@@ -153,14 +156,14 @@ function phase(
 
             # impute and write to file
             impute!(X1, X2, compressed_Hunique, ph)
-            write(outfile, X1, X2, compressed_Hunique, ph, X_sampleID)
+            write(outfile, X1, X2, compressed_Hunique, X_sampleID)
         else # output genotypes all unphased
             X_full = Matrix{Union{Missing, UInt8}}(missing, ref_snps, people)
             copyto!(@view(X_full[XtoH_idx, :]), X) # keep known entries
 
             # impute and write to file
             impute_discard_phase!(X_full, compressed_Hunique, ph)
-            write(outfile, X_full, compressed_Hunique, ph, X_sampleID)
+            write(outfile, X_full, compressed_Hunique, X_sampleID)
         end
     else # impute only missing entries in typed SNPs
         if phase
@@ -169,10 +172,10 @@ function phase(
 
             # impute and write to file
             impute!(X1, X2, compressed_Hunique, ph)
-            write(outfile, X1, X2, compressed_Hunique, ph, X_sampleID)
+            write(outfile, X1, X2, compressed_Hunique, X_sampleID, XtoH_idx)
         else
             impute_discard_phase!(X, compressed_Hunique, ph)
-            write(outfile, X, compressed_Hunique, ph, X_sampleID)
+            write(outfile, X, compressed_Hunique, X_sampleID, XtoH_idx)
         end
     end
     impute_time = time() - impute_start

@@ -10,10 +10,8 @@ function Base.write(
     outfile::AbstractString,
     X::AbstractMatrix,
     compressed_haplotypes::CompressedHaplotypes,
-    phaseinfo::Vector{HaplotypeMosaicPair},
-    X_sampleID::AbstractVector;
+    X_sampleID::AbstractVector,
     XtoH_idx::Union{Nothing, AbstractVector} = nothing,
-    phase::Bool = false
     )
     # retrieve reference file information
     chr = (isnothing(XtoH_idx) ? compressed_haplotypes.chr : compressed_haplotypes.chr[XtoH_idx])
@@ -39,7 +37,7 @@ function Base.write(
 
     pmeter = Progress(size(X, 1), 5, "Writing to file...")
     @inbounds for i in 1:size(X, 1)
-        # write meta info (chrom/pos/id/ref/alt)
+        # write meta info (chrom/pos/snpid/ref/alt)
         print(pb, chr[i], "\t", string(pos[i]), "\t", ids[i][1], "\t", ref[i],
             "\t", alt[i][1], "\t.\tPASS\t.\tGT")
 
@@ -66,10 +64,8 @@ function Base.write(
     X1::AbstractMatrix,
     X2::AbstractMatrix,
     compressed_haplotypes::CompressedHaplotypes,
-    phaseinfo::Vector{HaplotypeMosaicPair},
     X_sampleID::AbstractVector;
     XtoH_idx::Union{Nothing, AbstractVector} = nothing,
-    phase::Bool = false
     )
     # retrieve reference file information
     chr = (isnothing(XtoH_idx) ? compressed_haplotypes.chr : compressed_haplotypes.chr[XtoH_idx])
@@ -94,17 +90,13 @@ function Base.write(
     (bytesavailable(pb) > (16*1024)) && write(io, take!(pb))
 
     pmeter = Progress(size(X1, 1), 5, "Writing to file...")
-    X1i = zeros(size(X1, 2))
-    X2i = zeros(size(X2, 2))
     @inbounds for i in 1:size(X1, 1)
         # write meta info (chrom/pos/id/ref/alt)
         print(pb, chr[i], "\t", string(pos[i]), "\t", ids[i][1], "\t", ref[i],
             "\t", alt[i][1], "\t.\tPASS\t.\tGT")
 
         # print ith record
-        copyto!(X1i, @view(X1[i, :]))
-        copyto!(X2i, @view(X2[i, :]))
-        write_snp!(pb, X1i, X2i)
+        write_snp!(pb, @view(X1[i, :]), @view(X2[i, :]))
 
         (bytesavailable(pb) > (16*1024)) && write(io, take!(pb))
         next!(pmeter)
@@ -121,7 +113,7 @@ Helper function for saving a record (SNP), not tracking phase information.
 """
 function write_snp!(pb::IOBuffer, X::AbstractVector)
     n = length(X)
-    for j in 1:n
+    @inbounds for j in 1:n
         if X[j] == 0
             print(pb, "\t0/0")
         elseif X[j] == 1
@@ -142,7 +134,7 @@ Helper function for saving a record (SNP), tracking phase information.
 function write_snp!(pb::IOBuffer, X1::AbstractVector, X2::AbstractVector)
     n = length(X1)
     @assert n == length(X2)
-    for j in 1:n
+    @inbounds for j in 1:n
         if X1[j] == X2[j] == 0
             print(pb, "\t0|0")
         elseif X1[j] == 0 && X2[j] == 1
@@ -188,7 +180,6 @@ function impute!(
             H = compressed_Hunique.CW[w].uniqueH
             H_start = abs(phase[i].strand1.start[s] - compressed_Hunique.start[w]) + 1
             H_idx = H_start:(H_start + length(X_idx) - 1)
-            # i == 10 && println("X_idx = $X_idx, H_idx = $H_idx")
             X1[X_idx, i] = H[H_idx, phase[i].strand1.haplotypelabel[s]]
         end
         w = phase[i].strand1.window[end]
