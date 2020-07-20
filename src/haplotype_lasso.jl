@@ -1,5 +1,5 @@
 ######## THIS FILE IS THE SAME AS `haplotype_pair.jl`
-######## except it solves the least squares objective using a 
+######## except it solves the least squares objective using a
 ######## heuristic stepwise search
 
 function haplopair_lasso!(
@@ -8,7 +8,7 @@ function haplopair_lasso!(
     inv_sqrt_allele_var::Union{AbstractVector, Nothing} = nothing,
     r::Int = 1,
     # preallocated vectors
-    happair1::AbstractVector          = ones(Int, size(X, 2)),              # length n 
+    happair1::AbstractVector          = ones(Int, size(X, 2)),              # length n
     happair2::AbstractVector          = ones(Int, size(X, 2)),              # length n
     hapscore::AbstractVector          = Vector{Float32}(undef, size(X, 2)), # length n
     maxindx ::AbstractVector{Int}     = Vector{Int}(undef, r),              # length r
@@ -19,13 +19,13 @@ function haplopair_lasso!(
     M     :: AbstractMatrix{Float32} = Matrix{Float32}(undef, size(H, 2), size(H, 2)), # cannot be preallocated until Julia 2.0
     Nt    :: AbstractMatrix{Float32} = Matrix{Float32}(undef, size(H, 2), size(X, 2)), # d × n (not preallocated)
     )
-    
+
     p, n  = size(X)
     d     = size(H, 2)
 
     # global search
     if r > d
-        return haplopair!(Xw_aligned, Hw_aligned, happair1=happair1, 
+        return haplopair!(Xw_aligned, Hw_aligned, happair1=happair1,
             happair2=happair2, hapscore=hapscore, Xwork=Xwork, Hwork=Hwork, M=M)
     end
 
@@ -37,18 +37,10 @@ function haplopair_lasso!(
     # initialize missing data
     initXfloat!(Xwork, X)
 
-    # assemble N
-    t2 = @elapsed begin
-        mul!(Nt, Transpose(Hwork), Xwork)
-        @simd for I in eachindex(Nt)
-            Nt[I] *= 2
-        end
-    end
-
     # assemble M (symmetric)
-    t2 += @elapsed begin
+    t2 = @elapsed begin
         if !isnothing(inv_sqrt_allele_var)
-            Hwork .*= inv_sqrt_allele_var # weight by frequency
+            Hwork .*= inv_sqrt_allele_var # wᵢ = 1/√2p(1-p)
         end
         mul!(M, Transpose(Hwork), Hwork)
         for j in 1:d, i in 1:(j - 1) # off-diagonal
@@ -58,13 +50,22 @@ function haplopair_lasso!(
             M[j, j] *= 4
         end
         LinearAlgebra.copytri!(M, 'U')
+
+        # assemble N
+        if !isnothing(inv_sqrt_allele_var)
+            Hwork .*= inv_sqrt_allele_var # wᵢ = 1/2p(1-p)
+        end
+        mul!(Nt, Transpose(Hwork), Xwork)
+        @simd for I in eachindex(Nt)
+            Nt[I] *= 2
+        end
     end
 
     # computational routine
     t3 = @elapsed begin
         if r == 1
             haplopair_stepwise!(happair1, happair2, hapscore, M, Nt)
-        else 
+        else
             haplopair_topr!(happair1, happair2, hapscore, M, Nt, r, maxindx, maxgrad)
         end
     end
@@ -81,7 +82,7 @@ function haplopair_lasso!(
     t1 = t4 = 0.0 # no haplotype rescreening or computing dist(X, H)
 
     return t1, t2, t3, t4
-end 
+end
 
 function haplopair_stepwise!(
     happair1 :: AbstractVector{<:Integer},
@@ -119,14 +120,14 @@ end
 """
     findtopr!(A, col, maxval, index)
 
-Find the largest `length(index)` elements of column `A[:, col]`. `val` is 
+Find the largest `length(index)` elements of column `A[:, col]`. `val` is
 filled with the found largest `r` elements in sorted order and `idx` is filled
-with their corresponding indices. 
+with their corresponding indices.
 """
 @inline function findtopr!(
-    A      :: AbstractMatrix{T}, 
+    A      :: AbstractMatrix{T},
     col    :: Integer,
-    maxval :: AbstractVector{T}, 
+    maxval :: AbstractVector{T},
     index  :: AbstractVector{<:Integer}
     ) where T <: Real
     fill!(maxval, typemin(T))

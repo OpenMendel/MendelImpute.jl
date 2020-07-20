@@ -34,6 +34,7 @@ function haplochunk!(
     threads = Threads.nthreads()
     tothaps = nhaplotypes(compressed_Hunique)
     avghaps = avg_haplotypes_per_window(compressed_Hunique)
+    inv_sqrt_allele_var = nothing
 
     # working arrys
     happair1 = [ones(Int32, people)           for _ in 1:threads]
@@ -59,7 +60,7 @@ function haplochunk!(
         redunhaps_bitvec2 = [falses(tothaps) for _ in 1:threads]
     end
 
-    ThreadPools.@qthreads for absolute_w in winrange
+    for absolute_w in winrange
         Hw_aligned = compressed_Hunique.CW_typed[absolute_w].uniqueH
         Xw_idx_start = (absolute_w - 1) * width + 1
         Xw_idx_end = (absolute_w == total_window ? length(X_pos) : absolute_w * width)
@@ -67,46 +68,39 @@ function haplochunk!(
         d  = size(Hw_aligned, 2)
         id = Threads.threadid()
 
-        # computational routine
+        # weight snp by inverse allele variance if requested
+        if scale_allelefreq
+            Hw_range = compressed_Hunique.start[absolute_w]:(absolute_w == total_window ?
+                ref_snps : compressed_Hunique.start[absolute_w + 1] - 1)
+            Hw_snp_pos = indexin(X_pos[Xw_idx_start:Xw_idx_end], compressed_Hunique.pos[Hw_range])
+            inv_sqrt_allele_var = compressed_Hunique.altfreq[Hw_snp_pos]
+            map!(x -> x < 0.15 ? 1.98 : 1 / sqrt(2*x*(1-x)),
+                inv_sqrt_allele_var, inv_sqrt_allele_var) # set min pᵢ = 0.005
+        end
+
+        # compute top haplotype pairs for each sample in current window
         if !isnothing(lasso) && d > max_haplotypes
-            # weight snp by inverse allele variance if requested
-            inv_sqrt_allele_var = nothing
-            if scale_allelefreq
-                Hw_range = compressed_Hunique.start[absolute_w]:(absolute_w == total_window ?
-                    ref_snps : compressed_Hunique.start[absolute_w + 1] - 1)
-                Hw_snp_pos = indexin(X_pos[Xw_idx_start:Xw_idx_end], compressed_Hunique.pos[Hw_range])
-                inv_sqrt_allele_var = compressed_Hunique.altfreq[Hw_snp_pos]
-                map!(x -> x < 3 ? 1 : 1 / sqrt(2*x*(1-x)), inv_sqrt_allele_var, inv_sqrt_allele_var) # scale by 1/2p(1-p)
-            end
+            # find hᵢ via stepwise regression, then find hⱼ via global search
             t1, t2, t3, t4 = haplopair_lasso!(Xw_aligned, Hw_aligned, r=lasso,
                 inv_sqrt_allele_var=inv_sqrt_allele_var, happair1=happair1[id],
                 happair2=happair2[id], hapscore=hapscore[id], maxindx=maxindx[id],
                 maxgrad=maxgrad[id], Xwork=Xwork[id])
         elseif !isnothing(thinning_factor) && d > max_haplotypes
-            # weight snp by frequecy if requested
-            alt_allele_freq = nothing
-            if scale_allelefreq
-                Hw_range = compressed_Hunique.start[absolute_w]:(absolute_w == total_window ?
-                    ref_snps : compressed_Hunique.start[absolute_w + 1] - 1)
-                Hw_snp_pos = indexin(X_pos[Xw_idx_start:Xw_idx_end], compressed_Hunique.pos[Hw_range])
-                alt_allele_freq = compressed_Hunique.altfreq[Hw_snp_pos]
-                map!(x -> x < 0.5 ? 1 - x : x, alt_allele_freq, alt_allele_freq) # scale by 1 - p
-                # map!(x -> 1 / sqrt(2*x*(1-x)), alt_allele_freq, alt_allele_freq) # scale by 1/√2x(1-x) (need a routine to check for division by 0)
-            end
-            # run haplotype thinning (i.e. search all (hi, hj) pairs where hi, hj ≈ x)
+            # haplotype thinning: search all (hᵢ, hⱼ) pairs where hᵢ ≈ x ≈ hⱼ
             t1, t2, t3, t4 = haplopair_thin_BLAS2!(Xw_aligned, Hw_aligned,
-                allele_freq=alt_allele_freq, keep=thinning_factor,
+                allele_freq=inv_sqrt_allele_var, keep=thinning_factor,
                 happair1=happair1[id], happair2=happair2[id], hapscore=hapscore[id],
                 maxindx=maxindx[id], maxgrad=maxgrad[id], Xi=Xi[id], N=N[id], Hk=Hk[id],
                 M=M[id], Xwork=Xwork[id])
         elseif rescreen
-            # global search to find many (hi, hj) pairs, then reminimize ||x - hi - hj|| on observed entries
+            # finds many (hᵢ, hⱼ) pairs via global search, then re-minimize ||x - hᵢ - hⱼ|| on observed entries
             t1, t2, t3, t4 = haplopair_screen!(Xw_aligned, Hw_aligned,
                 happair1=happair1[id], happair2=happair2[id], hapscore=hapscore[id],
                 Xwork=Xwork[id])
         else
             # global search
-            t1, t2, t3, t4 = haplopair!(Xw_aligned, Hw_aligned, happair1=happair1[id],
+            t1, t2, t3, t4 = haplopair!(Xw_aligned, Hw_aligned,
+                inv_sqrt_allele_var=inv_sqrt_allele_var, happair1=happair1[id],
                 happair2=happair2[id], hapscore=hapscore[id], Xwork=Xwork[id])
         end
 
@@ -413,9 +407,10 @@ function haplopair!(
     X::AbstractMatrix, # p × n
     H::AbstractMatrix; # p × d
     # preallocated vectors
-    happair1::AbstractVector = ones(Int, size(X, 2)),      # length n
-    happair2::AbstractVector = ones(Int, size(X, 2)),      # length n
+    happair1::AbstractVector = ones(Int, size(X, 2)), # length n
+    happair2::AbstractVector = ones(Int, size(X, 2)), # length n
     hapscore::AbstractVector = Vector{Float32}(undef, size(X, 2)), # length n
+    inv_sqrt_allele_var::Union{Nothing, AbstractVector} = nothing, # length p
     # preallocated matrices
     M     :: AbstractMatrix{Float32} = Matrix{Float32}(undef, size(H, 2), size(H, 2)), # cannot be preallocated until Julia 2.0
     Xwork :: AbstractMatrix{Float32} = Matrix{Float32}(undef, size(X, 1), size(X, 2)), # p × n
@@ -441,7 +436,8 @@ function haplopair!(
     # initializes missing
     initXfloat!(Xwork, X)
 
-    t2, t3 = haplopair!(Xwork, Hwork, M, N, happair1, happair2, hapscore)
+    t2, t3 = haplopair!(Xwork, Hwork, M, N, happair1, happair2, hapscore,
+        inv_sqrt_allele_var)
     t1 = t4 = 0.0 # no time spent on haplotype thinning or rescreening
 
     return t1, t2, t3, t4
@@ -471,13 +467,17 @@ function haplopair!(
     N::AbstractMatrix{Float32},
     happair1::AbstractVector{Int32},
     happair2::AbstractVector{Int32},
-    hapscore::AbstractVector{Float32}
+    hapscore::AbstractVector{Float32},
+    inv_sqrt_allele_var::Union{Nothing, AbstractVector}
     )
 
     p, n, d = size(X, 1), size(X, 2), size(H, 2)
 
     # assemble M (upper triangular only)
     t2 = @elapsed begin
+        if !isnothing(inv_sqrt_allele_var)
+            H .*= inv_sqrt_allele_var # wᵢ = 1/√2p(1-p)
+        end
         mul!(M, Transpose(H), H)
         for j in 1:d, i in 1:(j - 1) # off-diagonal
             M[i, j] = 2M[i, j] + M[i, i] + M[j, j]
@@ -487,6 +487,9 @@ function haplopair!(
         end
 
         # assemble N
+        if !isnothing(inv_sqrt_allele_var)
+            H .*= inv_sqrt_allele_var # wᵢ = 1/2p(1-p)
+        end
         mul!(N, Transpose(X), H)
         @simd for I in eachindex(N)
             N[I] *= 2
