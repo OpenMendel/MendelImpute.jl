@@ -492,7 +492,7 @@ function phase_fast!(
     # first  1/3: ((w - 2) * width + 1):((w - 1) * width)
     # middle 1/3: ((w - 1) * width + 1):(      w * width)
     # last   1/3: (      w * width + 1):((w + 1) * width)
-    for i in 1:people
+    ThreadPools.@qthreads for i in 1:people
         id = Threads.threadid()
 
         # window 1
