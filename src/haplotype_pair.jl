@@ -18,7 +18,7 @@ function haplochunk!(
     X_pos::AbstractVector,
     dynamic_programming::Bool,
     lasso::Union{Nothing, Int},
-    thinning_factor::Union{Nothing, Int},
+    tf::Union{Nothing, Int}, # thinning factor
     scale_allelefreq::Bool,
     max_haplotypes::Int,
     rescreen::Bool,
@@ -36,20 +36,22 @@ function haplochunk!(
     avghaps = avg_haplotypes_per_window(compressed_Hunique)
     inv_sqrt_allele_var = nothing
 
-    # working arrys
+    # return arrays
+    haplotype1 = [zeros(Int, windows) for i in 1:people]
+    haplotype2 = [zeros(Int, windows) for i in 1:people]
+
+    # working arrays
     happair1 = [ones(Int32, people)           for _ in 1:threads]
     happair2 = [ones(Int32, people)           for _ in 1:threads]
     hapscore = [zeros(Float32, size(X, 2))    for _ in 1:threads]
     Xwork    = [zeros(Float32, width, people) for _ in 1:threads]
-    # N        = [ElasticArray{Float32}(undef, people, avghaps) for _ in 1:threads]
-    # Hwork    = [ElasticArray{Float32}(undef, width, avghaps)  for _ in 1:threads]
-    if !isnothing(thinning_factor)
-        maxindx = [zeros(Int, thinning_factor)                 for _ in 1:threads]
-        maxgrad = [zeros(Float32, thinning_factor)             for _ in 1:threads]
-        Hk = [zeros(Float32, width, thinning_factor)           for _ in 1:threads]
-        Xi = [zeros(Float32, width)                            for _ in 1:threads]
-        M  = [zeros(Float32, thinning_factor, thinning_factor) for _ in 1:threads]
-        N  = [zeros(Float32, thinning_factor)                  for _ in 1:threads]
+    if !isnothing(tf)
+        maxindx = [zeros(Int, tf)       for _ in 1:threads]
+        maxgrad = [zeros(Float32, tf)   for _ in 1:threads]
+        Hk = [zeros(Float32, width, tf) for _ in 1:threads]
+        Xi = [zeros(Float32, width)     for _ in 1:threads]
+        M  = [zeros(Float32, tf, tf)    for _ in 1:threads]
+        N  = [zeros(Float32, tf)        for _ in 1:threads]
     end
     if !isnothing(lasso)
         maxindx = [zeros(Int,     lasso) for _ in 1:threads]
@@ -75,7 +77,7 @@ function haplochunk!(
             Hw_snp_pos = indexin(X_pos[Xw_idx_start:Xw_idx_end], compressed_Hunique.pos[Hw_range])
             inv_sqrt_allele_var = compressed_Hunique.altfreq[Hw_snp_pos]
             map!(x -> x < 0.15 ? 1.98 : 1 / sqrt(2*x*(1-x)),
-                inv_sqrt_allele_var, inv_sqrt_allele_var) # set min pᵢ = 0.005
+                inv_sqrt_allele_var, inv_sqrt_allele_var) # set min pᵢ = 0.15
         end
 
         # compute top haplotype pairs for each sample in current window
@@ -85,10 +87,10 @@ function haplochunk!(
                 inv_sqrt_allele_var=inv_sqrt_allele_var, happair1=happair1[id],
                 happair2=happair2[id], hapscore=hapscore[id], maxindx=maxindx[id],
                 maxgrad=maxgrad[id], Xwork=Xwork[id])
-        elseif !isnothing(thinning_factor) && d > max_haplotypes
+        elseif !isnothing(tf) && d > max_haplotypes
             # haplotype thinning: search all (hᵢ, hⱼ) pairs where hᵢ ≈ x ≈ hⱼ
             t1, t2, t3, t4 = haplopair_thin_BLAS2!(Xw_aligned, Hw_aligned,
-                allele_freq=inv_sqrt_allele_var, keep=thinning_factor,
+                allele_freq=inv_sqrt_allele_var, keep=tf,
                 happair1=happair1[id], happair2=happair2[id], hapscore=hapscore[id],
                 maxindx=maxindx[id], maxgrad=maxgrad[id], Xi=Xi[id], N=N[id], Hk=Hk[id],
                 M=M[id], Xwork=Xwork[id])
