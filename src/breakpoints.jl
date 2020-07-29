@@ -1,7 +1,7 @@
 """
-`X` is a genotype vector spanning 2 windows. Haplotype pair for first window is 
-`happair_prev`, the next 2 haplotype pair is `happair_next`. This function searches 
-the breakpoint between them.
+`X` is a genotype vector spanning 2 windows. Haplotype pair for first window is
+`happair_prev`, the next 2 haplotype pair is `happair_next`. This function
+searches the breakpoint between them.
 """
 function continue_haplotype(
     X::AbstractVector,

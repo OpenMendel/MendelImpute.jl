@@ -12,7 +12,8 @@ t4 = rescreen time
 t5 = finding redundant happairs
 """
 function haplochunk!(
-    redundant_haplotypes::AbstractVector,
+    haplotype1::AbstractVector,
+    haplotype2::AbstractVector,
     compressed_Hunique::CompressedHaplotypes,
     X::AbstractMatrix,
     X_pos::AbstractVector,
@@ -23,8 +24,6 @@ function haplochunk!(
     max_haplotypes::Int,
     rescreen::Bool,
     winrange::UnitRange,
-    total_window::Int,
-    pmeter::Progress,
     timers::AbstractVector
     )
     people = size(X, 2)
@@ -35,10 +34,6 @@ function haplochunk!(
     tothaps = nhaplotypes(compressed_Hunique)
     avghaps = avg_haplotypes_per_window(compressed_Hunique)
     inv_sqrt_allele_var = nothing
-
-    # return arrays
-    haplotype1 = [zeros(Int32, windows) for i in 1:people]
-    haplotype2 = [zeros(Int32, windows) for i in 1:people]
 
     # working arrays
     happair1 = [ones(Int32, people)           for _ in 1:threads]
@@ -62,10 +57,11 @@ function haplochunk!(
         redunhaps_bitvec2 = [falses(tothaps) for _ in 1:threads]
     end
 
+    pmeter = Progress(windows, 5, "Computing optimal haplotypes...")
     ThreadPools.@qthreads for absolute_w in winrange
         Hw_aligned = compressed_Hunique.CW_typed[absolute_w].uniqueH
         Xw_idx_start = (absolute_w - 1) * width + 1
-        Xw_idx_end = (absolute_w == total_window ? length(X_pos) :
+        Xw_idx_end = (absolute_w == windows ? length(X_pos) :
             absolute_w * width)
         Xw_aligned = view(X, Xw_idx_start:Xw_idx_end, :)
         d  = size(Hw_aligned, 2)
@@ -129,12 +125,12 @@ function haplochunk!(
             end
         end
 
-        # record timings and haplotypes
-        timers[id][1] += t1
-        timers[id][2] += t2
-        timers[id][3] += t3
-        timers[id][4] += t4
-        timers[id][5] += t5
+        # record timings and haplotypes (× 8 to avoid false sharing)
+        timers[id][1*8] += t1
+        timers[id][2*8] += t2
+        timers[id][3*8] += t3
+        timers[id][4*8] += t4
+        timers[id][5*8] += t5
 
         # update progress
         next!(pmeter)

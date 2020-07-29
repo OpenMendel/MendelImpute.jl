@@ -25,7 +25,7 @@ function phase_sample!(
 
     windows = length(happair1)
     windows == length(happair2) || error("happair1 and happair2" *
-        "have different length.")
+        " have different lengths.")
     haplotypes = nhaplotypes(compressed_Hunique)
     lifespan1 = lifespan2 = 1 # counter to track survival time
 
@@ -35,7 +35,7 @@ function phase_sample!(
     store!(survivors1, get(compressed_Hunique.CW_typed[1].hapmap, h1, h1))
     store!(survivors2, get(compressed_Hunique.CW_typed[1].hapmap, h2, h2))
 
-    for w in 2:windows
+    @inbounds for w in 2:windows
         # get current window's best haplotypes
         h1 = happair1[w]
         h2 = happair2[w]
@@ -96,8 +96,8 @@ function phase_sample!(
     end
 
     # treat last few windows separately since intersection may not become empty
-    happair1[(windows - lifespan1):(windows - 1)] .= survivors1[1]
-    happair2[(windows - lifespan2):(windows - 1)] .= survivors2[1]
+    happair1[(windows - lifespan1 + 1):windows] .= survivors1[1]
+    happair2[(windows - lifespan2 + 1):windows] .= survivors2[1]
 
     return nothing
 end
@@ -126,16 +126,27 @@ function Base.intersect!(
     end
     nothing
 end
+function Base.intersect!(
+    v::AbstractVector{<:Integer},
+    u::Integer,
+    seen::AbstractSet
+    )
+    keep = u in v
+    empty!(v)
+    keep && push!(v, u)
+    nothing
+end
 
 """
     intersect_size(v::AbstractVector, u::AbstractVector, seen::BitSet=BitSet())
 
-Computes the size of `v ∩ u` in place. Assumes `v` is usually smaller than `u`.
+Computes the size of `v ∩ u` in place. Assumes `v` is usually smaller than `u`
+and each element in `v` is unique.
 
 # Arguments
 - `v`: An integer vector
 - `u`: An integer vector
-- `uset`: Preallocated storage container
+- `seen`: Preallocated storage container
 """
 function intersect_size(
     v::AbstractVector{<:Integer},
@@ -147,8 +158,8 @@ function intersect_size(
         push!(seen, i)
     end
     s = 0
-    for i in v
-        i ∈ seen && (s += 1)
+    for i in eachindex(v)
+        @inbounds v[i] ∈ seen && (s += 1)
     end
     return s
 end
