@@ -361,29 +361,26 @@ function phase_fast!(
     H_pos = compressed_Hunique.pos
 
     # working arrays
-    seen = BitSet()
-    survivors1 = Int32[]
-    survivors2 = Int32[]
-    sizehint!(seen, haplotypes)
-    sizehint!(survivors1, haplotypes)
-    sizehint!(survivors2, haplotypes)
-
-    # First pass to phase each sample window-by-window
-    t = time()
-    for i in 1:people
-        phase_sample!(haplotype1[i], haplotype2[i], compressed_Hunique, seen,
-            survivors1, survivors2)
+    seen = [BitSet() for _ in 1:Threads.nthreads()]
+    survivors1 = [Int32[] for _ in 1:Threads.nthreads()]
+    survivors2 = [Int32[] for _ in 1:Threads.nthreads()]
+    for id in 1:Threads.nthreads()
+        sizehint!(seen[id], haplotypes)
+        sizehint!(survivors1[id], haplotypes)
+        sizehint!(survivors2[id], haplotypes)
     end
-    println("time = ", time() - t)
 
-    # Second pass to find optimal break points and record info to phase
     # first  1/3: ((w - 2) * width + 1):((w - 1) * width)
     # middle 1/3: ((w - 1) * width + 1):(      w * width)
     # last   1/3: (      w * width + 1):((w + 1) * width)
     ThreadPools.@qthreads for i in 1:people
         id = Threads.threadid()
 
-        # first window
+        # First pass to phase each sample window-by-window
+        phase_sample!(haplotype1[i], haplotype2[i], compressed_Hunique,
+            seen[id], survivors1[id], survivors2[id])
+
+        # record info for first window
         hap1 = haplotype1[i][1] # complete idx
         hap2 = haplotype2[i][1] # complete idx
         h1 = complete_idx_to_unique_all_idx(hap1, 1,
@@ -397,14 +394,14 @@ function phase_fast!(
         push!(ph[i].strand2.window, 1)
         push!(ph[i].strand2.haplotypelabel, h2)
 
-        # search breakpoints for remaining windows
+        # Second pass to find optimal break points and record info to phase
         @inbounds for w in 2:windows
             # get genotype vector spanning 2 windows
             Xwi_start = (w - 2) * width + 1
             Xwi_end = (w == windows ? snps : w * width)
             Xwi = view(X, Xwi_start:Xwi_end, i)
 
-            # let first surviving haplotype be phase
+            # previous and current haplotypes for both strands
             hap1_prev = haplotype1[i][w - 1]
             hap2_prev = haplotype2[i][w - 1]
             hap1_curr = haplotype1[i][w]
