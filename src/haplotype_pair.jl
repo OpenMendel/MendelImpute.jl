@@ -1,8 +1,8 @@
 """
     haplochunk!(redundant_haplotypes, compressed_Hunique, X, ...)
 
-Wrapper function that computes the best haplotype pair `(hᵢ, hⱼ)` for each genotype vector
-in a given chunk.
+Wrapper function that computes the best haplotype pair `(hᵢ, hⱼ)` for each
+genotype vector in a given chunk.
 
 # There are 5 timers (some may be 0):
 t1 = screening for top haplotypes
@@ -37,8 +37,8 @@ function haplochunk!(
     inv_sqrt_allele_var = nothing
 
     # return arrays
-    haplotype1 = [zeros(Int, windows) for i in 1:people]
-    haplotype2 = [zeros(Int, windows) for i in 1:people]
+    haplotype1 = [zeros(Int32, windows) for i in 1:people]
+    haplotype2 = [zeros(Int32, windows) for i in 1:people]
 
     # working arrays
     happair1 = [ones(Int32, people)           for _ in 1:threads]
@@ -65,16 +65,19 @@ function haplochunk!(
     ThreadPools.@qthreads for absolute_w in winrange
         Hw_aligned = compressed_Hunique.CW_typed[absolute_w].uniqueH
         Xw_idx_start = (absolute_w - 1) * width + 1
-        Xw_idx_end = (absolute_w == total_window ? length(X_pos) : absolute_w * width)
+        Xw_idx_end = (absolute_w == total_window ? length(X_pos) :
+            absolute_w * width)
         Xw_aligned = view(X, Xw_idx_start:Xw_idx_end, :)
         d  = size(Hw_aligned, 2)
         id = Threads.threadid()
 
         # weight snp by inverse allele variance if requested
         if scale_allelefreq
-            Hw_range = compressed_Hunique.start[absolute_w]:(absolute_w == total_window ?
-                ref_snps : compressed_Hunique.start[absolute_w + 1] - 1)
-            Hw_snp_pos = indexin(X_pos[Xw_idx_start:Xw_idx_end], compressed_Hunique.pos[Hw_range])
+            Hw_range = compressed_Hunique.start[absolute_w]:(absolute_w ==
+                total_window ? ref_snps :
+                               compressed_Hunique.start[absolute_w + 1] - 1)
+            Hw_snp_pos = indexin(X_pos[Xw_idx_start:Xw_idx_end],
+                compressed_Hunique.pos[Hw_range])
             inv_sqrt_allele_var = compressed_Hunique.altfreq[Hw_snp_pos]
             map!(x -> x < 0.15 ? 1.98 : 1 / sqrt(2*x*(1-x)),
                 inv_sqrt_allele_var, inv_sqrt_allele_var) # set min pᵢ = 0.15
@@ -85,20 +88,20 @@ function haplochunk!(
             # find hᵢ via stepwise regression, then find hⱼ via global search
             t1, t2, t3, t4 = haplopair_lasso!(Xw_aligned, Hw_aligned, r=lasso,
                 inv_sqrt_allele_var=inv_sqrt_allele_var, happair1=happair1[id],
-                happair2=happair2[id], hapscore=hapscore[id], maxindx=maxindx[id],
-                maxgrad=maxgrad[id], Xwork=Xwork[id])
+                happair2=happair2[id], hapscore=hapscore[id],
+                maxindx=maxindx[id], maxgrad=maxgrad[id], Xwork=Xwork[id])
         elseif !isnothing(tf) && d > max_haplotypes
             # haplotype thinning: search all (hᵢ, hⱼ) pairs where hᵢ ≈ x ≈ hⱼ
             t1, t2, t3, t4 = haplopair_thin_BLAS2!(Xw_aligned, Hw_aligned,
                 allele_freq=inv_sqrt_allele_var, keep=tf,
-                happair1=happair1[id], happair2=happair2[id], hapscore=hapscore[id],
-                maxindx=maxindx[id], maxgrad=maxgrad[id], Xi=Xi[id], N=N[id], Hk=Hk[id],
-                M=M[id], Xwork=Xwork[id])
+                happair1=happair1[id], happair2=happair2[id],
+                hapscore=hapscore[id], maxindx=maxindx[id], maxgrad=maxgrad[id],
+                Xi=Xi[id], N=N[id], Hk=Hk[id], M=M[id], Xwork=Xwork[id])
         elseif rescreen
-            # finds many (hᵢ, hⱼ) pairs via global search, then re-minimize ||x - hᵢ - hⱼ|| on observed entries
+            # global search + searching ||x - hᵢ - hⱼ|| on observed entries
             t1, t2, t3, t4 = haplopair_screen!(Xw_aligned, Hw_aligned,
-                happair1=happair1[id], happair2=happair2[id], hapscore=hapscore[id],
-                Xwork=Xwork[id])
+                happair1=happair1[id], happair2=happair2[id],
+                hapscore=hapscore[id], Xwork=Xwork[id])
         else
             # global search
             t1, t2, t3, t4 = haplopair!(Xw_aligned, Hw_aligned,
@@ -106,16 +109,24 @@ function haplochunk!(
                 happair2=happair2[id], hapscore=hapscore[id], Xwork=Xwork[id])
         end
 
-        # convert happairs (which index off unique haplotypes) to indices of full haplotype pool, and find all matching happairs
+        # convert happairs (which index off unique haplotypes) to indices of
+        # full haplotype pool, and find all matching happairs
         t5 = @elapsed begin
-            w = something(findfirst(x -> x == absolute_w, winrange)) # window index of current chunk
-            compute_redundant_haplotypes!(redundant_haplotypes, compressed_Hunique,
-                happair1[id], happair2[id], w, absolute_w, redunhaps_bitvec1[id],
-                redunhaps_bitvec2[id])
+            # w = something(findfirst(x -> x == absolute_w, winrange)) # window index of current chunk
+            # compute_redundant_haplotypes!(redundant_haplotypes, compressed_Hunique,
+            #     happair1[id], happair2[id], w, absolute_w, redunhaps_bitvec1[id],
+            #     redunhaps_bitvec2[id])
 
             # save_unique_only!(redundant_haplotypes, compressed_Hunique,
             #     happair1[id], happair2[id], w, absolute_w, redunhaps_bitvec1[id],
             #     redunhaps_bitvec2[id])
+
+            for i in 1:people
+                haplotype1[i][absolute_w] = unique_idx_to_complete_idx(
+                    happair1[id][i], absolute_w, compressed_Hunique)
+                haplotype2[i][absolute_w] = unique_idx_to_complete_idx(
+                    happair2[id][i], absolute_w, compressed_Hunique)
+            end
         end
 
         # record timings and haplotypes
@@ -128,6 +139,8 @@ function haplochunk!(
         # update progress
         next!(pmeter)
     end
+
+    return haplotype1, haplotype2
 end
 
 """

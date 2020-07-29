@@ -1,39 +1,39 @@
 """
-    phase_sample!(strand1, strand2, happair1, happair2, compressed_Hunique)
+    phase_sample!(happair1, happair2, compressed_Hunique, [seen])
 
-For a sample, intersects redundant haplotype pairs window by window,
-then search for breakpoints.
+Phases `happair1` and `happair2` window-by-window using a heuristic strategy.
+`happair1[w]` can be mutated to an equivalent haplotype in window `w` such
+that overall windows the number of haplotype switches is minimzed.
 
 # Arguments
-- `happair1`: `happair1[w]` stores best haplotype index for strand1 in window `w`
-- `happair2`: `happair2[w]` stores best haplotype index for strand2 in window `w`
+- `happair1`: `happair1[w]` is the haplotype index for strand1 in window `w`
+- `happair2`: `happair2[w]` is the haplotype index for strand2 in window `w`
 - `compressed_Hunique`: A `CompressedHaplotypes` object
 
 # Optional storage argument
 - `seen`: Preallocated storage container
-
-These are needed because intersection can happen in 4 ways:
-A   B      A   B
-|   |  or    X
-C   D      C   D
 """
 function phase_sample!(
     happair1::AbstractVector{<:Integer},
     happair2::AbstractVector{<:Integer},
     compressed_Hunique::CompressedHaplotypes,
+    # preallocated items
     seen::AbstractSet=BitSet(),
+    survivors1::AbstractVector{<:Integer}=Int32[],
+    survivors2::AbstractVector{<:Integer}=Int32[],
     )
 
-    windows = length(strand1)
-    windows == length(strand2) == length(happair1) == length(happair2) ||
-         error("strand1, happair1, happair2, and happair2 have different length.")
-    lifespan = (1, 1) # counter to track survival time
+    windows = length(happair1)
+    windows == length(happair2) || error("happair1 and happair2" *
+        "have different length.")
+    haplotypes = nhaplotypes(compressed_Hunique)
+    lifespan1 = lifespan2 = 1 # counter to track survival time
 
     # get first window's optimal haplotypes
     h1 = happair1[1]
     h2 = happair2[1]
-    survivors1 = get(compressed_Hunique.CW_typed[1].hapmap, h1, h1)
-    survivors2 = get(compressed_Hunique.CW_typed[1].hapmap, h2, h2)
+    store!(survivors1, get(compressed_Hunique.CW_typed[1].hapmap, h1, h1))
+    store!(survivors2, get(compressed_Hunique.CW_typed[1].hapmap, h2, h2))
 
     for w in 2:windows
         # get current window's best haplotypes
@@ -43,52 +43,61 @@ function phase_sample!(
         h2set = get(compressed_Hunique.CW_typed[w].hapmap, h2, h2)
 
         # heuristic to decide whether cross-over is better
+        # A   B      A   B
+        # |   |  or    X
+        # C   D      C   D
+        AC = intersect_size(survivors1, h1set, seen)
+        BD = intersect_size(survivors2, h2set, seen)
+        AD = intersect_size(survivors1, h2set, seen)
+        BC = intersect_size(survivors2, h1set, seen)
         crossed = false
-        AC = intersect_size(survivors1, h1set)
-        BD = intersect_size(survivors2, h2set)
-        AD = intersect_size(survivors1, h2set)
-        BC = intersect_size(survivors2, h1set)
         if AC + BD < AD + BC
             crossed = true
         end
 
-        # update strand 1 and 2
+        # Prune survivors. If there are none, record last survivor into
+        # happair for all previous windows and reset survivors to current
+        # window's haplotypes
         if crossed
-            if AD == 0
-                happair1[(w - lifespan[1]):(w - 1)] .= survivors1[1] # record first survivor
-                lifespan[1] = 1 # reset counters
+            if AD == 0 # no survivors
+                happair1[(w - lifespan1):(w - 1)] .= survivors1[1]
+                store!(survivors1, h2set)
+                lifespan1 = 1
             else
-                intersect!(survivors1, h1set, seen)
-                lifespan[1] += 1
+                intersect!(survivors1, h2set, seen)
+                lifespan1 += 1
             end
-            if BC == 0
-                happair2[(w - lifespan[2]):(w - 1)] .= survivors2[1] # record first survivor
-                lifespan[2] = 1 # reset counters
+            if BC == 0 # no survivors
+                happair2[(w - lifespan2):(w - 1)] .= survivors2[1]
+                store!(survivors2, h1set)
+                lifespan2 = 1
             else
-                intersect!(survivors2, h2set, seen)
-                lifespan[2] += 1
+                intersect!(survivors2, h1set, seen)
+                lifespan2 += 1
             end
         else
-            if AC == 0
-                happair1[(w - lifespan[1]):(w - 1)] .= survivors1[1] # record first survivor
-                lifespan[1] = 1 # reset counters
+            if AC == 0 # no survivors
+                happair1[(w - lifespan1):(w - 1)] .= survivors1[1]
+                store!(survivors1, h1set)
+                lifespan1 = 1
             else
                 intersect!(survivors1, h1set, seen)
-                lifespan[1] += 1
+                lifespan1 += 1
             end
-            if BD == 0
-                happair2[(w - lifespan[2]):(w - 1)] .= survivors2[1] # record first survivor
-                lifespan[2] = 1 # reset counters
+            if BD == 0 # no survivors
+                happair2[(w - lifespan2):(w - 1)] .= survivors2[1]
+                store!(survivors2, h2set)
+                lifespan2 = 1
             else
                 intersect!(survivors2, h2set, seen)
-                lifespan[2] += 1
+                lifespan2 += 1
             end
         end
     end
 
     # treat last few windows separately since intersection may not become empty
-    happair1[(windows - lifespan[1]):(windows - 1)] .= survivors1[1]
-    happair2[(windows - lifespan[2]):(windows - 1)] .= survivors2[1]
+    happair1[(windows - lifespan1):(windows - 1)] .= survivors1[1]
+    happair2[(windows - lifespan2):(windows - 1)] .= survivors2[1]
 
     return nothing
 end
@@ -143,11 +152,17 @@ function intersect_size(
     end
     return s
 end
+intersect_size(v::AbstractVector, u::Integer, seen) = u in v
 
-function intersect_size(
-    v::AbstractVector{<:Integer},
-    u::Integer,
-    seen::AbstractSet=BitSet()
-    )
-    return u in v
+"""
+    store!(v, u)
+
+Deletes everything in `v` and saves each element of `u` to `v`.
+"""
+function store!(v::AbstractVector, u)
+    empty!(v)
+    for i in u
+        push!(v, i)
+    end
+    return nothing
 end

@@ -110,16 +110,21 @@ function phase(
         w_start = (chunk - 1) * num_windows_per_chunks + 1
         w_end = (chunk == chunks ? tot_windows : chunk * num_windows_per_chunks)
         # reset hapset for next chunk
-        initialize!(redundant_haplotypes)
-        chunk == chunks && resize!(redundant_haplotypes, last_chunk_windows)
+        # initialize!(redundant_haplotypes)
+        # chunk == chunks && resize!(redundant_haplotypes, last_chunk_windows)
         # println("chunk = $chunk, windows = $windows, start window = $w_start, end window = $w_end")
 
         pmeter = Progress(windows, 5, "Phasing chunk $chunk/$chunks...")
         # find best happairs for each window in current chunk
-        haplochunk!(redundant_haplotypes, compressed_Hunique, X, X_pos,
+        h1, h2 = haplochunk!(redundant_haplotypes, compressed_Hunique, X, X_pos,
             dynamic_programming, lasso, thinning_factor, scale_allelefreq,
             max_haplotypes, rescreen, w_start:w_end, tot_windows, pmeter, haptimers)
         calculate_happairs_time += time() - calculate_happairs_start
+
+        println(h1[1])
+        println(h1[10])
+        println(h1[100])
+        fdsa
 
         # check whether flanking windows give better prediction
         # screen_flanking_windows!(redundant_haplotypes, compressed_Hunique, X,
