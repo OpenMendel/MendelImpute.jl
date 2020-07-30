@@ -140,72 +140,72 @@ function compute_optimal_haplotypes!(
     return sum(timers) ./ Threads.nthreads()
 end
 
-"""
-Records optimal-redundant haplotypes for each window.
+# """
+# Records optimal-redundant haplotypes for each window.
 
-Warning: This function is called in a multithreaded loop. If you modify this
-function you must check whether imputation accuracy is affected (when run with
->1 threads).
+# Warning: This function is called in a multithreaded loop. If you modify this
+# function you must check whether imputation accuracy is affected (when run with
+# >1 threads).
 
-# Arguments:
-- `window_idx`: window in current chunk
-- `window_overall`: window index in terms of every windows
-"""
-function compute_redundant_haplotypes!(
-    redundant_haplotypes::Vector{OptimalHaplotypeSet},
-    Hunique::CompressedHaplotypes,
-    happair1::AbstractVector,
-    happair2::AbstractVector,
-    window_idx::Int,
-    window_overall::Int,
-    storage1 = falses(nhaplotypes(Hunique)),
-    storage2 = falses(nhaplotypes(Hunique))
-    )
+# # Arguments:
+# - `window_idx`: window in current chunk
+# - `window_overall`: window index in terms of every windows
+# """
+# function compute_redundant_haplotypes!(
+#     redundant_haplotypes::Vector{OptimalHaplotypeSet},
+#     Hunique::CompressedHaplotypes,
+#     happair1::AbstractVector,
+#     happair2::AbstractVector,
+#     window_idx::Int,
+#     window_overall::Int,
+#     storage1 = falses(nhaplotypes(Hunique)),
+#     storage2 = falses(nhaplotypes(Hunique))
+#     )
 
-    people = length(redundant_haplotypes)
+#     people = length(redundant_haplotypes)
 
-    @inbounds for k in 1:people
-        # convert happairs from unique idx to complete idx
-        Hi_idx = unique_idx_to_complete_idx(happair1[k], window_overall,
-            Hunique)
-        Hj_idx = unique_idx_to_complete_idx(happair2[k], window_overall,
-            Hunique)
+#     @inbounds for k in 1:people
+#         # convert happairs from unique idx to complete idx
+#         Hi_idx = unique_idx_to_complete_idx(happair1[k], window_overall,
+#             Hunique)
+#         Hj_idx = unique_idx_to_complete_idx(happair2[k], window_overall,
+#             Hunique)
 
-        # strand1
-        storage1 .= false
-        if haskey(Hunique.CW_typed[window_overall].hapmap, Hi_idx)
-            h1_set = Hunique.CW_typed[window_overall].hapmap[Hi_idx]
-            for i in h1_set
-                storage1[i] = true
-            end
-        else
-            storage1[Hi_idx] = true # Hi_idx is singleton (i.e. unique)
-        end
+#         # strand1
+#         storage1 .= false
+#         if haskey(Hunique.CW_typed[window_overall].hapmap, Hi_idx)
+#             h1_set = Hunique.CW_typed[window_overall].hapmap[Hi_idx]
+#             for i in h1_set
+#                 storage1[i] = true
+#             end
+#         else
+#             storage1[Hi_idx] = true # Hi_idx is singleton (i.e. unique)
+#         end
 
-        # strand2
-        storage2 .= false
-        if haskey(Hunique.CW_typed[window_overall].hapmap, Hj_idx)
-            h2_set = Hunique.CW_typed[window_overall].hapmap[Hj_idx]
-            for i in h2_set
-                storage2[i] = true
-            end
-        else
-            storage2[Hj_idx] = true # Hj_idx is singleton (i.e. unique)
-        end
+#         # strand2
+#         storage2 .= false
+#         if haskey(Hunique.CW_typed[window_overall].hapmap, Hj_idx)
+#             h2_set = Hunique.CW_typed[window_overall].hapmap[Hj_idx]
+#             for i in h2_set
+#                 storage2[i] = true
+#             end
+#         else
+#             storage2[Hj_idx] = true # Hj_idx is singleton (i.e. unique)
+#         end
 
-        # redundant_haplotypes[k].strand1[window_idx] = copy(storage1)
-        # redundant_haplotypes[k].strand2[window_idx] = copy(storage2)
-        if isassigned(redundant_haplotypes[k].strand1, window_idx)
-            redundant_haplotypes[k].strand1[window_idx] .= storage1
-            redundant_haplotypes[k].strand2[window_idx] .= storage2
-        else
-            redundant_haplotypes[k].strand1[window_idx] = copy(storage1)
-            redundant_haplotypes[k].strand2[window_idx] = copy(storage2)
-        end
-    end
+#         # redundant_haplotypes[k].strand1[window_idx] = copy(storage1)
+#         # redundant_haplotypes[k].strand2[window_idx] = copy(storage2)
+#         if isassigned(redundant_haplotypes[k].strand1, window_idx)
+#             redundant_haplotypes[k].strand1[window_idx] .= storage1
+#             redundant_haplotypes[k].strand2[window_idx] .= storage2
+#         else
+#             redundant_haplotypes[k].strand1[window_idx] = copy(storage1)
+#             redundant_haplotypes[k].strand2[window_idx] = copy(storage2)
+#         end
+#     end
 
-    return nothing
-end
+#     return nothing
+# end
 
 """
     screen_flanking_windows!(haplotype1, haplotype2, compressed_Hunique, X)

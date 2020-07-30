@@ -112,7 +112,7 @@ Computes `v ∩ u` in place and stores result in `v`.
 - `u`: An integer vector
 - `seen`: Preallocated storage container
 """
-function Base.intersect!(
+function intersect!(
     v::AbstractVector{<:Integer},
     u::AbstractVector{<:Integer},
     seen::AbstractSet
@@ -126,7 +126,7 @@ function Base.intersect!(
     end
     nothing
 end
-function Base.intersect!(
+function intersect!(
     v::AbstractVector{<:Integer},
     u::Integer,
     seen::AbstractSet

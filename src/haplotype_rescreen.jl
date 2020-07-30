@@ -251,7 +251,7 @@ function choose_happair!(
     n = size(X, 2)
     d = size(H, 2)
     p == size(H, 1) || error("Dimension mismatch: size(X, 1) = $p but" *
-        * " size(H, 1) = $(size(H, 1))")
+        " size(H, 1) = $(size(H, 1))")
     T = UInt8 # X is Matrix{Union{Missing, UInt8}}
 
     # loop over each person's genotype

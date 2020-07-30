@@ -1,27 +1,29 @@
 """
-    phase(tgtfile, reffile; [outfile], [impute], [width], [recreen], 
-    [thinning_factor], [dynamic_programming])
+    phase(tgtfile, reffile; [outfile], [impute], [phase], [width], [recreen], 
+    [max_haplotypes], [thinning_factor], [stepwise], [scale_allelefreq], 
+    [dynamic_programming], )
 
 Main function of MendelImpute program. Phasing (haplotying) of `tgtfile` from a
 pool of haplotypes `reffile` by sliding windows and saves result in `outfile`.
 
 # Input
 - `tgtfile`: VCF or PLINK files. VCF files should end in `.vcf` or `.vcf.gz`.
-    PLINK files should exclude `.bim/.bed/.fam` suffixes but the trio must all be present in the directory.
+    PLINK files should exclude `.bim/.bed/.fam` suffixes but the trio must all
+    be present in the directory.
 - `reffile`: VCF or compressed Julia binary files. VCF files should end in 
-    `.vcf` or `.vcf.gz`. Acceptable Julia binary formats includes `.jld2`
-    (fastest read time) and `.jlso` (smallest file size).
+    `.vcf`, `.vcf.gz`, or `.jlso` (compressed binary files).
 
 # Optional Inputs
 - `outfile`: output filename ending in `.vcf.gz` or `.vcf`. Output genotypes
     will have no missing data.
-- `impute`: If `true`, untyped SNPs will be imputed, otherwise only missing snps
-    in `tgtfile` will be imputed.  (default `false`)
-- `phase`: If `true`, all output genotypes will be phased. Otherwise all output
-    genotypes will be unphased.
+- `impute`: If `true`, untyped SNPs will be imputed, otherwise only missing
+    snps in `tgtfile` will be imputed.  (default `false`)
+- `phase`: If `true`, all output genotypes will be phased. Otherwise all
+    output genotypes will be unphased.
 - `width`: number of SNPs (markers) in each haplotype window. (default `512`)
-- `rescreen`: This option saves a number of top haplotype pairs when solving the
-    least squares objective, and re-minimize least squares on just observed data.
+- `rescreen`: This option saves a number of top haplotype pairs when solving
+    the least squares objective, and re-minimize least squares on just
+    observed data.
 - `thinning_factor`: This option solves the least squares objective on only
     "thining_factor" unique haplotypes.
 """
@@ -34,10 +36,10 @@ function phase(
     width::Int = 512,
     rescreen::Bool = false,
     max_haplotypes::Int = 800,
+    stepwise::Union{Nothing, Int} = nothing,
     thinning_factor::Union{Nothing, Int} = nothing,
     scale_allelefreq::Bool = false,
     dynamic_programming::Bool = true,
-    lasso::Union{Nothing, Int} = nothing
     )
 
     if dynamic_programming
@@ -50,11 +52,7 @@ function phase(
     # import reference data
     println("Importing reference haplotype data..."); flush(stdout)
     import_data_start = time()
-    if endswith(reffile, ".jld2")
-        @load reffile compressed_Hunique
-        width == compressed_Hunique.width || error("Specified width = $width" *
-            " does not equal $(compressed_Hunique.width) = width in .jdl2 file")
-    elseif endswith(reffile, ".jlso")
+    if endswith(reffile, ".jlso")
         loaded = JLSO.load(reffile)
         compressed_Hunique = loaded[:compressed_Hunique]
         width == compressed_Hunique.width || error("Specified width = $width" *
@@ -66,7 +64,7 @@ function phase(
             "compressed." * reffile, width)
     else
         error("Unrecognized reference file format: only VCF (ends in" * 
-            " .vcf or .vcf.gz), `.jlso`, or `.jld2` files are acceptable.")
+            " .vcf or .vcf.gz) or `.jlso` files are acceptable.")
     end
     # import genotype data
     if endswith(tgtfile, ".vcf") || endswith(tgtfile, ".vcf.gz")
@@ -113,9 +111,9 @@ function phase(
     #
     calculate_happairs_start = time()
     haptimers = compute_optimal_haplotypes!(haplotype1, haplotype2, 
-        compressed_Hunique, X, X_pos, lasso, thinning_factor, scale_allelefreq, 
-        max_haplotypes, rescreen)
-    screen_flanking_windows!(haplotype1, haplotype2, compressed_Hunique, X)
+        compressed_Hunique, X, X_pos, stepwise, thinning_factor,
+        scale_allelefreq, max_haplotypes, rescreen)
+    # screen_flanking_windows!(haplotype1, haplotype2, compressed_Hunique, X)
     calculate_happairs_time = time() - calculate_happairs_start
 
     #
@@ -209,11 +207,15 @@ Phasing (haplotying) of genotype matrix `X` from a pool of haplotypes `H`
 by dynamic programming.
 
 # Input
-* `ph`: A vector of `HaplotypeMosaicPair` keeping track of each person's phase information.
-* `X`: `p x n` matrix with missing values. Each column is genotypes of an individual.
-* `compressed_Hunique`: A `CompressedHaplotypes` keeping track of unique haplotypes for each window and some other information
-* `redundant_haplotypes`: Vector of optimal haplotype pairs across windows. The haplotype pairs are indices to the full haplotype set and NOT the compressed haplotypes
-* `chunk_offset`: Shifts SNPs if a chromosome had been chunked. (not currently implemented)
+* `ph`: A vector of `HaplotypeMosaicPair` keeping track of each person's
+    phaseinformation.
+* `X`: `p x n` matrix with missing values. Each column is genotypes of
+    an individual.
+* `compressed_Hunique`: A `CompressedHaplotypes` keeping track of unique
+    haplotypes for each window and some other information
+* `redundant_haplotypes`: Vector of optimal haplotype pairs across windows.
+    The haplotype pairs are indices to the full haplotype set and NOT the
+    compressed haplotypes
 """
 function phase!(
     ph::Vector{HaplotypeMosaicPair},
@@ -234,7 +236,8 @@ function phase!(
     chunk_offset = (first(winrange) - 1) * width
 
     # allocate working arrays
-    sol_path = [Vector{Tuple{Int32, Int32}}(undef, windows) for i in 1:Threads.nthreads()]
+    sol_path = [Vector{Tuple{Int32, Int32}}(undef, windows) for i in
+        1:Threads.nthreads()]
     nxt_pair = [[Int32[] for i in 1:windows] for i in 1:Threads.nthreads()]
     tree_err = [[Float64[] for i in 1:windows] for i in 1:Threads.nthreads()]
 
@@ -243,13 +246,16 @@ function phase!(
     # middle 1/3: ((w - 1) * width + 1):(      w * width)
     # last   1/3: (      w * width + 1):((w + 1) * width)
     ThreadPools.@qthreads for i in 1:people
-        # first find optimal haplotype pair in each window using dynamic programming
+        # first find optimal haplotype pair in each window
         id = Threads.threadid()
-        connect_happairs!(sol_path[id], nxt_pair[id], tree_err[id], redundant_haplotypes[i], λ = 1.0)
+        connect_happairs!(sol_path[id], nxt_pair[id], tree_err[id],
+            redundant_haplotypes[i], λ = 1.0)
 
         # phase first window
-        h1 = complete_idx_to_unique_all_idx(sol_path[id][1][1], first(winrange), compressed_Hunique)
-        h2 = complete_idx_to_unique_all_idx(sol_path[id][1][2], first(winrange), compressed_Hunique)
+        h1 = complete_idx_to_unique_all_idx(sol_path[id][1][1],
+            first(winrange), compressed_Hunique)
+        h2 = complete_idx_to_unique_all_idx(sol_path[id][1][2],
+            first(winrange), compressed_Hunique)
         push!(ph[i].strand1.start, 1 + chunk_offset)
         push!(ph[i].strand1.window, first(winrange))
         push!(ph[i].strand1.haplotypelabel, h1)
@@ -292,26 +298,29 @@ function phase!(
                 absolute_w, sol_path[id][w - 1], sol_path[id][w])
 
             # record strand 1 info
-            update_phase!(ph[i].strand1, compressed_Hunique, bkpts[1], sol_path[id][w - 1][1],
-                sol_path[id][w][1], absolute_w, width, Xwi_start, Xwi_end)
+            update_phase!(ph[i].strand1, compressed_Hunique, bkpts[1],
+                sol_path[id][w - 1][1], sol_path[id][w][1], absolute_w, width,
+                Xwi_start, Xwi_end)
             # record strand 2 info
-            update_phase!(ph[i].strand2, compressed_Hunique, bkpts[2], sol_path[id][w - 1][2],
-                sol_path[id][w][2], absolute_w, width, Xwi_start, Xwi_end)
+            update_phase!(ph[i].strand2, compressed_Hunique, bkpts[2],
+                sol_path[id][w - 1][2], sol_path[id][w][2], absolute_w, width,
+                Xwi_start, Xwi_end)
         end
     end
 end
 
 """
-Helper function for updating phase information after breakpoints have been identified
-between windows `w - 1` and `w`. Every window have 0 or 1 breakpoint. Here indices in
-`ph.start` are recorded in terms of X's index.
+Helper function for updating phase information after breakpoints have been
+identified between windows `w - 1` and `w`. Every window have 0 or 1
+breakpoint. Here indices in `ph.start` are recorded in terms of X's index.
 
-Caveat: technically it is possible for a window to have 2 breakpoints (that might even overlap)
-since we can have the previous and next window both extend into the current one, but hopefully
-this is extremely rare.
+Caveat: technically it is possible for a window to have 2 breakpoints (that
+might even overlap) since we can have the previous and next window both
+extend into the current one, but hopefully this is extremely rare.
 """
-function update_phase!(ph::HaplotypeMosaic, compressed_Hunique::CompressedHaplotypes,
-    bkpt::Int, hap_prev, hap_curr, window::Int, width::Int, Xwi_start::Int, Xwi_end::Int)
+function update_phase!(ph::HaplotypeMosaic,
+    compressed_Hunique::CompressedHaplotypes, bkpt::Int, hap_prev, hap_curr,
+    window::Int, width::Int, Xwi_start::Int, Xwi_end::Int)
 
     # no breakpoints
     if bkpt == -1
@@ -336,29 +345,32 @@ function update_phase!(ph::HaplotypeMosaic, compressed_Hunique::CompressedHaplot
 
     if Xwi_mid <= X_bkpt_end <= Xwi_end
         # previous window extends to current window
-        h1 = complete_idx_to_unique_all_idx(hap_prev, window, compressed_Hunique)
+        h1 = complete_idx_to_unique_all_idx(hap_prev, window, 
+            compressed_Hunique)
         push!(ph.start, Xwi_mid)
         push!(ph.haplotypelabel, h1)
         push!(ph.window, window)
         # 2nd part of current window
-        h2 = complete_idx_to_unique_all_idx(hap_curr, window, compressed_Hunique)
+        h2 = complete_idx_to_unique_all_idx(hap_curr, window, 
+            compressed_Hunique)
         push!(ph.start, X_bkpt_end)
         push!(ph.haplotypelabel, h2)
         push!(ph.window, window)
     elseif X_bkpt_end < Xwi_mid
         # current window extends to previous window
-        h1 = complete_idx_to_unique_all_idx(hap_curr, window - 1, compressed_Hunique)
+        h1 = complete_idx_to_unique_all_idx(hap_curr, window - 1, 
+            compressed_Hunique)
         push!(ph.start, X_bkpt_end)
         push!(ph.haplotypelabel, h1)
         push!(ph.window, window - 1)
         # update current window
-        h2 = complete_idx_to_unique_all_idx(hap_curr, window, compressed_Hunique)
+        h2 = complete_idx_to_unique_all_idx(hap_curr, window, 
+            compressed_Hunique)
         push!(ph.start, Xwi_mid)
         push!(ph.haplotypelabel, h2)
         push!(ph.window, window)
     else
-        # println("H_bkpt_pos = $H_bkpt_pos, Hw_start=$Hw_start, Hw_mid=$Hw_mid, Hw_end=$Hw_end ")
-        error("update_phase!: bkpt does not satisfy -1 <= bkpt <= 2width! Shouldn't be possible")
+        error("update_phase!: bkpt does not satisfy -1 <= bkpt <= 2width!")
     end
 
     return nothing
@@ -405,10 +417,8 @@ function phase_fast!(
         # record info for first window
         hap1 = haplotype1[i][1] # complete idx
         hap2 = haplotype2[i][1] # complete idx
-        h1 = complete_idx_to_unique_all_idx(hap1, 1,
-            compressed_Hunique) #unique haplotype idx in window 1
-        h2 = complete_idx_to_unique_all_idx(hap2, 1,
-            compressed_Hunique) #unique haplotype idx in window 1
+        h1 = complete_idx_to_unique_all_idx(hap1, 1, compressed_Hunique)
+        h2 = complete_idx_to_unique_all_idx(hap2, 1, compressed_Hunique)
         push!(ph[i].strand1.start, 1)
         push!(ph[i].strand1.window, 1)
         push!(ph[i].strand1.haplotypelabel, h1)

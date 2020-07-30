@@ -130,9 +130,9 @@ Assumes all SNPs in `tgtfile` is present in `reffile`.
 # Inputs
 * `reffile`: reference haplotype file name
 * `reffile`: target genotype file name
-* `outfile`: Output file name (ends in `.jld2` or `.jlso` (recommended))
-* `width`: Number of typed SNPs per window. Number of SNPs in last window may be
-    in `[width, 2width]`.
+* `outfile`: Output file name (ends in `.jlso`)
+* `width`: Number of typed SNPs per window. Number of SNPs in last window
+    may be in `[width, 2width]`.
 """
 function compress_haplotypes(
     reffile::AbstractString,
@@ -140,9 +140,7 @@ function compress_haplotypes(
     outfile::AbstractString,
     width::Int,
     )
-    endswith(outfile, ".jld2") || endswith(outfile, ".jlso") || 
-        error("Unrecognized compression format: `outfile` can only end in" * 
-        " `.jlso` or `.jld2`")
+    endswith(outfile, ".jlso") || error("`outfile` does not end in '.jlso'")
 
     # import reference haplotypes
     H, H_sampleID, H_chr, H_pos, H_ids, H_ref, H_alt = convert_ht(Bool, 
@@ -162,16 +160,16 @@ function compress_haplotypes(
 end
 
 """
-`X` and `H` stores genotypes/haplotypes in columns. 
+    compress_haplotypes(X, H, outfile, ...)
+
+Compresses `H` window-by-window into `.jlso` format.
 """
 function compress_haplotypes(H::AbstractMatrix, X::AbstractMatrix, 
     outfile::AbstractString, X_pos::AbstractVector, H_sampleID::AbstractVector, 
     H_chr::AbstractVector, H_pos::AbstractVector, H_ids::AbstractVector, 
     H_ref::AbstractVector, H_alt::AbstractVector, width::Int)
 
-    endswith(outfile, ".jld2") || endswith(outfile, ".jlso") || 
-        error("Unrecognized compression format: `outfile` can only end in" *
-        " `.jlso` or `.jld2`")
+    endswith(outfile, ".jlso") || error("`outfile` does not end in 'jlso'.")
 
     # some constants
     ref_snps = size(H, 1)
@@ -242,8 +240,7 @@ function compress_haplotypes(H::AbstractMatrix, X::AbstractMatrix,
         Hw_idx_start = Hw_idx_end + 1
     end
 
-    # save using JLSO or JLD2
-    endswith(outfile, ".jld2") && JLD2.@save outfile compressed_Hunique
+    # save using jlso
     endswith(outfile, ".jlso") && JLSO.save(outfile, 
         :compressed_Hunique => compressed_Hunique, format=:julia_serialize, 
         compression=:gzip)
