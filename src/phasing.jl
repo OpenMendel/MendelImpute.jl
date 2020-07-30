@@ -179,15 +179,15 @@ function phase(
     println("    Computing haplotype pair        = ", 
         round(calculate_happairs_time, sigdigits=6), " seconds")
     haptimers[1] != 0 && println("        screening for top haplotypes   = ", 
-        round(haptimers[1], sigdigits=6), " seconds per thread")
+        round(haptimers[1*8], sigdigits=6), " seconds per thread")
     println("        BLAS3 mul! to get M and N      = ", 
-        round(haptimers[2], sigdigits=6), " seconds per thread")
+        round(haptimers[2*8], sigdigits=6), " seconds per thread")
     println("        haplopair search               = ", 
-        round(haptimers[3], sigdigits=6), " seconds per thread")
+        round(haptimers[3*8], sigdigits=6), " seconds per thread")
     haptimers[4] != 0 && println("        min least sq on observed data  = ", 
-        round(haptimers[4], sigdigits=6), " seconds per thread")
+        round(haptimers[4*8], sigdigits=6), " seconds per thread")
     println("        index conversion               = ", 
-        round(haptimers[5], sigdigits=6), " seconds per thread")
+        round(haptimers[5*8], sigdigits=6), " seconds per thread")
     dynamic_programming ? println("    Phasing by dynamic programming  = ", 
                           round(phase_time, sigdigits=6), " seconds") :
                           println("    Phasing by win-win intersection = ", 

@@ -5,15 +5,17 @@
 """
     haplopair_rescreen(X, H, ...)
 
-Calculate the best pair of haplotypes in `H` for each individual in `X`. Missing data in `X`
-does not have missing data. Missing data is initialized as 2x alternate allele freq.
+Calculate the best pair of haplotypes in `H` for each individual in `X`.
+Missing data in `X` does not have missing data. Missing data is initialized as
+2x alternate allele freq.
 
 # Input
 * `X`: `p x n` genotype matrix. Each column is an individual.
 * `H`: `p * d` haplotype matrix. Each column is a haplotype.
 
 # Output
-* `happair`: optimal haplotype pairs. `X[:, k] ≈ H[:, happair[1][k]] + H[:, happair[2][k]]`.
+* `happair`: optimal haplotype pairs. `X[:, k] ≈ H[:, happair[1][k]] + 
+    H[:, happair[2][k]]`.
 * `hapscore`: haplotyping score. 0 means best. Larger means worse.
 """
 function haplopair_rescreen!(
@@ -43,7 +45,7 @@ function haplopair_rescreen!(
 
     # working array
     happairs = [Tuple{Int32, Int32}[] for i in 1:n]
-    sizehint!.(happairs, 100) # will not save > 100 unique haplotype pairs to conserve memory
+    sizehint!.(happairs, 100) # save only first 100 pairs to conserve memory
 
     # compute top haplotype pairs for each genotype vector
     t2, t3 = haplopair!(Xwork, Hwork, M, N, happairs, hapscore)
@@ -65,10 +67,10 @@ end
 """
     haplopair!(X, H, M, N, happair, hapscore)
 
-Calculate the best pair of haplotypes in `H` for each individual in `X`. Overwite
-`M` by `M[i, j] = 2dot(H[:, i], H[:, j]) + sumabs2(H[:, i]) + sumabs2(H[:, j])`,
-`N` by `2X'H`, `happair` by optimal haplotype pair, and `hapscore` by
-objective value from the optimal haplotype pair.
+Calculate the best pair of haplotypes in `H` for each individual in `X`.
+Overwite `M` by `M[i, j] = 2dot(H[:, i], H[:, j]) + sumabs2(H[:, i]) + 
+sumabs2(H[:, j])`, `N` by `2X'H`, `happair` by optimal haplotype pair, and 
+`hapscore` by objective value from the optimal haplotype pair.
 
 # Input
 * `X`: `p x n` genotype matrix. Each column is an individual.
@@ -76,7 +78,8 @@ objective value from the optimal haplotype pair.
 * `M`: overwritten by `M[i, j] = 2dot(H[:, i], H[:, j]) + sumabs2(H[:, i]) +
     sumabs2(H[:, j])`.
 * `N`: overwritten by `n x d` matrix `2X'H`.
-* `happair`: optimal haplotype pair. `X[:, k] ≈ H[:, happair[k, 1]] + H[:, happair[k, 2]]`.
+* `happair`: optimal haplotype pair. `X[:, k] ≈ H[:, happair[k, 1]] + 
+    H[:, happair[k, 2]]`.
 * `hapscore`: haplotyping score. 0 means best. Larger means worse.
 """
 function haplopair!(
@@ -177,7 +180,7 @@ function haplopair!(
             #     push!(happairs[i], (j, k))
             # end
 
-            # keep happairs that within some range of best pair (but finding all of them requires a 2nd pass)
+            # keep happairs that within some range of best pair
             if score < hapmin[i]
                 empty!(happairs[i])
                 push!(happairs[i], (j, k))
@@ -247,7 +250,8 @@ function choose_happair!(
     p = size(X, 1)
     n = size(X, 2)
     d = size(H, 2)
-    p == size(H, 1) || error("Dimension mismatch: size(X, 1) = $p but size(H, 1) = $(size(H, 1))")
+    p == size(H, 1) || error("Dimension mismatch: size(X, 1) = $p but" *
+        * " size(H, 1) = $(size(H, 1))")
     T = UInt8 # X is Matrix{Union{Missing, UInt8}}
 
     # loop over each person's genotype

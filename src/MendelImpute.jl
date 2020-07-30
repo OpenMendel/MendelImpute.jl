@@ -33,11 +33,13 @@ module MendelImpute
     # main functions that users are exposed to
     export phase
     export compress_haplotypes
-    export nhaplotypes, windows, count_haplotypes_per_window, avg_haplotypes_per_window, nchunks
+    export nhaplotypes, windows, count_haplotypes_per_window
+    export avg_haplotypes_per_window, nchunks
 
     export OptimalHaplotypeSet, compute_optimal_halotype_set
     export make_refvcf_file, make_tgtvcf_file
-    export simulate_uniform_haplotypes, simulate_markov_haplotypes, simulate_genotypes
+    export simulate_uniform_haplotypes, simulate_markov_haplotypes
+    export simulate_genotypes
     export unphase, compress_vcf_to_gz
     export extract_marker_info
 

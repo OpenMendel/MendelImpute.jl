@@ -14,11 +14,16 @@ function Base.write(
     XtoH_idx::Union{Nothing, AbstractVector} = nothing,
     )
     # retrieve reference file information
-    chr = (isnothing(XtoH_idx) ? compressed_haplotypes.chr : compressed_haplotypes.chr[XtoH_idx])
-    pos = (isnothing(XtoH_idx) ? compressed_haplotypes.pos : compressed_haplotypes.pos[XtoH_idx])
-    ids = (isnothing(XtoH_idx) ? compressed_haplotypes.SNPid : compressed_haplotypes.SNPid[XtoH_idx])
-    ref = (isnothing(XtoH_idx) ? compressed_haplotypes.refallele : compressed_haplotypes.refallele[XtoH_idx])
-    alt = (isnothing(XtoH_idx) ? compressed_haplotypes.altallele : compressed_haplotypes.altallele[XtoH_idx])
+    chr = (isnothing(XtoH_idx) ? compressed_haplotypes.chr : 
+                                 compressed_haplotypes.chr[XtoH_idx])
+    pos = (isnothing(XtoH_idx) ? compressed_haplotypes.pos : 
+                                 compressed_haplotypes.pos[XtoH_idx])
+    ids = (isnothing(XtoH_idx) ? compressed_haplotypes.SNPid : 
+                                 compressed_haplotypes.SNPid[XtoH_idx])
+    ref = (isnothing(XtoH_idx) ? compressed_haplotypes.refallele : 
+                                 compressed_haplotypes.refallele[XtoH_idx])
+    alt = (isnothing(XtoH_idx) ? compressed_haplotypes.altallele : 
+                                 compressed_haplotypes.altallele[XtoH_idx])
 
     # write minimal meta information to outfile
     io = openvcf(outfile, "w")
@@ -68,11 +73,16 @@ function Base.write(
     XtoH_idx::Union{Nothing, AbstractVector} = nothing,
     )
     # retrieve reference file information
-    chr = (isnothing(XtoH_idx) ? compressed_haplotypes.chr : compressed_haplotypes.chr[XtoH_idx])
-    pos = (isnothing(XtoH_idx) ? compressed_haplotypes.pos : compressed_haplotypes.pos[XtoH_idx])
-    ids = (isnothing(XtoH_idx) ? compressed_haplotypes.SNPid : compressed_haplotypes.SNPid[XtoH_idx])
-    ref = (isnothing(XtoH_idx) ? compressed_haplotypes.refallele : compressed_haplotypes.refallele[XtoH_idx])
-    alt = (isnothing(XtoH_idx) ? compressed_haplotypes.altallele : compressed_haplotypes.altallele[XtoH_idx])
+    chr = (isnothing(XtoH_idx) ? compressed_haplotypes.chr :
+                                 compressed_haplotypes.chr[XtoH_idx])
+    pos = (isnothing(XtoH_idx) ? compressed_haplotypes.pos :
+                                 compressed_haplotypes.pos[XtoH_idx])
+    ids = (isnothing(XtoH_idx) ? compressed_haplotypes.SNPid :
+                                 compressed_haplotypes.SNPid[XtoH_idx])
+    ref = (isnothing(XtoH_idx) ? compressed_haplotypes.refallele :
+                                 compressed_haplotypes.refallele[XtoH_idx])
+    alt = (isnothing(XtoH_idx) ? compressed_haplotypes.altallele :
+                                 compressed_haplotypes.altallele[XtoH_idx])
 
     # write minimal meta information to outfile
     io = openvcf(outfile, "w")
@@ -178,13 +188,15 @@ function impute!(
             X_idx = phase[i].strand1.start[s]:(phase[i].strand1.start[s + 1] - 1)
             w = phase[i].strand1.window[s]
             H = compressed_Hunique.CW[w].uniqueH
-            H_start = abs(phase[i].strand1.start[s] - compressed_Hunique.start[w]) + 1
+            H_start = abs(phase[i].strand1.start[s] - 
+                compressed_Hunique.start[w]) + 1
             H_idx = H_start:(H_start + length(X_idx) - 1)
             X1[X_idx, i] = H[H_idx, phase[i].strand1.haplotypelabel[s]]
         end
         w = phase[i].strand1.window[end]
         X_idx = phase[i].strand1.start[end]:phase[i].strand1.length
-        H_start = abs(phase[i].strand1.start[end] - compressed_Hunique.start[w]) + 1
+        H_start = abs(phase[i].strand1.start[end] - 
+            compressed_Hunique.start[w]) + 1
         H_idx = H_start:(H_start + length(X_idx) - 1)
         H = compressed_Hunique.CW[w].uniqueH
         X1[X_idx, i] = H[H_idx, phase[i].strand1.haplotypelabel[end]]
@@ -194,14 +206,16 @@ function impute!(
             X_idx = phase[i].strand2.start[s]:(phase[i].strand2.start[s + 1] - 1)
             w = phase[i].strand2.window[s]
             H = compressed_Hunique.CW[w].uniqueH
-            H_start = abs(phase[i].strand2.start[s] - compressed_Hunique.start[w]) + 1
+            H_start = abs(phase[i].strand2.start[s] - 
+                compressed_Hunique.start[w]) + 1
             H_idx = H_start:(H_start + length(X_idx) - 1)
             X2[X_idx, i] = H[H_idx, phase[i].strand2.haplotypelabel[s]]
         end
         X_idx = phase[i].strand2.start[end]:phase[i].strand2.length
         w = phase[i].strand2.window[end]
         H = compressed_Hunique.CW[w].uniqueH
-        H_start = abs(phase[i].strand2.start[end] - compressed_Hunique.start[w]) + 1
+        H_start = abs(phase[i].strand2.start[end] - 
+            compressed_Hunique.start[w]) + 1
         H_idx = H_start:(H_start + length(X_idx) - 1)
         X2[X_idx, i] = H[H_idx, phase[i].strand2.haplotypelabel[end]]
     end
@@ -210,9 +224,9 @@ end
 """
     impute_discard_phase!(X, H, phase)
 
-Imputes missing entries of `X` using corresponding haplotypes `H` via `phase` information.
-Non-missing entries in `X` will not change, but X and H has to be aligned. This does NOT
-preserve phase information.
+Imputes missing entries of `X` using corresponding haplotypes `H` via `phase`
+information. Non-missing entries in `X` will not change, but X and H has to be
+aligned. This does NOT preserve phase information.
 """
 function impute_discard_phase!(
     X::AbstractMatrix,
@@ -226,8 +240,8 @@ function impute_discard_phase!(
         @inbounds for snp in 1:p
             if ismissing(X[snp, person])
                 #find which segment the snp is located
-                hap1_segment = searchsortedlast(phase[person].strand1.start, snp)
-                hap2_segment = searchsortedlast(phase[person].strand2.start, snp)
+                hap1_segment = searchsortedlast(phase[person].strand1.start,snp)
+                hap2_segment = searchsortedlast(phase[person].strand2.start,snp)
 
                 #find haplotype pair in corresponding window for this segment
                 h1 = phase[person].strand1.haplotypelabel[hap1_segment]

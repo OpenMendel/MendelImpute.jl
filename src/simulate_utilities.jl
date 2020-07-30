@@ -1,11 +1,12 @@
 """
     make_refvcf_file(H, filename, phased)
 
-Creates a .vcf file with `filename` based on reference panels `H`. Consecutive columns are treated as genotypes.
-REF/ALT alleles are always A/C.
+Creates a .vcf file with `filename` based on reference panels `H`. Consecutive
+columns are treated as genotypes. REF/ALT alleles are always A/C.
 
 # Inputs:
-+ `H`: BitMatrix of haplotypes. Each column is a haplotype. e.g. Columns 1 and 2 form the genotype for sample 1. 
++ `H`: BitMatrix of haplotypes. Each column is a haplotype. e.g. Columns 1 and
+    2 form the genotype for sample 1. 
 + `filename`: A string for the resulting .vcf file. 
 + `phased`: True uses '|' as separator. False uses '/' as separator. 
 """
@@ -22,7 +23,8 @@ function make_refvcf_file(
 
     p, d = size(H)
     separator = (phased ? '|' : '/')
-    iseven(d) || error("make_vcf_file: number of haplotypes must be even but was $d")
+    iseven(d) || 
+        error("make_vcf_file: number of haplotypes must be even but was $d")
 
     # first write minimal meta information
     io = openvcf(vcffilename, "w")
@@ -43,7 +45,8 @@ function make_refvcf_file(
     for snp in 1:p
         print(pb, "1\t$snp\tref_snp_$snp\tA\tC\t.\tPASS\t.\tGT")
         for i in 1:2:d
-            print(pb, string("\t", Int(H[snp, i]), separator, Int(H[snp, i + 1])))
+            print(pb, string("\t", Int(H[snp, i]), separator, 
+                Int(H[snp, i + 1])))
         end
         print(pb, "\n")
         (bytesavailable(pb) > (16*1024)) && write(io, take!(pb))
@@ -55,7 +58,8 @@ end
 """
     extract_marker_info(vcffile)
 
-Extracts each marker's basic info (CHROM, POS, ID, REF, ALT) and return in separate vectors.
+Extracts each marker's basic info (CHROM, POS, ID, REF, ALT) and return in
+separate vectors.
 """
 function extract_marker_info(vcffile::String)
     reader = VCF.Reader(openvcf(vcffile))
@@ -79,9 +83,9 @@ end
 """
     make_tgtvcf_file(X, filename)
 
-Creates a .vcf file given a genotype matrix `X`. Missing entries in `X` will become `./.`. 
-Otherwise, X[i, j] should be either 0, 1, or 2. 0 = '0/0', 1 = '1/0', and 2 = '1/1'. REF/ALT 
-alleles are always A/C.
+Creates a .vcf file given a genotype matrix `X`. Missing entries in `X`
+will become `./.`. Otherwise, X[i, j] should be either 0, 1, or 2. 0 = '0/0',
+1 = '1/0', and 2 = '1/1'. REF/ALT alleles are always A/C.
 
 # Inputs:
 + `X`: Matrix of 0, 1, or 2. Each column is a person's genotype. 
@@ -104,7 +108,8 @@ function make_tgtvcf_file(
     li = length(marker_ID)
     lr = length(marker_REF)
     la = length(marker_ALT)
-    p == lc == lp == li == lr == la || error("There are $p markers in X but CHROM/POS/ID/REF/ALT vectors are of length $lc, $lp, $li, $lr, $la")
+    p == lc == lp == li == lr == la || error("There are $p markers in X but" *
+        " CHROM/POS/ID/REF/ALT vectors are of length $lc, $lp, $li, $lr, $la")
     separator = (phased ? '|' : '/')
 
     # first write minimal meta information
@@ -124,8 +129,9 @@ function make_tgtvcf_file(
 
     # write phase info
     for snp in 1:p
-        print(pb, marker_chrom[snp], '\t', string(marker_pos[snp]), '\t', marker_ID[snp], '\t', 
-            marker_REF[snp], '\t', marker_ALT[snp], "\t.\tPASS\t.\tGT")
+        print(pb, marker_chrom[snp], '\t', string(marker_pos[snp]), '\t',
+            marker_ID[snp], '\t', marker_REF[snp], '\t', marker_ALT[snp],
+            "\t.\tPASS\t.\tGT")
         for i in 1:d
             if ismissing(X[snp, i])
                 genotype = "./."
@@ -136,7 +142,8 @@ function make_tgtvcf_file(
             elseif X[snp, i] == 2
                 genotype = "1/1"
             else
-                error("genotypes can only be 0, 1, 2, or missing, but was $(X[snp, i])")
+                error("genotypes can only be 0, 1, 2, or missing," *
+                    " but was $(X[snp, i])")
             end
             print(pb, '\t', genotype)
         end
@@ -150,8 +157,9 @@ end
 """
     simulate_markov_haplotypes(p, d, prob)
 
-Simulates a haplotype matrix as a markov chain. The `i`th allele (0 or 1) will transition 
-to the opposite allele (0 or 1) with probability `prob` at the `i + 1`th allele. 
+Simulates a haplotype matrix as a markov chain. The `i`th allele (0 or 1)
+will transition to the opposite allele (0 or 1) with probability `prob` at
+the `i + 1`th allele. 
 
 # Inputs
 - `p`: Length of each haplotype.
@@ -167,7 +175,8 @@ function simulate_markov_haplotypes(
     prob::AbstractFloat = 0.25,
     vcffilename::String = ""
     )
-    @assert 0 < prob < 1 "transition probably `prob` should be between 0 and 1, got $prob"
+    @assert 0 < prob < 1 "transition probably `prob` should be between 0 and" *
+        " 1, got $prob"
 
     H = falses(p, d)
     @inbounds for j in 1:d
@@ -230,7 +239,7 @@ last window.
 - `T`: Type of output matrix, default `Float32`.
 - `min_cross_over`: Minimum number of breakpoints for each person's genotype. 
 - `max_cross_over`: Maximum number of breakpoints for each person's genotype. 
-- `width`: Number of SNPs in a window. Cross-overs can happen at most once in a window
+- `width`: Number of SNPs in each window. Crossovers happen ≤ 1 time in a window
 
 # Output:
 * `X`: `p x people` genotype matrix. Each column is a person's genotype. 
@@ -247,17 +256,20 @@ function simulate_genotypes(
     
     p, d = size(H)
     X = zeros(Union{T, Missing}, p, people)
-    min_cross_over <= max_cross_over || error("Please supply min_cross_over and max_cross_over satisfying min_cross_over <= max_cross_over.")
+    min_cross_over <= max_cross_over || error("Please supply min_cross_over" *
+        " and max_cross_over satisfying min_cross_over <= max_cross_over.")
 
     # loop through each person
     segments = UnitRange{Int64}[]
     sizehint!(segments, max_cross_over)
     for i in 1:people, strand in 1:2
-        # simulate cross overs. no crossovers in first/last windows and 2 crossover cannot occur within 1 window
+        # simulate cross overs: no crossovers in first/last windows and
+        # 2 crossover cannot occur within 1 window
         cross_overs = rand(min_cross_over:max_cross_over)
         cross_over_location = collect(1:cross_overs)
         while true
-            cross_over_location .= sample((width + 1):(p - width - 1), cross_overs, replace=false) 
+            cross_over_location .= sample((width + 1):(p - width - 1), 
+                cross_overs, replace=false) 
             sort!(cross_over_location)
             cross_overs == 1 && break
             minimum(diff(cross_over_location)) > width && break
@@ -266,7 +278,8 @@ function simulate_genotypes(
         empty!(segments)
         push!(segments, 1:cross_over_location[1])
         for j in 1:(length(cross_over_location) - 1)
-            push!(segments, (cross_over_location[j] + 1):cross_over_location[j + 1])
+            push!(segments, 
+                (cross_over_location[j] + 1):cross_over_location[j + 1])
         end
         push!(segments, (cross_over_location[end] + 1):p)
         # fill X with sum of 2 randomly chosen haplotypes in each segment
@@ -285,8 +298,10 @@ Simulates genotype from haplotype reference panels.
 + `people`: Integer for number of samples you want to simulate. 
 
 Returns `hap_mosaics` and `hap_mosaic_range` where 
-+ `hap_mosaics[i]` is a vector haplotypes [(hi, hj), ...] that was used to simulate person `i`'s genotype
-+ `hap_mosaic_range` is a vector of ranges (e.g. [1:100, ...]) that records the range of SNPs where (hi, hj) filled.
++ `hap_mosaics[i]` is a vector haplotypes [(hi, hj), ...] that was used to
+    simulate person `i`'s genotype
++ `hap_mosaic_range` is a vector of ranges (e.g. [1:100, ...]) that records
+     the range of SNPs where (hi, hj) filled.
 """
 function simulate_phased_genotypes(
     H::Union{AbstractMatrix, String},
@@ -303,7 +318,8 @@ function simulate_phased_genotypes(
 
     p, d = size(H)
     separator = '|'
-    iseven(d) || error("simulate_phased_genotypes: number of haplotypes must be even but was $d")
+    iseven(d) || error("simulate_phased_genotypes: number of haplotypes" *
+        " must be even but was $d")
 
     # create target matrix, where 2 columns form 1 genotype
     X = zeros(Union{T, Missing}, p, 2people)
@@ -313,11 +329,13 @@ function simulate_phased_genotypes(
     segments = UnitRange{Int64}[]
     sizehint!(segments, max_cross_over)
     for i in 1:people
-        # simulate cross overs. no crossovers in first/last windows and 2 crossover cannot occur within 1 window
+        # simulate cross overs. no crossovers in first/last windows and
+        # 2 crossover cannot occur within 1 window
         cross_overs = rand(min_cross_over:max_cross_over)
         cross_over_location = collect(1:cross_overs)
         while true
-            cross_over_location .= sample((width + 1):(p - width - 1), cross_overs, replace=false) 
+            cross_over_location .= sample((width + 1):(p - width - 1),
+                cross_overs, replace=false) 
             sort!(cross_over_location)
             cross_overs == 1 && break
             minimum(diff(cross_over_location)) > width && break
@@ -326,7 +344,8 @@ function simulate_phased_genotypes(
         empty!(segments)
         push!(segments, 1:cross_over_location[1])
         for j in 1:(length(cross_over_location) - 1)
-            push!(segments, (cross_over_location[j] + 1):cross_over_location[j + 1])
+            push!(segments, 
+                (cross_over_location[j] + 1):cross_over_location[j + 1])
         end
         push!(segments, (cross_over_location[end] + 1):p)
         # fill X with 2 randomly chosen haplotypes in each segment
@@ -349,8 +368,8 @@ function simulate_phased_genotypes(
 end
 
 """
-Given a phased VCF file, transforms all heterozygote genotypes (0|1 or 1|0) to 
-(0/1). 
+Given a phased VCF file, transforms all heterozygote genotypes
+(0|1 or 1|0) to (0/1). 
 """
 function unphase(
     tgtfile::AbstractString;

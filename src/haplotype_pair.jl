@@ -143,8 +143,9 @@ end
 """
 Records optimal-redundant haplotypes for each window.
 
-Warning: This function is called in a multithreaded loop. If you modify this function
-you must check whether imputation accuracy is affected (when run with >1 threads).
+Warning: This function is called in a multithreaded loop. If you modify this
+function you must check whether imputation accuracy is affected (when run with
+>1 threads).
 
 # Arguments:
 - `window_idx`: window in current chunk
@@ -165,8 +166,10 @@ function compute_redundant_haplotypes!(
 
     @inbounds for k in 1:people
         # convert happairs from unique idx to complete idx
-        Hi_idx = unique_idx_to_complete_idx(happair1[k], window_overall, Hunique)
-        Hj_idx = unique_idx_to_complete_idx(happair2[k], window_overall, Hunique)
+        Hi_idx = unique_idx_to_complete_idx(happair1[k], window_overall,
+            Hunique)
+        Hj_idx = unique_idx_to_complete_idx(happair2[k], window_overall,
+            Hunique)
 
         # strand1
         storage1 .= false
@@ -214,7 +217,8 @@ pairs produce better error on the observed entries.
 - `haplotype1`: Person `i` strand1 haplotype in window `w` is `haplotype1[i][w]`
 - `haplotype2`: Person `i` strand2 haplotype in window `w` is `haplotype2[i][w]`
 - `compressed_Hunique`: A `CompressedHaplotypes` object
-- `X`: the full genotype matrix possibly with missings. Each column is an individual.
+- `X`: the full genotype matrix possibly with missings. Each column is an
+    individual.
 """
 function screen_flanking_windows!(
     haplotype1::AbstractVector,
@@ -373,10 +377,10 @@ end
 """
     haplopair!(X, H, M, N, happair, hapscore)
 
-Calculate the best pair of haplotypes in `H` for each individual in `X`. Overwite
-`M` by `M[i, j] = 2dot(H[:, i], H[:, j]) + sumabs2(H[:, i]) + sumabs2(H[:, j])`,
-`N` by `2X'H`, `happair` by optimal haplotype pair, and `hapscore` by
-objective value from the optimal haplotype pair.
+Calculate the best pair of haplotypes in `H` for each individual in `X`.
+Overwite `M` by `M[i, j] = 2dot(H[:, i], H[:, j]) + sumabs2(H[:, i]) + 
+sumabs2(H[:, j])`, `N` by `2X'H`, `happair` by optimal haplotype pair, and 
+`hapscore` by objective value from the optimal haplotype pair.
 
 # Input
 * `X`: `p x n` genotype matrix. Each column is an individual.
@@ -384,7 +388,8 @@ objective value from the optimal haplotype pair.
 * `M`: overwritten by `M[i, j] = 2dot(H[:, i], H[:, j]) + sumabs2(H[:, i]) +
     sumabs2(H[:, j])`.
 * `N`: overwritten by `n x d` matrix `2X'H`.
-* `happair`: optimal haplotype pair. `X[:, k] ≈ H[:, happair[k, 1]] + H[:, happair[k, 2]]`.
+* `happair`: optimal haplotype pair. `X[:, k] ≈ H[:, happair[k, 1]] + 
+    H[:, happair[k, 2]]`.
 * `hapscore`: haplotyping score. 0 means best. Larger means worse.
 """
 function haplopair!(
@@ -530,10 +535,13 @@ Fill in missing genotypes in `X` according to haplotypes. Non-missing genotypes
 remain same.
 
 # Input
-* `Xm`: `p x n` genotype matrix with missing values. Each column is an individual.
-* `Xwork`: `p x n` genotype matrix where missing values are filled with sum of 2 haplotypes.
+* `Xm`: `p x n` genotype matrix with missing values. Each column is an
+    individual.
+* `Xwork`: `p x n` genotype matrix where missing values are filled with sum of 2
+    haplotypes.
 * `H`: `p x d` haplotype matrix. Each column is a haplotype.
-* `happair`: pair of haplotypes. `X[:, k] = H[:, happair[1][k]] + H[:, happair[2][k]]`.
+* `happair`: pair of haplotypes. `X[:, k] = H[:, happair[1][k]] + 
+    H[:, happair[2][k]]`.
 """
 function fillmissing!(
     Xm::AbstractMatrix{Union{U, Missing}},
@@ -564,12 +572,14 @@ end
 """
     initXfloat!(Xfloat, X)
 
-Initializes the matrix `Xfloat` where missing values of matrix `X` by `2 x` allele frequency
-and nonmissing entries of `X` are converted to type `Float32` for subsequent BLAS routines.
+Initializes the matrix `Xfloat` where missing values of matrix `X` by `2 x`
+allele frequency and nonmissing entries of `X` are converted to type `Float32`
+for subsequent BLAS routines.
 
 # Input
 * `X` is a `p x n` genotype matrix. Each column is an individual.
-* `Xfloat` is the `p x n` matrix of X where missing values are filled by 2x allele frequency.
+* `Xfloat` is the `p x n` matrix of X where missing values are filled by 2x
+    allele frequency.
 """
 function initXfloat!(
     Xfloat::AbstractMatrix,
@@ -600,9 +610,9 @@ function initXfloat!(
         end
     end
 
-    any(isnan, Xfloat) && error("Xfloat contains NaN during initialization! Shouldn't happen!")
-    any(isinf, Xfloat) && error("Xfloat contains Inf during initialization! Shouldn't happen!")
-    any(ismissing, Xfloat) && error("Xfloat contains Missing during initialization! Shouldn't happen!")
+    any(isnan, Xfloat) && error("Xfloat has NaN during initialization!")
+    any(isinf, Xfloat) && error("Xfloat has Inf during initialization!")
+    any(ismissing, Xfloat) && error("Xfloat has Missing during initialization!")
 
     return nothing
 end
@@ -628,7 +638,8 @@ estimated memory. Total memory usage will be roughly 80% of total RAM.
 # Memory intensive items:
 - `M`: requires `d × d × 4` bytes per thread
 - `N`: requires `d × p × 4` bytes per thread
-- `redundant_haplotypes`: requires `windows × 2td × n` bits where `windows` is number of windows per chunk
+- `redundant_haplotypes`: requires `windows × 2td × n` bits where `windows` is
+    number of windows per chunk
 """
 function nchunks(
     d::Int,
@@ -661,5 +672,6 @@ function nchunks(
         Hbits += Base.summarysize(compressed_Hunique.altfreq)
     end
 
-    return round(Int, (usable_bits - Hbits - Xbits - Nbits_per_win - Mbits_per_win) / Rbits_per_win)
+    return round(Int, (usable_bits - Hbits - Xbits - 
+        Nbits_per_win - Mbits_per_win) / Rbits_per_win)
 end

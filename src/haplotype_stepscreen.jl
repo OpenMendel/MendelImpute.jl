@@ -66,7 +66,8 @@ function haplopair_stepscreen!(
         if r == 1
             haplopair_stepwise!(happair1, happair2, hapscore, M, Nt)
         else
-            haplopair_topr!(happair1, happair2, hapscore, M, Nt, r, maxindx, maxgrad)
+            haplopair_topr!(happair1, happair2, hapscore, M, Nt, r, maxindx,
+                maxgrad)
         end
     end
 
@@ -145,7 +146,8 @@ end
 """
     popinsert!(v, k, vk)
 
-Move elements in `v[2:k]` to `v[1:k-1]` and insert `vk` at position `k` of vector `v`.
+Move elements in `v[2:k]` to `v[1:k-1]` and insert `vk` at position `k` of
+vector `v`.
 """
 @inline function popinsert!(v::AbstractVector, k::Integer, vk)
     @inbounds for i in 1:k-1
@@ -155,7 +157,7 @@ Move elements in `v[2:k]` to `v[1:k-1]` and insert `vk` at position `k` of vecto
     v
 end
 
-# same as haplopair_stepwise! but searches top `r` haplotypes with largest gradient
+# same as haplopair_stepwise! but searches top `r` largest gradient
 function haplopair_topr!(
     happair1 :: AbstractVector{<:Integer},
     happair2 :: AbstractVector{<:Integer},

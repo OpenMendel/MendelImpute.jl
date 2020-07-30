@@ -44,10 +44,13 @@ function haplopair_thin_BLAS2!(
 
     # compute distances between each column of H and each column of X
     t1 = @elapsed begin
+        
         if !isnothing(allele_freq)
+            # Rij = wk * || H[:, i] - X[:, j] ||²
             pairwise!(R, WeightedSqEuclidean(allele_freq), Hwork, Xwork, dims=2)
-        else 
-            pairwise!(R, SqEuclidean(), Hwork, Xwork, dims=2) # Rij = || H[:, i] - X[:, j] ||²
+        else
+            # Rij = || H[:, i] - X[:, j] ||²
+            pairwise!(R, SqEuclidean(), Hwork, Xwork, dims=2)
         end 
     end
 
@@ -114,7 +117,8 @@ end
 """
     popinsert_rev!(v, k, vk)
 
-Move elements in `v[k:end-1]` to `v[k+1:end]` and insert `vk` at position `k` of vector `v`.
+Move elements in `v[k:end-1]` to `v[k+1:end]` and insert `vk` at position `k` of
+vector `v`.
 """
 @inline function popinsert_rev!(v::AbstractVector, k::Integer, vk)
     @inbounds for i in Iterators.reverse(k+1:length(v))

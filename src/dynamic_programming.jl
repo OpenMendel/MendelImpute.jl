@@ -1,5 +1,6 @@
 """
-Helper function to calculate the squared Hamming difference between 2 unordered pair of integers.
+Helper function to calculate the squared Hamming difference between 2 
+unordered pair of integers.
 
 # Inputs 
 - `pair1`: tuple (a, b) where a, b are integers
@@ -13,7 +14,11 @@ Helper function to calculate the squared Hamming difference between 2 unordered 
 - `pair_error((2, 5), (5, 2)  = 0` 
 - `pair_error((1, 2), (3, 4)) = 4λ`
 """
-function pair_error(pair1::T, pair2::T; λ::Real = 1.0) where T <: Tuple{Int32, Int32}
+function pair_error(
+    pair1::T, 
+    pair2::T; 
+    λ::Real = 1.0
+    ) where T <: Tuple{Int32, Int32}
     # parallel connections
     # a b
     # | |
@@ -33,16 +38,19 @@ too little typed SNPs will inherit haplotype pairs from the closest
 window containing feasible haplotype pairs. 
 
 # Inputs
-- `haplotype_set`: A person's possible haplotype pairs in each window. `(-1, -1)` indicates too little typed snps. 
+- `haplotype_set`: A person's possible haplotype pairs in each window.
 
 # Optional input:
 - `λ`: Error each switch contributes. Defaults to 1.0
 
 # Output:
-- `sol_path`: Optimal sequence of haplotype pairs indices (in the complete haplotype pool) in each window
-- `memory`: Vector of dictionary storing the optimal error for each haplotype pair in each window
+- `sol_path`: Optimal sequence of haplotype pairs indices (in the complete
+    haplotype pool) in each window
+- `memory`: Vector of dictionary storing the optimal error for each haplotype
+    pair in each window
 - `path_err`: Error for each window induced by `sol_path`
-- `best_err`: Osverall error induced by `sol_path`. Equals λ times number of switch points. 
+- `best_err`: Osverall error induced by `sol_path`. Equals λ times number of
+    switch points. 
 """
 function connect_happairs!(
     haplotype_set::Vector{Vector{T}};
@@ -56,7 +64,8 @@ function connect_happairs!(
     subtree_err = [Float64[] for i in 1:windows]
 
     # computational routine
-    best_err = connect_happairs!(sol_path, next_pair, subtree_err, haplotype_set, λ = λ)
+    best_err = connect_happairs!(sol_path, next_pair, subtree_err,
+        haplotype_set, λ = λ)
 
     return sol_path, next_pair, subtree_err, best_err
 end
@@ -68,17 +77,21 @@ too little typed SNPs will inherit haplotype pairs from the closest
 window containing feasible haplotype pairs. 
 
 # Inputs
-- `sol_path`: Optimal sequence of haplotype pairs indices (in the complete haplotype pool) in each window
-- `memory`: Vector of dictionary storing the optimal error for each haplotype pair in each window
+- `sol_path`: Optimal sequence of haplotype pairs indices (in the complete
+    haplotype pool) in each window
+- `memory`: Vector of dictionary storing the optimal error for each haplotype
+    pair in each window
 - `path_err`: Error for each window induced by `sol_path`
-- `haplotype_set`: A vector of vectors. `haplotype_set[1]` stores all pairs of haplotypes in window 1 in a vector, and so on. 
+- `haplotype_set`: A vector of vectors. `haplotype_set[1]` stores all pairs of
+    haplotypes in window 1 in a vector, and so on. 
 - `λ`: Error each switch contributes. Defaults to 1.0
 
 # Optional input:
 - `λ`: Error each switch contributes. Defaults to 1.0
 
 # Output
-- `best_err`: Overall error induced by `sol_path`. Equals λ times number of switch points. 
+- `best_err`: Overall error induced by `sol_path`. Equals λ times number of
+    switch points. 
 """
 function connect_happairs!(
     sol_path::Vector{T},
@@ -123,7 +136,7 @@ function connect_happairs!(
             push!(next_pair[w], best_next_pair)
         end
 
-        # remove pairs that are much worse than best error, reducing dp search space
+        # Heuristic to reduce dynamic programming search space
         tol = win_best_err # remove all suboptimal pairs
         for (i, err) in enumerate(subtree_err[w])
             if err > tol

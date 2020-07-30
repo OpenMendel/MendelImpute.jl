@@ -23,8 +23,9 @@ function continue_haplotype(
         return (l, k), (-1, -1)
     end
 
-    Hprev = compressed_Hunique.CW_typed[window - 1].uniqueH # unique haplotypes with only typed snps in window - 1
-    Hcurr = compressed_Hunique.CW_typed[window].uniqueH     # unique haplotypes with only typed snps in window
+    # unique haplotypes with only typed snps
+    Hprev = compressed_Hunique.CW_typed[window - 1].uniqueH
+    Hcurr = compressed_Hunique.CW_typed[window].uniqueH
 
     # only one strand matches
     if i == k && j ≠ l
@@ -110,7 +111,9 @@ function search_breakpoint(
     )
 
     n = length(X)
-    length(s1) == length(s21) == length(s22) == n || error("search_breakpoint: all vectors should have same length but length X = $n, s1 = $(length(s1)), s21 = $(length(s21)), s22 = $(length(s22))")
+    length(s1) == length(s21) == length(s22) == n ||error("search_breakpoint:" * 
+        " all vectors should have same length but length X = $n, s1 =" * 
+        " $(length(s1)), s21 = $(length(s21)), s22 = $(length(s22))")
 
     # count number of errors if second haplotype is all from s22
     errors = 0
