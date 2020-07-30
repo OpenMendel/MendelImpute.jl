@@ -28,7 +28,7 @@ module MendelImpute
     export simulate_phased_genotypes
     export connect_happairs
     export phase!, phase_fast!, phase_sample!
-    export haplopair_screen!, haplopair_lasso!
+    export haplopair_screen!, haplopair_stepscreen!
 
     # main functions that users are exposed to
     export phase
@@ -49,9 +49,9 @@ module MendelImpute
     include("data_structures.jl")
     include("phasing.jl")
     include("haplotype_pair.jl")
-    include("haplotype_pair_screen.jl")
+    include("haplotype_rescreen.jl")
     include("haplotype_thinning.jl")
-    include("haplotype_lasso.jl")
+    include("haplotype_stepscreen.jl")
     include("simulate_utilities.jl")
     include("dynamic_programming.jl")
     include("impute.jl")

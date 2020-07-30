@@ -1,20 +1,29 @@
 """
-    phase(tgtfile, reffile; [outfile], [impute], [width], [recreen], [thinning_factor], [dynamic_programming])
+    phase(tgtfile, reffile; [outfile], [impute], [width], [recreen], 
+    [thinning_factor], [dynamic_programming])
 
-Main function of MendelImpute program. Phasing (haplotying) of `tgtfile` from a pool
-of haplotypes `reffile` by sliding windows and saves result in `outfile`.
+Main function of MendelImpute program. Phasing (haplotying) of `tgtfile` from a
+pool of haplotypes `reffile` by sliding windows and saves result in `outfile`.
 
 # Input
-- `tgtfile`: VCF or PLINK files. VCF files should end in `.vcf` or `.vcf.gz`. PLINK files should exclude `.bim/.bed/.fam` suffixes but the trio must all be present in the directory.
-- `reffile`: VCF or compressed Julia binary files. VCF files should end in `.vcf` or `.vcf.gz`. Acceptable Julia binary formats includes `.jld2` (fastest read time) and `.jlso` (smallest file size).
+- `tgtfile`: VCF or PLINK files. VCF files should end in `.vcf` or `.vcf.gz`.
+    PLINK files should exclude `.bim/.bed/.fam` suffixes but the trio must all be present in the directory.
+- `reffile`: VCF or compressed Julia binary files. VCF files should end in 
+    `.vcf` or `.vcf.gz`. Acceptable Julia binary formats includes `.jld2`
+    (fastest read time) and `.jlso` (smallest file size).
 
 # Optional Inputs
-- `outfile`: output filename ending in `.vcf.gz` or `.vcf`. Output genotypes will have no missing data.
-- `impute`: If `true`, untyped SNPs will be imputed, otherwise only missing snps in `tgtfile` will be imputed.  (default `false`)
-- `phase`: If `true`, all output genotypes will be phased. Otherwise all output genotypes will be unphased.
+- `outfile`: output filename ending in `.vcf.gz` or `.vcf`. Output genotypes
+    will have no missing data.
+- `impute`: If `true`, untyped SNPs will be imputed, otherwise only missing snps
+    in `tgtfile` will be imputed.  (default `false`)
+- `phase`: If `true`, all output genotypes will be phased. Otherwise all output
+    genotypes will be unphased.
 - `width`: number of SNPs (markers) in each haplotype window. (default `512`)
-- `rescreen`: This option saves a number of top haplotype pairs when solving the least squares objective, and re-minimize least squares on just observed data.
-- `thinning_factor`: This option solves the least squares objective on only "thining_factor" unique haplotypes.
+- `rescreen`: This option saves a number of top haplotype pairs when solving the
+    least squares objective, and re-minimize least squares on just observed data.
+- `thinning_factor`: This option solves the least squares objective on only
+    "thining_factor" unique haplotypes.
 """
 function phase(
     tgtfile::AbstractString,
@@ -43,26 +52,31 @@ function phase(
     import_data_start = time()
     if endswith(reffile, ".jld2")
         @load reffile compressed_Hunique
-        width == compressed_Hunique.width || error("Specified width = $width does not equal $(compressed_Hunique.width) = width in .jdl2 file")
+        width == compressed_Hunique.width || error("Specified width = $width" *
+            " does not equal $(compressed_Hunique.width) = width in .jdl2 file")
     elseif endswith(reffile, ".jlso")
         loaded = JLSO.load(reffile)
         compressed_Hunique = loaded[:compressed_Hunique]
-        width == compressed_Hunique.width || error("Specified width = $width does not equal $(compressed_Hunique.width) = width in .jlso file")
+        width == compressed_Hunique.width || error("Specified width = $width" *
+            " does not equal $(compressed_Hunique.width) = width in .jlso file")
     elseif endswith(reffile, ".vcf") || endswith(reffile, ".vcf.gz")
-        # for VCF files, compress into jlso files and filter for unique haplotypes in each window
-        @info "VCF files detected: compressing reference file to .jlso format..."
-        compressed_Hunique = compress_haplotypes(reffile, tgtfile, "compressed." * reffile, width, dims=2, flankwidth = 0)
+        # compress and filter VCF files for unique haplotypes in each window
+        @info "VCF files detected: compressing reference file to .jlso format.."
+        compressed_Hunique = compress_haplotypes(reffile, tgtfile,
+            "compressed." * reffile, width)
     else
-        error("Unrecognized reference file format: only VCF (ends in .vcf or .vcf.gz), `.jlso`, or `.jld2` files are acceptable.")
+        error("Unrecognized reference file format: only VCF (ends in" * 
+            " .vcf or .vcf.gz), `.jlso`, or `.jld2` files are acceptable.")
     end
-
     # import genotype data
     if endswith(tgtfile, ".vcf") || endswith(tgtfile, ".vcf.gz")
-        X, X_sampleID, X_chr, X_pos, X_ids, X_ref, X_alt = VCFTools.convert_gt(UInt8, tgtfile, trans=true, save_snp_info=true, msg = "Importing genotype file...")
-    elseif isfile(tgtfile * ".bed") && isfile(tgtfile * ".fam") && isfile(tgtfile * ".bim")
+        X, X_sampleID, X_chr, X_pos, X_ids, X_ref, X_alt = 
+            VCFTools.convert_gt(UInt8, tgtfile, trans=true, 
+            save_snp_info=true, msg = "Importing genotype file...")
+    elseif isplink(tgtfile)
         # PLINK files
         X_snpdata = SnpArrays.SnpData(tgtfile)
-        X = convert(Matrix{UInt8}, X_snpdata.snparray') # transpose genotypes from rows to column
+        X = convert(Matrix{UInt8}, X_snpdata.snparray')
         X_sampleID = X_snpdata.person_info[!, :iid]
         X_chr = X_snpdata.snp_info[!, :chromosome]
         X_pos = X_snpdata.snp_info[!, :position]
@@ -70,7 +84,9 @@ function phase(
         X_ref = X_snpdata.snp_info[!, :allele1]
         X_alt = X_snpdata.snp_info[!, :allele2]
     else
-        error("Unrecognized target file format: target file can only be VCF files (ends in .vcf or .vcf.gz) or PLINK files (do not include .bim/bed/fam and all three files must exist in 1 directory)")
+        error("Unrecognized target file format: target file can only be VCF" *
+            " files (ends in .vcf or .vcf.gz) or PLINK files (do not include" *
+            " .bim/bed/fam and all three files must exist in 1 directory)")
     end
     import_data_time = time() - import_data_start
 
@@ -80,7 +96,6 @@ function phase(
     ref_snps = length(compressed_Hunique.pos)
     windows = floor(Int, tgt_snps / width)
     num_unique_haps = round(Int, avg_haplotypes_per_window(compressed_Hunique))
-    haptimers = [zeros(5*8) for _ in 1:Threads.nthreads()] # 8 for spacing
 
     # working arrays
     ph = [HaplotypeMosaicPair(ref_snps) for i in 1:people]
@@ -94,22 +109,14 @@ function phase(
     # end
 
     #
-    # compute redundant haplotype sets.
+    # find best happairs for each window
     #
     calculate_happairs_start = time()
-    # find best happairs for each window
-    haplochunk!(haplotype1, haplotype2, compressed_Hunique, X, X_pos,
-        dynamic_programming, lasso, thinning_factor, scale_allelefreq,
-        max_haplotypes, rescreen, 1:windows, haptimers)
+    haptimers = compute_optimal_haplotypes!(haplotype1, haplotype2, 
+        compressed_Hunique, X, X_pos, lasso, thinning_factor, scale_allelefreq, 
+        max_haplotypes, rescreen)
+    screen_flanking_windows!(haplotype1, haplotype2, compressed_Hunique, X)
     calculate_happairs_time = time() - calculate_happairs_start
-
-    # check whether flanking windows give better prediction
-    # screen_flanking_windows!(redundant_haplotypes, compressed_Hunique, X,
-    #     w_start:w_end, tot_windows)
-    #
-    # # expand to redundant haplotypes
-    # find_redundant_haplotypes!(redundant_haplotypes, compressed_Hunique,
-    #     w_start:w_end)
 
     #
     # phasing (haplotyping) + breakpoint search
@@ -117,7 +124,7 @@ function phase(
     phase_start = time()
     if dynamic_programming
         phase!(ph, X, compressed_Hunique, redundant_haplotypes, X_pos,
-            1:windows) # dynamic programming
+        1:windows) # dynamic programming
     else
         phase_fast!(ph, X, compressed_Hunique, haplotype1, haplotype2, X_pos,
             1:windows) # phase window-by-window
@@ -128,7 +135,7 @@ function phase(
     # impute step
     #
     impute_start = time()
-    XtoH_idx = indexin(X_pos, compressed_Hunique.pos) # X_pos[i] == H_pos[XtoH_idx[i]]
+    XtoH_idx = indexin(X_pos, compressed_Hunique.pos)
     if impute # imputes typed and untyped SNPs
         # convert phase's starting position from X's index to H's index
         update_marker_position!(ph, XtoH_idx)
@@ -163,22 +170,37 @@ function phase(
     end
     impute_time = time() - impute_start
 
-    haptimers = sum(haptimers) ./ Threads.nthreads()
-    println("Total windows = $windows, averaging ~ $num_unique_haps unique haplotypes per window.\n")
+    # print timing results
+    println("Total windows = $windows, averaging ~ $num_unique_haps " *
+        "unique haplotypes per window.\n")
     println("Timings: ")
-    println("    Data import                     = ", round(import_data_time, sigdigits=6), " seconds")
-    println("    Computing haplotype pair        = ", round(calculate_happairs_time, sigdigits=6), " seconds")
-    haptimers[1] != 0 && println("        screening for top haplotypes   = ", round(haptimers[1*8], sigdigits=6), " seconds per thread")
-    println("        BLAS3 mul! to get M and N      = ", round(haptimers[2*8], sigdigits=6), " seconds per thread")
-    println("        haplopair search               = ", round(haptimers[3*8], sigdigits=6), " seconds per thread")
-    haptimers[4] != 0 && println("        min least sq on observed data  = ", round(haptimers[4*8], sigdigits=6), " seconds per thread")
-    println("        finding redundant happairs     = ", round(haptimers[5*8], sigdigits=6), " seconds per thread")
-    dynamic_programming ? println("    Phasing by dynamic programming  = ", round(phase_time, sigdigits=6), " seconds") :
-                          println("    Phasing by win-win intersection = ", round(phase_time, sigdigits=6), " seconds")
-    println("    Imputation                      = ", round(impute_time, sigdigits=6), " seconds\n")
+    println("    Data import                     = ", 
+        round(import_data_time, sigdigits=6), " seconds")
+    println("    Computing haplotype pair        = ", 
+        round(calculate_happairs_time, sigdigits=6), " seconds")
+    haptimers[1] != 0 && println("        screening for top haplotypes   = ", 
+        round(haptimers[1], sigdigits=6), " seconds per thread")
+    println("        BLAS3 mul! to get M and N      = ", 
+        round(haptimers[2], sigdigits=6), " seconds per thread")
+    println("        haplopair search               = ", 
+        round(haptimers[3], sigdigits=6), " seconds per thread")
+    haptimers[4] != 0 && println("        min least sq on observed data  = ", 
+        round(haptimers[4], sigdigits=6), " seconds per thread")
+    println("        index conversion               = ", 
+        round(haptimers[5], sigdigits=6), " seconds per thread")
+    dynamic_programming ? println("    Phasing by dynamic programming  = ", 
+                          round(phase_time, sigdigits=6), " seconds") :
+                          println("    Phasing by win-win intersection = ", 
+                          round(phase_time, sigdigits=6), " seconds")
+    println("    Imputation                      = ", 
+        round(impute_time, sigdigits=6), " seconds\n")
 
     return ph
 end
+
+isplink(tgtfile::AbstractString) = isfile(tgtfile * ".bed") && 
+                                   isfile(tgtfile * ".fam") && 
+                                   isfile(tgtfile * ".bim")
 
 """
     phase!(X, H, width=400, verbose=true)

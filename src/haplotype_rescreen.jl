@@ -3,7 +3,7 @@
 ######## and then screens them each based on the observed entries.
 
 """
-    haplopair(X, H)
+    haplopair_rescreen(X, H, ...)
 
 Calculate the best pair of haplotypes in `H` for each individual in `X`. Missing data in `X`
 does not have missing data. Missing data is initialized as 2x alternate allele freq.
@@ -16,7 +16,7 @@ does not have missing data. Missing data is initialized as 2x alternate allele f
 * `happair`: optimal haplotype pairs. `X[:, k] ≈ H[:, happair[1][k]] + H[:, happair[2][k]]`.
 * `hapscore`: haplotyping score. 0 means best. Larger means worse.
 """
-function haplopair_screen!(
+function haplopair_rescreen!(
     X::AbstractMatrix,
     H::BitMatrix;
     # preallocated vectors

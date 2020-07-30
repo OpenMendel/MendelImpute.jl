@@ -1,39 +1,54 @@
 """
-    haplochunk!(redundant_haplotypes, compressed_Hunique, X, ...)
+    compute_optimal_haplotypes!(haplotype1, haplotype2, compressed_Hunique, ...)
 
-Wrapper function that computes the best haplotype pair `(hᵢ, hⱼ)` for each
-genotype vector in a given chunk.
+Computes the best haplotype pair `(hᵢ, hⱼ)` for each genotype vector `x` and 
+stores result in `haplotype1` and `haplotype2`.
 
-# There are 5 timers (some may be 0):
-t1 = screening for top haplotypes
-t2 = BLAS3 mul! to get M and N
-t3 = haplopair search
-t4 = rescreen time
-t5 = finding redundant happairs
+# Arguments
+- `haplotype1`: Person `i` strand1 haplotype in window `w` is `haplotype1[i][w]`
+- `haplotype2`: Person `i` strand2 haplotype in window `w` is `haplotype2[i][w]`
+- `compressed_Hunique`: A `CompressedHaplotypes` object
+- `X`: the full genotype matrix possibly with missings. Each column is an 
+    individual.
+- `X_pos`: Position of each SNP in `X`
+- `stepscreen`: Boolean indicating whether to use a stepwise heuristic to screen
+    for top haplotypes instead of performing global search
+- `tf`: Thinning factor. If `tf !== nothing`, will run heuristic routine to 
+    prune down number of haplotypes to search 
+- `scale_allelefreq` Boolean indicating whether to give rare SNPs more weight
+    scaled by `wᵢ = 1 / √2p(1-p)` where max weight is 2. 
+- `max_haplotypes` Maximum number of haplotypes for using to global search. 
+    This number should be specified along with `stepscreen` or `tf`.
+- `rescreen` Boolean for a more rigorous global search. 
+- `timers`
+
+# Timers:
+- `t1` = screening for top haplotypes
+- `t2` = BLAS3 mul! to get M and N
+- `t3` = haplopair search
+- `t4` = rescreen time
+- `t5` = index conversion
 """
-function haplochunk!(
+function compute_optimal_haplotypes!(
     haplotype1::AbstractVector,
     haplotype2::AbstractVector,
     compressed_Hunique::CompressedHaplotypes,
     X::AbstractMatrix,
     X_pos::AbstractVector,
-    dynamic_programming::Bool,
-    lasso::Union{Nothing, Int},
+    stepscreen::Union{Nothing, Int},
     tf::Union{Nothing, Int}, # thinning factor
     scale_allelefreq::Bool,
     max_haplotypes::Int,
     rescreen::Bool,
-    winrange::UnitRange,
-    timers::AbstractVector
     )
+    # constants
     people = size(X, 2)
     ref_snps = length(compressed_Hunique.pos)
     width = compressed_Hunique.width
-    windows = length(winrange)
+    windows = length(haplotype1[1])
     threads = Threads.nthreads()
-    tothaps = nhaplotypes(compressed_Hunique)
-    avghaps = avg_haplotypes_per_window(compressed_Hunique)
     inv_sqrt_allele_var = nothing
+    timers = [zeros(5*8) for _ in 1:Threads.nthreads()] # 8 for spacing
 
     # working arrays
     happair1 = [ones(Int32, people)           for _ in 1:threads]
@@ -48,95 +63,81 @@ function haplochunk!(
         M  = [zeros(Float32, tf, tf)    for _ in 1:threads]
         N  = [zeros(Float32, tf)        for _ in 1:threads]
     end
-    if !isnothing(lasso)
-        maxindx = [zeros(Int,     lasso) for _ in 1:threads]
-        maxgrad = [zeros(Float32, lasso) for _ in 1:threads]
-    end
-    if !dynamic_programming
-        redunhaps_bitvec1 = [falses(tothaps) for _ in 1:threads]
-        redunhaps_bitvec2 = [falses(tothaps) for _ in 1:threads]
+    if !isnothing(stepscreen)
+        maxindx = [zeros(Int,     stepscreen) for _ in 1:threads]
+        maxgrad = [zeros(Float32, stepscreen) for _ in 1:threads]
     end
 
     pmeter = Progress(windows, 5, "Computing optimal haplotypes...")
-    ThreadPools.@qthreads for absolute_w in winrange
-        Hw_aligned = compressed_Hunique.CW_typed[absolute_w].uniqueH
-        Xw_idx_start = (absolute_w - 1) * width + 1
-        Xw_idx_end = (absolute_w == windows ? length(X_pos) :
-            absolute_w * width)
+    ThreadPools.@qthreads for w in 1:windows
+        Hw_aligned = compressed_Hunique.CW_typed[w].uniqueH
+        Xw_idx_start = (w - 1) * width + 1
+        Xw_idx_end = (w == windows ? length(X_pos) : w * width)
         Xw_aligned = view(X, Xw_idx_start:Xw_idx_end, :)
         d  = size(Hw_aligned, 2)
         id = Threads.threadid()
 
         # weight snp by inverse allele variance if requested
         if scale_allelefreq
-            Hw_range = compressed_Hunique.start[absolute_w]:(absolute_w ==
-                total_window ? ref_snps :
-                               compressed_Hunique.start[absolute_w + 1] - 1)
-            Hw_snp_pos = indexin(X_pos[Xw_idx_start:Xw_idx_end],
+            Hw_range = compressed_Hunique.start[w]:(w ==
+                windows ? ref_snps : compressed_Hunique.start[w + 1] - 1)
+            @views Hw_snp_pos = indexin(X_pos[Xw_idx_start:Xw_idx_end],
                 compressed_Hunique.pos[Hw_range])
-            inv_sqrt_allele_var = compressed_Hunique.altfreq[Hw_snp_pos]
+            @views inv_sqrt_allele_var = compressed_Hunique.altfreq[Hw_snp_pos]
             map!(x -> x < 0.15 ? 1.98 : 1 / sqrt(2*x*(1-x)),
                 inv_sqrt_allele_var, inv_sqrt_allele_var) # set min pᵢ = 0.15
         end
 
         # compute top haplotype pairs for each sample in current window
-        if !isnothing(lasso) && d > max_haplotypes
+        if !isnothing(stepscreen) && d > max_haplotypes
             # find hᵢ via stepwise regression, then find hⱼ via global search
-            t1, t2, t3, t4 = haplopair_lasso!(Xw_aligned, Hw_aligned, r=lasso,
-                inv_sqrt_allele_var=inv_sqrt_allele_var, happair1=happair1[id],
-                happair2=happair2[id], hapscore=hapscore[id],
+            @inbounds t1, t2, t3, t4 = haplopair_stepscreen!(Xw_aligned, 
+                Hw_aligned, r=stepscreen, 
+                inv_sqrt_allele_var=inv_sqrt_allele_var, happair1=happair1[id], 
+                happair2=happair2[id], hapscore=hapscore[id], 
                 maxindx=maxindx[id], maxgrad=maxgrad[id], Xwork=Xwork[id])
         elseif !isnothing(tf) && d > max_haplotypes
             # haplotype thinning: search all (hᵢ, hⱼ) pairs where hᵢ ≈ x ≈ hⱼ
-            t1, t2, t3, t4 = haplopair_thin_BLAS2!(Xw_aligned, Hw_aligned,
-                allele_freq=inv_sqrt_allele_var, keep=tf,
+            @inbounds t1, t2, t3, t4 = haplopair_thin_BLAS2!(Xw_aligned,
+                Hw_aligned, allele_freq=inv_sqrt_allele_var, keep=tf,
                 happair1=happair1[id], happair2=happair2[id],
                 hapscore=hapscore[id], maxindx=maxindx[id], maxgrad=maxgrad[id],
                 Xi=Xi[id], N=N[id], Hk=Hk[id], M=M[id], Xwork=Xwork[id])
         elseif rescreen
             # global search + searching ||x - hᵢ - hⱼ|| on observed entries
-            t1, t2, t3, t4 = haplopair_screen!(Xw_aligned, Hw_aligned,
-                happair1=happair1[id], happair2=happair2[id],
+            @inbounds t1, t2, t3, t4 = haplopair_rescreen!(Xw_aligned, 
+                Hw_aligned, happair1=happair1[id], happair2=happair2[id],
                 hapscore=hapscore[id], Xwork=Xwork[id])
         else
             # global search
-            t1, t2, t3, t4 = haplopair!(Xw_aligned, Hw_aligned,
+            @inbounds t1, t2, t3, t4 = haplopair!(Xw_aligned, Hw_aligned,
                 inv_sqrt_allele_var=inv_sqrt_allele_var, happair1=happair1[id],
                 happair2=happair2[id], hapscore=hapscore[id], Xwork=Xwork[id])
         end
 
         # convert happairs (which index off unique haplotypes) to indices of
-        # full haplotype pool, and find all matching happairs
+        # full haplotype pool before saving
         t5 = @elapsed begin
-            # w = something(findfirst(x -> x == absolute_w, winrange)) # window index of current chunk
-            # compute_redundant_haplotypes!(redundant_haplotypes, compressed_Hunique,
-            #     happair1[id], happair2[id], w, absolute_w, redunhaps_bitvec1[id],
-            #     redunhaps_bitvec2[id])
-
-            # save_unique_only!(redundant_haplotypes, compressed_Hunique,
-            #     happair1[id], happair2[id], w, absolute_w, redunhaps_bitvec1[id],
-            #     redunhaps_bitvec2[id])
-
-            for i in 1:people
-                haplotype1[i][absolute_w] = unique_idx_to_complete_idx(
-                    happair1[id][i], absolute_w, compressed_Hunique)
-                haplotype2[i][absolute_w] = unique_idx_to_complete_idx(
-                    happair2[id][i], absolute_w, compressed_Hunique)
+            @inbounds for i in 1:people
+                haplotype1[i][w] = unique_idx_to_complete_idx(
+                    happair1[id][i], w, compressed_Hunique)
+                haplotype2[i][w] = unique_idx_to_complete_idx(
+                    happair2[id][i], w, compressed_Hunique)
             end
         end
 
         # record timings and haplotypes (× 8 to avoid false sharing)
-        timers[id][1*8] += t1
-        timers[id][2*8] += t2
-        timers[id][3*8] += t3
-        timers[id][4*8] += t4
-        timers[id][5*8] += t5
+        timers[id][8]  += t1
+        timers[id][16] += t2
+        timers[id][24] += t3
+        timers[id][32] += t4
+        timers[id][40] += t5
 
         # update progress
         next!(pmeter)
     end
 
-    return haplotype1, haplotype2
+    return sum(timers) ./ Threads.nthreads()
 end
 
 """
@@ -203,137 +204,57 @@ function compute_redundant_haplotypes!(
     return nothing
 end
 
-function save_unique_only!(
-    redundant_haplotypes::Vector{OptimalHaplotypeSet},
-    Hunique::CompressedHaplotypes,
-    happair1::AbstractVector,
-    happair2::AbstractVector,
-    window_idx::Int,
-    window_overall::Int,
-    storage1 = falses(nhaplotypes(Hunique)),
-    storage2 = falses(nhaplotypes(Hunique))
-    )
-
-    people = length(redundant_haplotypes)
-
-    @inbounds for k in 1:people
-        # convert happairs from unique idx to complete idx
-        Hi_idx = unique_idx_to_complete_idx(happair1[k], window_overall, Hunique)
-        Hj_idx = unique_idx_to_complete_idx(happair2[k], window_overall, Hunique)
-
-        # strand1: save unique index
-        storage1 .= false
-        storage1[Hi_idx] = true # Hi_idx is singleton (i.e. unique)
-
-        # strand2: save unique index
-        storage2 .= false
-        storage2[Hj_idx] = true # Hj_idx is singleton (i.e. unique)
-
-        # redundant_haplotypes[k].strand1[window_idx] = copy(storage1)
-        # redundant_haplotypes[k].strand2[window_idx] = copy(storage2)
-        if isassigned(redundant_haplotypes[k].strand1, window_idx)
-            redundant_haplotypes[k].strand1[window_idx] .= storage1
-            redundant_haplotypes[k].strand2[window_idx] .= storage2
-        else
-            redundant_haplotypes[k].strand1[window_idx] = copy(storage1)
-            redundant_haplotypes[k].strand2[window_idx] = copy(storage2)
-        end
-    end
-
-    return nothing
-end
-
 """
-For person `i`, find redundant haplotypes matching each haplotype index in
-redundant_haplotypes[i].strand1 and redundant_haplotypes[i].strand2 (which
-should record complete index).
+    screen_flanking_windows!(haplotype1, haplotype2, compressed_Hunique, X)
+
+For each window's haplotype pair, tests whether adjacent window's haplotype
+pairs produce better error on the observed entries. 
+
+# Arguments
+- `haplotype1`: Person `i` strand1 haplotype in window `w` is `haplotype1[i][w]`
+- `haplotype2`: Person `i` strand2 haplotype in window `w` is `haplotype2[i][w]`
+- `compressed_Hunique`: A `CompressedHaplotypes` object
+- `X`: the full genotype matrix possibly with missings. Each column is an individual.
 """
-function find_redundant_haplotypes!(
-    redundant_haplotypes::Vector{OptimalHaplotypeSet},
-    Hunique::CompressedHaplotypes,
-    winrange::UnitRange,
-    storage1 = falses(nhaplotypes(Hunique)),
-    storage2 = falses(nhaplotypes(Hunique))
-    )
-
-    people = length(redundant_haplotypes)
-
-    @inbounds for k in 1:people, w in winrange
-        # get complete index
-        Hi_idx = something(findfirst(redundant_haplotypes[k].strand1[w]))
-        Hj_idx = something(findfirst(redundant_haplotypes[k].strand2[w]))
-
-        # strand1
-        storage1 .= false
-        if haskey(Hunique.CW_typed[w].hapmap, Hi_idx)
-            h1_set = Hunique.CW_typed[w].hapmap[Hi_idx]
-            for i in h1_set
-                storage1[i] = true
-            end
-        else
-            storage1[Hi_idx] = true # Hi_idx is singleton (i.e. unique)
-        end
-
-        # strand2
-        storage2 .= false
-        if haskey(Hunique.CW_typed[w].hapmap, Hj_idx)
-            h2_set = Hunique.CW_typed[w].hapmap[Hj_idx]
-            for i in h2_set
-                storage2[i] = true
-            end
-        else
-            storage2[Hj_idx] = true # Hj_idx is singleton (i.e. unique)
-        end
-
-        # redundant_haplotypes[k].strand1[window_idx] = copy(storage1)
-        # redundant_haplotypes[k].strand2[window_idx] = copy(storage2)
-        if isassigned(redundant_haplotypes[k].strand1, w)
-            redundant_haplotypes[k].strand1[w] .= storage1
-            redundant_haplotypes[k].strand2[w] .= storage2
-        else
-            redundant_haplotypes[k].strand1[w] = copy(storage1)
-            redundant_haplotypes[k].strand2[w] = copy(storage2)
-        end
-    end
-
-    return nothing
-end
-
 function screen_flanking_windows!(
-    redundant_haplotypes::Vector{OptimalHaplotypeSet},
+    haplotype1::AbstractVector,
+    haplotype2::AbstractVector,
     compressed_Hunique::CompressedHaplotypes,
-    X::AbstractMatrix,
-    winrange::UnitRange,
-    total_window::Int,
+    X::AbstractMatrix
     )
 
-    people = length(redundant_haplotypes)
+    people = length(haplotype1)
     haplotypes = nhaplotypes(compressed_Hunique)
     width = compressed_Hunique.width
-    windows = length(winrange)
+    windows = length(haplotype1[1])
 
-    for absolute_w in winrange
-        w = something(findfirst(x -> x == absolute_w, winrange))
-        Hw_aligned = compressed_Hunique.CW_typed[absolute_w].uniqueH
-        Xw_idx_start = (absolute_w - 1) * width + 1
-        Xw_idx_end = (absolute_w == total_window ? size(X, 1) : absolute_w * width)
+    for w in 1:windows
+        Hw_aligned = compressed_Hunique.CW_typed[w].uniqueH
+        Xw_idx_start = (w - 1) * width + 1
+        Xw_idx_end = (w == windows ? size(X, 1) : w * width)
         Xw_aligned = view(X, Xw_idx_start:Xw_idx_end, :)
 
         for i in 1:people
             # calculate observed error for current pair
-            h1_curr_complete = something(findfirst(redundant_haplotypes[i].strand1[w])) # complete index
-            h2_curr_complete = something(findfirst(redundant_haplotypes[i].strand2[w])) # complete index
-            h1_curr = complete_idx_to_unique_typed_idx(h1_curr_complete, absolute_w, compressed_Hunique) # unique index
-            h2_curr = complete_idx_to_unique_typed_idx(h2_curr_complete, absolute_w, compressed_Hunique) # unique index
-            curr_err = observed_error(Xw_aligned, i, Hw_aligned, h1_curr, h2_curr) # calculate current erro
+            h1_curr_complete = haplotype1[i][w] # complete index
+            h2_curr_complete = haplotype2[i][w] # complete index
+            h1_curr = complete_idx_to_unique_typed_idx(h1_curr_complete, w, 
+                compressed_Hunique) # unique index
+            h2_curr = complete_idx_to_unique_typed_idx(h2_curr_complete, w, 
+                compressed_Hunique) # unique index
+            curr_err = observed_error(Xw_aligned, i, Hw_aligned, h1_curr, 
+                h2_curr)
 
             # consider previous pair
             if w != 1
-                h1_prev_complete = something(findfirst(redundant_haplotypes[i].strand1[w - 1]))
-                h2_prev_complete = something(findfirst(redundant_haplotypes[i].strand2[w - 1]))
-                h1_prev = complete_idx_to_unique_typed_idx(h1_prev_complete, absolute_w, compressed_Hunique) # unique index
-                h2_prev = complete_idx_to_unique_typed_idx(h2_prev_complete, absolute_w, compressed_Hunique) # unique index
-                prev_err = observed_error(Xw_aligned, i, Hw_aligned, h1_prev, h2_prev)
+                h1_prev_complete = haplotype1[i][w - 1]
+                h2_prev_complete = haplotype2[i][w - 1]
+                h1_prev = complete_idx_to_unique_typed_idx(h1_prev_complete, 
+                    w, compressed_Hunique)
+                h2_prev = complete_idx_to_unique_typed_idx(h2_prev_complete, 
+                    w, compressed_Hunique)
+                prev_err = observed_error(Xw_aligned, i, Hw_aligned, h1_prev, 
+                    h2_prev)
                 if prev_err < curr_err
                     h1_curr, h2_curr, curr_err = h1_prev, h2_prev, prev_err
                 end
@@ -341,23 +262,24 @@ function screen_flanking_windows!(
 
             # consider next pair
             if w != windows
-                h1_next_complete = something(findfirst(redundant_haplotypes[i].strand1[w + 1]))
-                h2_next_complete = something(findfirst(redundant_haplotypes[i].strand2[w + 1]))
-                h1_next = complete_idx_to_unique_typed_idx(h1_next_complete, absolute_w, compressed_Hunique) # unique index
-                h2_next = complete_idx_to_unique_typed_idx(h2_next_complete, absolute_w, compressed_Hunique) # unique index
-                next_err = observed_error(Xw_aligned, i, Hw_aligned, h1_next, h2_next)
+                h1_next_complete = haplotype1[i][w + 1]
+                h2_next_complete = haplotype2[i][w + 1]
+                h1_next = complete_idx_to_unique_typed_idx(h1_next_complete, 
+                    w, compressed_Hunique) # unique index
+                h2_next = complete_idx_to_unique_typed_idx(h2_next_complete, 
+                    w, compressed_Hunique) # unique index
+                next_err = observed_error(Xw_aligned, i, Hw_aligned, h1_next, 
+                    h2_next)
                 if next_err < curr_err
                     h1_curr, h2_curr, curr_err = h1_next, h2_next, next_err
                 end
             end
 
-            # convert from unique idx to complete idx
+            # convert from unique idx back to complete idx
             H1_idx = unique_idx_to_complete_idx(h1_curr, w, compressed_Hunique)
             H2_idx = unique_idx_to_complete_idx(h2_curr, w, compressed_Hunique)
-            redundant_haplotypes[i].strand1[w][h1_curr_complete] = false # reset
-            redundant_haplotypes[i].strand2[w][h2_curr_complete] = false # reset
-            redundant_haplotypes[i].strand1[w][H1_idx] = true # save best
-            redundant_haplotypes[i].strand2[w][H2_idx] = true # save best
+            haplotype1[i][w] = H1_idx
+            haplotype2[i][w] = H2_idx
         end
     end
 
@@ -433,16 +355,10 @@ function haplopair!(
     p, n  = size(X)
     d     = size(H, 2)
 
-    # reallocate matrices for last window (TODO: Hwork)
+    # reallocate matrices for last window
     if size(Xwork, 1) != p
         Xwork = zeros(Float32, p, n)
-        # Hwork = ElasticArray{Float32}(undef, p, d)
     end
-
-    # resize N
-    # ElasticArrays.resize!(N, n, d)
-    # ElasticArrays.resize!(Hwork, p, d)
-    # copyto!(Hwork, H)
 
     # initializes missing
     initXfloat!(Xwork, X)

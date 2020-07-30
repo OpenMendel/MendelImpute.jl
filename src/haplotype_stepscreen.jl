@@ -2,7 +2,7 @@
 ######## except it solves the least squares objective using a
 ######## heuristic stepwise search
 
-function haplopair_lasso!(
+function haplopair_stepscreen!(
     X::AbstractMatrix,
     H::AbstractMatrix;
     inv_sqrt_allele_var::Union{AbstractVector, Nothing} = nothing,
