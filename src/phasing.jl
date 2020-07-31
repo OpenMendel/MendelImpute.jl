@@ -122,10 +122,10 @@ function phase(
     phase_start = time()
     if dynamic_programming
         phase!(ph, X, compressed_Hunique, redundant_haplotypes, X_pos,
-            1:windows) # dynamic programming
-    else
-        phase_fast!(ph, X, compressed_Hunique, haplotype1, haplotype2, X_pos,
-            1:windows) # phase window-by-window
+            1:windows)
+    else # phase window-by-window
+        phasetimers = phase_fast!(ph, X, compressed_Hunique, haplotype1,
+            haplotype2)
     end
     phase_time = time() - phase_start
 
@@ -168,7 +168,9 @@ function phase(
     end
     impute_time = time() - impute_start
 
+    #
     # print timing results
+    #
     println("Total windows = $windows, averaging ~ $num_unique_haps " *
         "unique haplotypes per window.\n")
     println("Timings: ")
@@ -190,6 +192,14 @@ function phase(
                           round(phase_time, sigdigits=6), " seconds") :
                           println("    Phasing by win-win intersection = ", 
                           round(phase_time, sigdigits=6), " seconds")
+    if !dynamic_programming
+        println("        Window-by-window intersection  = ", 
+            round(phasetimers[1*8], sigdigits=6), " seconds per thread")
+        println("        Breakpoint search              = ", 
+            round(phasetimers[2*8], sigdigits=6), " seconds per thread")
+        println("        Recording result               = ", 
+            round(phasetimers[3*8], sigdigits=6), " seconds per thread")
+    end
     println("    Imputation                      = ", 
         round(impute_time, sigdigits=6), " seconds\n")
 
@@ -232,7 +242,6 @@ function phase!(
     snps = size(X, 1)
     width = compressed_Hunique.width
     windows = length(winrange)
-    H_pos = compressed_Hunique.pos
     chunk_offset = (first(winrange) - 1) * width
 
     # allocate working arrays
@@ -376,14 +385,34 @@ function update_phase!(ph::HaplotypeMosaic,
     return nothing
 end
 
+"""
+    phase_fast!(ph, X, compressed_Hunique, haplotype1, haplotype2)
+
+Given optimal haplotype pairs in each window, performs window-by-window 
+intersection heuristic to find longest spanning haplotypes (phasing) then
+searches for optimal breakpoint. 
+
+# Arguments
+* `ph`: A vector of `HaplotypeMosaicPair` keeping track of each person's
+    phaseinformation.
+* `X`: `p x n` matrix with missing values. Each column is genotypes of
+    an individual.
+* `compressed_Hunique`: A `CompressedHaplotypes` keeping track of unique
+    haplotypes for each window and some other information
+* `haplotype1`: `haplotype1[w]` stores a optimal haplotype for window `w`. 
+* `haplotype2`: `haplotype2[w]` stores a optimal haplotype for window `w`. 
+
+# Timers:
+- `t1` = Window-by-window intersection
+- `t2` = Breakpoint search
+- `t3` = Recording result
+"""
 function phase_fast!(
     ph::Vector{HaplotypeMosaicPair},
     X::AbstractMatrix{Union{Missing, T}},
     compressed_Hunique::CompressedHaplotypes,
     haplotype1::AbstractVector,
     haplotype2::AbstractVector,
-    X_pos::Vector{Int},
-    winrange::UnitRange
     ) where T <: Real
 
     # declare some constants
@@ -391,8 +420,7 @@ function phase_fast!(
     snps = size(X, 1)
     haplotypes = nhaplotypes(compressed_Hunique)
     width = compressed_Hunique.width
-    windows = length(winrange)
-    H_pos = compressed_Hunique.pos
+    windows = length(haplotype1[1])
 
     # working arrays
     seen = [BitSet() for _ in 1:Threads.nthreads()]
@@ -403,6 +431,7 @@ function phase_fast!(
         sizehint!(survivors1[id], haplotypes)
         sizehint!(survivors2[id], haplotypes)
     end
+    timers = [zeros(3*8) for _ in 1:Threads.nthreads()] # 8 for spacing
     pmeter = Progress(people, 5, "Phasing...")
 
     # first  1/3: ((w - 2) * width + 1):((w - 1) * width)
@@ -412,20 +441,22 @@ function phase_fast!(
         id = Threads.threadid()
 
         # First pass to phase each sample window-by-window
-        phase_sample!(haplotype1[i], haplotype2[i], compressed_Hunique,
-            seen[id], survivors1[id], survivors2[id])
+        timers[id][1*8] += @elapsed phase_sample!(haplotype1[i], haplotype2[i],
+            compressed_Hunique, seen[id], survivors1[id], survivors2[id])
 
         # record info for first window
-        hap1 = haplotype1[i][1] # complete idx
-        hap2 = haplotype2[i][1] # complete idx
-        h1 = complete_idx_to_unique_all_idx(hap1, 1, compressed_Hunique)
-        h2 = complete_idx_to_unique_all_idx(hap2, 1, compressed_Hunique)
-        push!(ph[i].strand1.start, 1)
-        push!(ph[i].strand1.window, 1)
-        push!(ph[i].strand1.haplotypelabel, h1)
-        push!(ph[i].strand2.start, 1)
-        push!(ph[i].strand2.window, 1)
-        push!(ph[i].strand2.haplotypelabel, h2)
+        timers[id][3*8] += @elapsed begin
+            hap1 = haplotype1[i][1] # complete idx
+            hap2 = haplotype2[i][1] # complete idx
+            h1 = complete_idx_to_unique_all_idx(hap1, 1, compressed_Hunique)
+            h2 = complete_idx_to_unique_all_idx(hap2, 1, compressed_Hunique)
+            push!(ph[i].strand1.start, 1)
+            push!(ph[i].strand1.window, 1)
+            push!(ph[i].strand1.haplotypelabel, h1)
+            push!(ph[i].strand2.start, 1)
+            push!(ph[i].strand2.window, 1)
+            push!(ph[i].strand2.haplotypelabel, h2)
+        end
 
         # Second pass to find optimal break points and record info to phase
         @inbounds for w in 2:windows
@@ -441,16 +472,20 @@ function phase_fast!(
             hap2_curr = haplotype2[i][w]
 
             # find optimal breakpoint if there is one
-            _, bkpts = continue_haplotype(Xwi, compressed_Hunique,
-                w, (hap1_prev, hap2_prev), (hap1_curr, hap2_curr))
+            timers[id][16] += @elapsed _, bkpts = continue_haplotype(Xwi, 
+                compressed_Hunique, w, (hap1_prev, hap2_prev),
+                (hap1_curr, hap2_curr))
 
-            # record strand 1 info
-            update_phase!(ph[i].strand1, compressed_Hunique, bkpts[1],
-                hap1_prev, hap1_curr, w, width, Xwi_start, Xwi_end)
-            # record strand 2 info
-            update_phase!(ph[i].strand2, compressed_Hunique, bkpts[2],
-                hap2_prev, hap2_curr, w, width, Xwi_start, Xwi_end)
+            timers[id][24] += @elapsed begin
+                # record strand 1 info
+                update_phase!(ph[i].strand1, compressed_Hunique, bkpts[1],
+                    hap1_prev, hap1_curr, w, width, Xwi_start, Xwi_end)
+                # record strand 2 info
+                update_phase!(ph[i].strand2, compressed_Hunique, bkpts[2],
+                    hap2_prev, hap2_curr, w, width, Xwi_start, Xwi_end)
+            end
         end
         next!(pmeter) # update progress
     end
+    return sum(timers) ./ Threads.nthreads()
 end
