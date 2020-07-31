@@ -122,7 +122,7 @@ function phase(
     phase_start = time()
     if dynamic_programming
         phase!(ph, X, compressed_Hunique, redundant_haplotypes, X_pos,
-        1:windows) # dynamic programming
+            1:windows) # dynamic programming
     else
         phase_fast!(ph, X, compressed_Hunique, haplotype1, haplotype2, X_pos,
             1:windows) # phase window-by-window
@@ -403,6 +403,7 @@ function phase_fast!(
         sizehint!(survivors1[id], haplotypes)
         sizehint!(survivors2[id], haplotypes)
     end
+    pmeter = Progress(people, 5, "Phasing...")
 
     # first  1/3: ((w - 2) * width + 1):((w - 1) * width)
     # middle 1/3: ((w - 1) * width + 1):(      w * width)
@@ -450,5 +451,6 @@ function phase_fast!(
             update_phase!(ph[i].strand2, compressed_Hunique, bkpts[2],
                 hap2_prev, hap2_curr, w, width, Xwi_start, Xwi_end)
         end
+        next!(pmeter) # update progress
     end
 end

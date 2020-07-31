@@ -2511,10 +2511,13 @@ tabix -p vcf ref.excludeTarget.vcf.gz
 # Run impute 5
 impute5 --h ref.excludeTarget.vcf.gz --m ../maps/genetic_maps.b37.tar/chr20.b37.gmap.gz --g beagle.target.phased.vcf.gz --r 20 --o impute5.imputed.vcf.gz
 
-#
 
-
-
-
-
-f
+let 
+    tot = 0
+    for (key, val) in compressed_Hunique.CW_typed[1].hapmap
+        if length(val) > 196
+            tot += 1
+        end
+    end
+    println(tot)
+end
