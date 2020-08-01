@@ -1,7 +1,7 @@
 """
     phase(tgtfile, reffile; [outfile], [impute], [phase], [width], [recreen], 
-    [max_haplotypes], [thinning_factor], [stepwise], [scale_allelefreq], 
-    [dynamic_programming], )
+    [max_haplotypes], [stepwise], [thinning_factor], [scale_allelefreq], 
+    [dynamic_programming])
 
 Main function of MendelImpute program. Phasing (haplotying) of `tgtfile` from a
 pool of haplotypes `reffile` by sliding windows and saves result in `outfile`.
@@ -9,23 +9,33 @@ pool of haplotypes `reffile` by sliding windows and saves result in `outfile`.
 # Input
 - `tgtfile`: VCF or PLINK files. VCF files should end in `.vcf` or `.vcf.gz`.
     PLINK files should exclude `.bim/.bed/.fam` suffixes but the trio must all
-    be present in the directory.
-- `reffile`: VCF or compressed Julia binary files. VCF files should end in 
+    be present in the same directory.
+- `reffile`: VCF or compressed Julia binary files. Files should end in 
     `.vcf`, `.vcf.gz`, or `.jlso` (compressed binary files).
 
 # Optional Inputs
 - `outfile`: output filename ending in `.vcf.gz` or `.vcf`. Output genotypes
     will have no missing data.
 - `impute`: If `true`, untyped SNPs will be imputed, otherwise only missing
-    snps in `tgtfile` will be imputed.  (default `false`)
+    snps in `tgtfile` will be imputed.
 - `phase`: If `true`, all output genotypes will be phased. Otherwise all
     output genotypes will be unphased.
-- `width`: number of SNPs (markers) in each haplotype window. (default `512`)
+- `width`: number of SNPs (markers) in each haplotype window.
+    Note this number is predetermined by the compression step. 
 - `rescreen`: This option saves a number of top haplotype pairs when solving
     the least squares objective, and re-minimize least squares on just
     observed data.
+- `max_haplotypes` Maximum number of haplotypes for using to global search. 
+    This number should be specified along with `stepscreen` or `thinning_factor`
+- `stepwise`: This option solves the least squares objective by first finding
+    `stepwise` top haplotypes using a stepwise heuristic then finds the next
+    haplotype using global search.
 - `thinning_factor`: This option solves the least squares objective on only
-    "thining_factor" unique haplotypes.
+    `thining_factor` unique haplotypes.
+- `scale_allelefreq` Boolean indicating whether to give rare SNPs more weight
+    scaled by `wᵢ = 1 / √2p(1-p)` where max weight is 2. 
+- `dynamic_programming` Boolean indicating whether to phase with a global 
+    search that finds the longest haplotype stretch over all windows.
 """
 function phase(
     tgtfile::AbstractString,
@@ -39,7 +49,7 @@ function phase(
     stepwise::Union{Nothing, Int} = nothing,
     thinning_factor::Union{Nothing, Int} = nothing,
     scale_allelefreq::Bool = false,
-    dynamic_programming::Bool = true,
+    dynamic_programming::Bool = false,
     )
 
     if dynamic_programming
@@ -66,6 +76,7 @@ function phase(
         error("Unrecognized reference file format: only VCF (ends in" * 
             " .vcf or .vcf.gz) or `.jlso` files are acceptable.")
     end
+
     # import genotype data
     if endswith(tgtfile, ".vcf") || endswith(tgtfile, ".vcf.gz")
         X, X_sampleID, X_chr, X_pos, X_ids, X_ref, X_alt = 
@@ -97,8 +108,8 @@ function phase(
 
     # working arrays
     ph = [HaplotypeMosaicPair(ref_snps) for i in 1:people]
-    haplotype1 = [zeros(Int32, windows) for i in 1:people]
-    haplotype2 = [zeros(Int32, windows) for i in 1:people]
+    haplotype1 = [zeros(Int, windows) for i in 1:people]
+    haplotype2 = [zeros(Int, windows) for i in 1:people]
     # if dynamic_programming
     #     redundant_haplotypes = [[Tuple{Int32, Int32}[] for i in
     #         1:num_windows_per_chunks] for j in 1:people]
@@ -424,8 +435,8 @@ function phase_fast!(
 
     # working arrays
     seen = [BitSet() for _ in 1:Threads.nthreads()]
-    survivors1 = [Int32[] for _ in 1:Threads.nthreads()]
-    survivors2 = [Int32[] for _ in 1:Threads.nthreads()]
+    survivors1 = [Int[] for _ in 1:Threads.nthreads()]
+    survivors2 = [Int[] for _ in 1:Threads.nthreads()]
     for id in 1:Threads.nthreads()
         sizehint!(seen[id], haplotypes)
         sizehint!(survivors1[id], haplotypes)
@@ -441,11 +452,11 @@ function phase_fast!(
         id = Threads.threadid()
 
         # First pass to phase each sample window-by-window
-        timers[id][1*8] += @elapsed phase_sample!(haplotype1[i], haplotype2[i],
+        timers[id][8] += @elapsed phase_sample!(haplotype1[i], haplotype2[i],
             compressed_Hunique, seen[id], survivors1[id], survivors2[id])
 
         # record info for first window
-        timers[id][3*8] += @elapsed begin
+        timers[id][24] += @elapsed begin
             hap1 = haplotype1[i][1] # complete idx
             hap2 = haplotype2[i][1] # complete idx
             h1 = complete_idx_to_unique_all_idx(hap1, 1, compressed_Hunique)

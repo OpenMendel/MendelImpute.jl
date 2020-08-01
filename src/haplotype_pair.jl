@@ -13,8 +13,8 @@ stores result in `haplotype1` and `haplotype2`.
 - `X_pos`: Position of each SNP in `X`
 - `stepscreen`: Boolean indicating whether to use a stepwise heuristic to screen
     for top haplotypes instead of performing global search
-- `tf`: Thinning factor. If `tf !== nothing`, will run heuristic routine to 
-    prune down number of haplotypes to search 
+- `tf`: This option solves the least squares objective on only
+    `tf` unique haplotypes.
 - `scale_allelefreq` Boolean indicating whether to give rare SNPs more weight
     scaled by `wᵢ = 1 / √2p(1-p)` where max weight is 2. 
 - `max_haplotypes` Maximum number of haplotypes for using to global search. 
@@ -51,8 +51,8 @@ function compute_optimal_haplotypes!(
     timers = [zeros(5*8) for _ in 1:Threads.nthreads()] # 8 for spacing
 
     # working arrays
-    happair1 = [ones(Int32, people)           for _ in 1:threads]
-    happair2 = [ones(Int32, people)           for _ in 1:threads]
+    happair1 = [ones(Int, people)           for _ in 1:threads]
+    happair2 = [ones(Int, people)           for _ in 1:threads]
     hapscore = [zeros(Float32, size(X, 2))    for _ in 1:threads]
     Xwork    = [zeros(Float32, width, people) for _ in 1:threads]
     if !isnothing(tf)
@@ -397,8 +397,8 @@ function haplopair!(
     H::AbstractMatrix{Float32},
     M::AbstractMatrix{Float32},
     N::AbstractMatrix{Float32},
-    happair1::AbstractVector{Int32},
-    happair2::AbstractVector{Int32},
+    happair1::AbstractVector{Int},
+    happair2::AbstractVector{Int},
     hapscore::AbstractVector{Float32},
     inv_sqrt_allele_var::Union{Nothing, AbstractVector}
     )
@@ -462,8 +462,8 @@ The best haplotype pairs are column indices of the filtered haplotype panels.
     in columns.
 """
 function haplopair!(
-    happair1::AbstractVector{Int32},
-    happair2::AbstractVector{Int32},
+    happair1::AbstractVector{Int},
+    happair2::AbstractVector{Int},
     hapmin::AbstractVector{Float32},
     M::AbstractMatrix{Float32},
     N::AbstractMatrix{Float32},

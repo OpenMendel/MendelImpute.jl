@@ -19,8 +19,8 @@ function phase_sample!(
     compressed_Hunique::CompressedHaplotypes,
     # preallocated items
     seen::AbstractSet=BitSet(),
-    survivors1::AbstractVector{<:Integer}=Int32[],
-    survivors2::AbstractVector{<:Integer}=Int32[],
+    survivors1::AbstractVector{<:Integer}=Int[],
+    survivors2::AbstractVector{<:Integer}=Int[],
     )
 
     windows = length(happair1)

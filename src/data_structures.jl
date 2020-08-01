@@ -1,5 +1,5 @@
 # This file stores data structures used in imputation and phasing.
-# For JLSO/JLD2 compression, the relevant data structures are in compress.jl
+# For JLSO compression, the relevant data structures are in compress.jl
 
 """
 Data structure for recording haplotype mosaic of one strand:
@@ -12,9 +12,9 @@ struct HaplotypeMosaic
     length::Int
     start::Vector{Int}
     window::Vector{Int}
-    haplotypelabel::Vector{Int32}
+    haplotypelabel::Vector{Int}
 end
-HaplotypeMosaic(len) = HaplotypeMosaic(len, Int[], Int[], Int32[])
+HaplotypeMosaic(len) = HaplotypeMosaic(len, Int[], Int[], Int[])
 
 # data structure for recording haplotype mosaic of two strands
 struct HaplotypeMosaicPair
