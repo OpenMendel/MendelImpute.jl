@@ -117,14 +117,8 @@ function compute_optimal_haplotypes!(
 
         # convert happairs (which index off unique haplotypes) to indices of
         # full haplotype pool before saving
-        t5 = @elapsed begin
-            @inbounds for i in 1:people
-                haplotype1[i][w] = unique_idx_to_complete_idx(
-                    happair1[id][i], w, compressed_Hunique)
-                haplotype2[i][w] = unique_idx_to_complete_idx(
-                    happair2[id][i], w, compressed_Hunique)
-            end
-        end
+        t5 = save_haplotypes!(haplotype1, haplotype2, happair1[id], 
+            happair2[id], compressed_Hunique, w)
 
         # record timings and haplotypes (× 8 to avoid false sharing)
         timers[id][8]  += t1
@@ -138,6 +132,25 @@ function compute_optimal_haplotypes!(
     end
 
     return sum(timers) ./ Threads.nthreads()
+end
+
+function save_haplotypes!(
+    haplotype1::Vector{Vector{Int}},
+    haplotype2::Vector{Vector{Int}},
+    happair1::Vector{Int},
+    happair2::Vector{Int},
+    compressed_Hunique::CompressedHaplotypes,
+    window::Int,
+    )
+    t5 = time()
+    people = length(haplotype1)
+    @inbounds for i in 1:people
+        haplotype1[i][window] = unique_idx_to_complete_idx(
+            happair1[i], window, compressed_Hunique)
+        haplotype2[i][window] = unique_idx_to_complete_idx(
+            happair2[i], window, compressed_Hunique)
+    end
+    return time() - t5
 end
 
 # """
