@@ -81,9 +81,9 @@ function compute_optimal_haplotypes!(
         if scale_allelefreq
             Hw_range = compressed_Hunique.start[w]:(w ==
                 windows ? ref_snps : compressed_Hunique.start[w + 1] - 1)
-            @views Hw_snp_pos = indexin(X_pos[Xw_idx_start:Xw_idx_end],
+            Hw_snp_pos = indexin(X_pos[Xw_idx_start:Xw_idx_end],
                 compressed_Hunique.pos[Hw_range])
-            @views inv_sqrt_allele_var = compressed_Hunique.altfreq[Hw_snp_pos]
+            inv_sqrt_allele_var = compressed_Hunique.altfreq[Hw_snp_pos]
             map!(x -> x < 0.15 ? 1.98 : 1 / sqrt(2*x*(1-x)),
                 inv_sqrt_allele_var, inv_sqrt_allele_var) # set min pᵢ = 0.15
         end
@@ -91,26 +91,26 @@ function compute_optimal_haplotypes!(
         # compute top haplotype pairs for each sample in current window
         if !isnothing(stepscreen) && d > max_haplotypes
             # find hᵢ via stepwise regression, then find hⱼ via global search
-            @inbounds t1, t2, t3, t4 = haplopair_stepscreen!(Xw_aligned, 
+            t1, t2, t3, t4 = haplopair_stepscreen!(Xw_aligned, 
                 Hw_aligned, r=stepscreen, 
                 inv_sqrt_allele_var=inv_sqrt_allele_var, happair1=happair1[id], 
                 happair2=happair2[id], hapscore=hapscore[id], 
                 maxindx=maxindx[id], maxgrad=maxgrad[id], Xwork=Xwork[id])
         elseif !isnothing(tf) && d > max_haplotypes
             # haplotype thinning: search all (hᵢ, hⱼ) pairs where hᵢ ≈ x ≈ hⱼ
-            @inbounds t1, t2, t3, t4 = haplopair_thin_BLAS2!(Xw_aligned,
+            t1, t2, t3, t4 = haplopair_thin_BLAS2!(Xw_aligned,
                 Hw_aligned, allele_freq=inv_sqrt_allele_var, keep=tf,
                 happair1=happair1[id], happair2=happair2[id],
                 hapscore=hapscore[id], maxindx=maxindx[id], maxgrad=maxgrad[id],
                 Xi=Xi[id], N=N[id], Hk=Hk[id], M=M[id], Xwork=Xwork[id])
         elseif rescreen
             # global search + searching ||x - hᵢ - hⱼ|| on observed entries
-            @inbounds t1, t2, t3, t4 = haplopair_rescreen!(Xw_aligned, 
+            t1, t2, t3, t4 = haplopair_rescreen!(Xw_aligned, 
                 Hw_aligned, happair1=happair1[id], happair2=happair2[id],
                 hapscore=hapscore[id], Xwork=Xwork[id])
         else
             # global search
-            @inbounds t1, t2, t3, t4 = haplopair!(Xw_aligned, Hw_aligned,
+            t1, t2, t3, t4 = haplopair!(Xw_aligned, Hw_aligned,
                 inv_sqrt_allele_var=inv_sqrt_allele_var, happair1=happair1[id],
                 happair2=happair2[id], hapscore=hapscore[id], Xwork=Xwork[id])
         end
