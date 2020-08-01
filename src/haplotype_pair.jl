@@ -39,7 +39,7 @@ function compute_optimal_haplotypes!(
     tf::Union{Nothing, Int}, # thinning factor
     scale_allelefreq::Bool,
     max_haplotypes::Int,
-    rescreen::Bool,
+    rescreen::Bool
     )
     # constants
     people = size(X, 2)
@@ -48,13 +48,14 @@ function compute_optimal_haplotypes!(
     windows = length(haplotype1[1])
     threads = Threads.nthreads()
     inv_sqrt_allele_var = nothing
-    timers = [zeros(5*8) for _ in 1:Threads.nthreads()] # 8 for spacing
 
     # working arrays
-    happair1 = [ones(Int, people)           for _ in 1:threads]
-    happair2 = [ones(Int, people)           for _ in 1:threads]
-    hapscore = [zeros(Float32, size(X, 2))    for _ in 1:threads]
-    Xwork    = [zeros(Float32, width, people) for _ in 1:threads]
+    timers = [zeros(5*8) for _ in 1:Threads.nthreads()] # 8 for spacing
+    pmeter = Progress(windows, 5, "Computing optimal haplotypes...")
+    happair1 = [ones(Int, people)             for _ in 1:Threads.nthreads()]
+    happair2 = [ones(Int, people)             for _ in 1:Threads.nthreads()]
+    hapscore = [zeros(Float32, people)        for _ in 1:Threads.nthreads()]
+    Xwork    = [zeros(Float32, width, people) for _ in 1:Threads.nthreads()]
     if !isnothing(tf)
         maxindx = [zeros(Int, tf)       for _ in 1:threads]
         maxgrad = [zeros(Float32, tf)   for _ in 1:threads]
@@ -68,7 +69,6 @@ function compute_optimal_haplotypes!(
         maxgrad = [zeros(Float32, stepscreen) for _ in 1:threads]
     end
 
-    pmeter = Progress(windows, 5, "Computing optimal haplotypes...")
     ThreadPools.@qthreads for w in 1:windows
         Hw_aligned = compressed_Hunique.CW_typed[w].uniqueH
         Xw_idx_start = (w - 1) * width + 1
@@ -115,8 +115,7 @@ function compute_optimal_haplotypes!(
                 happair2=happair2[id], hapscore=hapscore[id], Xwork=Xwork[id])
         end
 
-        # convert happairs (which index off unique haplotypes) to indices of
-        # full haplotype pool before saving
+        # save result 
         t5 = save_haplotypes!(haplotype1, haplotype2, happair1[id], 
             happair2[id], compressed_Hunique, w)
 
@@ -134,6 +133,22 @@ function compute_optimal_haplotypes!(
     return sum(timers) ./ Threads.nthreads()
 end
 
+"""
+    save_haplotypes!(haplotype1, haplotype2, happair1, happair2, ...)
+
+Helper function to convert happairs (which index off unique haplotypes) to 
+indices of full haplotype pool before saving.
+
+# Arguments
+- `haplotype1`: Person `i` strand1 haplotype in window `w` is `haplotype1[i][w]`
+- `haplotype2`: Person `i` strand2 haplotype in window `w` is `haplotype2[i][w]`
+- `happair1`: Optimal haplotype pair in strand1 of current window, indexes off
+    of unique haplotypes.
+- `happair2`: Optimal haplotype pair in strand2 of current window, indexes off
+    of unique haplotypes.
+- `compressed_Hunique`: A `CompressedHaplotypes` object
+- `window` current window.
+"""
 function save_haplotypes!(
     haplotype1::Vector{Vector{Int}},
     haplotype2::Vector{Vector{Int}},

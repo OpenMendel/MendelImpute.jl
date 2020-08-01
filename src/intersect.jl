@@ -18,7 +18,6 @@ function phase_sample!(
     happair2::AbstractVector{<:Integer},
     compressed_Hunique::CompressedHaplotypes,
     # preallocated items
-    seen::AbstractSet=BitSet(),
     survivors1::AbstractVector{<:Integer}=Int[],
     survivors2::AbstractVector{<:Integer}=Int[],
     )
@@ -46,10 +45,10 @@ function phase_sample!(
         # A   B      A   B
         # |   |  or    X
         # C   D      C   D
-        AC = intersect_size(survivors1, h1set, seen)
-        BD = intersect_size(survivors2, h2set, seen)
-        AD = intersect_size(survivors1, h2set, seen)
-        BC = intersect_size(survivors2, h1set, seen)
+        AC = intersect_size_sorted(survivors1, h1set)
+        BD = intersect_size_sorted(survivors2, h2set)
+        AD = intersect_size_sorted(survivors1, h2set)
+        BC = intersect_size_sorted(survivors2, h1set)
         crossed = false
         if AC + BD < AD + BC
             crossed = true
@@ -64,7 +63,7 @@ function phase_sample!(
                 store!(survivors1, h2set)
                 lifespan1 = 1
             else
-                intersect!(survivors1, h2set, seen)
+                intersect_sorted!(survivors1, h2set)
                 lifespan1 += 1
             end
             if BC == 0 # no survivors
@@ -72,7 +71,7 @@ function phase_sample!(
                 store!(survivors2, h1set)
                 lifespan2 = 1
             else
-                intersect!(survivors2, h1set, seen)
+                intersect_sorted!(survivors2, h1set)
                 lifespan2 += 1
             end
         else
@@ -81,7 +80,7 @@ function phase_sample!(
                 store!(survivors1, h1set)
                 lifespan1 = 1
             else
-                intersect!(survivors1, h1set, seen)
+                intersect_sorted!(survivors1, h1set)
                 lifespan1 += 1
             end
             if BD == 0 # no survivors
@@ -89,7 +88,7 @@ function phase_sample!(
                 store!(survivors2, h2set)
                 lifespan2 = 1
             else
-                intersect!(survivors2, h2set, seen)
+                intersect_sorted!(survivors2, h2set)
                 lifespan2 += 1
             end
         end
@@ -177,3 +176,79 @@ function store!(v::AbstractVector, u)
     end
     return nothing
 end
+
+"""
+    intersect_sorted!(v::AbstractVector, u::AbstractVector)
+
+Computes `v ∩ u` in place and stores result in `v`. `v` and `u` is assumed sorted.
+Repeated elements is allowed. 
+"""
+function intersect_sorted!(
+    v::AbstractVector{<:Integer}, 
+    u::AbstractVector{<:Integer}
+    )
+    lv = length(v)
+    lu = length(u)
+    i  = j = 1
+    @inbounds while i ≤ lv && j ≤ lu
+        if v[i] == u[j]
+            i += 1
+            j += 1
+        elseif v[i] > u[j]
+            j += 1
+        else
+            deleteat!(v, i)
+            lv -= 1
+        end
+    end
+    # handle remainders
+    while i ≤ lv
+        deleteat!(v, i)
+        lv -= 1
+    end
+    return nothing
+end
+function intersect_sorted!(
+    v::AbstractVector{<:Integer},
+    u::Integer
+    )
+    keep = u in v
+    empty!(v)
+    keep && push!(v, u)
+    nothing
+end
+
+"""
+    intersect_size_sorted(v::AbstractVector, u::AbstractVector)
+
+Computes the size of `v ∩ u` in place. `v` and `u` is assumed sorted.
+Repeated elements is allowed. 
+
+# Arguments
+- `v`: An integer vector
+- `u`: An integer vector
+- `seen`: Preallocated storage container
+"""
+function intersect_size_sorted(
+    v::AbstractVector{<:Integer}, 
+    u::AbstractVector{<:Integer}
+    )
+    lv = length(v)
+    lu = length(u)
+    s = 0
+    i = 1
+    j = 1
+    @inbounds while i ≤ lv && j ≤ lu
+        if v[i] == u[j]
+            s += 1
+            i += 1
+            j += 1
+        elseif v[i] > u[j]
+            j += 1
+        else
+            i += 1
+        end
+    end
+    return s
+end
+@inline intersect_size_sorted(v::AbstractVector, u::Integer) = u in v

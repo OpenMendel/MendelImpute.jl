@@ -436,11 +436,9 @@ function phase_fast!(
     windows = length(haplotype1[1])
 
     # working arrays
-    seen = [BitSet() for _ in 1:Threads.nthreads()]
     survivors1 = [Int[] for _ in 1:Threads.nthreads()]
     survivors2 = [Int[] for _ in 1:Threads.nthreads()]
     for id in 1:Threads.nthreads()
-        sizehint!(seen[id], haplotypes)
         sizehint!(survivors1[id], haplotypes)
         sizehint!(survivors2[id], haplotypes)
     end
@@ -455,7 +453,7 @@ function phase_fast!(
 
         # First pass to phase each sample window-by-window
         timers[id][8] += @elapsed phase_sample!(haplotype1[i], haplotype2[i],
-            compressed_Hunique, seen[id], survivors1[id], survivors2[id])
+            compressed_Hunique, survivors1[id], survivors2[id])
 
         # record info for first window
         timers[id][24] += @elapsed begin
