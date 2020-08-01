@@ -330,7 +330,9 @@ function phase!(
 end
 
 """
-Helper function for updating phase information after breakpoints have been
+    update_phase!(ph, compressed_Hunique, bkpt, ...)
+
+Updates a person's phase information after breakpoints have been
 identified between windows `w - 1` and `w`. Every window have 0 or 1
 breakpoint. Here indices in `ph.start` are recorded in terms of X's index.
 
