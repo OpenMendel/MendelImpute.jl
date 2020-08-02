@@ -23,12 +23,13 @@ stores result in `haplotype1` and `haplotype2`.
 - `timers`
 
 # Timers:
-- `t1` = screening for top haplotypes
+- `t1` = screening for top haplotypes (0 unless `stepscreen` or `tf` options)
 - `t2` = BLAS3 mul! to get M and N
 - `t3` = haplopair search
-- `t4` = rescreen time
+- `t4` = rescreen time (0 unless `rescreen = true`)
 - `t5` = initializing missing
-- `t6` = index conversion
+- `t6` = allocating internal matrices
+- `t7` = index conversion
 """
 function compute_optimal_haplotypes!(
     haplotype1::AbstractVector,
@@ -51,7 +52,7 @@ function compute_optimal_haplotypes!(
     inv_sqrt_allele_var = nothing
 
     # working arrays
-    timers = [zeros(6*8) for _ in 1:Threads.nthreads()] # 8 for spacing
+    timers = [zeros(7*8) for _ in 1:Threads.nthreads()] # 8 for spacing
     pmeter = Progress(windows, 5, "Computing optimal haplotypes...")
     happair1 = [ones(Int32, people)           for _ in 1:Threads.nthreads()]
     happair2 = [ones(Int32, people)           for _ in 1:Threads.nthreads()]
@@ -93,32 +94,32 @@ function compute_optimal_haplotypes!(
         # compute top haplotype pairs for each sample in current window
         if !isnothing(stepscreen) && d > max_haplotypes
             # find hᵢ via stepwise regression, then find hⱼ via global search
-            t1, t2, t3, t4, t5 = haplopair_stepscreen!(Xw_aligned, 
+            t1, t2, t3, t4, t5, t6 = haplopair_stepscreen!(Xw_aligned, 
                 Hw_aligned, r=stepscreen, 
                 inv_sqrt_allele_var=inv_sqrt_allele_var, happair1=happair1[id], 
                 happair2=happair2[id], hapscore=hapscore[id], 
                 maxindx=maxindx[id], maxgrad=maxgrad[id], Xwork=Xwork[id])
         elseif !isnothing(tf) && d > max_haplotypes
             # haplotype thinning: search all (hᵢ, hⱼ) pairs where hᵢ ≈ x ≈ hⱼ
-            t1, t2, t3, t4, t5 = haplopair_thin_BLAS2!(Xw_aligned,
+            t1, t2, t3, t4, t5, t6 = haplopair_thin_BLAS2!(Xw_aligned,
                 Hw_aligned, allele_freq=inv_sqrt_allele_var, keep=tf,
                 happair1=happair1[id], happair2=happair2[id],
                 hapscore=hapscore[id], maxindx=maxindx[id], maxgrad=maxgrad[id],
                 Xi=Xi[id], N=N[id], Hk=Hk[id], M=M[id], Xwork=Xwork[id])
         elseif rescreen
             # global search + searching ||x - hᵢ - hⱼ|| on observed entries
-            t1, t2, t3, t4, t5 = haplopair_rescreen!(Xw_aligned, 
+            t1, t2, t3, t4, t5, t6 = haplopair_rescreen!(Xw_aligned, 
                 Hw_aligned, happair1=happair1[id], happair2=happair2[id],
                 hapscore=hapscore[id], Xwork=Xwork[id])
         else
             # global search
-            t1, t2, t3, t4, t5 = haplopair!(Xw_aligned, Hw_aligned,
+            t1, t2, t3, t4, t5, t6 = haplopair!(Xw_aligned, Hw_aligned,
                 inv_sqrt_allele_var=inv_sqrt_allele_var, happair1=happair1[id],
                 happair2=happair2[id], hapscore=hapscore[id], Xwork=Xwork[id])
         end
 
         # save result 
-        t6 = @elapsed save_haplotypes!(haplotype1, haplotype2, happair1[id], 
+        t7 = @elapsed save_haplotypes!(haplotype1, haplotype2, happair1[id], 
             happair2[id], compressed_Hunique, w)
 
         # record timings and haplotypes (× 8 to avoid false sharing)
@@ -128,6 +129,7 @@ function compute_optimal_haplotypes!(
         timers[id][32] += t4
         timers[id][40] += t5
         timers[id][48] += t6
+        timers[id][56] += t7
 
         # update progress
         next!(pmeter)
@@ -139,8 +141,8 @@ end
 """
     save_haplotypes!(haplotype1, haplotype2, happair1, happair2, ...)
 
-Helper function to convert happairs (which index off unique haplotypes) to 
-indices of full haplotype pool before saving.
+Helper function to convert `happair`s (which index off unique haplotypes) to 
+indices of full haplotype pool, and store them in `haplotype`s.
 
 # Arguments
 - `haplotype1`: Person `i` strand1 haplotype in window `w` is `haplotype1[i][w]`
@@ -379,19 +381,19 @@ function haplopair!(
     hapscore::AbstractVector = Vector{Float32}(undef, size(X, 2)), # length n
     inv_sqrt_allele_var::Union{Nothing, AbstractVector} = nothing, # length p
     # preallocated matrices
-    M     :: AbstractMatrix{Float32} = Matrix{Float32}(undef, size(H, 2), size(H, 2)), # cannot be preallocated until Julia 2.0
     Xwork :: AbstractMatrix{Float32} = Matrix{Float32}(undef, size(X, 1), size(X, 2)), # p × n
-    Hwork :: AbstractMatrix{Float32} = convert(Matrix{Float32}, H),                    # p × d (not preallocated)
-    N     :: AbstractMatrix{Float32} = Matrix{Float32}(undef, size(X, 2), size(H, 2)), # n × d (not preallocated)
-    # Hwork :: ElasticArray{Float32} = convert(ElasticArrays{Float32}, H),            # p × d
-    # N     :: ElasticArray{Float32} = ElasticArrays{Float32}(undef, size(X, 2), size(H, 2)), # n × d
     )
     p, n  = size(X)
     d     = size(H, 2)
 
-    # reallocate matrices for last window
-    if size(Xwork, 1) != p
-        Xwork = zeros(Float32, p, n)
+    # allocate matrices
+    t6 = @elapsed begin
+        Hwork = convert(Matrix{Float32}, H)                # p × d
+        M = Matrix{Float32}(undef, size(H, 2), size(H, 2)) # d × d
+        N = Matrix{Float32}(undef, size(X, 2), size(H, 2)) # n × d
+        if size(Xwork, 1) != p
+            Xwork = zeros(Float32, p, n)
+        end
     end
 
     # initializes missing
@@ -401,7 +403,7 @@ function haplopair!(
         inv_sqrt_allele_var)
     t1 = t4 = 0.0 # no time spent on haplotype thinning or rescreening
 
-    return t1, t2, t3, t4, t5
+    return t1, t2, t3, t4, t5, t6
 end
 
 """

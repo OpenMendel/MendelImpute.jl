@@ -15,9 +15,6 @@ function haplopair_stepscreen!(
     maxgrad ::AbstractVector{Float32} = Vector{Float32}(undef, r),          # length r
     # preallocated matrices
     Xwork :: AbstractMatrix{Float32} = Matrix{Float32}(undef, size(X, 1), size(X, 2)), # p × n
-    Hwork :: AbstractMatrix{Float32} = convert(Matrix{Float32}, H),                    # p × d (not preallocated)
-    M     :: AbstractMatrix{Float32} = Matrix{Float32}(undef, size(H, 2), size(H, 2)), # cannot be preallocated until Julia 2.0
-    Nt    :: AbstractMatrix{Float32} = Matrix{Float32}(undef, size(H, 2), size(X, 2)), # d × n (not preallocated)
     )
 
     p, n  = size(X)
@@ -26,12 +23,17 @@ function haplopair_stepscreen!(
     # global search
     if r > d
         return haplopair!(Xw_aligned, Hw_aligned, happair1=happair1,
-            happair2=happair2, hapscore=hapscore, Xwork=Xwork, Hwork=Hwork, M=M)
+            happair2=happair2, hapscore=hapscore, Xwork=Xwork)
     end
 
-    # reallocate matrices for last window. TODO = Hwork, R
-    if size(Xwork, 1) != size(H, 1)
-        Xwork = zeros(Float32, p, n)
+    # allocate matrices
+    t6 = @elapsed begin
+        Hwork = convert(Matrix{Float32}, H)                 # p × d 
+        M  = Matrix{Float32}(undef, size(H, 2), size(H, 2)) # d × d
+        Nt = Matrix{Float32}(undef, size(H, 2), size(X, 2)) # d × n 
+        if size(Xwork, 1) != size(H, 1)
+            Xwork = zeros(Float32, p, n)
+        end
     end
 
     # initialize missing data
@@ -82,7 +84,7 @@ function haplopair_stepscreen!(
 
     t1 = t4 = 0.0 # no haplotype rescreening or computing dist(X, H)
 
-    return t1, t2, t3, t4, t5
+    return t1, t2, t3, t4, t5, t6
 end
 
 function haplopair_stepwise!(

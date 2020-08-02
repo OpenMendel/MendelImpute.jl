@@ -19,8 +19,6 @@ function haplopair_thin_BLAS2!(
     Hk    :: AbstractMatrix{Float32} = Matrix{Float32}(undef, size(H, 1), keep),       # p × keep 
     M     :: AbstractMatrix{Float32} = Matrix{Float32}(undef, keep, keep),             # keep × keep
     Xwork :: AbstractMatrix{Float32} = Matrix{Float32}(undef, size(X, 1), size(X, 2)), # p × n
-    Hwork :: AbstractMatrix{Float32} = convert(Matrix{Float32}, H),                    # p × d (not preallocated)
-    R     :: AbstractMatrix{Float32} = Matrix{Float32}(undef, size(H, 2), size(X, 2)), # d × p (not preallocated)
     )
 
     p, n = size(X)
@@ -29,14 +27,18 @@ function haplopair_thin_BLAS2!(
     # do global search for small problems 
     if keep > d
         return haplopair!(Xw_aligned, Hw_aligned, happair1=happair1, 
-            happair2=happair2, hapscore=hapscore, Xwork=Xwork, Hwork=Hwork)
+            happair2=happair2, hapscore=hapscore, Xwork=Xwork)
     end
 
     # reallocate matrices for last window. TODO = Hwork, R
-    if size(Hk, 1) != size(H, 1)
-        Hk = zeros(Float32, size(H, 1), keep)
-        Xi = zeros(Float32, size(H, 1))
-        Xwork = zeros(Float32, p, n)
+    t6 = @elapsed begin
+        Hwork = convert(Matrix{Float32}, H)                    # p × d
+        R     = Matrix{Float32}(undef, size(H, 2), size(X, 2)) # d × p
+        if size(Hk, 1) != size(H, 1)
+            Hk = zeros(Float32, size(H, 1), keep)
+            Xi = zeros(Float32, size(H, 1))
+            Xwork = zeros(Float32, p, n)
+        end
     end
 
     # initialize missing
@@ -86,7 +88,7 @@ function haplopair_thin_BLAS2!(
 
     t4 = 0.0 # no haplotype rescreening
 
-    return t1, t2, t3, t4, t5
+    return t1, t2, t3, t4, t5, t6
 end
 
 """

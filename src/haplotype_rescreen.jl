@@ -26,18 +26,20 @@ function haplopair_rescreen!(
     happair2::AbstractVector = ones(Int32, size(X, 2)),      # length n
     hapscore::AbstractVector = Vector{Float32}(undef, size(X, 2)), # length n
     # preallocated matrices
-    M     :: AbstractMatrix{Float32} = Matrix{Float32}(undef, size(H, 2), size(H, 2)), # cannot be preallocated until Julia 2.0
     Xwork :: AbstractMatrix{Float32} = Matrix{Float32}(undef, size(X, 1), size(X, 2)), # p × n
-    Hwork :: AbstractMatrix{Float32} = convert(Matrix{Float32}, H),                    # p × d (not preallocated)
-    N     :: AbstractMatrix{Float32} = Matrix{Float32}(undef, size(X, 2), size(H, 2)), # n × d (not preallocated)
     )
 
     p, n = size(X)
     d    = size(H, 2)
 
-    # reallocate matrices for last window
-    if size(Xwork, 1) != p
-        Xwork = zeros(Float32, p, n)
+    # allocate matrices
+    t6 = @elapsed begin
+        Hwork = convert(Matrix{Float32}, H)                # p × d
+        M = Matrix{Float32}(undef, size(H, 2), size(H, 2)) # d × d
+        N = Matrix{Float32}(undef, size(X, 2), size(H, 2)) # n × d
+        if size(Xwork, 1) != p
+            Xwork = zeros(Float32, p, n)
+        end
     end
 
     # initialize missings in Xwork
@@ -61,7 +63,7 @@ function haplopair_rescreen!(
     end
 
     t1 = 0.0 # no time spent on haplotype thinning
-    return t1, t2, t3, t4, t5
+    return t1, t2, t3, t4, t5, t6
 end
 
 """
