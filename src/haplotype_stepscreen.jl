@@ -172,20 +172,41 @@ function haplopair_topr!(
     ) where T <: Real
     d, n = size(Nt)
     fill!(hapmin, typemax(T))
+    chunks = div(d, 4)
     @inbounds for k in 1:n
         # find the top r haplotypes
         findtopr!(Nt, k, maxgrad, maxindx)
         # for each top haplotype, find the optimal second one
         for riter in 1:r
+            i  = 1
             i1 = maxindx[riter]
             gmax = maxgrad[riter]
-            for i in 1:d
+            for chunk in 1:chunks
                 score = M[i, i1] - gmax - Nt[i, k]
                 if score < hapmin[k]
-                    hapmin[k] = score
-                    happair1[k] = i1
-                    happair2[k] = i
+                    hapmin[k], happair1[k], happair2[k] = score, i1, i
                 end
+                score = M[i+1, i1] - gmax - Nt[i+1, k]
+                if score < hapmin[k]
+                    hapmin[k], happair1[k], happair2[k] = score, i1, i+1
+                end
+                score = M[i+2, i1] - gmax - Nt[i+2, k]
+                if score < hapmin[k]
+                    hapmin[k], happair1[k], happair2[k] = score, i1, i+2
+                end
+                score = M[i+3, i1] - gmax - Nt[i+3, k]
+                if score < hapmin[k]
+                    hapmin[k], happair1[k], happair2[k] = score, i1, i+3
+                end
+                i += 4
+            end
+            # handle remaining terms
+            while i ≤ d
+                score = M[i, i1] - gmax - Nt[i, k]
+                if score < hapmin[k]
+                    hapmin[k], happair1[k], happair2[k] = score, i1, i
+                end
+                i += 1
             end
         end
     end

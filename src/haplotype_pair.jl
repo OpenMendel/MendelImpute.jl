@@ -23,7 +23,7 @@ stores result in `haplotype1` and `haplotype2`.
 - `timers`
 
 # Timers:
-- `t1` = screening for top haplotypes (0 unless `stepscreen` or `tf` options)
+- `t1` = screening for top haplotypes (0 unless `tf` option is on)
 - `t2` = BLAS3 mul! to get M and N
 - `t3` = haplopair search
 - `t4` = rescreen time (0 unless `rescreen = true`)

@@ -189,13 +189,13 @@ function phase(
         round(import_data_time, sigdigits=6), " seconds")
     println("    Computing haplotype pair        = ", 
         round(calculate_happairs_time, sigdigits=6), " seconds")
-    haptimers[1] != 0 && println("        screening for top haplotypes   = ", 
+    haptimers[1*8] != 0 && println("        screening for top haplotypes   = ", 
         round(haptimers[1*8], sigdigits=6), " seconds per thread")
     println("        BLAS3 mul! to get M and N      = ", 
         round(haptimers[2*8], sigdigits=6), " seconds per thread")
     println("        haplopair search               = ", 
         round(haptimers[3*8], sigdigits=6), " seconds per thread")
-    haptimers[4] != 0 && println("        min least sq on observed data  = ", 
+    haptimers[4*8] != 0 && println("        min least sq on observed data  = ", 
         round(haptimers[4*8], sigdigits=6), " seconds per thread")
     println("        initializing missing           = ", 
         round(haptimers[5*8], sigdigits=6), " seconds per thread")
