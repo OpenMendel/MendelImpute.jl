@@ -197,8 +197,10 @@ function phase(
         round(haptimers[3*8], sigdigits=6), " seconds per thread")
     haptimers[4] != 0 && println("        min least sq on observed data  = ", 
         round(haptimers[4*8], sigdigits=6), " seconds per thread")
-    println("        index conversion               = ", 
+    println("        initializing missing           = ", 
         round(haptimers[5*8], sigdigits=6), " seconds per thread")
+    println("        index conversion               = ", 
+        round(haptimers[6*8], sigdigits=6), " seconds per thread")
     dynamic_programming ? println("    Phasing by dynamic programming  = ", 
                           round(phase_time, sigdigits=6), " seconds") :
                           println("    Phasing by win-win intersection = ", 

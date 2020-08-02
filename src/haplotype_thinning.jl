@@ -40,7 +40,7 @@ function haplopair_thin_BLAS2!(
     end
 
     # initialize missing
-    initXfloat!(Xwork, X)
+    t5 = @elapsed initXfloat!(Xwork, X)
 
     # compute distances between each column of H and each column of X
     t1 = @elapsed begin
@@ -86,7 +86,7 @@ function haplopair_thin_BLAS2!(
 
     t4 = 0.0 # no haplotype rescreening
 
-    return t1, t2, t3, t4
+    return t1, t2, t3, t4, t5
 end
 
 """

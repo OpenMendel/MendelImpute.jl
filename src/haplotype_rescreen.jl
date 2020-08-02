@@ -41,7 +41,7 @@ function haplopair_rescreen!(
     end
 
     # initialize missings in Xwork
-    initXfloat!(Xwork, X)
+    t5 = @elapsed initXfloat!(Xwork, X)
 
     # working array
     happairs = [Tuple{Int32, Int32}[] for i in 1:n]
@@ -61,7 +61,7 @@ function haplopair_rescreen!(
     end
 
     t1 = 0.0 # no time spent on haplotype thinning
-    return t1, t2, t3, t4
+    return t1, t2, t3, t4, t5
 end
 
 """

@@ -35,7 +35,7 @@ function haplopair_stepscreen!(
     end
 
     # initialize missing data
-    initXfloat!(Xwork, X)
+    t5 = @elapsed initXfloat!(Xwork, X)
 
     # assemble M (symmetric)
     t2 = @elapsed begin
@@ -82,7 +82,7 @@ function haplopair_stepscreen!(
 
     t1 = t4 = 0.0 # no haplotype rescreening or computing dist(X, H)
 
-    return t1, t2, t3, t4
+    return t1, t2, t3, t4, t5
 end
 
 function haplopair_stepwise!(

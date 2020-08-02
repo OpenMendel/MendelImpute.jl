@@ -27,7 +27,8 @@ stores result in `haplotype1` and `haplotype2`.
 - `t2` = BLAS3 mul! to get M and N
 - `t3` = haplopair search
 - `t4` = rescreen time
-- `t5` = index conversion
+- `t5` = initializing missing
+- `t6` = index conversion
 """
 function compute_optimal_haplotypes!(
     haplotype1::AbstractVector,
@@ -50,7 +51,7 @@ function compute_optimal_haplotypes!(
     inv_sqrt_allele_var = nothing
 
     # working arrays
-    timers = [zeros(5*8) for _ in 1:Threads.nthreads()] # 8 for spacing
+    timers = [zeros(6*8) for _ in 1:Threads.nthreads()] # 8 for spacing
     pmeter = Progress(windows, 5, "Computing optimal haplotypes...")
     happair1 = [ones(Int32, people)           for _ in 1:Threads.nthreads()]
     happair2 = [ones(Int32, people)           for _ in 1:Threads.nthreads()]
@@ -92,32 +93,32 @@ function compute_optimal_haplotypes!(
         # compute top haplotype pairs for each sample in current window
         if !isnothing(stepscreen) && d > max_haplotypes
             # find hᵢ via stepwise regression, then find hⱼ via global search
-            t1, t2, t3, t4 = haplopair_stepscreen!(Xw_aligned, 
+            t1, t2, t3, t4, t5 = haplopair_stepscreen!(Xw_aligned, 
                 Hw_aligned, r=stepscreen, 
                 inv_sqrt_allele_var=inv_sqrt_allele_var, happair1=happair1[id], 
                 happair2=happair2[id], hapscore=hapscore[id], 
                 maxindx=maxindx[id], maxgrad=maxgrad[id], Xwork=Xwork[id])
         elseif !isnothing(tf) && d > max_haplotypes
             # haplotype thinning: search all (hᵢ, hⱼ) pairs where hᵢ ≈ x ≈ hⱼ
-            t1, t2, t3, t4 = haplopair_thin_BLAS2!(Xw_aligned,
+            t1, t2, t3, t4, t5 = haplopair_thin_BLAS2!(Xw_aligned,
                 Hw_aligned, allele_freq=inv_sqrt_allele_var, keep=tf,
                 happair1=happair1[id], happair2=happair2[id],
                 hapscore=hapscore[id], maxindx=maxindx[id], maxgrad=maxgrad[id],
                 Xi=Xi[id], N=N[id], Hk=Hk[id], M=M[id], Xwork=Xwork[id])
         elseif rescreen
             # global search + searching ||x - hᵢ - hⱼ|| on observed entries
-            t1, t2, t3, t4 = haplopair_rescreen!(Xw_aligned, 
+            t1, t2, t3, t4, t5 = haplopair_rescreen!(Xw_aligned, 
                 Hw_aligned, happair1=happair1[id], happair2=happair2[id],
                 hapscore=hapscore[id], Xwork=Xwork[id])
         else
             # global search
-            t1, t2, t3, t4 = haplopair!(Xw_aligned, Hw_aligned,
+            t1, t2, t3, t4, t5 = haplopair!(Xw_aligned, Hw_aligned,
                 inv_sqrt_allele_var=inv_sqrt_allele_var, happair1=happair1[id],
                 happair2=happair2[id], hapscore=hapscore[id], Xwork=Xwork[id])
         end
 
         # save result 
-        t5 = save_haplotypes!(haplotype1, haplotype2, happair1[id], 
+        t6 = @elapsed save_haplotypes!(haplotype1, haplotype2, happair1[id], 
             happair2[id], compressed_Hunique, w)
 
         # record timings and haplotypes (× 8 to avoid false sharing)
@@ -126,6 +127,7 @@ function compute_optimal_haplotypes!(
         timers[id][24] += t3
         timers[id][32] += t4
         timers[id][40] += t5
+        timers[id][48] += t6
 
         # update progress
         next!(pmeter)
@@ -158,7 +160,6 @@ function save_haplotypes!(
     compressed_Hunique::CompressedHaplotypes,
     window::Int,
     )
-    t5 = time()
     people = length(haplotype1)
     @inbounds for i in 1:people
         haplotype1[i][window] = unique_idx_to_complete_idx(
@@ -166,7 +167,7 @@ function save_haplotypes!(
         haplotype2[i][window] = unique_idx_to_complete_idx(
             happair2[i], window, compressed_Hunique)
     end
-    return time() - t5
+    return nothing
 end
 
 # """
@@ -394,13 +395,13 @@ function haplopair!(
     end
 
     # initializes missing
-    initXfloat!(Xwork, X)
+    t5 = @elapsed initXfloat!(Xwork, X)
 
     t2, t3 = haplopair!(Xwork, Hwork, M, N, happair1, happair2, hapscore,
         inv_sqrt_allele_var)
     t1 = t4 = 0.0 # no time spent on haplotype thinning or rescreening
 
-    return t1, t2, t3, t4
+    return t1, t2, t3, t4, t5
 end
 
 """
@@ -441,10 +442,10 @@ function haplopair!(
         end
         mul!(M, Transpose(H), H)
         for j in 1:d, i in 1:(j - 1) # off-diagonal
-            M[i, j] = 2M[i, j] + M[i, i] + M[j, j]
+            @inbounds M[i, j] = 2M[i, j] + M[i, i] + M[j, j]
         end
         for j in 1:d # diagonal
-            M[j, j] *= 4
+            @inbounds M[j, j] *= 4
         end
 
         # assemble N
@@ -506,7 +507,7 @@ function haplopair!(
         Mjk = M[j, k]
         i = 1
         # loop over individuals
-        @fastmath for chunk in 1:chunks
+        for chunk in 1:chunks
             score = Mjk - N[i, j] - N[i, k]
             if score < hapmin[i]
                 hapmin[i], happair1[i], happair2[i] = score, j, k
