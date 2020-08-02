@@ -30,6 +30,7 @@ stores result in `haplotype1` and `haplotype2`.
 - `t5` = initializing missing
 - `t6` = allocating internal matrices
 - `t7` = index conversion
+- `t8` = creating views
 """
 function compute_optimal_haplotypes!(
     haplotype1::AbstractVector,
@@ -52,36 +53,40 @@ function compute_optimal_haplotypes!(
     inv_sqrt_allele_var = nothing
 
     # working arrays
-    timers = [zeros(7*8) for _ in 1:Threads.nthreads()] # 8 for spacing
+    timers = [zeros(8*8) for _ in 1:threads] # 8 for spacing
     pmeter = Progress(windows, 5, "Computing optimal haplotypes...")
-    happair1 = [ones(Int32, people)           for _ in 1:Threads.nthreads()]
-    happair2 = [ones(Int32, people)           for _ in 1:Threads.nthreads()]
-    hapscore = [zeros(Float32, people)        for _ in 1:Threads.nthreads()]
-    Xwork    = [zeros(Float32, width, people) for _ in 1:Threads.nthreads()]
-    if !isnothing(tf)
-        maxindx = [zeros(Int32, tf)     for _ in 1:threads]
-        maxgrad = [zeros(Float32, tf)   for _ in 1:threads]
-        Hk = [zeros(Float32, width, tf) for _ in 1:threads]
-        Xi = [zeros(Float32, width)     for _ in 1:threads]
-        M  = [zeros(Float32, tf, tf)    for _ in 1:threads]
-        N  = [zeros(Float32, tf)        for _ in 1:threads]
-    end
-    if !isnothing(stepscreen)
-        maxindx = [zeros(Int32,   stepscreen) for _ in 1:threads]
-        maxgrad = [zeros(Float32, stepscreen) for _ in 1:threads]
+    timers[1][48] += @elapsed begin # time for allocating
+        happair1 = [ones(Int32, people)           for _ in 1:threads]
+        happair2 = [ones(Int32, people)           for _ in 1:threads]
+        hapscore = [zeros(Float32, people)        for _ in 1:threads]
+        Xwork    = [zeros(Float32, width, people) for _ in 1:threads]
+        if !isnothing(tf)
+            maxindx = [zeros(Int32, tf)     for _ in 1:threads]
+            maxgrad = [zeros(Float32, tf)   for _ in 1:threads]
+            Hk = [zeros(Float32, width, tf) for _ in 1:threads]
+            Xi = [zeros(Float32, width)     for _ in 1:threads]
+            M  = [zeros(Float32, tf, tf)    for _ in 1:threads]
+            N  = [zeros(Float32, tf)        for _ in 1:threads]
+        end
+        if !isnothing(stepscreen)
+            maxindx = [zeros(Int32,   stepscreen) for _ in 1:threads]
+            maxgrad = [zeros(Float32, stepscreen) for _ in 1:threads]
+        end
     end
 
     # for w in 1:windows
     ThreadPools.@qthreads for w in 1:windows
-        Hw_aligned = compressed_Hunique.CW_typed[w].uniqueH
-        Xw_idx_start = (w - 1) * width + 1
-        Xw_idx_end = (w == windows ? length(X_pos) : w * width)
-        Xw_aligned = view(X, Xw_idx_start:Xw_idx_end, :)
-        d  = size(Hw_aligned, 2)
         id = Threads.threadid()
+        t8 = @elapsed begin
+            Hw_aligned = compressed_Hunique.CW_typed[w].uniqueH
+            Xw_idx_start = (w - 1) * width + 1
+            Xw_idx_end = (w == windows ? length(X_pos) : w * width)
+            Xw_aligned = view(X, Xw_idx_start:Xw_idx_end, :)
+            d  = size(Hw_aligned, 2)
+        end
 
         # weight snp by inverse allele variance if requested
-        if scale_allelefreq
+        t8 += @elapsed if scale_allelefreq
             Hw_range = compressed_Hunique.start[w]:(w ==
                 windows ? ref_snps : compressed_Hunique.start[w + 1] - 1)
             Hw_snp_pos = indexin(X_pos[Xw_idx_start:Xw_idx_end],
@@ -130,12 +135,13 @@ function compute_optimal_haplotypes!(
         timers[id][40] += t5
         timers[id][48] += t6
         timers[id][56] += t7
+        timers[id][64] += t8
 
         # update progress
         next!(pmeter)
     end
 
-    return sum(timers) ./ Threads.nthreads()
+    return sum(timers) ./ threads
 end
 
 """

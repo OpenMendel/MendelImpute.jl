@@ -203,6 +203,8 @@ function phase(
         round(haptimers[6*8], sigdigits=6), " seconds per thread")
     println("        index conversion               = ", 
         round(haptimers[7*8], sigdigits=6), " seconds per thread")
+    println("        creating views                 = ", 
+        round(haptimers[8*8], sigdigits=6), " seconds per thread")
     dynamic_programming ? println("    Phasing by dynamic programming  = ", 
                           round(phase_time, sigdigits=6), " seconds") :
                           println("    Phasing by win-win intersection = ", 
