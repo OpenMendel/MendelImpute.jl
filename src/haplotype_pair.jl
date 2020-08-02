@@ -69,6 +69,7 @@ function compute_optimal_haplotypes!(
         maxgrad = [zeros(Float32, stepscreen) for _ in 1:threads]
     end
 
+    # for w in 1:windows
     ThreadPools.@qthreads for w in 1:windows
         Hw_aligned = compressed_Hunique.CW_typed[w].uniqueH
         Xw_idx_start = (w - 1) * width + 1
@@ -481,7 +482,8 @@ for each individual in `X` using sufficient statistics `M` and `N`.
 The best haplotype pairs are column indices of the filtered haplotype panels.
 
 # Input
-* `happair`: optimal haplotype pair for each individual.
+* `happair1`: optimal haplotype in strand 1 for each individual.
+* `happair2`: optimal haplotype in strand 2 for each individual.
 * `hapmin`: minimum offered by the optimal haplotype pair.
 * `M`: `d x d` matrix with entries `M[i, j] = 2dot(H[:, i], H[:, j]) +
     sumabs2(H[:, i]) + sumabs2(H[:, j])`, where `H` is the haplotype matrix
@@ -489,6 +491,28 @@ The best haplotype pairs are column indices of the filtered haplotype panels.
 * `N`: `n x d` matrix `2X'H`, where `X` is the genotype matrix with individuals
     in columns.
 """
+# function haplopair!(
+#     happair1::AbstractVector{Int32},
+#     happair2::AbstractVector{Int32},
+#     hapmin::AbstractVector{Float32},
+#     M::AbstractMatrix{Float32},
+#     N::AbstractMatrix{Float32},
+#     )
+
+#     n, d = size(N)
+#     fill!(hapmin, Inf32)
+#     @inbounds for k in 1:d, j in 1:k
+#         Mjk = M[j, k]
+#         # loop over individuals
+#         @simd for i in 1:n
+#             score = Mjk - N[i, j] - N[i, k]
+#             if score < hapmin[i]
+#                 hapmin[i], happair1[i], happair2[i] = score, j, k
+#             end
+#         end
+#     end
+# end
+
 function haplopair!(
     happair1::AbstractVector{Int32},
     happair2::AbstractVector{Int32},
@@ -498,62 +522,40 @@ function haplopair!(
     )
 
     n, d = size(N)
+    chunks = div(n, 4)
     fill!(hapmin, Inf32)
-
     @inbounds for k in 1:d, j in 1:k
         Mjk = M[j, k]
+        i = 1
         # loop over individuals
-        @simd for i in 1:n
+        @fastmath for chunk in 1:chunks
             score = Mjk - N[i, j] - N[i, k]
-
-            # keep best happair (original code)
             if score < hapmin[i]
                 hapmin[i], happair1[i], happair2[i] = score, j, k
             end
-
-            # keep all happairs that are equally good
-            # if score < hapmin[i]
-            #     empty!(happairs[i])
-            #     push!(happairs[i], (j, k))
-            #     hapmin[i] = score
-            # elseif score == hapmin[i]
-            #     push!(happairs[i], (j, k))
-            # end
-
-            # keep happairs that within some range of best pair (but finding all of them requires a 2nd pass)
-            # if score < hapmin[i]
-            #     empty!(happairs[i])
-            #     push!(happairs[i], (j, k))
-            #     hapmin[i] = score
-            # elseif score <= hapmin[i] + tol && length(happairs[i]) < 100
-            #     push!(happairs[i], (j, k))
-            # end
-
-            # keep top 10 haplotype pairs
-            # if score < hapmin[i]
-            #     length(happairs[i]) == 10 && popfirst!(happairs[i])
-            #     push!(happairs[i], (j, k))
-            #     hapmin[i] = score
-            # elseif score <= hapmin[i] + interval
-            #     length(happairs[i]) == 10 && popfirst!(happairs[i])
-            #     push!(happairs[i], (j, k))
-            # end
-
-            # keep all previous best pairs
-            # if score < hapmin[i]
-            #     push!(happairs[i], (j, k))
-            #     hapmin[i] = score
-            # end
-
-            # keep all previous best pairs and equally good pairs
-            # if score <= hapmin[i]
-            #     push!(happairs[i], (j, k))
-            #     hapmin[i] = score
-            # end
+            score = Mjk - N[i+1, j] - N[i+1, k]
+            if score < hapmin[i+1]
+                hapmin[i+1], happair1[i+1], happair2[i+1] = score, j, k
+            end
+            score = Mjk - N[i+2, j] - N[i+2, k]
+            if score < hapmin[i+2]
+                hapmin[i+2], happair1[i+2], happair2[i+2] = score, j, k
+            end
+            score = Mjk - N[i+3, j] - N[i+3, k]
+            if score < hapmin[i+3]
+                hapmin[i+3], happair1[i+3], happair2[i+3] = score, j, k
+            end
+            i += 4
+        end
+        # handle remaining terms
+        while i ≤ n
+            score = Mjk - N[i, j] - N[i, k]
+            if score < hapmin[i]
+                hapmin[i], happair1[i], happair2[i] = score, j, k
+            end
+            i += 1
         end
     end
-
-    return nothing
 end
 
 """

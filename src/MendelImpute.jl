@@ -12,11 +12,9 @@ module MendelImpute
     using GroupSlices
     using Random
     using ProgressMeter
-    using JLD2, FileIO
     using JLSO
     using Distances
     using ThreadPools
-    # using ElasticArrays
 
     export continue_haplotype, haplopair!, haplopair, haploimpute!
     export impute!, impute_discard_phase!, search_breakpoint
