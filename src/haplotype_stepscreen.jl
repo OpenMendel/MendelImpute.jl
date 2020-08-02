@@ -8,10 +8,10 @@ function haplopair_stepscreen!(
     inv_sqrt_allele_var::Union{AbstractVector, Nothing} = nothing,
     r::Int = 1,
     # preallocated vectors
-    happair1::AbstractVector          = ones(Int, size(X, 2)),              # length n
-    happair2::AbstractVector          = ones(Int, size(X, 2)),              # length n
+    happair1::AbstractVector          = ones(Int32, size(X, 2)),            # length n
+    happair2::AbstractVector          = ones(Int32, size(X, 2)),            # length n
     hapscore::AbstractVector          = Vector{Float32}(undef, size(X, 2)), # length n
-    maxindx ::AbstractVector{Int}     = Vector{Int}(undef, r),              # length r
+    maxindx ::AbstractVector{Int32}   = Vector{Int32}(undef, r),            # length r
     maxgrad ::AbstractVector{Float32} = Vector{Float32}(undef, r),          # length r
     # preallocated matrices
     Xwork :: AbstractMatrix{Float32} = Matrix{Float32}(undef, size(X, 1), size(X, 2)), # p × n
@@ -165,7 +165,7 @@ function haplopair_topr!(
     M        :: AbstractMatrix{T}, # d x d
     Nt       :: AbstractMatrix{T}, # d x n
     r        :: Integer = 5,
-    maxindx  :: Vector{<:Integer} = Vector{Int}(undef, r),
+    maxindx  :: Vector{<:Integer} = Vector{Int32}(undef, r),
     maxgrad  :: Vector{T} = Vector{T}(undef, r)
     ) where T <: Real
     d, n = size(Nt)

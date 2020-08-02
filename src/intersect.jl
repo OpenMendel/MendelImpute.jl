@@ -18,8 +18,8 @@ function phase_sample!(
     happair2::AbstractVector{<:Integer},
     compressed_Hunique::CompressedHaplotypes,
     # preallocated items
-    survivors1::AbstractVector{<:Integer}=Int[],
-    survivors2::AbstractVector{<:Integer}=Int[],
+    survivors1::AbstractVector{<:Integer}=Int32[],
+    survivors2::AbstractVector{<:Integer}=Int32[],
     )
 
     windows = length(happair1)

@@ -108,8 +108,8 @@ function phase(
 
     # working arrays
     ph = [HaplotypeMosaicPair(ref_snps) for i in 1:people]
-    haplotype1 = [zeros(Int, windows) for i in 1:people]
-    haplotype2 = [zeros(Int, windows) for i in 1:people]
+    haplotype1 = [zeros(Int32, windows) for i in 1:people]
+    haplotype2 = [zeros(Int32, windows) for i in 1:people]
     # if dynamic_programming
     #     redundant_haplotypes = [[Tuple{Int32, Int32}[] for i in
     #         1:num_windows_per_chunks] for j in 1:people]
@@ -436,8 +436,8 @@ function phase_fast!(
     windows = length(haplotype1[1])
 
     # working arrays
-    survivors1 = [Int[] for _ in 1:Threads.nthreads()]
-    survivors2 = [Int[] for _ in 1:Threads.nthreads()]
+    survivors1 = [Int32[] for _ in 1:Threads.nthreads()]
+    survivors2 = [Int32[] for _ in 1:Threads.nthreads()]
     for id in 1:Threads.nthreads()
         sizehint!(survivors1[id], haplotypes)
         sizehint!(survivors2[id], haplotypes)
@@ -448,7 +448,8 @@ function phase_fast!(
     # first  1/3: ((w - 2) * width + 1):((w - 1) * width)
     # middle 1/3: ((w - 1) * width + 1):(      w * width)
     # last   1/3: (      w * width + 1):((w + 1) * width)
-    ThreadPools.@qthreads for i in 1:people
+    # ThreadPools.@qthreads for i in 1:people
+    for i in 1:people
         id = Threads.threadid()
 
         # First pass to phase each sample window-by-window

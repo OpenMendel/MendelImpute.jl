@@ -22,8 +22,8 @@ function haplopair_rescreen!(
     X::AbstractMatrix,
     H::BitMatrix;
     # preallocated vectors
-    happair1::AbstractVector = ones(Int, size(X, 2)),      # length n
-    happair2::AbstractVector = ones(Int, size(X, 2)),      # length n
+    happair1::AbstractVector = ones(Int32, size(X, 2)),      # length n
+    happair2::AbstractVector = ones(Int32, size(X, 2)),      # length n
     hapscore::AbstractVector = Vector{Float32}(undef, size(X, 2)), # length n
     # preallocated matrices
     M     :: AbstractMatrix{Float32} = Matrix{Float32}(undef, size(H, 2), size(H, 2)), # cannot be preallocated until Julia 2.0

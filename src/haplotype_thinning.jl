@@ -8,10 +8,10 @@ function haplopair_thin_BLAS2!(
     allele_freq::Union{AbstractVector, Nothing} = nothing,
     keep::Int = 100,
     # preallocated vectors
-    happair1:: AbstractVector{Int}     = ones(Int, size(X, 2)),      # length n 
-    happair2:: AbstractVector{Int}     = ones(Int, size(X, 2)),      # length n
+    happair1:: AbstractVector{Int32}   = ones(Int32, size(X, 2)),      # length n 
+    happair2:: AbstractVector{Int32}   = ones(Int32, size(X, 2)),      # length n
     hapscore:: AbstractVector{Float32} = Vector{Float32}(undef, size(X, 2)), # length n
-    maxindx :: AbstractVector{Int}     = Vector{Int}(undef, keep),           # length keep
+    maxindx :: AbstractVector{Int32}   = Vector{Int32}(undef, keep),           # length keep
     maxgrad :: AbstractVector{Float32} = Vector{Float32}(undef, keep),       # length keep
     Xi      :: AbstractVector{Float32} = Vector{Float32}(undef, size(H, 1)), # length p
     N       :: AbstractVector{Float32} = Vector{Float32}(undef, keep),       # length keep

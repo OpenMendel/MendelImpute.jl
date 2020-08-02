@@ -52,12 +52,12 @@ function compute_optimal_haplotypes!(
     # working arrays
     timers = [zeros(5*8) for _ in 1:Threads.nthreads()] # 8 for spacing
     pmeter = Progress(windows, 5, "Computing optimal haplotypes...")
-    happair1 = [ones(Int, people)             for _ in 1:Threads.nthreads()]
-    happair2 = [ones(Int, people)             for _ in 1:Threads.nthreads()]
+    happair1 = [ones(Int32, people)           for _ in 1:Threads.nthreads()]
+    happair2 = [ones(Int32, people)           for _ in 1:Threads.nthreads()]
     hapscore = [zeros(Float32, people)        for _ in 1:Threads.nthreads()]
     Xwork    = [zeros(Float32, width, people) for _ in 1:Threads.nthreads()]
     if !isnothing(tf)
-        maxindx = [zeros(Int, tf)       for _ in 1:threads]
+        maxindx = [zeros(Int32, tf)     for _ in 1:threads]
         maxgrad = [zeros(Float32, tf)   for _ in 1:threads]
         Hk = [zeros(Float32, width, tf) for _ in 1:threads]
         Xi = [zeros(Float32, width)     for _ in 1:threads]
@@ -65,7 +65,7 @@ function compute_optimal_haplotypes!(
         N  = [zeros(Float32, tf)        for _ in 1:threads]
     end
     if !isnothing(stepscreen)
-        maxindx = [zeros(Int,     stepscreen) for _ in 1:threads]
+        maxindx = [zeros(Int32,   stepscreen) for _ in 1:threads]
         maxgrad = [zeros(Float32, stepscreen) for _ in 1:threads]
     end
 
@@ -150,10 +150,10 @@ indices of full haplotype pool before saving.
 - `window` current window.
 """
 function save_haplotypes!(
-    haplotype1::Vector{Vector{Int}},
-    haplotype2::Vector{Vector{Int}},
-    happair1::Vector{Int},
-    happair2::Vector{Int},
+    haplotype1::Vector{Vector{Int32}},
+    haplotype2::Vector{Vector{Int32}},
+    happair1::Vector{Int32},
+    happair2::Vector{Int32},
     compressed_Hunique::CompressedHaplotypes,
     window::Int,
     )
@@ -372,8 +372,8 @@ function haplopair!(
     X::AbstractMatrix, # p × n
     H::AbstractMatrix; # p × d
     # preallocated vectors
-    happair1::AbstractVector = ones(Int, size(X, 2)), # length n
-    happair2::AbstractVector = ones(Int, size(X, 2)), # length n
+    happair1::AbstractVector = ones(Int32, size(X, 2)), # length n
+    happair2::AbstractVector = ones(Int32, size(X, 2)), # length n
     hapscore::AbstractVector = Vector{Float32}(undef, size(X, 2)), # length n
     inv_sqrt_allele_var::Union{Nothing, AbstractVector} = nothing, # length p
     # preallocated matrices
@@ -425,8 +425,8 @@ function haplopair!(
     H::AbstractMatrix{Float32},
     M::AbstractMatrix{Float32},
     N::AbstractMatrix{Float32},
-    happair1::AbstractVector{Int},
-    happair2::AbstractVector{Int},
+    happair1::AbstractVector{Int32},
+    happair2::AbstractVector{Int32},
     hapscore::AbstractVector{Float32},
     inv_sqrt_allele_var::Union{Nothing, AbstractVector}
     )
@@ -490,8 +490,8 @@ The best haplotype pairs are column indices of the filtered haplotype panels.
     in columns.
 """
 function haplopair!(
-    happair1::AbstractVector{Int},
-    happair2::AbstractVector{Int},
+    happair1::AbstractVector{Int32},
+    happair2::AbstractVector{Int32},
     hapmin::AbstractVector{Float32},
     M::AbstractMatrix{Float32},
     N::AbstractMatrix{Float32},
@@ -575,7 +575,7 @@ function fillmissing!(
     Xm::AbstractMatrix{Union{U, Missing}},
     Xwork::AbstractMatrix{T},
     H::AbstractMatrix{T},
-    happairs::Vector{Vector{Tuple{Int, Int}}},
+    happairs::Vector{Vector{Tuple{Int32, Int32}}},
     ) where {T, U}
 
     p, n = size(Xm)

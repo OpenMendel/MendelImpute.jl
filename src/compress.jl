@@ -20,7 +20,7 @@ then
     uniqueindex = [1, 2, 4, 6]
     to_unique = [1, 2, 2, 3, 2, 4, 1, 4, 1]
     uniqueH = [a b c d]
-    hapmap = `Dict{Int64,Array{Int64,1}} with 3 entry:
+    hapmap = `Dict{Int32,Array{Int32,1}} with 3 entry:
         1 => [1, 7, 9]
         2 => [2, 3, 5]
         6 => [6, 8]`
@@ -28,9 +28,9 @@ then
 where `4 => [4]` in `hapmap` has been skipped since it is a singleton.
 """
 struct CompressedWindow
-    uniqueindex::Vector{Int}
-    hapmap::Dict{Int64, Vector{Int64}}
-    to_unique::Vector{Int}
+    uniqueindex::Vector{Int32}
+    hapmap::Dict{Int32, Vector{Int32}}
+    to_unique::Vector{Int32}
     uniqueH::BitMatrix
 end
 
@@ -204,7 +204,7 @@ function compress_haplotypes(H::AbstractMatrix, X::AbstractMatrix,
         # find unique haplotypes on all SNPs
         mapping = groupslices(Hw, dims = 2)
         unique_idx = unique(mapping)
-        hapmap = Dict{Int, Vector{Int}}()
+        hapmap = Dict{Int32, Vector{Int32}}()
         for idx in unique_idx
             redundant_haplotypes = findall(x -> x == idx, mapping)
             if length(redundant_haplotypes) == 1
@@ -221,7 +221,7 @@ function compress_haplotypes(H::AbstractMatrix, X::AbstractMatrix,
         # find unique haplotypes on typed SNPs
         mapping_typed = groupslices(Hw_typed, dims = 2)
         unique_idx_typed = unique(mapping_typed)
-        hapmap_typed = Dict{Int, Vector{Int}}()
+        hapmap_typed = Dict{Int32, Vector{Int32}}()
         for idx in unique_idx_typed
             redundant_haplotypes = findall(x -> x == idx, mapping_typed)
             if length(redundant_haplotypes) == 1
