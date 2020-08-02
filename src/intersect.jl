@@ -63,7 +63,7 @@ function phase_sample!(
                 store!(survivors1, h2set)
                 lifespan1 = 1
             else
-                intersect_sorted!(survivors1, h2set)
+                intersect_lange!(survivors1, h2set)
                 lifespan1 += 1
             end
             if BC == 0 # no survivors
@@ -71,7 +71,7 @@ function phase_sample!(
                 store!(survivors2, h1set)
                 lifespan2 = 1
             else
-                intersect_sorted!(survivors2, h1set)
+                intersect_lange!(survivors2, h1set)
                 lifespan2 += 1
             end
         else
@@ -80,7 +80,7 @@ function phase_sample!(
                 store!(survivors1, h1set)
                 lifespan1 = 1
             else
-                intersect_sorted!(survivors1, h1set)
+                intersect_lange!(survivors1, h1set)
                 lifespan1 += 1
             end
             if BD == 0 # no survivors
@@ -88,7 +88,7 @@ function phase_sample!(
                 store!(survivors2, h2set)
                 lifespan2 = 1
             else
-                intersect_sorted!(survivors2, h2set)
+                intersect_lange!(survivors2, h2set)
                 lifespan2 += 1
             end
         end
@@ -252,3 +252,27 @@ function intersect_size_sorted(
     return s
 end
 @inline intersect_size_sorted(v::AbstractVector, u::Integer) = u in v
+
+function intersect_lange!(v::Vector{T}, u::Vector{T}) where T <: Integer
+    lv = length(v)
+    lu = length(u)
+    s = 0
+    i = 1
+    j = 1
+    @inbounds while i ≤ lv && j ≤ lu
+        if v[i] == u[j]
+            s += 1
+            v[s] = v[i]
+            i += 1
+            j += 1
+        elseif v[i] > u[j]
+            j += 1
+        else
+            i += 1
+        end
+    end
+    deleteat!(v, s+1:lv)
+    return nothing
+end
+intersect_lange!(v::AbstractVector{<:Integer}, u::Integer) = 
+    intersect_sorted!(v, u)
