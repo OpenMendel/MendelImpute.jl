@@ -102,69 +102,6 @@ function phase_sample!(
 end
 
 """
-    intersect!(v::AbstractVector, u::AbstractVector, seen::BitSet=BitSet())
-
-Computes `v ∩ u` in place and stores result in `v`.
-
-# Arguments
-- `v`: An integer vector
-- `u`: An integer vector
-- `seen`: Preallocated storage container
-"""
-function intersect!(
-    v::AbstractVector{<:Integer},
-    u::AbstractVector{<:Integer},
-    seen::AbstractSet
-    )
-    empty!(seen)
-    for i in u
-        push!(seen, i)
-    end
-    for i in Iterators.reverse(eachindex(v))
-        @inbounds v[i] ∉ seen && deleteat!(v, i)
-    end
-    nothing
-end
-function intersect!(
-    v::AbstractVector{<:Integer},
-    u::Integer,
-    seen::AbstractSet
-    )
-    keep = u in v
-    empty!(v)
-    keep && push!(v, u)
-    nothing
-end
-
-"""
-    intersect_size(v::AbstractVector, u::AbstractVector, seen::BitSet=BitSet())
-
-Computes the size of `v ∩ u` in place. Assumes `v` is usually smaller than `u`
-and each element in `v` is unique.
-
-# Arguments
-- `v`: An integer vector
-- `u`: An integer vector
-- `seen`: Preallocated storage container
-"""
-function intersect_size(
-    v::AbstractVector{<:Integer},
-    u::AbstractVector{<:Integer},
-    seen::AbstractSet=BitSet()
-    )
-    empty!(seen)
-    for i in u
-        push!(seen, i)
-    end
-    s = 0
-    for i in eachindex(v)
-        @inbounds v[i] ∈ seen && (s += 1)
-    end
-    return s
-end
-intersect_size(v::AbstractVector, u::Integer, seen) = u in v
-
-"""
     store!(v, u)
 
 Deletes everything in `v` and saves each element of `u` to `v`.
@@ -180,8 +117,8 @@ end
 """
     intersect_sorted!(v::AbstractVector, u::AbstractVector)
 
-Computes `v ∩ u` in place and stores result in `v`. `v` and `u` is assumed sorted.
-Repeated elements is allowed. 
+Computes `v ∩ u` in place and stores result in `v`. `v` and `u` is assumed
+sorted. Repeated elements is allowed. 
 """
 function intersect_sorted!(
     v::AbstractVector{<:Integer}, 
@@ -208,6 +145,7 @@ function intersect_sorted!(
     end
     return nothing
 end
+
 function intersect_sorted!(
     v::AbstractVector{<:Integer},
     u::Integer
@@ -227,7 +165,6 @@ Repeated elements is allowed.
 # Arguments
 - `v`: An integer vector
 - `u`: An integer vector
-- `seen`: Preallocated storage container
 """
 function intersect_size_sorted(
     v::AbstractVector{<:Integer}, 
@@ -251,8 +188,14 @@ function intersect_size_sorted(
     end
     return s
 end
-@inline intersect_size_sorted(v::AbstractVector, u::Integer) = u in v
+intersect_size_sorted(v::AbstractVector, u::Integer) = u in v
 
+"""
+    intersect_lange!(v::AbstractVector, u::AbstractVector)
+
+Computes `v ∩ u` in place and stores result in `v`. `v` and `u` is assumed
+sorted. Repeated elements is allowed. 
+"""
 function intersect_lange!(v::Vector{T}, u::Vector{T}) where T <: Integer
     lv = length(v)
     lu = length(u)

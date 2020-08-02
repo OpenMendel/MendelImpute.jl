@@ -491,28 +491,6 @@ The best haplotype pairs are column indices of the filtered haplotype panels.
 * `N`: `n x d` matrix `2X'H`, where `X` is the genotype matrix with individuals
     in columns.
 """
-# function haplopair!(
-#     happair1::AbstractVector{Int32},
-#     happair2::AbstractVector{Int32},
-#     hapmin::AbstractVector{Float32},
-#     M::AbstractMatrix{Float32},
-#     N::AbstractMatrix{Float32},
-#     )
-
-#     n, d = size(N)
-#     fill!(hapmin, Inf32)
-#     @inbounds for k in 1:d, j in 1:k
-#         Mjk = M[j, k]
-#         # loop over individuals
-#         @simd for i in 1:n
-#             score = Mjk - N[i, j] - N[i, k]
-#             if score < hapmin[i]
-#                 hapmin[i], happair1[i], happair2[i] = score, j, k
-#             end
-#         end
-#     end
-# end
-
 function haplopair!(
     happair1::AbstractVector{Int32},
     happair2::AbstractVector{Int32},
