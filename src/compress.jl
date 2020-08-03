@@ -69,6 +69,21 @@ CompressedHaplotypes(windows::Int, width, sampleID, chr, pos, SNPid, ref, alt,
 
 nhaplotypes(x::CompressedHaplotypes) = 2length(x.sampleID)
 windows(x::CompressedHaplotypes) = length(x.CW)
+function max_haplotypes_per_window(Hunique::CompressedHaplotypes)
+    m = 0
+    for w in 1:win
+        num = length(Hunique.CW_typed[w].uniqueindex)
+        num > m && (m = num)
+    end
+    return m
+end
+function max_haplotypes_per_window(reffile::String)
+    endswith(reffile, ".jlso") || error("count_haplotypes_per_window can only" *
+        " be called on a `CompressedHaplotypes` or `.jlso` files.")
+    loaded = JLSO.load(reffile)
+    compressed_Hunique = loaded[:compressed_Hunique]
+    return max_haplotypes_per_window(compressed_Hunique)
+end
 function count_haplotypes_per_window(Hunique::CompressedHaplotypes)
     win = windows(Hunique)
     unique_haplotype_counts = zeros(Int, win)

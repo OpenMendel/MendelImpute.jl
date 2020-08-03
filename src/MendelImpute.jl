@@ -32,9 +32,9 @@ module MendelImpute
     export phase
     export compress_haplotypes
     export nhaplotypes, windows, count_haplotypes_per_window
-    export avg_haplotypes_per_window, nchunks
+    export avg_haplotypes_per_window, nchunks, max_haplotypes_per_window
 
-    export OptimalHaplotypeSet, compute_optimal_halotype_set
+    export compute_optimal_haplotypes!
     export make_refvcf_file, make_tgtvcf_file
     export simulate_uniform_haplotypes, simulate_markov_haplotypes
     export simulate_genotypes
