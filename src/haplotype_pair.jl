@@ -54,7 +54,6 @@ function compute_optimal_haplotypes!(
 
     # allocate working arrays
     timers = [zeros(7*8) for _ in 1:threads] # 8 for spacing
-    pmeter = Progress(windows, 5, "Computing optimal haplotypes...")
     timers[1][48] += @elapsed begin # time for allocating
         happair1 = [ones(Int32, people)           for _ in 1:threads]
         happair2 = [ones(Int32, people)           for _ in 1:threads]
@@ -79,6 +78,7 @@ function compute_optimal_haplotypes!(
             N = [zeros(Float32, people, max_d) for _ in 1:threads]
         end
     end
+    pmeter = Progress(windows, 5, "Computing optimal haplotypes...")
 
     # for w in 1:windows
     ThreadPools.@qthreads for w in 1:windows
