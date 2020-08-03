@@ -70,6 +70,7 @@ CompressedHaplotypes(windows::Int, width, sampleID, chr, pos, SNPid, ref, alt,
 nhaplotypes(x::CompressedHaplotypes) = 2length(x.sampleID)
 windows(x::CompressedHaplotypes) = length(x.CW)
 function max_haplotypes_per_window(Hunique::CompressedHaplotypes)
+    win = windows(Hunique)
     m = 0
     for w in 1:win
         num = length(Hunique.CW_typed[w].uniqueindex)

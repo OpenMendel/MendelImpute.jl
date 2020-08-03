@@ -51,8 +51,9 @@ function compute_optimal_haplotypes!(
     windows = length(haplotype1[1])
     threads = Threads.nthreads()
     inv_sqrt_allele_var = nothing
+    max_d = max_haplotypes_per_window(compressed_Hunique)
 
-    # working arrays
+    # allocate working arrays
     timers = [zeros(8*8) for _ in 1:threads] # 8 for spacing
     pmeter = Progress(windows, 5, "Computing optimal haplotypes...")
     timers[1][48] += @elapsed begin # time for allocating
@@ -60,6 +61,9 @@ function compute_optimal_haplotypes!(
         happair2 = [ones(Int32, people)           for _ in 1:threads]
         hapscore = [zeros(Float32, people)        for _ in 1:threads]
         Xwork    = [zeros(Float32, width, people) for _ in 1:threads]
+        Hwork    = [zeros(Float32, width, max_d)  for _ in 1:threads]
+        M        = [zeros(Float32, max_d, max_d)  for _ in 1:threads]
+        N        = [zeros(Float32, people, max_d) for _ in 1:threads]
         if !isnothing(tf)
             maxindx = [zeros(Int32, tf)     for _ in 1:threads]
             maxgrad = [zeros(Float32, tf)   for _ in 1:threads]
@@ -120,7 +124,8 @@ function compute_optimal_haplotypes!(
             # global search
             t1, t2, t3, t4, t5, t6 = haplopair!(Xw_aligned, Hw_aligned,
                 inv_sqrt_allele_var=inv_sqrt_allele_var, happair1=happair1[id],
-                happair2=happair2[id], hapscore=hapscore[id], Xwork=Xwork[id])
+                happair2=happair2[id], hapscore=hapscore[id], Xwork=Xwork[id],
+                Hwork=Hwork[id], M=M[id], N = N[id])
         end
 
         # save result 
@@ -367,16 +372,25 @@ end
 """
     haplopair(X, H)
 
-Calculate the best pair of haplotypes in `H` for each individual in `X`. Missing data in `X`
-does not have missing data. Missing data is initialized as 2x alternate allele freq.
+Calculate the best pair of haplotypes in `H` for each individual in `X`. 
+Missing data is initialized as 2x alternate allele freq.
 
 # Input
-* `X`: `p x n` genotype matrix possibly with missings. Each column is an individual.
-* `H`: `p * d` haplotype matrix. Each column is a haplotype.
+* `X`: `p × n` genotype matrix possibly with missings. Each column is an individual.
+* `H`: `p × d` haplotype matrix. Each column is a haplotype.
 
-# Output
-* `happair`: optimal haplotype pairs. `X[:, k] ≈ H[:, happair[1][k]] + H[:, happair[2][k]]`.
+# Optional arguments
+* `happair1`: optimal haplotype pairs for strand 1.
+* `happair2`: optimal haplotype pairs for strand 2.
 * `hapscore`: haplotyping score. 0 means best. Larger means worse.
+* `inv_sqrt_allele_var`: If not nothing, SNP `i` will be scaled according to 
+    `inv_sqrt_allele_var[i]`.
+* `Xwork`: A `Float32` version of `X`, missing entries are filled with `2maf`
+* `Hwork`: A `Float32` version of `H`.
+* `M`: `d x d` matrix with entries `M[i, j] = 2dot(Hwork[:, i], Hwork[:, j]) +
+    sumabs2(Hwork[:, i]) + sumabs2(Hwork[:, j])`. Only the upper triangular 
+    part of `M` is used.
+* `N`: `n x d` matrix `2Xwork'Hwork`.
 """
 function haplopair!(
     X::AbstractMatrix, # p × n
@@ -387,26 +401,31 @@ function haplopair!(
     hapscore::AbstractVector = Vector{Float32}(undef, size(X, 2)), # length n
     inv_sqrt_allele_var::Union{Nothing, AbstractVector} = nothing, # length p
     # preallocated matrices
-    Xwork :: AbstractMatrix{Float32} = Matrix{Float32}(undef, size(X, 1), size(X, 2)), # p × n
+    Xwork::AbstractMatrix{Float32}=Matrix{Float32}(undef,size(X,1),size(X,2)), # p × n
+    Hwork::AbstractMatrix{Float32}=convert(Matrix{Float32}, H),                # p × d
+    M::AbstractMatrix{Float32}=Matrix{Float32}(undef, size(H, 2), size(H, 2)), # d × d
+    N::AbstractMatrix{Float32}=Matrix{Float32}(undef, size(X, 2), size(H, 2)), # n × d
     )
     p, n  = size(X)
     d     = size(H, 2)
 
-    # allocate matrices
+    # create views for matrices
     t6 = @elapsed begin
-        Hwork = convert(Matrix{Float32}, H)                # p × d
-        M = Matrix{Float32}(undef, size(H, 2), size(H, 2)) # d × d
-        N = Matrix{Float32}(undef, size(X, 2), size(H, 2)) # n × d
         if size(Xwork, 1) != p
-            Xwork = zeros(Float32, p, n)
+            Xwork = Matrix{Float32}(undef, p, n)
+            Hwork = Matrix{Float32}(undef, p, d)
         end
+        Mwork = view(M, 1:d, 1:d)
+        Nwork = view(N, :, 1:d)
+        Hwork_view = view(Hwork, :, 1:d)
+        copyto!(Hwork_view, H)
     end
 
     # initializes missing
     t5 = @elapsed initXfloat!(Xwork, X)
 
-    t2, t3 = haplopair!(Xwork, Hwork, M, N, happair1, happair2, hapscore,
-        inv_sqrt_allele_var)
+    t2, t3 = haplopair!(Xwork, Hwork_view, Mwork, Nwork, happair1, happair2,
+        hapscore, inv_sqrt_allele_var)
     t1 = t4 = 0.0 # no time spent on haplotype thinning or rescreening
 
     return t1, t2, t3, t4, t5, t6
@@ -448,7 +467,11 @@ function haplopair!(
         if !isnothing(inv_sqrt_allele_var)
             H .*= inv_sqrt_allele_var # wᵢ = 1/√2p(1-p)
         end
-        mul!(M, Transpose(H), H)
+        try 
+            mul!(M, Transpose(H), H)
+        catch
+            error("sizeM = $(size(M)), sizeH = $(size(H))")
+        end
         for j in 1:d, i in 1:(j - 1) # off-diagonal
             @inbounds M[i, j] = 2M[i, j] + M[i, i] + M[j, j]
         end
