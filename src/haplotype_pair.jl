@@ -28,9 +28,8 @@ stores result in `haplotype1` and `haplotype2`.
 - `t3` = haplopair search
 - `t4` = rescreen time (0 unless `rescreen = true`)
 - `t5` = initializing missing
-- `t6` = allocating internal matrices
+- `t6` = allocating and viewing
 - `t7` = index conversion
-- `t8` = creating views
 """
 function compute_optimal_haplotypes!(
     haplotype1::AbstractVector,
@@ -54,7 +53,7 @@ function compute_optimal_haplotypes!(
     max_d = max_haplotypes_per_window(compressed_Hunique)
 
     # allocate working arrays
-    timers = [zeros(8*8) for _ in 1:threads] # 8 for spacing
+    timers = [zeros(7*8) for _ in 1:threads] # 8 for spacing
     pmeter = Progress(windows, 5, "Computing optimal haplotypes...")
     timers[1][48] += @elapsed begin # time for allocating
         happair1 = [ones(Int32, people)           for _ in 1:threads]
@@ -62,8 +61,6 @@ function compute_optimal_haplotypes!(
         hapscore = [zeros(Float32, people)        for _ in 1:threads]
         Xwork    = [zeros(Float32, width, people) for _ in 1:threads]
         Hwork    = [zeros(Float32, width, max_d)  for _ in 1:threads]
-        M        = [zeros(Float32, max_d, max_d)  for _ in 1:threads]
-        N        = [zeros(Float32, people, max_d) for _ in 1:threads]
         if !isnothing(tf)
             maxindx = [zeros(Int32, tf)     for _ in 1:threads]
             maxgrad = [zeros(Float32, tf)   for _ in 1:threads]
@@ -71,17 +68,22 @@ function compute_optimal_haplotypes!(
             Xi = [zeros(Float32, width)     for _ in 1:threads]
             M  = [zeros(Float32, tf, tf)    for _ in 1:threads]
             N  = [zeros(Float32, tf)        for _ in 1:threads]
-        end
-        if !isnothing(stepscreen)
+            R  = [zeros(Float32, max_d, people) for _ in 1:threads]
+        elseif !isnothing(stepscreen)
             maxindx = [zeros(Int32,   stepscreen) for _ in 1:threads]
             maxgrad = [zeros(Float32, stepscreen) for _ in 1:threads]
+            M  = [zeros(Float32, max_d, max_d)    for _ in 1:threads]
+            Nt = [zeros(Float32, max_d, people)   for _ in 1:threads]
+        else
+            M = [zeros(Float32, max_d, max_d)  for _ in 1:threads]
+            N = [zeros(Float32, people, max_d) for _ in 1:threads]
         end
     end
 
     # for w in 1:windows
     ThreadPools.@qthreads for w in 1:windows
         id = Threads.threadid()
-        t8 = @elapsed begin
+        t6 = @elapsed begin
             Hw_aligned = compressed_Hunique.CW_typed[w].uniqueH
             Xw_idx_start = (w - 1) * width + 1
             Xw_idx_end = (w == windows ? length(X_pos) : w * width)
@@ -90,7 +92,7 @@ function compute_optimal_haplotypes!(
         end
 
         # weight snp by inverse allele variance if requested
-        t8 += @elapsed if scale_allelefreq
+        t6 += @elapsed if scale_allelefreq
             Hw_range = compressed_Hunique.start[w]:(w ==
                 windows ? ref_snps : compressed_Hunique.start[w + 1] - 1)
             Hw_snp_pos = indexin(X_pos[Xw_idx_start:Xw_idx_end],
@@ -107,14 +109,16 @@ function compute_optimal_haplotypes!(
                 Hw_aligned, r=stepscreen, 
                 inv_sqrt_allele_var=inv_sqrt_allele_var, happair1=happair1[id], 
                 happair2=happair2[id], hapscore=hapscore[id], 
-                maxindx=maxindx[id], maxgrad=maxgrad[id], Xwork=Xwork[id])
+                maxindx=maxindx[id], maxgrad=maxgrad[id], Xwork=Xwork[id],
+                Hwork=Hwork[id], Nt=Nt[id], M=M[id])
         elseif !isnothing(tf) && d > max_haplotypes
             # haplotype thinning: search all (hᵢ, hⱼ) pairs where hᵢ ≈ x ≈ hⱼ
             t1, t2, t3, t4, t5, t6 = haplopair_thin_BLAS2!(Xw_aligned,
                 Hw_aligned, allele_freq=inv_sqrt_allele_var, keep=tf,
                 happair1=happair1[id], happair2=happair2[id],
                 hapscore=hapscore[id], maxindx=maxindx[id], maxgrad=maxgrad[id],
-                Xi=Xi[id], N=N[id], Hk=Hk[id], M=M[id], Xwork=Xwork[id])
+                Xi=Xi[id], N=N[id], Hk=Hk[id], M=M[id], Xwork=Xwork[id],
+                Hwork=Hwork[id], R=R[id])
         elseif rescreen
             # global search + searching ||x - hᵢ - hⱼ|| on observed entries
             t1, t2, t3, t4, t5, t6 = haplopair_rescreen!(Xw_aligned, 
@@ -140,7 +144,6 @@ function compute_optimal_haplotypes!(
         timers[id][40] += t5
         timers[id][48] += t6
         timers[id][56] += t7
-        timers[id][64] += t8
 
         # update progress
         next!(pmeter)
@@ -411,7 +414,7 @@ function haplopair!(
 
     # create views for matrices
     t6 = @elapsed begin
-        if size(Xwork, 1) != p
+        if size(Xwork, 1) != p # last window
             Xwork = Matrix{Float32}(undef, p, n)
             Hwork = Matrix{Float32}(undef, p, d)
         end

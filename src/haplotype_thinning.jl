@@ -11,34 +11,39 @@ function haplopair_thin_BLAS2!(
     happair1:: AbstractVector{Int32}   = ones(Int32, size(X, 2)),      # length n 
     happair2:: AbstractVector{Int32}   = ones(Int32, size(X, 2)),      # length n
     hapscore:: AbstractVector{Float32} = Vector{Float32}(undef, size(X, 2)), # length n
-    maxindx :: AbstractVector{Int32}   = Vector{Int32}(undef, keep),           # length keep
+    maxindx :: AbstractVector{Int32}   = Vector{Int32}(undef, keep),         # length keep
     maxgrad :: AbstractVector{Float32} = Vector{Float32}(undef, keep),       # length keep
     Xi      :: AbstractVector{Float32} = Vector{Float32}(undef, size(H, 1)), # length p
     N       :: AbstractVector{Float32} = Vector{Float32}(undef, keep),       # length keep
     # preallocated matrices
-    Hk    :: AbstractMatrix{Float32} = Matrix{Float32}(undef, size(H, 1), keep),       # p × keep 
-    M     :: AbstractMatrix{Float32} = Matrix{Float32}(undef, keep, keep),             # keep × keep
-    Xwork :: AbstractMatrix{Float32} = Matrix{Float32}(undef, size(X, 1), size(X, 2)), # p × n
+    Hk    :: AbstractMatrix{Float32}=Matrix{Float32}(undef,size(H,1),keep),     # p × keep 
+    M     :: AbstractMatrix{Float32}=Matrix{Float32}(undef,keep,keep),          # keep × keep
+    Xwork :: AbstractMatrix{Float32}=Matrix{Float32}(undef,size(X,1),size(X,2)),# p × n
+    Hwork :: AbstractMatrix{Float32}=convert(Matrix{Float32},H),                # p × d
+    R     :: AbstractMatrix{Float32}=Matrix{Float32}(undef,size(H,2),size(X,2)),# d × n
     )
 
     p, n = size(X)
     d    = size(H, 2)
 
     # do global search for small problems 
-    if keep > d
+    if keep ≥ d
         return haplopair!(Xw_aligned, Hw_aligned, happair1=happair1, 
-            happair2=happair2, hapscore=hapscore, Xwork=Xwork)
+            happair2=happair2, hapscore=hapscore, Xwork=Xwork, Hwork=Hwork,
+            M=M)
     end
 
-    # reallocate matrices for last window. TODO = Hwork, R
+    # create views for matrices
     t6 = @elapsed begin
-        Hwork = convert(Matrix{Float32}, H)                    # p × d
-        R     = Matrix{Float32}(undef, size(H, 2), size(X, 2)) # d × p
         if size(Hk, 1) != size(H, 1)
-            Hk = zeros(Float32, size(H, 1), keep)
-            Xi = zeros(Float32, size(H, 1))
-            Xwork = zeros(Float32, p, n)
+            Hk = Matrix{Float32}(undef, size(H, 1), keep)
+            Xi = Vector{Float32}(undef, size(H, 1))
+            Xwork = Matrix{Float32}(undef, p, n)
+            Hwork = Matrix{Float32}(undef, p, d)
         end
+        Rwork = view(R, 1:d, :)
+        Hwork_view = view(Hwork, :, 1:d)
+        copyto!(Hwork_view, H)
     end
 
     # initialize missing
@@ -46,27 +51,27 @@ function haplopair_thin_BLAS2!(
 
     # compute distances between each column of H and each column of X
     t1 = @elapsed begin
-        
         if !isnothing(allele_freq)
             # Rij = wk * || H[:, i] - X[:, j] ||²
-            pairwise!(R, WeightedSqEuclidean(allele_freq), Hwork, Xwork, dims=2)
+            pairwise!(Rwork, WeightedSqEuclidean(allele_freq), Hwork_view, 
+                Xwork, dims=2)
         else
             # Rij = || H[:, i] - X[:, j] ||²
-            pairwise!(R, SqEuclidean(), Hwork, Xwork, dims=2)
+            pairwise!(Rwork, SqEuclidean(), Hwork_view, Xwork, dims=2)
         end 
     end
 
     t2 = t3 = 0.0
     @inbounds for i in 1:n
         # find top matching haplotypes for sample i
-        t1 += @elapsed findbotr!(R, i, maxgrad, maxindx)
+        t1 += @elapsed findbotr!(Rwork, i, maxgrad, maxindx)
 
         # sync Hk, Xi, M, N
         t2 += @elapsed begin
             for k in 1:keep
                 col = maxindx[k]
                 for j in 1:p
-                    Hk[j, k] = Hwork[j, col]
+                    Hk[j, k] = Hwork_view[j, col]
                 end
             end
             for j in eachindex(Xi)

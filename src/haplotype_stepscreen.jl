@@ -15,25 +15,31 @@ function haplopair_stepscreen!(
     maxgrad ::AbstractVector{Float32} = Vector{Float32}(undef, r),          # length r
     # preallocated matrices
     Xwork :: AbstractMatrix{Float32} = Matrix{Float32}(undef, size(X, 1), size(X, 2)), # p × n
+    Hwork :: AbstractMatrix{Float32} = convert(Matrix{Float32}, H),                 # p × d 
+    M  :: AbstractMatrix{Float32} = Matrix{Float32}(undef, size(H, 2), size(H, 2)), # d × d
+    Nt :: AbstractMatrix{Float32} = Matrix{Float32}(undef, size(H, 2), size(X, 2)), # d × n 
     )
 
     p, n  = size(X)
     d     = size(H, 2)
 
     # global search
-    if r > d
+    if r ≥ d
         return haplopair!(Xw_aligned, Hw_aligned, happair1=happair1,
-            happair2=happair2, hapscore=hapscore, Xwork=Xwork)
+            happair2=happair2, hapscore=hapscore, Xwork=Xwork, Hwork=Hwork,
+            M=M, N=Transpose(Nt))
     end
 
-    # allocate matrices
+    # create views for matrices
     t6 = @elapsed begin
-        Hwork = convert(Matrix{Float32}, H)                 # p × d 
-        M  = Matrix{Float32}(undef, size(H, 2), size(H, 2)) # d × d
-        Nt = Matrix{Float32}(undef, size(H, 2), size(X, 2)) # d × n 
-        if size(Xwork, 1) != size(H, 1)
-            Xwork = zeros(Float32, p, n)
+        if size(Xwork, 1) != size(H, 1) # last window
+            Xwork = Matrix{Float32}(undef, p, n)
+            Hwork = Matrix{Float32}(undef, p, d)
         end
+        Mwork = view(M, 1:d, 1:d)
+        Ntwork = view(Nt, 1:d, :)
+        Hwork_view = view(Hwork, :, 1:d)
+        copyto!(Hwork_view, H)
     end
 
     # initialize missing data
@@ -42,34 +48,34 @@ function haplopair_stepscreen!(
     # assemble M (symmetric)
     t2 = @elapsed begin
         if !isnothing(inv_sqrt_allele_var)
-            Hwork .*= inv_sqrt_allele_var # wᵢ = 1/√2p(1-p)
+            Hwork_view .*= inv_sqrt_allele_var # wᵢ = 1/√2p(1-p)
         end
-        mul!(M, Transpose(Hwork), Hwork)
+        mul!(Mwork, Transpose(Hwork_view), Hwork_view)
         for j in 1:d, i in 1:(j - 1) # off-diagonal
-            M[i, j] = 2M[i, j] + M[i, i] + M[j, j]
+            @inbounds Mwork[i, j] = 2Mwork[i, j] + Mwork[i, i] + Mwork[j, j]
         end
         for j in 1:d # diagonal
-            M[j, j] *= 4
+            @inbounds Mwork[j, j] *= 4
         end
-        LinearAlgebra.copytri!(M, 'U')
+        LinearAlgebra.copytri!(Mwork, 'U')
 
         # assemble N
         if !isnothing(inv_sqrt_allele_var)
-            Hwork .*= inv_sqrt_allele_var # wᵢ = 1/2p(1-p)
+            Hwork_view .*= inv_sqrt_allele_var # wᵢ = 1/2p(1-p)
         end
-        mul!(Nt, Transpose(Hwork), Xwork)
-        @simd for I in eachindex(Nt)
-            Nt[I] *= 2
+        mul!(Ntwork, Transpose(Hwork_view), Xwork)
+        @simd for I in eachindex(Ntwork)
+            @inbounds Ntwork[I] *= 2
         end
     end
 
     # computational routine
     t3 = @elapsed begin
         if r == 1
-            haplopair_stepwise!(happair1, happair2, hapscore, M, Nt)
+            haplopair_stepwise!(happair1, happair2, hapscore, Mwork, Ntwork)
         else
-            haplopair_topr!(happair1, happair2, hapscore, M, Nt, r, maxindx,
-                maxgrad)
+            haplopair_topr!(happair1, happair2, hapscore, Mwork, Ntwork, r,
+                maxindx, maxgrad)
         end
     end
 
