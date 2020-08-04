@@ -46,14 +46,14 @@ Keeps a vector of `CompressedWindow`. Indexing off instances of
 - `start`: `start[i]` to `start[i + 1]` is the range of H's SNPs that are in
     window `i`. It includes all SNP until the first typed snp of window `i + 1`. 
 - `sampleID`: Sample names as listed in the VCF file
-- `width`: Number of typed SNPs per window
+- `widths`: Number of typed SNPs in each window
 - `altfreq`: Alternate allele frequency (frequency of "1" in VCF file)
 """
 struct CompressedHaplotypes
     CW::Vector{CompressedWindow}
     CW_typed::Vector{CompressedWindow}
     start::Vector{Int}
-    width::Int
+    widths::Vector{Int}
     sampleID::Vector{String}
     chr::Vector{String}
     pos::Vector{Int}
@@ -62,9 +62,9 @@ struct CompressedHaplotypes
     altallele::Vector{Vector{String}}
     altfreq::Vector{Float32}
 end
-CompressedHaplotypes(windows::Int, width, sampleID, chr, pos, SNPid, ref, alt,
+CompressedHaplotypes(windows::Int, widths, sampleID, chr, pos, SNPid, ref, alt,
     altfreq) = CompressedHaplotypes(Vector{CompressedWindow}(undef, windows), 
-    Vector{CompressedWindow}(undef, windows), zeros(windows), width, sampleID, 
+    Vector{CompressedWindow}(undef, windows), zeros(windows), widths, sampleID, 
     chr, pos, SNPid, ref, alt, altfreq)
 
 nhaplotypes(x::CompressedHaplotypes) = 2length(x.sampleID)
@@ -135,26 +135,29 @@ haplotype pool of just the typed SNPs in specified window.
 end
 
 """
-    compress_haplotypes(vcffile, tgtfile, outfile, width, [dims], [flankwidth])
+    compress_haplotypes(reffile, tgtfile, outfile, d)
 
-For each window of `X`, finds unique haplotype indices stored in the columns of
-H, saves a mapping vector to the unique col of H, and outputs compressed
-haplotypes as binary Julia file. 
+Cuts a haplotype matrix `reffile` into windows of variable width so that each
+window has less than `d` unique haplotypes. Saves result to `outfile` as
+a compressed binary format. All SNPs in `tgtfile` must be present in `reffile`. 
 
-Assumes all SNPs in `tgtfile` is present in `reffile`. 
+# Why is `tgtfile` required? 
+The unique haplotypes in each window is computed on the typed SNPs only. 
+A genotype matrix `tgtfile` is used to identify the typed SNPs. In the future, 
+hopefully we can compute compressed haplotype panels for all genotyping 
+platforms. 
 
 # Inputs
-* `reffile`: reference haplotype file name
-* `reffile`: target genotype file name
+* `reffile`: reference haplotype file name (ends in `.vcf` or `.vcf.gz`)
+* `tgtfile`: target genotype file name (ends in `.vcf` or `.vcf.gz`)
 * `outfile`: Output file name (ends in `.jlso`)
-* `width`: Number of typed SNPs per window. Number of SNPs in last window
-    may be in `[width, 2width]`.
+* `d`: Max number of unique haplotypes per window. 
 """
 function compress_haplotypes(
     reffile::AbstractString,
     tgtfile::AbstractString,
     outfile::AbstractString,
-    width::Int,
+    d::Int=1000,
     )
     endswith(outfile, ".jlso") || error("`outfile` does not end in '.jlso'")
 
@@ -170,52 +173,57 @@ function compress_haplotypes(
 
     # compress routine
     compress_haplotypes(H, X, outfile, X_pos, H_sampleID, H_chr, H_pos, H_ids, 
-        H_ref, H_alt, width)
+        H_ref, H_alt, d)
 
     return nothing
 end
 
 """
-    compress_haplotypes(X, H, outfile, ...)
+    compress_haplotypes(H, X, outfile, ...)
 
-Compresses `H` window-by-window into `.jlso` format.
+Compresses `H` window-by-window into `.jlso` format so that each window has `d`
+unique haplotypes determined by typed SNPs position in `X`. 
 """
 function compress_haplotypes(H::AbstractMatrix, X::AbstractMatrix, 
     outfile::AbstractString, X_pos::AbstractVector, H_sampleID::AbstractVector, 
     H_chr::AbstractVector, H_pos::AbstractVector, H_ids::AbstractVector, 
-    H_ref::AbstractVector, H_alt::AbstractVector, width::Int)
+    H_ref::AbstractVector, H_alt::AbstractVector, d::Int)
 
     endswith(outfile, ".jlso") || error("`outfile` does not end in 'jlso'.")
 
     # some constants
     ref_snps = size(H, 1)
     tgt_snps = size(X, 1)
-    windows = floor(Int, tgt_snps / width)
     Hw_idx_start = 1
+
+    # compute window intervals based on typed SNPs
+    XtoH_idx = indexin(X_pos, H_pos) # assumes all SNPs in X are in H
+    Hw_typed = H[XtoH_idx, :]        # H with only typed snps
+    widths = get_window_intervals(Hw_typed, d)
 
     # initialize compressed haplotype object
     alt_freq = reshape(sum(H, dims=2), size(H, 1)) ./ size(H, 2)
-    compressed_Hunique = MendelImpute.CompressedHaplotypes(windows, width, 
+    compressed_Hunique = MendelImpute.CompressedHaplotypes(windows, widths, 
         H_sampleID, H_chr, H_pos, H_ids, H_ref, H_alt, convert(Vector{Float32}, 
         alt_freq))
 
     # record unique haplotypes and mappings window by window
-    for w in 1:windows
+    for w in 1:length(winranges)
         # current window ranges
-        Xw_idx_start = (w - 1) * width + 1
-        Xw_idx_end = (w == windows ? length(X_pos) : w * width)
+        Xw_idx_start = first(widths[w])
+        Xw_idx_end = last(widths[w])
         Xw_pos_end = X_pos[Xw_idx_end]
-        Xw_pos_next_start = (w == windows ? X_pos[end] : X_pos[w * width + 1])
+        Xw_pos_next_start = first(widths[w + 1])
         Hw_idx_end = (w == windows ? length(H_pos) : 
             something(findnext(x -> x == Xw_pos_next_start, H_pos, 
             Hw_idx_start)) - 1)
         compressed_Hunique.start[w] = Hw_idx_start
 
         # get current window of H
-        Xw_pos = X_pos[Xw_idx_start:Xw_idx_end]
+        Xw_pos = @view(X_pos[Xw_idx_start:Xw_idx_end])
         XwtoH_idx = indexin(Xw_pos, H_pos) # assumes all SNPs in X are in H
-        Hw = H[Hw_idx_start:Hw_idx_end, :] # including all snps
-        Hw_typed = H[XwtoH_idx, :]         # including only typed snps
+        Hw = @view(H[Hw_idx_start:Hw_idx_end, :]) # including all snps
+        Hw_typed = @view(H[XwtoH_idx, :])         # including only typed snps
 
         # find unique haplotypes on all SNPs
         mapping = groupslices(Hw, dims = 2)
@@ -262,4 +270,60 @@ function compress_haplotypes(H::AbstractMatrix, X::AbstractMatrix,
         compression=:gzip)
 
     return nothing
+end
+
+"""
+    get_window_intervals(H, d, low, high...)
+
+Find window intervals so that every window has `d` or less unique haplotypes
+by recursively dividing windows into halves. 
+
+# Inputs
+- `H`: The full haplotype matrix (on typed SNPs). Each column is a haplotype.
+- `d`: Number of unique haplotypes in each window
+- `low`: start of current window
+- `high`: end of current window
+- `intervals`: Vector of window ranges. This is also the return vector
+- `seen`: storage container
+
+# Output
+- `intervals`: Vector of window ranges. This is also the return vector
+"""
+function get_window_intervals(
+    H::AbstractMatrix,
+    d::Int, 
+    low::Int=1, 
+    high::Int=size(H, 1),
+    intervals = UnitRange[],
+    seen=BitSet(),
+    )
+    
+    unique_columns_maps = groupslices(view(H, low:high, :), dims = 2)
+    k = count_unique(unique_columns_maps, seen)
+    if k ≤ d
+        push!(intervals, low:high)
+    else
+        mid = (low + high) >>> 1
+        get_window_intervals(H, d, low,     mid,  intervals, seen)
+        get_window_intervals(H, d, mid + 1, high, intervals, seen)
+    end
+
+    return sort!(intervals)
+end
+
+"""
+    count_unique(v, seen)
+
+Count the number of unique elements in `v`, using `seen` as storage.
+"""
+function count_unique(v::AbstractVector{<:Integer}, seen::AbstractSet=BitSet())
+    empty!(seen)
+    s = 0
+    for i in v
+        if i ∉ seen
+            s += 1
+            push!(seen, i)
+        end
+    end
+    return s
 end
