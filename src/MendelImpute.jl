@@ -3,7 +3,7 @@ __precompile__()
 module MendelImpute
 
     import StatsBase: sample
-    
+
     using LinearAlgebra
     using StatsBase
     using GeneticVariation
@@ -12,11 +12,9 @@ module MendelImpute
     using GroupSlices
     using Random
     using ProgressMeter
-    using JLD2, FileIO
     using JLSO
     using Distances
     using ThreadPools
-    # using ElasticArrays
 
     export continue_haplotype, haplopair!, haplopair, haploimpute!
     export impute!, impute_discard_phase!, search_breakpoint
@@ -27,17 +25,19 @@ module MendelImpute
     export compute_optimal_halotype_pair
     export simulate_phased_genotypes
     export connect_happairs
-    export phase!, phase_fast!, nearest_window_with_sufficient_typed_snps
-    export haplopair_thin_BLAS2!, haplopair_thin_BLAS3!, haplopair_screen!, haplopair_lasso!
+    export phase!, phase_fast!, phase_sample!
+    export haplopair_screen!, haplopair_stepscreen!
 
     # main functions that users are exposed to
     export phase
     export compress_haplotypes
-    export nhaplotypes, windows, count_haplotypes_per_window, avg_haplotypes_per_window, nchunks
+    export nhaplotypes, windows, count_haplotypes_per_window
+    export avg_haplotypes_per_window, nchunks, max_haplotypes_per_window
 
-    export OptimalHaplotypeSet, compute_optimal_halotype_set
+    export compute_optimal_haplotypes!
     export make_refvcf_file, make_tgtvcf_file
-    export simulate_uniform_haplotypes, simulate_markov_haplotypes, simulate_genotypes
+    export simulate_uniform_haplotypes, simulate_markov_haplotypes
+    export simulate_genotypes
     export unphase, compress_vcf_to_gz
     export extract_marker_info
 
@@ -49,12 +49,13 @@ module MendelImpute
     include("data_structures.jl")
     include("phasing.jl")
     include("haplotype_pair.jl")
-    include("haplotype_pair_screen.jl")
+    include("haplotype_rescreen.jl")
     include("haplotype_thinning.jl")
-    include("haplotype_lasso.jl")
+    include("haplotype_stepscreen.jl")
     include("simulate_utilities.jl")
     include("dynamic_programming.jl")
     include("impute.jl")
     include("breakpoints.jl")
+    include("intersect.jl")
 
 end # module
