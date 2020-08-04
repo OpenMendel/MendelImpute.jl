@@ -2521,3 +2521,27 @@ let
     end
     println(tot)
 end
+
+
+using Revise
+using LinearAlgebra
+using BenchmarkTools
+using ThreadPools
+
+BLAS.set_num_threads(1)
+
+function test_multiply()
+    threads = Threads.nthreads()
+    A = [rand(1000, 1000) for _ in 1:threads]
+    B = [rand(1000, 1000) for _ in 1:threads]
+    C = [rand(1001, 1001) for _ in 1:threads]
+    # Threads.@threads for i in 1:10000
+    ThreadPools.@qthreads for i in 1:10000
+            id = Threads.threadid()
+        mul!(view(C[id], 1:1000, 1:1000), A[id], B[id])
+    end
+    return C
+end
+test_multiply();
+
+

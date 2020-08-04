@@ -470,11 +470,7 @@ function haplopair!(
         if !isnothing(inv_sqrt_allele_var)
             H .*= inv_sqrt_allele_var # wᵢ = 1/√2p(1-p)
         end
-        try 
-            mul!(M, Transpose(H), H)
-        catch
-            error("sizeM = $(size(M)), sizeH = $(size(H))")
-        end
+        mul!(M, Transpose(H), H)
         for j in 1:d, i in 1:(j - 1) # off-diagonal
             @inbounds M[i, j] = 2M[i, j] + M[i, i] + M[j, j]
         end
