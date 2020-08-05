@@ -55,7 +55,7 @@ Keeps a vector of `CompressedWindow`. Indexing off instances of
 struct CompressedHaplotypes
     CW::Vector{CompressedWindow}
     CW_typed::Vector{CompressedWindow}
-    Hstart::Vector{Int}
+    Hstart::Vector{Int} # we need the starting point more often than the range
     X_window_range::Vector{UnitRange}
     sampleID::Vector{String}
     chr::Vector{String}

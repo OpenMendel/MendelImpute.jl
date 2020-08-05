@@ -347,11 +347,8 @@ extend into the current one, but hopefully this is extremely rare.
 """
 function update_phase!(ph::HaplotypeMosaic,
     compressed_Hunique::CompressedHaplotypes, bkpt::Int, hap_prev, hap_curr,
-    window::Int, cur_range::UnitRange)
+    window::Int, Xwi_start::Int, Xwi_mid::Int, Xwi_end::Int)
 
-    Xwi_start = first(cur_range)
-    Xwi_end = last(cur_range)
-    Xwi_mid = (Xwi_start + Xwi_end) >>> 1
     X_bkpt_end = Xwi_start + bkpt
 
     # no breakpoints
@@ -364,7 +361,7 @@ function update_phase!(ph::HaplotypeMosaic,
     end
 
     # previous window's haplotype completely covers current window
-    if bkpt == length(cur_range)
+    if bkpt == length(Xwi_start:Xwi_end)
         h = complete_idx_to_unique_all_idx(hap_prev, window, compressed_Hunique)
         push!(ph.start, Xwi_mid)
         push!(ph.haplotypelabel, h)
@@ -478,8 +475,10 @@ function phase_fast!(
         # Second pass to find optimal break points and record info to phase
         @inbounds for w in 2:windows
             # get genotype vector spanning 2 windows
-            cur_snps = first(winranges[w - 1]):last(winranges[w])
-            Xwi = view(X, cur_snps, i)
+            start_prev = first(winranges[w - 1])
+            start_curr = first(winranges[w])
+            end_curr = last(winranges[w])
+            Xwi = view(X, start_prev:end_curr, i)
 
             # previous and current haplotypes for both strands
             hap1_prev = haplotype1[i][w - 1]
@@ -495,10 +494,10 @@ function phase_fast!(
             timers[id][24] += @elapsed begin
                 # record strand 1 info
                 update_phase!(ph[i].strand1, compressed_Hunique, bkpts[1],
-                    hap1_prev, hap1_curr, w, cur_snps)
+                    hap1_prev, hap1_curr, w, start_prev, start_curr, end_curr)
                 # record strand 2 info
                 update_phase!(ph[i].strand2, compressed_Hunique, bkpts[2],
-                    hap2_prev, hap2_curr, w, cur_snps)
+                    hap2_prev, hap2_curr, w, start_prev, start_curr, end_curr)
             end
         end
         next!(pmeter) # update progress
