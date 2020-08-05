@@ -20,8 +20,8 @@ pool of haplotypes `reffile` by sliding windows and saves result in `outfile`.
     snps in `tgtfile` will be imputed.
 - `phase`: If `true`, all output genotypes will be phased. Otherwise all
     output genotypes will be unphased.
-- `width`: number of SNPs (markers) in each haplotype window.
-    Note this number is predetermined by the compression step. 
+- `max_d`: Maximum number of unique haplotypes in each haplotype window.
+    Note this number is used in the compression step and nowhere else. 
 - `rescreen`: This option saves a number of top haplotype pairs when solving
     the least squares objective, and re-minimize least squares on just
     observed data.
@@ -43,7 +43,7 @@ function phase(
     outfile::AbstractString = "imputed." * tgtfile,
     impute::Bool = true,
     phase::Bool = false,
-    width::Int = 512,
+    max_d::Int = 1000,
     rescreen::Bool = false,
     max_haplotypes::Int = 800,
     stepwise::Union{Nothing, Int} = nothing,
@@ -65,8 +65,9 @@ function phase(
     if endswith(reffile, ".jlso")
         loaded = JLSO.load(reffile)
         compressed_Hunique = loaded[:compressed_Hunique]
-        width == compressed_Hunique.width || error("Specified width = $width" *
-            " does not equal $(compressed_Hunique.width) = width in .jlso file")
+        max_d == compressed_Hunique.max_unique_haplotypes || 
+            error("Specified width = $width does not equal " *
+            "$(compressed_Hunique.max_unique_haplotypes) listed in .jlso file")
     elseif endswith(reffile, ".vcf") || endswith(reffile, ".vcf.gz")
         # compress and filter VCF files for unique haplotypes in each window
         @info "VCF files detected: compressing reference file to .jlso format.."

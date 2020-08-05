@@ -43,17 +43,19 @@ Keeps a vector of `CompressedWindow`. Indexing off instances of
 - `CW_typed`: Vector of `CompressedWindow`. `CW_typed[i]` stores unique
     haplotypes filtered with respect to typed SNPs from `start[i]` to
     `start[i + 1]`
-- `start`: `start[i]` to `start[i + 1]` is the range of H's SNPs that are in
-    window `i`. It includes all SNP until the first typed snp of window `i + 1`. 
+- `H_window_range`: `H_window_range[w]` is the range of H's SNPs (typed and
+    untyped) that are in window `w`. It includes all SNP until the first typed
+    snp of window `w + 1`. 
+- `X_window_range`: Typed SNP's index in each window
 - `sampleID`: Sample names as listed in the VCF file
-- `widths`: Number of typed SNPs in each window
 - `altfreq`: Alternate allele frequency (frequency of "1" in VCF file)
+- `max_unique_haplotypes`: Maximum number of unique haplotypes in each window. 
 """
 struct CompressedHaplotypes
     CW::Vector{CompressedWindow}
     CW_typed::Vector{CompressedWindow}
-    start::Vector{Int}
-    widths::Vector{Int}
+    H_window_range::Vector{UnitRange}
+    X_window_range::Vector{UnitRange}
     sampleID::Vector{String}
     chr::Vector{String}
     pos::Vector{Int}
@@ -61,29 +63,31 @@ struct CompressedHaplotypes
     refallele::Vector{String}
     altallele::Vector{Vector{String}}
     altfreq::Vector{Float32}
+    max_unique_haplotypes::Int
 end
-CompressedHaplotypes(windows::Int, widths, sampleID, chr, pos, SNPid, ref, alt,
-    altfreq) = CompressedHaplotypes(Vector{CompressedWindow}(undef, windows), 
-    Vector{CompressedWindow}(undef, windows), zeros(windows), widths, sampleID, 
-    chr, pos, SNPid, ref, alt, altfreq)
+CompressedHaplotypes(windows::Int, sampleID, chr, pos, SNPid, ref, alt, altfreq,
+    max_unique_haplotypes) = CompressedHaplotypes(Vector{CompressedWindow}(
+    undef, windows), Vector{CompressedWindow}(undef, windows), zeros(windows), 
+    zeros(windows), sampleID, chr, pos, SNPid, ref, alt, altfreq, 
+    max_unique_haplotypes)
 
 nhaplotypes(x::CompressedHaplotypes) = 2length(x.sampleID)
 windows(x::CompressedHaplotypes) = length(x.CW)
-function max_haplotypes_per_window(Hunique::CompressedHaplotypes)
+function max_width(Hunique::CompressedHaplotypes)
     win = windows(Hunique)
-    m = 0
+    mymax = 0
     for w in 1:win
-        num = length(Hunique.CW_typed[w].uniqueindex)
-        num > m && (m = num)
+        n = length(Hunique.X_window_range[w])
+        n > mymax && (mymax = n)
     end
-    return m
+    return mymax
 end
-function max_haplotypes_per_window(reffile::String)
-    endswith(reffile, ".jlso") || error("count_haplotypes_per_window can only" *
+function max_width(reffile::String)
+    endswith(reffile, ".jlso") || error("max_width can only" *
         " be called on a `CompressedHaplotypes` or `.jlso` files.")
     loaded = JLSO.load(reffile)
     compressed_Hunique = loaded[:compressed_Hunique]
-    return max_haplotypes_per_window(compressed_Hunique)
+    return max_width(compressed_Hunique)
 end
 function count_haplotypes_per_window(Hunique::CompressedHaplotypes)
     win = windows(Hunique)
@@ -199,31 +203,31 @@ function compress_haplotypes(H::AbstractMatrix, X::AbstractMatrix,
     # compute window intervals based on typed SNPs
     XtoH_idx = indexin(X_pos, H_pos) # assumes all SNPs in X are in H
     Hw_typed = H[XtoH_idx, :]        # H with only typed snps
-    widths = get_window_intervals(Hw_typed, d)
+    window_ranges = get_window_intervals(Hw_typed, d)
 
     # initialize compressed haplotype object
     alt_freq = reshape(sum(H, dims=2), size(H, 1)) ./ size(H, 2)
-    compressed_Hunique = MendelImpute.CompressedHaplotypes(windows, widths, 
-        H_sampleID, H_chr, H_pos, H_ids, H_ref, H_alt, convert(Vector{Float32}, 
-        alt_freq))
+    compressed_Hunique = MendelImpute.CompressedHaplotypes(windows, H_sampleID,
+        H_chr, H_pos, H_ids, H_ref, H_alt, convert(Vector{Float32},alt_freq), d)
+    compressed_Hunique.X_window_range .= window_ranges
 
     # record unique haplotypes and mappings window by window
-    for w in 1:length(winranges)
+    for w in 1:length(window_ranges)
         # current window ranges
-        Xw_idx_start = first(widths[w])
-        Xw_idx_end = last(widths[w])
+        Xw_idx_start = first(window_ranges[w])
+        Xw_idx_end = last(window_ranges[w])
         Xw_pos_end = X_pos[Xw_idx_end]
-        Xw_pos_next_start = first(widths[w + 1])
+        Xw_pos_next_start = first(window_ranges[w + 1])
         Hw_idx_end = (w == windows ? length(H_pos) : 
             something(findnext(x -> x == Xw_pos_next_start, H_pos, 
             Hw_idx_start)) - 1)
-        compressed_Hunique.start[w] = Hw_idx_start
+        compressed_Hunique.H_window_range[w] = Hw_idx_start:Hw_idx_end
 
         # get current window of H
         Xw_pos = @view(X_pos[Xw_idx_start:Xw_idx_end])
         XwtoH_idx = indexin(Xw_pos, H_pos) # assumes all SNPs in X are in H
         Hw = @view(H[Hw_idx_start:Hw_idx_end, :]) # including all snps
-        Hw_typed = @view(H[XwtoH_idx, :])         # including only typed snps
+        Hw_typed = H[XwtoH_idx, :]                # including only typed snps
 
         # find unique haplotypes on all SNPs
         mapping = groupslices(Hw, dims = 2)
