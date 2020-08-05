@@ -189,14 +189,14 @@ function impute!(
             w = phase[i].strand1.window[s]
             H = compressed_Hunique.CW[w].uniqueH
             H_start = abs(phase[i].strand1.start[s] - 
-                compressed_Hunique.start[w]) + 1
+                compressed_Hunique.Hstart[w]) + 1
             H_idx = H_start:(H_start + length(X_idx) - 1)
             X1[X_idx, i] = H[H_idx, phase[i].strand1.haplotypelabel[s]]
         end
         w = phase[i].strand1.window[end]
         X_idx = phase[i].strand1.start[end]:phase[i].strand1.length
         H_start = abs(phase[i].strand1.start[end] - 
-            compressed_Hunique.start[w]) + 1
+            compressed_Hunique.Hstart[w]) + 1
         H_idx = H_start:(H_start + length(X_idx) - 1)
         H = compressed_Hunique.CW[w].uniqueH
         X1[X_idx, i] = H[H_idx, phase[i].strand1.haplotypelabel[end]]
@@ -207,7 +207,7 @@ function impute!(
             w = phase[i].strand2.window[s]
             H = compressed_Hunique.CW[w].uniqueH
             H_start = abs(phase[i].strand2.start[s] - 
-                compressed_Hunique.start[w]) + 1
+                compressed_Hunique.Hstart[w]) + 1
             H_idx = H_start:(H_start + length(X_idx) - 1)
             X2[X_idx, i] = H[H_idx, phase[i].strand2.haplotypelabel[s]]
         end
@@ -215,7 +215,7 @@ function impute!(
         w = phase[i].strand2.window[end]
         H = compressed_Hunique.CW[w].uniqueH
         H_start = abs(phase[i].strand2.start[end] - 
-            compressed_Hunique.start[w]) + 1
+            compressed_Hunique.Hstart[w]) + 1
         H_idx = H_start:(H_start + length(X_idx) - 1)
         X2[X_idx, i] = H[H_idx, phase[i].strand2.haplotypelabel[end]]
     end
@@ -236,8 +236,9 @@ function impute_discard_phase!(
 
     p, n = size(X)
 
-    ThreadPools.@qthreads for person in 1:n
-        @inbounds for snp in 1:p
+    for person in 1:n
+    # ThreadPools.@qthreads for person in 1:n
+        for snp in 1:p
             if ismissing(X[snp, person])
                 #find which segment the snp is located
                 hap1_segment = searchsortedlast(phase[person].strand1.start,snp)
@@ -248,8 +249,8 @@ function impute_discard_phase!(
                 h2 = phase[person].strand2.haplotypelabel[hap2_segment]
                 w1 = phase[person].strand1.window[hap1_segment]
                 w2 = phase[person].strand2.window[hap2_segment]
-                i1 = snp - compressed_Hunique.start[w1] + 1
-                i2 = snp - compressed_Hunique.start[w2] + 1
+                i1 = snp - compressed_Hunique.Hstart[w1] + 1
+                i2 = snp - compressed_Hunique.Hstart[w2] + 1
 
                 # imputation step
                 H1 = compressed_Hunique.CW[w1].uniqueH

@@ -46,7 +46,7 @@ function compute_optimal_haplotypes!(
     # constants
     people = size(X, 2)
     ref_snps = length(compressed_Hunique.pos)
-    max_width = maxwidth(compressed_Hunique)
+    max_width = MendelImpute.max_width(compressed_Hunique)
     windows = length(haplotype1[1])
     threads = Threads.nthreads()
     inv_sqrt_allele_var = nothing
@@ -83,6 +83,7 @@ function compute_optimal_haplotypes!(
 
     # for w in 1:windows
     ThreadPools.@qthreads for w in 1:windows
+    # Threads.@threads for w in 1:windows
         id = Threads.threadid()
         t6 = @elapsed begin
             Hw_aligned = compressed_Hunique.CW_typed[w].uniqueH
@@ -92,7 +93,8 @@ function compute_optimal_haplotypes!(
 
         # weight snp by inverse allele variance if requested
         t6 += @elapsed if scale_allelefreq
-            Hw_range = compressed_Hunique.H_window_range[w]
+            Hw_range = compressed_Hunique.Hstart[w]:(w ==
+                windows ? ref_snps : compressed_Hunique.Hstart[w + 1] - 1)
             Hw_snp_pos = indexin(X_pos[winranges[w]],
                 compressed_Hunique.pos[Hw_range])
             inv_sqrt_allele_var = compressed_Hunique.altfreq[Hw_snp_pos]
@@ -408,7 +410,7 @@ function haplopair!(
     )
     p,  n = size(X)
     pp, d = size(H)
-    p == pp && error("size of H doesn't match X! Expected $p got $pp")
+    p == pp || error("size of H doesn't match X! Expected $p got $pp")
 
     # create views for matrices
     t6 = @elapsed begin
@@ -701,7 +703,7 @@ function nchunks(
         # avoid computing sizes for vector of strings because they are slow
         Hbits += Base.summarysize(compressed_Hunique.CW)
         Hbits += Base.summarysize(compressed_Hunique.CW_typed)
-        Hbits += Base.summarysize(compressed_Hunique.start)
+        Hbits += Base.summarysize(compressed_Hunique.Hstart)
         Hbits += Base.summarysize(compressed_Hunique.pos)
         Hbits += Base.summarysize(compressed_Hunique.altfreq)
     end
