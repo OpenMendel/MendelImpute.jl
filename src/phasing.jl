@@ -179,6 +179,7 @@ function phase(
         end
     end
     impute_time = time() - impute_start
+    total_time = time() - import_data_start
 
     #
     # print timing results
@@ -218,6 +219,8 @@ function phase(
     end
     println("    Imputation                      = ", 
         round(impute_time, sigdigits=6), " seconds\n")
+    println("    Total time                      = ", 
+        round(total_time, sigdigits=6), " seconds\n")
 
     return ph
 end

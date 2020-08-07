@@ -1,7 +1,5 @@
-@testset "connect_happairs" begin
-    T = Tuple{Int, Int}
-
-    # first case
+@testset "dynamic programming" begin
+    T = Tuple{Int32, Int32}
     windows = 4
     haplotype_set = [T[] for i in 1:windows]
     push!(haplotype_set[1], (1, 4))
@@ -39,39 +37,17 @@
     push!(haplotype_set[4], (8, 6))
     push!(haplotype_set[4], (8, 8))
 
-    sol_path, next_pair, subtree_err, best_err = connect_happairs(haplotype_set)
+    sol_path, next_pair, subtree_err, best_err = 
+        MendelImpute.connect_happairs!(haplotype_set)
 
     @test best_err == 1.0
     @test sol_path == [(1, 5), (1, 5), (1, 5), (5, 4)]
-    @test all(subtree_err[1] .== [2.0; 1.0; 2.0; 3.0; 2.0; 3.0; 3.0; 2.0; 3.0])
-    @test all(subtree_err[2] .== [1.0; 2.0; 2.0; 2.0; 3.0; 3.0; 2.0; 3.0; 3.0])
-    @test all(subtree_err[3] .== [2.0; 1.0; 2.0; 1.0])
-    @test all(subtree_err[4] .== [0.0; 0.0; 0.0; 0.0; 0.0; 0.0; 0.0; 0.0; 0.0])
-    @test all(next_pair[1] .== [1; 1; 1; 1; 1; 1; 1; 1; 1])
-    @test all(next_pair[2] .== [2; 2; 2; 2; 2; 2; 2; 2; 2])
+    @test all(subtree_err[1] .== [2.0; 1.0; 2.0; 3.0; 2.0; 3.0; 5.0; 2.0; 3.0])
+    @test all(subtree_err[2] .== [1.0; 2.0; 2.0; 2.0; 5.0; 5.0; 2.0; 5.0; 5.0])
+    @test all(subtree_err[3] .== [4.0; 1.0; 4.0; 1.0])
+    @test all(subtree_err[end] .== 0.0)
+    @test all(next_pair[1] .== [1; 1; 1; 4; 1; 4; 1; 1; 7])
+    @test all(next_pair[2] .== 2)
     @test all(next_pair[3] .== [1; 4; 1; 4])
-    @test all(next_pair[4] .== [0; 0; 0; 0; 0; 0; 0; 0; 0])
-
-    # second case
-    windows = 5
-    haplotype_set = [T[] for i in 1:windows]
-
-    Random.seed!(2020)
-    for w in 1:windows
-        haplotype_set[w] = [(rand(1:10), rand(1:10)) for i in 1:rand(1:10)]
-    end
-    sol_path, next_pair, subtree_err, best_err = connect_happairs(haplotype_set)
-
-    @test best_err == 4.0
-    @test sol_path == [(3, 10), (2, 9), (6, 9), (3, 9), (9, 3)]
-    @test all(subtree_err[1] .== [4.0])
-    @test all(subtree_err[2] .== [2.0; 3.0; 3.0; 2.0; 3.0; 2.0])
-    @test all(subtree_err[3] .== [2.0; 1.0])
-    @test all(subtree_err[4] .== [1.0; 1.0; 0.0; 1.0])
-    @test all(subtree_err[5] .== [0.0; 0.0; 0.0; 0.0; 0.0; 0.0; 0.0;])
-    @test all(next_pair[1] .== [1])
-    @test all(next_pair[2] .== [2; 2; 1; 2; 2; 2])
-    @test all(next_pair[3] .== [1; 3])
-    @test all(next_pair[4] .== [1; 1; 1; 3])
-    @test all(next_pair[5] .== [0; 0; 0; 0; 0; 0; 0])
+    @test all(next_pair[4] .== 0)
 end

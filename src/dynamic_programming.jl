@@ -88,6 +88,8 @@ window containing feasible haplotype pairs.
 
 # Optional input:
 - `λ`: Error each switch contributes. Defaults to 1.0
+- `tolerance`: A heuristic to reduce search space. At each window, pairs that 
+    are more than `tolerance` worse than the optimal pair gets deleted. 
 
 # Output
 - `best_err`: Overall error induced by `sol_path`. Equals λ times number of
@@ -99,6 +101,7 @@ function connect_happairs!(
     subtree_err::Vector{Vector{Float64}},
     haplotype_set::Vector{Vector{T}};
     λ::Float64 = 1.0,
+    tolerance::Float64 = Inf,
     ) where T <: Tuple{Int32, Int32}
 
     windows = length(haplotype_set)
@@ -137,7 +140,7 @@ function connect_happairs!(
         end
 
         # Heuristic to reduce dynamic programming search space
-        tol = win_best_err # remove all suboptimal pairs
+        tol = win_best_err + tolerance
         for (i, err) in enumerate(subtree_err[w])
             if err > tol
                 deleteat!(subtree_err[w], i)
