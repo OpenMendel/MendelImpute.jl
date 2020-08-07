@@ -14,7 +14,6 @@ module MendelImpute
     using ProgressMeter
     using JLSO
     using Distances
-    using ThreadPools
 
     export continue_haplotype, haplopair!, haplopair, haploimpute!
     export impute!, impute_discard_phase!, search_breakpoint
@@ -31,8 +30,9 @@ module MendelImpute
     # main functions that users are exposed to
     export phase
     export compress_haplotypes
-    export nhaplotypes, windows, count_haplotypes_per_window
-    export avg_haplotypes_per_window, nchunks, max_haplotypes_per_window
+    export nhaplotypes, nwindows, count_haplotypes_per_window
+    export avg_haplotypes_per_window, nchunks
+    export max_width
 
     export compute_optimal_haplotypes!
     export make_refvcf_file, make_tgtvcf_file

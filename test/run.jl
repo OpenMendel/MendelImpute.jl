@@ -2545,3 +2545,14 @@ end
 test_multiply();
 
 
+
+
+
+
+using Revise
+using VCFTools
+using GroupSlices
+
+cd(".julia/dev/MendelImpute/simulation/compare2")
+H = convert_ht(Bool, "ref.excludeTarget.vcf.gz", trans=true)
+result = get_window_intervals(H, 1000)

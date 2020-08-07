@@ -500,12 +500,6 @@ version = "1.0.4"
 deps = ["Distributed", "InteractiveUtils", "Logging", "Random"]
 uuid = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
-[[ThreadPools]]
-deps = ["Printf", "RecipesBase", "Statistics"]
-git-tree-sha1 = "7d38d9706b4b15b65b6c7844d704df934b1dba37"
-uuid = "b189fb0b-2eb5-4ed4-bc0c-d34c51242431"
-version = "1.1.1"
-
 [[TimeZones]]
 deps = ["Dates", "EzXML", "Mocking", "Printf", "RecipesBase", "Serialization", "Unicode"]
 git-tree-sha1 = "db7bc2051d4c2e5f336409224df81485c00de6cb"

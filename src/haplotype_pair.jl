@@ -46,27 +46,28 @@ function compute_optimal_haplotypes!(
     # constants
     people = size(X, 2)
     ref_snps = length(compressed_Hunique.pos)
-    width = compressed_Hunique.width
+    max_width = MendelImpute.max_width(compressed_Hunique)
     windows = length(haplotype1[1])
     threads = Threads.nthreads()
     inv_sqrt_allele_var = nothing
-    max_d = max_haplotypes_per_window(compressed_Hunique)
+    max_d = compressed_Hunique.max_unique_haplotypes
+    winranges = compressed_Hunique.X_window_range
 
     # allocate working arrays
     timers = [zeros(7*8) for _ in 1:threads] # 8 for spacing
     timers[1][48] += @elapsed begin # time for allocating
-        happair1 = [ones(Int32, people)           for _ in 1:threads]
-        happair2 = [ones(Int32, people)           for _ in 1:threads]
-        hapscore = [zeros(Float32, people)        for _ in 1:threads]
-        Xwork    = [zeros(Float32, width, people) for _ in 1:threads]
-        Hwork    = [zeros(Float32, width, max_d)  for _ in 1:threads]
+        happair1 = [ones(Int32, people)               for _ in 1:threads]
+        happair2 = [ones(Int32, people)               for _ in 1:threads]
+        hapscore = [zeros(Float32, people)            for _ in 1:threads]
+        Xwork    = [zeros(Float32, max_width, people) for _ in 1:threads]
+        Hwork    = [zeros(Float32, max_width, max_d)  for _ in 1:threads]
         if !isnothing(tf)
-            maxindx = [zeros(Int32, tf)     for _ in 1:threads]
-            maxgrad = [zeros(Float32, tf)   for _ in 1:threads]
-            Hk = [zeros(Float32, width, tf) for _ in 1:threads]
-            Xi = [zeros(Float32, width)     for _ in 1:threads]
-            M  = [zeros(Float32, tf, tf)    for _ in 1:threads]
-            N  = [zeros(Float32, tf)        for _ in 1:threads]
+            maxindx = [zeros(Int32, tf)         for _ in 1:threads]
+            maxgrad = [zeros(Float32, tf)       for _ in 1:threads]
+            Hk = [zeros(Float32, max_width, tf) for _ in 1:threads]
+            Xi = [zeros(Float32, max_width)     for _ in 1:threads]
+            M  = [zeros(Float32, tf, tf)        for _ in 1:threads]
+            N  = [zeros(Float32, tf)            for _ in 1:threads]
             R  = [zeros(Float32, max_d, people) for _ in 1:threads]
         elseif !isnothing(stepscreen)
             maxindx = [zeros(Int32,   stepscreen) for _ in 1:threads]
@@ -74,28 +75,27 @@ function compute_optimal_haplotypes!(
             M  = [zeros(Float32, max_d, max_d)    for _ in 1:threads]
             Nt = [zeros(Float32, max_d, people)   for _ in 1:threads]
         else
-            M = [zeros(Float32, max_d, max_d)  for _ in 1:threads]
+            M = [zeros(Float32, max_d,  max_d) for _ in 1:threads]
             N = [zeros(Float32, people, max_d) for _ in 1:threads]
         end
     end
     pmeter = Progress(windows, 5, "Computing optimal haplotypes...")
 
     # for w in 1:windows
-    ThreadPools.@qthreads for w in 1:windows
+    Threads.@threads for w in 1:windows
+    # Threads.@threads for w in 1:windows
         id = Threads.threadid()
         t6 = @elapsed begin
             Hw_aligned = compressed_Hunique.CW_typed[w].uniqueH
-            Xw_idx_start = (w - 1) * width + 1
-            Xw_idx_end = (w == windows ? length(X_pos) : w * width)
-            Xw_aligned = view(X, Xw_idx_start:Xw_idx_end, :)
-            d  = size(Hw_aligned, 2)
+            Xw_aligned = view(X, winranges[w], :)
+            d = size(Hw_aligned, 2)
         end
 
         # weight snp by inverse allele variance if requested
         t6 += @elapsed if scale_allelefreq
-            Hw_range = compressed_Hunique.start[w]:(w ==
-                windows ? ref_snps : compressed_Hunique.start[w + 1] - 1)
-            Hw_snp_pos = indexin(X_pos[Xw_idx_start:Xw_idx_end],
+            Hw_range = compressed_Hunique.Hstart[w]:(w ==
+                windows ? ref_snps : compressed_Hunique.Hstart[w + 1] - 1)
+            Hw_snp_pos = indexin(X_pos[winranges[w]],
                 compressed_Hunique.pos[Hw_range])
             inv_sqrt_allele_var = compressed_Hunique.altfreq[Hw_snp_pos]
             map!(x -> x < 0.15 ? 1.98 : 1 / sqrt(2*x*(1-x)),
@@ -277,12 +277,11 @@ function screen_flanking_windows!(
     haplotypes = nhaplotypes(compressed_Hunique)
     width = compressed_Hunique.width
     windows = length(haplotype1[1])
+    winranges = compressed_Hunique.X_window_range
 
     for w in 1:windows
         Hw_aligned = compressed_Hunique.CW_typed[w].uniqueH
-        Xw_idx_start = (w - 1) * width + 1
-        Xw_idx_end = (w == windows ? size(X, 1) : w * width)
-        Xw_aligned = view(X, Xw_idx_start:Xw_idx_end, :)
+        Xw_aligned = view(X, winranges[w], :)
 
         for i in 1:people
             # calculate observed error for current pair
@@ -409,26 +408,24 @@ function haplopair!(
     M::AbstractMatrix{Float32}=Matrix{Float32}(undef, size(H, 2), size(H, 2)), # d × d
     N::AbstractMatrix{Float32}=Matrix{Float32}(undef, size(X, 2), size(H, 2)), # n × d
     )
-    p, n  = size(X)
-    d     = size(H, 2)
+    p,  n = size(X)
+    pp, d = size(H)
+    p == pp || error("size of H doesn't match X! Expected $p got $pp")
 
     # create views for matrices
     t6 = @elapsed begin
-        if size(Xwork, 1) != p # last window
-            Xwork = Matrix{Float32}(undef, p, n)
-            Hwork = Matrix{Float32}(undef, p, d)
-        end
-        Mwork = view(M, 1:d, 1:d)
-        Nwork = view(N, :, 1:d)
-        Hwork_view = view(Hwork, :, 1:d)
-        copyto!(Hwork_view, H)
+        Mwork_view = view(M, 1:d, 1:d)
+        Nwork_view = view(N, :, 1:d)
+        Hwork_view = view(Hwork, 1:p, 1:d)
+        Xwork_view = view(Xwork, 1:p, :)
+        copyto!(Hwork_view, H) # update Hwork_view, others are updated later
     end
 
     # initializes missing
-    t5 = @elapsed initXfloat!(Xwork, X)
+    t5 = @elapsed initXfloat!(Xwork_view, X)
 
-    t2, t3 = haplopair!(Xwork, Hwork_view, Mwork, Nwork, happair1, happair2,
-        hapscore, inv_sqrt_allele_var)
+    t2, t3 = haplopair!(Xwork_view, Hwork_view, Mwork_view, Nwork_view, 
+        happair1, happair2, hapscore, inv_sqrt_allele_var)
     t1 = t4 = 0.0 # no time spent on haplotype thinning or rescreening
 
     return t1, t2, t3, t4, t5, t6
@@ -706,7 +703,7 @@ function nchunks(
         # avoid computing sizes for vector of strings because they are slow
         Hbits += Base.summarysize(compressed_Hunique.CW)
         Hbits += Base.summarysize(compressed_Hunique.CW_typed)
-        Hbits += Base.summarysize(compressed_Hunique.start)
+        Hbits += Base.summarysize(compressed_Hunique.Hstart)
         Hbits += Base.summarysize(compressed_Hunique.pos)
         Hbits += Base.summarysize(compressed_Hunique.altfreq)
     end
