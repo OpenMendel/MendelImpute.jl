@@ -451,7 +451,7 @@ function phase_fast!(
 
     # phase person by person
     # for i in 1:people
-    ThreadPools.@qthreads for i in 1:people
+    Threads.@threads for i in 1:people
         id = Threads.threadid()
 
         # First pass to phase each sample window-by-window

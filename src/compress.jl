@@ -292,7 +292,7 @@ by recursively dividing windows into halves.
 - `seen`: storage container
 
 # Output
-- `intervals`: Vector of window ranges. This is also the return vector
+- `intervals`: Vector of window ranges. Each range have ≤ `d` unique haplotypes
 """
 function get_window_intervals(
     H::AbstractMatrix,

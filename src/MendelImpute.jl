@@ -14,7 +14,6 @@ module MendelImpute
     using ProgressMeter
     using JLSO
     using Distances
-    using ThreadPools
 
     export continue_haplotype, haplopair!, haplopair, haploimpute!
     export impute!, impute_discard_phase!, search_breakpoint

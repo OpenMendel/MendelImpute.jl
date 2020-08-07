@@ -236,7 +236,7 @@ function impute_discard_phase!(
     p, n = size(X)
 
     # for person in 1:n
-    ThreadPools.@qthreads for person in 1:n
+    Threads.@threads for person in 1:n
         @inbounds for snp in 1:p
             if ismissing(X[snp, person])
                 #find which segment the snp is located
@@ -252,16 +252,9 @@ function impute_discard_phase!(
                 i2 = snp - compressed_Hunique.Hstart[w2] + 1
 
                 # imputation step
-                try
-                    H1 = compressed_Hunique.CW[w1].uniqueH
-                    H2 = compressed_Hunique.CW[w2].uniqueH
-                    X[snp, person] = H1[i1, h1] + H2[i2, h2]
-                catch
-                    println("snp = $snp, h1 = $h1, w1 = $w1, i1 = $i1")
-                    println("snp = $snp, h2 = $h2, w2 = $w2, i2 = $i2\n")
-
-                    break
-                end
+                H1 = compressed_Hunique.CW[w1].uniqueH
+                H2 = compressed_Hunique.CW[w2].uniqueH
+                X[snp, person] = H1[i1, h1] + H2[i2, h2]
             end
         end
     end

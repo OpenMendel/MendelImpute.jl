@@ -82,7 +82,7 @@ function compute_optimal_haplotypes!(
     pmeter = Progress(windows, 5, "Computing optimal haplotypes...")
 
     # for w in 1:windows
-    ThreadPools.@qthreads for w in 1:windows
+    Threads.@threads for w in 1:windows
     # Threads.@threads for w in 1:windows
         id = Threads.threadid()
         t6 = @elapsed begin
