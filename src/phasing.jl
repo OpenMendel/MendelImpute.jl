@@ -20,8 +20,9 @@ pool of haplotypes `reffile` by sliding windows and saves result in `outfile`.
     snps in `tgtfile` will be imputed.
 - `phase`: If `true`, all output genotypes will be phased. Otherwise all
     output genotypes will be unphased.
-- `max_d`: Maximum number of unique haplotypes in each haplotype window.
-    Note this number is used in the compression step and nowhere else. 
+- `dosage`: If `true`, will assume target matrix are dosages for imputation. 
+- `max_d`: Maximum number of unique haplotypes in each window. Note this number
+    is used in the compression step and nowhere else. 
 - `rescreen`: This option saves a number of top haplotype pairs when solving
     the least squares objective, and re-minimize least squares on just
     observed data.
@@ -43,6 +44,7 @@ function phase(
     outfile::AbstractString = "imputed." * tgtfile,
     impute::Bool = true,
     phase::Bool = false,
+    dosage::Bool = false,
     max_d::Int = 1000,
     rescreen::Bool = false,
     max_haplotypes::Int = 800,
@@ -79,12 +81,16 @@ function phase(
     end
 
     # import genotype data
-    if endswith(tgtfile, ".vcf") || endswith(tgtfile, ".vcf.gz")
+    if (endswith(tgtfile, ".vcf") || endswith(tgtfile, ".vcf.gz")) && !dosage
         X, X_sampleID, X_chr, X_pos, X_ids, X_ref, X_alt = 
             VCFTools.convert_gt(UInt8, tgtfile, trans=true, 
             save_snp_info=true, msg = "Importing genotype file...")
+    elseif (endswith(tgtfile, ".vcf") || endswith(tgtfile, ".vcf.gz")) && dosage
+        X, X_sampleID, X_chr, X_pos, X_ids, X_ref, X_alt = 
+            VCFTools.convert_ds(Float32, tgtfile, trans=true, 
+            save_snp_info=true, msg = "Importing genotype file as dosages...")
     elseif isplink(tgtfile)
-        # PLINK files
+        dosage && error("PLINK files detected but dosage = true!")
         X_snpdata = SnpArrays.SnpData(tgtfile)
         X = convert(Matrix{UInt8}, X_snpdata.snparray')
         X_sampleID = X_snpdata.person_info[!, :iid]
