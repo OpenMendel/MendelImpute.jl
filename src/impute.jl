@@ -1,10 +1,12 @@
 """
-    output_unphased!(X, compressed_haplotypes, phaseinfo, outfile, X_sampleID)
+    write(X, compressed_haplotypes, phaseinfo, outfile, X_sampleID)
 
-Imputes `X` using `phaseinfo` and outputs result in `outfile`. All genotypes
-in `outfile` are non-missing and unphased.
+Writes imputed `X` into `outfile`. All genotypes in `outfile` are non-missing
+and unphased. 
 
-If `XtoH_idx == nothing`, all SNPs in reference file will be imputed.
+# Notes
+Here the writing routine is emulating `write_dlm` in Base at 
+https://github.com/JuliaLang/julia/blob/3608c84e6093594fe86923339fc315231492484c/stdlib/DelimitedFiles/src/DelimitedFiles.jl#L736
 """
 function Base.write(
     outfile::AbstractString,
@@ -62,7 +64,12 @@ end
 """
     write(outfile, X1, X2, compressed_haplotypes, phaseinfo, X_sampleID)
 
-All genotypes in `outfile` are non-missing and phased.
+Writes `X = X1 + X2` into `outfile`. All genotypes in `outfile` are non-missing
+and phased. 
+
+# Notes
+Here the writing routine is emulating `write_dlm` in Base at 
+https://github.com/JuliaLang/julia/blob/3608c84e6093594fe86923339fc315231492484c/stdlib/DelimitedFiles/src/DelimitedFiles.jl#L736
 """
 function Base.write(
     outfile::AbstractString,

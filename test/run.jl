@@ -2556,3 +2556,110 @@ using GroupSlices
 cd(".julia/dev/MendelImpute/simulation/compare2")
 H = convert_ht(Bool, "ref.excludeTarget.vcf.gz", trans=true)
 result = get_window_intervals(H, 1000)
+
+
+# experiment with parallel write
+using Revise
+using VCFTools
+using MendelImpute
+using GeneticVariation
+using Random
+using StatsBase
+using CodecZlib
+using ProgressMeter
+using BenchmarkTools
+using GroupSlices
+
+function Base.write(
+    outfile::AbstractString,
+    X::AbstractMatrix,
+    )
+    # write minimal meta information to outfile
+    io = openvcf(outfile, "w")
+    pb = PipeBuffer()
+    print(pb, "##fileformat=VCFv4.2\n")
+    print(pb, "##source=MendelImpute\n")
+    print(pb, "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n")
+
+    pmeter = Progress(size(X, 1), 5, "Writing to file...")
+    @inbounds for i in 1:size(X, 1)
+        # print ith record
+        write_snp!(pb, @view(X[i, :]))
+
+        (bytesavailable(pb) > (1024*1024)) && write(io, take!(pb))
+        next!(pmeter)
+    end
+    write(io, take!(pb))
+
+    # close & return
+    close(io); close(pb)
+    return nothing
+end
+"""
+Helper function for saving a record (SNP), not tracking phase information.
+"""
+function write_snp!(pb::IOBuffer, X::AbstractVector)
+    n = length(X)
+    @inbounds for j in 1:n
+        if X[j] == 0
+            print(pb, "\t0/0")
+        elseif X[j] == 1
+            print(pb, "\t1/0")
+        elseif X[j] == 2
+            print(pb, "\t1/1")
+        else
+            error("imputed genotypes can only be 0, 1, 2 but got $(X[j])")
+        end
+    end
+    print(pb, "\n")
+    nothing
+end
+
+# not correct: simply testing if multithreading could give speedup in principle
+function write_threaded(
+    outfile::AbstractString,
+    X::AbstractMatrix,
+    )
+    threads = Threads.nthreads()
+
+    # write minimal meta information to outfile
+    io = openvcf(outfile, "w")
+    pb = [PipeBuffer() for _ in 1:threads]
+    print(pb[1], "##fileformat=VCFv4.2\n")
+    print(pb[1], "##source=MendelImpute\n")
+    print(pb[1], "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n")
+    write(io, take!(pb[1]))
+
+    pmeter = Progress(size(X, 1), 5, "Writing to file...")
+    mutex = Threads.SpinLock()
+    Threads.@threads for i in 1:size(X, 1)
+        id = Threads.threadid()
+
+        # print ith record
+        write_snp!(pb[id], @view(X[i, :]))
+
+        lock(mutex)
+        write(io, take!(pb[id]))
+        unlock(mutex)
+    
+        next!(pmeter)
+    end
+
+    # close & return
+    close(io); close.(pb)
+    return nothing
+end
+
+Random.seed!(2020)
+p = 100_000
+n = 1000
+X = convert(Matrix{UInt8}, rand(0:2, p, n))
+Y = convert(Matrix{UInt8}, rand(0:2, 10, 10))
+outfile = "test.vcf.gz"
+
+@time write(outfile, X) # 23.534699 seconds (60.28 k allocations: 384.933 MiB, 0.39% gc time)
+@time write_threaded(outfile, X) #25.389392 seconds (367.30 k allocations: 405.123 MiB)
+
+using ProfileView
+@profview write(outfile, Y) 
+@profview write(outfile, X) 
