@@ -75,6 +75,8 @@ function phase(
         @info "VCF files detected: compressing reference file to .jlso format.."
         compressed_Hunique = compress_haplotypes(reffile, tgtfile,
             "compressed." * reffile, max_d)
+    elseif endswith(reffile, ".jld2")
+        @load reffile compressed_Hunique 
     else
         error("Unrecognized reference file format: only VCF (ends in" * 
             " .vcf or .vcf.gz) or `.jlso` files are acceptable.")

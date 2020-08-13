@@ -164,8 +164,10 @@ function compress_haplotypes(
     outfile::AbstractString,
     d::Int=1000,
     )
-    endswith(outfile, ".jlso") || error("`outfile` does not end in '.jlso'")
-
+    endswith(outfile, ".jld2") || endswith(outfile, ".jlso") || 
+        error("Unrecognized compression format: `outfile` can only end in " * 
+        "`.jlso` or `.jld2`")
+        
     # import reference haplotypes
     H, H_sampleID, H_chr, H_pos, H_ids, H_ref, H_alt = convert_ht(Bool, 
         reffile, trans=true, save_snp_info=true, 
@@ -194,7 +196,9 @@ function compress_haplotypes(H::AbstractMatrix, X::AbstractMatrix,
     H_chr::AbstractVector, H_pos::AbstractVector, H_ids::AbstractVector, 
     H_ref::AbstractVector, H_alt::AbstractVector, d::Int)
 
-    endswith(outfile, ".jlso") || error("`outfile` does not end in 'jlso'.")
+    endswith(outfile, ".jld2") || endswith(outfile, ".jlso") || 
+        error("Unrecognized compression format: `outfile` can only end in " * 
+        "`.jlso` or `.jld2`")
 
     # some constants
     ref_snps = size(H, 1)
@@ -271,8 +275,17 @@ function compress_haplotypes(H::AbstractMatrix, X::AbstractMatrix,
         Hw_idx_start = Hw_idx_end + 1
     end
 
-    JLSO.save(outfile, :compressed_Hunique => compressed_Hunique, 
-        format=:julia_serialize, compression=:gzip)
+    # save using JLSO or JLD2
+    # endswith(outfile, ".jld2") && JLD2.@save outfile compress = 
+    #     true compressed_Hunique
+    if endswith(outfile, ".jld2")
+        jldopen(outfile, "w", compress=true) do file
+            file["compressed_Hunique"] = compressed_Hunique
+        end
+    else #jlso
+        JLSO.save(outfile, :compressed_Hunique => 
+        compressed_Hunique, format=:julia_serialize, compression=:gzip)
+    end
 
     return compressed_Hunique
 end

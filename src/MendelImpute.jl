@@ -12,7 +12,7 @@ module MendelImpute
     using GroupSlices
     using Random
     using ProgressMeter
-    using JLSO
+    using JLD2, FileIO, JLSO
     using Distances
 
     export continue_haplotype, haplopair!, haplopair, haploimpute!
