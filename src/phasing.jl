@@ -63,7 +63,7 @@ function phase(
 
     # import reference data
     println("Importing reference haplotype data..."); flush(stdout)
-    import_data_start = time()
+    ref_import_start = time()
     if endswith(reffile, ".jlso")
         loaded = JLSO.load(reffile)
         compressed_Hunique = loaded[:compressed_Hunique]
@@ -79,8 +79,10 @@ function phase(
         error("Unrecognized reference file format: only VCF (ends in" * 
             " .vcf or .vcf.gz) or `.jlso` files are acceptable.")
     end
+    ref_import_time = time() - ref_import_start
 
     # import genotype data
+    genotype_import_start = time()
     if (endswith(tgtfile, ".vcf") || endswith(tgtfile, ".vcf.gz")) && !dosage
         X, X_sampleID, X_chr, X_pos, X_ids, X_ref, X_alt = 
             VCFTools.convert_gt(UInt8, tgtfile, trans=true, 
@@ -104,7 +106,8 @@ function phase(
             " files (ends in .vcf or .vcf.gz) or PLINK files (do not include" *
             " .bim/bed/fam and all three files must exist in 1 directory)")
     end
-    import_data_time = time() - import_data_start
+    genotype_import_time = time() - genotype_import_start
+    import_data_time = time() - ref_import_start
 
     # some constants and timers
     people = size(X, 2)
@@ -151,6 +154,7 @@ function phase(
     # impute step
     #
     impute_start = time()
+    write_time = 0.0
     XtoH_idx = indexin(X_pos, compressed_Hunique.pos)
     if impute # imputes typed and untyped SNPs
         # convert phase's starting position from X's index to H's index
@@ -162,14 +166,16 @@ function phase(
 
             # impute and write to file
             impute!(X1, X2, compressed_Hunique, ph)
-            write(outfile, X1, X2, compressed_Hunique, X_sampleID)
+            write_time += @elapsed write(outfile, X1, X2, compressed_Hunique, 
+                X_sampleID)
         else # output genotypes all unphased
             X_full = Matrix{Union{Missing, UInt8}}(missing, ref_snps, people)
             copyto!(@view(X_full[XtoH_idx, :]), X) # keep known entries
 
             # impute and write to file
             impute_discard_phase!(X_full, compressed_Hunique, ph)
-            write(outfile, X_full, compressed_Hunique, X_sampleID)
+            write_time += @elapsed write(outfile, X_full, compressed_Hunique, 
+                X_sampleID)
         end
     else # impute only missing entries in typed SNPs
         if phase
@@ -178,14 +184,17 @@ function phase(
 
             # impute and write to file
             impute!(X1, X2, compressed_Hunique, ph)
-            write(outfile, X1, X2, compressed_Hunique, X_sampleID, XtoH_idx)
+            write_time += @elapsed write(outfile, X1, X2, compressed_Hunique, 
+                X_sampleID, XtoH_idx)
         else
             impute_discard_phase!(X, compressed_Hunique, ph)
-            write(outfile, X, compressed_Hunique, X_sampleID, XtoH_idx)
+            write_time += @elapsed write(outfile, X, compressed_Hunique, 
+                X_sampleID, XtoH_idx)
         end
     end
     impute_time = time() - impute_start
-    total_time = time() - import_data_start
+    impute_nonwrite_time = impute_time - write_time
+    total_time = time() - ref_import_start
 
     #
     # print timing results
@@ -195,6 +204,10 @@ function phase(
     println("Timings: ")
     println("    Data import                     = ", 
         round(import_data_time, sigdigits=6), " seconds")
+    println("        import target data             = ", 
+        round(genotype_import_time, sigdigits=6), " seconds")
+    println("        import compressed haplotypes   = ", 
+        round(ref_import_time, sigdigits=6), " seconds")
     println("    Computing haplotype pair        = ", 
         round(calculate_happairs_time, sigdigits=6), " seconds")
     haptimers[1*8] != 0 && println("        screening for top haplotypes   = ", 
@@ -223,8 +236,12 @@ function phase(
         println("        Recording result               = ", 
             round(phasetimers[3*8], sigdigits=6), " seconds per thread")
     end
-    println("    Imputation                      = ", 
-        round(impute_time, sigdigits=6), " seconds\n")
+    println("    Imputation                     = ", 
+        round(impute_time, sigdigits=6), " seconds")
+    println("        Imputing missing               = ", 
+        round(impute_nonwrite_time, sigdigits=6), " seconds")
+    println("        Writing to file                = ", 
+        round(write_time, sigdigits=6), " seconds\n")
     println("    Total time                      = ", 
         round(total_time, sigdigits=6), " seconds\n")
 

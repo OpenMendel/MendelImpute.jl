@@ -2663,3 +2663,16 @@ outfile = "test.vcf.gz"
 using ProfileView
 @profview write(outfile, Y) 
 @profview write(outfile, X) 
+
+
+# experiment with parallel read
+using Revise
+using VCFTools
+using MendelImpute
+using GeneticVariation
+using Random
+using StatsBase
+using CodecZlib
+using ProgressMeter
+using BenchmarkTools
+using GroupSlices
