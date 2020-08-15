@@ -1,5 +1,5 @@
 """
-    write(X, compressed_haplotypes, phaseinfo, outfile, X_sampleID)
+    write(outfile, X, compressed_haplotypes, X_sampleID, XtoH_idx)
 
 Writes imputed `X` into `outfile`. All genotypes in `outfile` are non-missing
 and unphased. 
@@ -8,6 +8,59 @@ and unphased.
 Here the writing routine is emulating `write_dlm` in Base at 
 https://github.com/JuliaLang/julia/blob/3608c84e6093594fe86923339fc315231492484c/stdlib/DelimitedFiles/src/DelimitedFiles.jl#L736
 """
+# function Base.write(
+#     outfile::AbstractString,
+#     X::AbstractMatrix,
+#     compressed_haplotypes::CompressedHaplotypes,
+#     X_sampleID::AbstractVector,
+#     XtoH_idx::Union{Nothing, AbstractVector} = nothing,
+#     )
+#     # retrieve reference file information
+#     chr = (isnothing(XtoH_idx) ? compressed_haplotypes.chr : 
+#                                  compressed_haplotypes.chr[XtoH_idx])
+#     pos = (isnothing(XtoH_idx) ? compressed_haplotypes.pos : 
+#                                  compressed_haplotypes.pos[XtoH_idx])
+#     ids = (isnothing(XtoH_idx) ? compressed_haplotypes.SNPid : 
+#                                  compressed_haplotypes.SNPid[XtoH_idx])
+#     ref = (isnothing(XtoH_idx) ? compressed_haplotypes.refallele : 
+#                                  compressed_haplotypes.refallele[XtoH_idx])
+#     alt = (isnothing(XtoH_idx) ? compressed_haplotypes.altallele : 
+#                                  compressed_haplotypes.altallele[XtoH_idx])
+
+#     # write minimal meta information to outfile
+#     io = openvcf(outfile, "w")
+#     pb = PipeBuffer()
+#     print(pb, "##fileformat=VCFv4.2\n")
+#     print(pb, "##source=MendelImpute\n")
+#     print(pb, "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n")
+
+#     # header line should match reffile (i.e. sample ID's should match)
+#     print(pb, "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT")
+#     for id in X_sampleID
+#         print(pb, "\t", id)
+#     end
+#     print(pb, "\n")
+#     (bytesavailable(pb) > (16*1024)) && write(io, take!(pb))
+
+#     pmeter = Progress(size(X, 1), 5, "Writing to file...")
+#     @inbounds for i in 1:size(X, 1)
+#         # write meta info (chrom/pos/snpid/ref/alt)
+#         print(pb, chr[i], "\t", string(pos[i]), "\t", ids[i][1], "\t", ref[i],
+#             "\t", alt[i][1], "\t.\tPASS\t.\tGT")
+
+#         # print ith record
+#         write_snp!(pb, @view(X[i, :]))
+
+#         (bytesavailable(pb) > (16*1024)) && write(io, take!(pb))
+#         next!(pmeter)
+#     end
+#     write(io, take!(pb))
+
+#     # close & return
+#     close(io); close(pb)
+#     return nothing
+# end
+
 function Base.write(
     outfile::AbstractString,
     X::AbstractMatrix,
@@ -15,6 +68,11 @@ function Base.write(
     X_sampleID::AbstractVector,
     XtoH_idx::Union{Nothing, AbstractVector} = nothing,
     )
+    threads = Threads.nthreads()
+    snps = size(X, 1)
+    len = div(snps, threads)
+    files = ["tmp$i.vcf.gz" for i in 1:threads]
+
     # retrieve reference file information
     chr = (isnothing(XtoH_idx) ? compressed_haplotypes.chr : 
                                  compressed_haplotypes.chr[XtoH_idx])
@@ -28,41 +86,53 @@ function Base.write(
                                  compressed_haplotypes.altallele[XtoH_idx])
 
     # write minimal meta information to outfile
-    io = openvcf(outfile, "w")
-    pb = PipeBuffer()
-    print(pb, "##fileformat=VCFv4.2\n")
-    print(pb, "##source=MendelImpute\n")
-    print(pb, "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n")
+    io = [openvcf(files[i], "w") for i in 1:threads]
+    pb = [PipeBuffer() for _ in 1:threads]
+    print(pb[1], "##fileformat=VCFv4.2\n")
+    print(pb[1], "##source=MendelImpute\n")
+    print(pb[1], "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n")
 
     # header line should match reffile (i.e. sample ID's should match)
-    print(pb, "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT")
+    print(pb[1], "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT")
     for id in X_sampleID
-        print(pb, "\t", id)
+        print(pb[1], "\t", id)
     end
-    print(pb, "\n")
-    (bytesavailable(pb) > (16*1024)) && write(io, take!(pb))
+    print(pb[1], "\n")
+    bytesavailable(pb[1]) > 1048576 && write(io[1], take!(pb[1]))
 
-    pmeter = Progress(size(X, 1), 5, "Writing to file...")
-    @inbounds for i in 1:size(X, 1)
-        # write meta info (chrom/pos/snpid/ref/alt)
-        print(pb, chr[i], "\t", string(pos[i]), "\t", ids[i][1], "\t", ref[i],
-            "\t", alt[i][1], "\t.\tPASS\t.\tGT")
+    # each thread writes `len` SNPs
+    pmeter = Progress(snps, 5, "Writing to file...")
+    Threads.@threads for t in 1:threads
+        id = Threads.threadid()
+        cur_ranges = (id == threads ? 
+            ((threads-1)*len+1:snps) : (1:len) .+ (t-1)*len)
 
-        # print ith record
-        write_snp!(pb, @view(X[i, :]))
-
-        (bytesavailable(pb) > (16*1024)) && write(io, take!(pb))
-        next!(pmeter)
+        @inbounds for i in cur_ranges
+            # write meta info (chrom/pos/snpid/ref/alt)
+            print(pb[id], chr[i], "\t", string(pos[i]), "\t", ids[i][1], "\t", 
+                ref[i], "\t", alt[i][1], "\t.\tPASS\t.\tGT")
+            # print ith record
+            write_snp!(pb[id], @view(X[i, :])) 
+            bytesavailable(pb[id]) > 1048576 && write(io[id], take!(pb[id]))
+            next!(pmeter)
+        end
+        write(io[id], take!(pb[id]))
     end
-    write(io, take!(pb))
+    close.(io); close.(pb) # close io and buffer
 
-    # close & return
-    close(io); close(pb)
+    # concatenate all files into 1 VCF file
+    run(pipeline(`cat $files`, stdout=outfile))
+
+    # delete intermediate files
+    for i in 1:threads
+        rm("tmp$i.vcf.gz", force=true)
+    end
+    
     return nothing
 end
 
 """
-    write(outfile, X1, X2, compressed_haplotypes, phaseinfo, X_sampleID)
+    write(outfile, X1, X2, compressed_haplotypes, X_sampleID, XtoH_idx)
 
 Writes `X = X1 + X2` into `outfile`. All genotypes in `outfile` are non-missing
 and phased. 

@@ -2615,40 +2615,47 @@ function write_snp!(pb::IOBuffer, X::AbstractVector)
     nothing
 end
 
-# not correct: simply testing if multithreading could give speedup in principle
 function write_threaded(
     outfile::AbstractString,
     X::AbstractMatrix,
     )
     threads = Threads.nthreads()
+    snps = size(X, 1)
+    len = div(snps, threads)
+    files = ["tmp$i.vcf.gz" for i in 1:threads]
 
     # write minimal meta information to outfile
-    io = openvcf(outfile, "w")
+    io = [openvcf(files[i], "w") for i in 1:threads]
     pb = [PipeBuffer() for _ in 1:threads]
     print(pb[1], "##fileformat=VCFv4.2\n")
     print(pb[1], "##source=MendelImpute\n")
     print(pb[1], "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n")
-    write(io, take!(pb[1]))
+    pmeter = Progress(snps, 5, "Writing to file...")
 
-    pmeter = Progress(size(X, 1), 5, "Writing to file...")
-    mutex = Threads.SpinLock()
-    Threads.@threads for i in 1:size(X, 1)
+    # each thread writes `len` SNPs
+    Threads.@threads for t in 1:threads
         id = Threads.threadid()
+        cur_ranges = (id == threads ? ((threads-1)*len+1:snps) : (1:len) .+ (t-1)*len)
+        @inbounds for i in cur_ranges
+            write_snp!(pb[id], @view(X[i, :]))
+            (bytesavailable(pb[id]) > (1024*1024)) && write(io[id], take!(pb[id])) 
+            next!(pmeter)
+        end
+        write(io[id], take!(pb[id]))
+    end
+    close.(io); close.(pb) # close io and buffer
 
-        # print ith record
-        write_snp!(pb[id], @view(X[i, :]))
+    # concatenate all files into 1 VCF file
+    run(pipeline(`cat $files`, stdout=outfile))
 
-        lock(mutex)
-        write(io, take!(pb[id]))
-        unlock(mutex)
-    
-        next!(pmeter)
+    # delete intermediate files
+    for i in 1:threads
+        rm("tmp$i.vcf.gz", force=true)
     end
 
-    # close & return
-    close(io); close.(pb)
     return nothing
 end
+
 
 Random.seed!(2020)
 p = 100_000
@@ -2658,7 +2665,24 @@ Y = convert(Matrix{UInt8}, rand(0:2, 10, 10))
 outfile = "test.vcf.gz"
 
 @time write(outfile, X) # 23.534699 seconds (60.28 k allocations: 384.933 MiB, 0.39% gc time)
-@time write_threaded(outfile, X) #25.389392 seconds (367.30 k allocations: 405.123 MiB)
+@time write_threaded(outfile, X) #
+
+
+# minimal example
+using CodecZlib
+for i in 1:3
+    file = "file$i.gz"
+    x = rand(2, 2)
+    io = GzipCompressorStream(open(file, "w"))
+    write(io, "hello, testing from i = $i")
+    # close(io)
+end
+
+files = ["file1.gz", "file2.gz", "file3.gz"]
+run(pipeline(`cat $files`, stdout="allfiles.gz"))
+
+
+
 
 using ProfileView
 @profview write(outfile, Y) 
