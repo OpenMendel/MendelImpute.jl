@@ -168,7 +168,7 @@ function phase(
 
             # impute and write to file
             impute!(X1, X2, compressed_Hunique, ph)
-            write_time += @elapsed write(outfile, X1, X2, compressed_Hunique, 
+            write_time += @elapsed write(outfile, (X1, X2), compressed_Hunique, 
                 X_sampleID)
         else # output genotypes all unphased
             X_full = Matrix{Union{Missing, UInt8}}(missing, ref_snps, people)
@@ -186,7 +186,7 @@ function phase(
 
             # impute and write to file
             impute!(X1, X2, compressed_Hunique, ph)
-            write_time += @elapsed write(outfile, X1, X2, compressed_Hunique, 
+            write_time += @elapsed write(outfile, (X1, X2), compressed_Hunique, 
                 X_sampleID, XtoH_idx)
         else
             impute_discard_phase!(X, compressed_Hunique, ph)

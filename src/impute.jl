@@ -1,75 +1,22 @@
 """
     write(outfile, X, compressed_haplotypes, X_sampleID, XtoH_idx)
 
-Writes imputed `X` into `outfile`. All genotypes in `outfile` are non-missing
+Writes imputed `X` into `outfile`. All genotypes in `outfile` are non-missing.
 and unphased. 
 
 # Notes
 Here the writing routine is emulating `write_dlm` in Base at 
 https://github.com/JuliaLang/julia/blob/3608c84e6093594fe86923339fc315231492484c/stdlib/DelimitedFiles/src/DelimitedFiles.jl#L736
 """
-# function Base.write(
-#     outfile::AbstractString,
-#     X::AbstractMatrix,
-#     compressed_haplotypes::CompressedHaplotypes,
-#     X_sampleID::AbstractVector,
-#     XtoH_idx::Union{Nothing, AbstractVector} = nothing,
-#     )
-#     # retrieve reference file information
-#     chr = (isnothing(XtoH_idx) ? compressed_haplotypes.chr : 
-#                                  compressed_haplotypes.chr[XtoH_idx])
-#     pos = (isnothing(XtoH_idx) ? compressed_haplotypes.pos : 
-#                                  compressed_haplotypes.pos[XtoH_idx])
-#     ids = (isnothing(XtoH_idx) ? compressed_haplotypes.SNPid : 
-#                                  compressed_haplotypes.SNPid[XtoH_idx])
-#     ref = (isnothing(XtoH_idx) ? compressed_haplotypes.refallele : 
-#                                  compressed_haplotypes.refallele[XtoH_idx])
-#     alt = (isnothing(XtoH_idx) ? compressed_haplotypes.altallele : 
-#                                  compressed_haplotypes.altallele[XtoH_idx])
-
-#     # write minimal meta information to outfile
-#     io = openvcf(outfile, "w")
-#     pb = PipeBuffer()
-#     print(pb, "##fileformat=VCFv4.2\n")
-#     print(pb, "##source=MendelImpute\n")
-#     print(pb, "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n")
-
-#     # header line should match reffile (i.e. sample ID's should match)
-#     print(pb, "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT")
-#     for id in X_sampleID
-#         print(pb, "\t", id)
-#     end
-#     print(pb, "\n")
-#     (bytesavailable(pb) > (16*1024)) && write(io, take!(pb))
-
-#     pmeter = Progress(size(X, 1), 5, "Writing to file...")
-#     @inbounds for i in 1:size(X, 1)
-#         # write meta info (chrom/pos/snpid/ref/alt)
-#         print(pb, chr[i], "\t", string(pos[i]), "\t", ids[i][1], "\t", ref[i],
-#             "\t", alt[i][1], "\t.\tPASS\t.\tGT")
-
-#         # print ith record
-#         write_snp!(pb, @view(X[i, :]))
-
-#         (bytesavailable(pb) > (16*1024)) && write(io, take!(pb))
-#         next!(pmeter)
-#     end
-#     write(io, take!(pb))
-
-#     # close & return
-#     close(io); close(pb)
-#     return nothing
-# end
-
 function Base.write(
     outfile::AbstractString,
-    X::AbstractMatrix,
+    X::Union{AbstractMatrix, Tuple{AbstractMatrix, AbstractMatrix}},
     compressed_haplotypes::CompressedHaplotypes,
     X_sampleID::AbstractVector,
     XtoH_idx::Union{Nothing, AbstractVector} = nothing,
     )
     threads = Threads.nthreads()
-    snps = size(X, 1)
+    snps = typeof(X) <: AbstractMatrix ? size(X, 1) : size(X[1], 1)
     len = div(snps, threads)
     files = ["tmp$i.vcf.gz" for i in 1:threads]
 
@@ -112,7 +59,7 @@ function Base.write(
             print(pb[id], chr[i], "\t", string(pos[i]), "\t", ids[i][1], "\t", 
                 ref[i], "\t", alt[i][1], "\t.\tPASS\t.\tGT")
             # print ith record
-            write_snp!(pb[id], @view(X[i, :])) 
+            write_snp!(pb[id], X, i) 
             bytesavailable(pb[id]) > 1048576 && write(io[id], take!(pb[id]))
             next!(pmeter)
         end
@@ -127,88 +74,25 @@ function Base.write(
     for i in 1:threads
         rm("tmp$i.vcf.gz", force=true)
     end
-    
-    return nothing
-end
 
-"""
-    write(outfile, X1, X2, compressed_haplotypes, X_sampleID, XtoH_idx)
-
-Writes `X = X1 + X2` into `outfile`. All genotypes in `outfile` are non-missing
-and phased. 
-
-# Notes
-Here the writing routine is emulating `write_dlm` in Base at 
-https://github.com/JuliaLang/julia/blob/3608c84e6093594fe86923339fc315231492484c/stdlib/DelimitedFiles/src/DelimitedFiles.jl#L736
-"""
-function Base.write(
-    outfile::AbstractString,
-    X1::AbstractMatrix,
-    X2::AbstractMatrix,
-    compressed_haplotypes::CompressedHaplotypes,
-    X_sampleID::AbstractVector;
-    XtoH_idx::Union{Nothing, AbstractVector} = nothing,
-    )
-    # retrieve reference file information
-    chr = (isnothing(XtoH_idx) ? compressed_haplotypes.chr :
-                                 compressed_haplotypes.chr[XtoH_idx])
-    pos = (isnothing(XtoH_idx) ? compressed_haplotypes.pos :
-                                 compressed_haplotypes.pos[XtoH_idx])
-    ids = (isnothing(XtoH_idx) ? compressed_haplotypes.SNPid :
-                                 compressed_haplotypes.SNPid[XtoH_idx])
-    ref = (isnothing(XtoH_idx) ? compressed_haplotypes.refallele :
-                                 compressed_haplotypes.refallele[XtoH_idx])
-    alt = (isnothing(XtoH_idx) ? compressed_haplotypes.altallele :
-                                 compressed_haplotypes.altallele[XtoH_idx])
-
-    # write minimal meta information to outfile
-    io = openvcf(outfile, "w")
-    pb = PipeBuffer()
-    print(pb, "##fileformat=VCFv4.2\n")
-    print(pb, "##source=MendelImpute\n")
-    print(pb, "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n")
-
-    # header line should match reffile (i.e. sample ID's should match)
-    print(pb, "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT")
-    for id in X_sampleID
-        print(pb, "\t", id)
-    end
-    print(pb, "\n")
-    (bytesavailable(pb) > (16*1024)) && write(io, take!(pb))
-
-    pmeter = Progress(size(X1, 1), 5, "Writing to file...")
-    @inbounds for i in 1:size(X1, 1)
-        # write meta info (chrom/pos/id/ref/alt)
-        print(pb, chr[i], "\t", string(pos[i]), "\t", ids[i][1], "\t", ref[i],
-            "\t", alt[i][1], "\t.\tPASS\t.\tGT")
-
-        # print ith record
-        write_snp!(pb, @view(X1[i, :]), @view(X2[i, :]))
-
-        (bytesavailable(pb) > (16*1024)) && write(io, take!(pb))
-        next!(pmeter)
-    end
-    write(io, take!(pb))
-
-    # close & return
-    close(io); close(pb)
     return nothing
 end
 
 """
 Helper function for saving a record (SNP), not tracking phase information.
 """
-function write_snp!(pb::IOBuffer, X::AbstractVector)
-    n = length(X)
+function write_snp!(pb::IOBuffer, X::AbstractMatrix, i::Int)
+    x = @view(X[i, :]) # current record
+    n = length(x)
     @inbounds for j in 1:n
-        if X[j] == 0
+        if x[j] == 0
             print(pb, "\t0/0")
-        elseif X[j] == 1
+        elseif x[j] == 1
             print(pb, "\t1/0")
-        elseif X[j] == 2
+        elseif x[j] == 2
             print(pb, "\t1/1")
         else
-            error("imputed genotypes can only be 0, 1, 2 but got $(X[j])")
+            error("imputed genotypes can only be 0, 1, 2 but got $(x[j])")
         end
     end
     print(pb, "\n")
@@ -217,22 +101,27 @@ end
 
 """
 Helper function for saving a record (SNP), tracking phase information.
+Here `X = X1 + X2`. 
 """
-function write_snp!(pb::IOBuffer, X1::AbstractVector, X2::AbstractVector)
-    n = length(X1)
-    @assert n == length(X2)
+function write_snp!(pb::IOBuffer, X::Tuple, i::Int)
+    X1, X2 = X[1], X[2]
+    x1 = @view(X1[i, :])
+    x2 = @view(X2[i, :])
+
+    n = length(x1)
+    @assert n == length(x2)
     @inbounds for j in 1:n
-        if X1[j] == X2[j] == 0
+        if x1[j] == x2[j] == 0
             print(pb, "\t0|0")
-        elseif X1[j] == 0 && X2[j] == 1
+        elseif x1[j] == 0 && x2[j] == 1
             print(pb, "\t0|1")
-        elseif X1[j] == 1 && X2[j] == 0
+        elseif x1[j] == 1 && x2[j] == 0
             print(pb, "\t1|0")
-        elseif X1[j] == 1 && X2[j] == 1
+        elseif x1[j] == 1 && x2[j] == 1
             print(pb, "\t1|1")
         else
             error("phased genotypes can only be 0|0, 0|1, 1|0 or 1|1 but
-                got $(X1[j])|$(X2[j])")
+                got $(x1[j])|$(x2[j])")
         end
     end
     print(pb, "\n")
