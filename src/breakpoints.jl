@@ -36,6 +36,7 @@ function continue_haplotype(
         lu1 = complete_idx_to_unique_typed_idx(l, window - 1, compressed_Hunique)
         lu2 = complete_idx_to_unique_typed_idx(l, window, compressed_Hunique)
 
+        # TODO: use `LazyArrays.jl` for `vcat` 
         s1  = vcat(Hprev[:, iu], Hcurr[:, ku])
         s21 = vcat(Hprev[:, ju1], Hcurr[:, ju2])
         s22 = vcat(Hprev[:, lu1], Hcurr[:, lu2])
@@ -50,6 +51,7 @@ function continue_haplotype(
         ku1 = complete_idx_to_unique_typed_idx(k, window - 1, compressed_Hunique)
         ku2 = complete_idx_to_unique_typed_idx(k, window, compressed_Hunique)
 
+        # TODO: use `LazyArrays.jl` for `vcat` 
         s1  = vcat(Hprev[:, iu], Hcurr[:, lu])
         s21 = vcat(Hprev[:, ju1], Hcurr[:, ju2])
         s22 = vcat(Hprev[:, ku1], Hcurr[:, ku2])
@@ -64,6 +66,7 @@ function continue_haplotype(
         lu1 = complete_idx_to_unique_typed_idx(l, window - 1, compressed_Hunique)
         lu2 = complete_idx_to_unique_typed_idx(l, window, compressed_Hunique)
 
+        # TODO: use `LazyArrays.jl` for `vcat` 
         s1  = vcat(Hprev[:, ju], Hcurr[:, ku])
         s21 = vcat(Hprev[:, iu1], Hcurr[:, iu2])
         s22 = vcat(Hprev[:, lu1], Hcurr[:, lu2])
@@ -78,6 +81,7 @@ function continue_haplotype(
         ku1 = complete_idx_to_unique_typed_idx(k, window - 1, compressed_Hunique)
         ku2 = complete_idx_to_unique_typed_idx(k, window, compressed_Hunique)
 
+        # TODO: use `LazyArrays.jl` for `vcat` 
         s1  = vcat(Hprev[:, ju], Hcurr[:, lu])
         s21 = vcat(Hprev[:, iu1], Hcurr[:, iu2])
         s22 = vcat(Hprev[:, ku1], Hcurr[:, ku2])

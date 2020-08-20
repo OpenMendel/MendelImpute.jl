@@ -1,13 +1,13 @@
 """
 Data structure for keeping track of unique haplotypes in a window. 
 
-- `uniqueindex`: the unique haplotype indices in a window.
-- `to_unique`: map every haplotype index to the unique haplotype index
-- `uniqueH`: A BitMatrix storing unique haplotypes in columns or rows, depending
-    on `dims` argument of `compress_haplotypes`
-- `hapmap`: Dictionary that maps every unique haplotype to all the same 
-    haplotypes. If a haplotype is unique, it will not be recorded in `hapmap`
-    to conserve memory.
+# Every window contains:
+- `uniqueindex`: the unique haplotype indices
+- `to_unique`: vertor that maps every haplotype index to the corresponding 
+    unique haplotype index
+- `uniqueH`: A BitMatrix storing unique haplotypes in columns
+- `hapmap`: Dictionary that maps every unique haplotype to its equivalent
+    haplotypes. Singleton haplotypes will not be recorded to conserve memory.
 
 # Example:
 
@@ -149,8 +149,9 @@ a compressed binary format. All SNPs in `tgtfile` must be present in `reffile`.
 # Why is `tgtfile` required? 
 The unique haplotypes in each window is computed on the typed SNPs only. 
 A genotype matrix `tgtfile` is used to identify the typed SNPs. In the future, 
-hopefully we can compute compressed haplotype panels for all genotyping 
-platforms. 
+hopefully we can pre-compute compressed haplotype panels for all genotyping 
+platforms and provide them as downloadable files. But currently, users must
+run this function by themselves. 
 
 # Inputs
 * `reffile`: reference haplotype file name (ends in `.vcf` or `.vcf.gz`)
@@ -167,7 +168,7 @@ function compress_haplotypes(
     endswith(outfile, ".jld2") || endswith(outfile, ".jlso") || 
         error("Unrecognized compression format: `outfile` can only end in " * 
         "`.jlso` or `.jld2`")
-        
+
     # import reference haplotypes
     H, H_sampleID, H_chr, H_pos, H_ids, H_ref, H_alt = convert_ht(Bool, 
         reffile, trans=true, save_snp_info=true, 
@@ -175,8 +176,8 @@ function compress_haplotypes(
     X, X_sampleID, X_chr, X_pos, X_ids, X_ref, X_alt = 
         VCFTools.convert_gt(UInt8, tgtfile, trans=true, save_snp_info=true, 
         msg = "Importing genotype file...")
-    any(isnothing, indexin(X_pos, H_pos)) && 
-        error("Found SNPs in target file that are not in reference file!")
+    any(isnothing, indexin(X_pos, H_pos)) && error("Found SNPs in target " * 
+        "file that are not in reference file! Please filter them out first!")
 
     # compress routine
     compress_haplotypes(H, X, outfile, X_pos, H_sampleID, H_chr, H_pos, H_ids, 
@@ -203,7 +204,6 @@ function compress_haplotypes(H::AbstractMatrix, X::AbstractMatrix,
     # some constants
     ref_snps = size(H, 1)
     tgt_snps = size(X, 1)
-    Hw_idx_start = 1
 
     # compute window intervals based on typed SNPs
     XtoH_idx = indexin(X_pos, H_pos) # assumes all SNPs in X are in H
@@ -218,6 +218,7 @@ function compress_haplotypes(H::AbstractMatrix, X::AbstractMatrix,
     compressed_Hunique.X_window_range .= window_ranges
 
     # record unique haplotypes and mappings window by window
+    Hw_idx_start = 1
     for w in 1:length(window_ranges)
         # current window ranges
         Xw_idx_start = first(window_ranges[w])
@@ -276,15 +277,13 @@ function compress_haplotypes(H::AbstractMatrix, X::AbstractMatrix,
     end
 
     # save using JLSO or JLD2
-    # endswith(outfile, ".jld2") && JLD2.@save outfile compress = 
-    #     true compressed_Hunique
     if endswith(outfile, ".jld2")
         jldopen(outfile, "w", compress=true) do file
             file["compressed_Hunique"] = compressed_Hunique
         end
     else #jlso
         JLSO.save(outfile, :compressed_Hunique => 
-        compressed_Hunique, format=:julia_serialize, compression=:gzip)
+            compressed_Hunique, format=:julia_serialize, compression=:gzip)
     end
 
     return compressed_Hunique

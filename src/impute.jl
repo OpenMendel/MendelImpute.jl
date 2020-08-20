@@ -2,7 +2,8 @@
     write(outfile, X, compressed_haplotypes, X_sampleID, XtoH_idx)
 
 Writes imputed `X` into `outfile`. All genotypes in `outfile` are non-missing.
-and unphased. 
+If `X` is a matrix, output VCF will be unphased. Otherwise if `X` is a Tuple
+of matrix (i.e. `X = X1 + X2`), then all output will be phased. 
 
 # Notes
 Here the writing routine is emulating `write_dlm` in Base at 
@@ -103,7 +104,7 @@ end
 Helper function for saving a record (SNP), tracking phase information.
 Here `X = X1 + X2`. 
 """
-function write_snp!(pb::IOBuffer, X::Tuple, i::Int)
+function write_snp!(pb::IOBuffer, X::Tuple{AbstractMatrix, AbstractMatrix}, i::Int)
     X1, X2 = X[1], X[2]
     x1 = @view(X1[i, :])
     x2 = @view(X2[i, :])
@@ -147,7 +148,7 @@ function impute!(
     fill!(X2, 0)
 
     # loop over individuals
-    for i in 1:size(X1, 2)
+    @inbounds for i in 1:size(X1, 2)
         # strand 1
         for s in 1:(length(phase[i].strand1.start) - 1)
             X_idx = phase[i].strand1.start[s]:(phase[i].strand1.start[s + 1] - 1)
