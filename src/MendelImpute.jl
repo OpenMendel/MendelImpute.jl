@@ -57,5 +57,6 @@ module MendelImpute
     include("impute.jl")
     include("breakpoints.jl")
     include("intersect.jl")
-
+    include("painting.jl")
+    
 end # module

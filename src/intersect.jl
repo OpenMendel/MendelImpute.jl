@@ -1,3 +1,7 @@
+###### This file is part of the MendelImpute.jl package.
+###### This file contains helper functions that facilitates phasing by
+###### window-by-window intersections. They are called in the `phasing.jl` file. 
+
 """
     phase_sample!(happair1, happair2, compressed_Hunique, [seen])
 

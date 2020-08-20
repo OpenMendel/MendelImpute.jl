@@ -196,7 +196,12 @@ function phase(
     end
     impute_time = time() - impute_start
     impute_nonwrite_time = impute_time - write_time
-    total_time = time() - ref_import_start
+    
+    #
+    # save phaseinfo into .jlso format
+    #
+    # JLSO.save("phaseinfo.jlso", :ph => ph, format=:julia_serialize, 
+    #     compression=:gzip)
 
     #
     # print timing results
@@ -244,6 +249,8 @@ function phase(
         round(impute_nonwrite_time, sigdigits=6), " seconds")
     println("        Writing to file                = ", 
         round(write_time, sigdigits=6), " seconds\n")
+
+    total_time = time() - ref_import_start
     println("    Total time                      = ", 
         round(total_time, sigdigits=6), " seconds\n")
 
