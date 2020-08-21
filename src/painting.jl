@@ -10,14 +10,17 @@ function paint(
     composition::AbstractVector = zeros(length(populations))
     )
     snps = sample_phase.strand1.length
-    l = length(sample_phase.strand1.haplotypelabel)
+    @assert snps == sample_phase.strand2.length "strands have different length!"
+    
+    l1 = length(sample_phase.strand1.haplotypelabel)
+    l2 = length(sample_phase.strand2.haplotypelabel)
     ref_sampleIDs = compressed_Hunique.sampleID
 
     # strand1 
-    for i in 1:l
+    for i in 1:l1
         h1 = sample_phase.strand1.haplotypelabel[i] # unique haplotype index
         w1 = sample_phase.strand1.window[i]
-        cur_range = (i == l ? 
+        cur_range = (i == l1 ? 
             (sample_phase.strand1.start[i]:sample_phase.strand1.length) : 
             (sample_phase.strand1.start[i]:(sample_phase.strand1.start[i+1] 
             - 1)))
@@ -35,18 +38,18 @@ function paint(
     end
 
     # strand2
-    for i in 1:l
+    for i in 1:l2
         h2 = sample_phase.strand2.haplotypelabel[i] # unique haplotype index
         w2 = sample_phase.strand2.window[i]
-        cur_range = (i == l ? 
+        cur_range = (i == l2 ? 
             (sample_phase.strand2.start[i]:sample_phase.strand2.length) : 
             (sample_phase.strand2.start[i]:(sample_phase.strand2.start[i+1] 
             - 1)))
 
         # convert unique haplotype idx to sampleID
-        H1 = unique_all_idx_to_complete_idx(h2, w2, 
+        H2 = unique_all_idx_to_complete_idx(h2, w2, 
             compressed_Hunique) # complete haplotype idx
-        sample_idx = div(H1, 2, RoundUp)
+        sample_idx = div(H2, 2, RoundUp)
         id = Symbol(ref_sampleIDs[sample_idx])
         population = sample_to_population[id]
 
@@ -55,9 +58,12 @@ function paint(
         composition[idx] += length(cur_range)
     end
 
-    sum(composition) == 2snps || error("numerical error?")
+    # This is not strictly enforced since a sample's phase could have overlapping
+    # regions due to breakpoint searching, which cases a very small region of snps
+    # to be double counted.
+    # sum(composition) == snps || error("composition should sum to number of snps")
     
-    return composition
+    return composition ./ 2snps
 end
 
 """
