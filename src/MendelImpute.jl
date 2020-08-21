@@ -45,6 +45,9 @@ module MendelImpute
     export impute_typed_only!, impute_untyped!
     export update_marker_position!
 
+    # chromosome painting
+    export paint
+
     include("compress.jl")
     include("data_structures.jl")
     include("phasing.jl")

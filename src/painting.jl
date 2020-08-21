@@ -17,7 +17,7 @@ function paint(
     for i in 1:l
         h1 = sample_phase.strand1.haplotypelabel[i] # unique haplotype index
         w1 = sample_phase.strand1.window[i]
-        snps = (i == l ? 
+        cur_range = (i == l ? 
             (sample_phase.strand1.start[i]:sample_phase.strand1.length) : 
             (sample_phase.strand1.start[i]:(sample_phase.strand1.start[i+1] 
             - 1)))
@@ -26,19 +26,19 @@ function paint(
         H1 = unique_all_idx_to_complete_idx(h1, w1, 
             compressed_Hunique) # complete haplotype idx
         sample_idx = div(H1, 2, RoundUp)
-        id = ref_sampleIDs[sample_idx]
-        population = Symbol(sample_to_population[id])
+        id = Symbol(ref_sampleIDs[sample_idx])
+        population = sample_to_population[id]
 
         # update composition
         idx = findfirst(x -> x == population, populations)
-        composition[idx] += length(snps)
+        composition[idx] += length(cur_range)
     end
 
     # strand2
     for i in 1:l
         h2 = sample_phase.strand2.haplotypelabel[i] # unique haplotype index
         w2 = sample_phase.strand2.window[i]
-        snps = (i == l ? 
+        cur_range = (i == l ? 
             (sample_phase.strand2.start[i]:sample_phase.strand2.length) : 
             (sample_phase.strand2.start[i]:(sample_phase.strand2.start[i+1] 
             - 1)))
@@ -47,19 +47,21 @@ function paint(
         H1 = unique_all_idx_to_complete_idx(h2, w2, 
             compressed_Hunique) # complete haplotype idx
         sample_idx = div(H1, 2, RoundUp)
-        id = ref_sampleIDs[sample_idx]
-        population = Symbol(sample_to_population[id])
+        id = Symbol(ref_sampleIDs[sample_idx])
+        population = sample_to_population[id]
 
         # update composition
         idx = findfirst(x -> x == population, populations)
-        composition[idx] += length(snps)
+        composition[idx] += length(cur_range)
     end
+
+    sum(composition) == 2snps || error("numerical error?")
     
     return composition
 end
 
 """
-unique_populations(x::Dict{Symbol, Symbol})
+    unique_populations(x::Dict{Symbol, Symbol})
 
 Computes the unique list of populations. `x` is a `Dict`
 where each sample is a key and populations are values. 
@@ -67,10 +69,7 @@ where each sample is a key and populations are values.
 function unique_populations(x::Dict{Symbol, Symbol})
     populations = Symbol[]
     for (key, val) in x
-        if val ∉ populations 
-            num_unique += 1
-            push!(populations, val)
-        end
+        val ∉ populations && push!(populations, val)
     end
     return populations
 end
