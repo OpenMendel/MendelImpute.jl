@@ -187,6 +187,33 @@ function impute!(
     end
 end
 
+function impute!(
+    X1::AbstractMatrix,
+    X2::AbstractMatrix,
+    H::AbstractMatrix,
+    phase::Vector{HaplotypeMosaicPair}
+    )
+
+    fill!(X1, 0)
+    fill!(X2, 0)
+
+    # loop over individuals
+    for i in 1:size(X1, 2)
+        for s in 1:(length(phase[i].strand1.start) - 1)
+            idx = phase[i].strand1.start[s]:(phase[i].strand1.start[s + 1] - 1)
+            X1[idx, i] = H[idx, phase[i].strand1.haplotypelabel[s]]
+        end
+        idx = phase[i].strand1.start[end]:phase[i].strand1.length
+        X1[idx, i] = H[idx, phase[i].strand1.haplotypelabel[end]]
+        for s in 1:(length(phase[i].strand2.start) - 1)
+            idx = phase[i].strand2.start[s]:(phase[i].strand2.start[s + 1] - 1)
+            X2[idx, i] += H[idx, phase[i].strand2.haplotypelabel[s]]
+        end
+        idx = phase[i].strand2.start[end]:phase[i].strand2.length
+        X2[idx, i] += H[idx, phase[i].strand2.haplotypelabel[end]]
+    end
+end
+
 """
     impute_discard_phase!(X, H, phase)
 

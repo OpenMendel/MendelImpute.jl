@@ -147,6 +147,8 @@ function search_breakpoint(
     return bkpt_optim, err_optim :: Int
 end
 
+
+
 # """
 #     search_breakpoint(X, H, s1, s2)
 # Find the optimal break point between s2[1] and s2[2] in configuration

@@ -45,7 +45,7 @@ function phase(
     reffile::AbstractString;
     outfile::AbstractString = "imputed." * tgtfile,
     impute::Bool = true,
-    phase::Bool = false,
+    phase::Bool = true,
     dosage::Bool = false,
     max_d::Int = 1000,
     rescreen::Bool = false,
@@ -56,12 +56,15 @@ function phase(
     dynamic_programming::Bool = false
     )
 
+    # first handle errors
     if dynamic_programming
         error("Currently dynamic programming routine is broken! Sorry!")
     end
     if !impute
         error("Currently one cannot impute only typed SNPs! Sorry!")
     end
+    ultra_compress = endswith(outfile, ".jlso") ? true : false
+    ultra_compress && !phase && error("Ultra compressed output must be phased!")
 
     # import reference data
     println("Importing reference haplotype data..."); flush(stdout)
@@ -109,8 +112,7 @@ function phase(
         error("Unrecognized target file format: target file can only be VCF" *
             " files (ends in .vcf or .vcf.gz) or PLINK files (do not include" *
             " .bim/bed/fam and all three files must exist in 1 directory)")
-    end
-    ultra_compress = endswith(outfile, ".jlso") ? true : false
+    end    
     genotype_import_time = time() - genotype_import_start
     import_data_time = time() - ref_import_start
 
@@ -164,14 +166,14 @@ function phase(
     impute_start = time()
     write_time = 0.0
     XtoH_idx = indexin(X_pos, compressed_Hunique.pos)
-    if ultra_compress 
-        write_time += @elapsed JLSO.save(outfile, :ph => ph, 
-            format=:julia_serialize, compression=:gzip)
-    elseif impute # imputes typed and untyped SNPs
+    if impute # imputes typed and untyped SNPs
         # convert phase's starting position from X's index to H's index
         update_marker_position!(ph, XtoH_idx)
 
-        if phase # output genotypes all phased
+        if ultra_compress # output ultra-compressed, phased genotypes in 
+            write_time += @elapsed JLSO.save(outfile, :ph => ph, 
+                format=:julia_serialize, compression=:gzip)
+        elseif phase # output genotypes all phased
             X1 = BitArray(undef, ref_snps, people)
             X2 = BitArray(undef, ref_snps, people)
 
@@ -189,7 +191,10 @@ function phase(
                 X_sampleID)
         end
     else # impute only missing entries in typed SNPs
-        if phase
+        if ultra_compress # output ultra-compressed, phased genotypes in 
+            write_time += @elapsed JLSO.save(outfile, :ph => ph, 
+                format=:julia_serialize, compression=:gzip)
+        elseif phase
             X1 = BitArray(undef, size(X, 1), size(X, 2))
             X2 = BitArray(undef, size(X, 1), size(X, 2))
 
@@ -587,10 +592,8 @@ function phase_fast_compress!(
             h1 = haplotype1[i][1]
             h2 = haplotype2[i][1]
             push!(ph[i].strand1.start, 1)
-            push!(ph[i].strand1.window, 1)
             push!(ph[i].strand1.haplotypelabel, h1)
             push!(ph[i].strand2.start, 1)
-            push!(ph[i].strand2.window, 1)
             push!(ph[i].strand2.haplotypelabel, h2)
         end
 
@@ -609,11 +612,9 @@ function phase_fast_compress!(
             hap2_curr = haplotype2[i][w]
 
             # find optimal breakpoint if there is one
-            timers[id][16] += @elapsed begin
-            (hap1_curr, hap2_curr), bkpts = continue_haplotype(Xwi, 
+            timers[id][16] += @elapsed _, bkpts = continue_haplotype(Xwi, 
                 compressed_Hunique, w, (hap1_prev, hap2_prev),
                 (hap1_curr, hap2_curr))
-            end
 
             timers[id][24] += @elapsed begin
                 # strand 1
