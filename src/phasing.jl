@@ -14,8 +14,10 @@ pool of haplotypes `reffile` by sliding windows and saves result in `outfile`.
     `.vcf`, `.vcf.gz`, or `.jlso` (compressed binary files).
 
 # Optional Inputs
-- `outfile`: output filename ending in `.vcf.gz` or `.vcf`. Output genotypes
-    will have no missing data.
+- `outfile`: output filename ending in `.vcf.gz`, `.vcf`, or `.jlso`. VCF output
+    genotypes will have no missing data. If ending in `.jlso`, will output
+    ultra-compressed data structure recording `HaplotypeMosaicPair`s for 
+    each sample
 - `impute`: If `true`, untyped SNPs will be imputed, otherwise only missing
     snps in `tgtfile` will be imputed.
 - `phase`: If `true`, all output genotypes will be phased. Otherwise all
@@ -51,7 +53,7 @@ function phase(
     stepwise::Union{Nothing, Int} = nothing,
     thinning_factor::Union{Nothing, Int} = nothing,
     scale_allelefreq::Bool = false,
-    dynamic_programming::Bool = false,
+    dynamic_programming::Bool = false
     )
 
     if dynamic_programming
@@ -108,6 +110,7 @@ function phase(
             " files (ends in .vcf or .vcf.gz) or PLINK files (do not include" *
             " .bim/bed/fam and all three files must exist in 1 directory)")
     end
+    ultra_compress = endswith(outfile, ".jlso") ? true : false
     genotype_import_time = time() - genotype_import_start
     import_data_time = time() - ref_import_start
 
@@ -146,7 +149,10 @@ function phase(
     if dynamic_programming
         phase!(ph, X, compressed_Hunique, redundant_haplotypes, X_pos,
             1:windows)
-    else # phase window-by-window
+    elseif ultra_compress # phase window-by-window for outputing ultra compressed format
+        phasetimers = phase_fast_compress!(ph, X, compressed_Hunique, 
+            haplotype1, haplotype2)
+    else # phase window-by-window for outputing VCF files
         phasetimers = phase_fast!(ph, X, compressed_Hunique, haplotype1,
             haplotype2)
     end
@@ -158,7 +164,10 @@ function phase(
     impute_start = time()
     write_time = 0.0
     XtoH_idx = indexin(X_pos, compressed_Hunique.pos)
-    if impute # imputes typed and untyped SNPs
+    if ultra_compress 
+        write_time += @elapsed JLSO.save(outfile, :ph => ph, 
+            format=:julia_serialize, compression=:gzip)
+    elseif impute # imputes typed and untyped SNPs
         # convert phase's starting position from X's index to H's index
         update_marker_position!(ph, XtoH_idx)
 
@@ -196,12 +205,6 @@ function phase(
     end
     impute_time = time() - impute_start
     impute_nonwrite_time = impute_time - write_time
-    
-    #
-    # save phaseinfo into .jlso format
-    #
-    # JLSO.save("phaseinfo.jlso", :ph => ph, format=:julia_serialize, 
-    #     compression=:gzip)
 
     #
     # print timing results
@@ -453,6 +456,10 @@ searches for optimal breakpoint.
     haplotypes for each window and some other information
 * `haplotype1`: `haplotype1[w]` stores a optimal haplotype for window `w`. 
 * `haplotype2`: `haplotype2[w]` stores a optimal haplotype for window `w`. 
+* `ultra_compress`: Boolean indicating whether eventual output file is VCF or 
+    ultra-compressed `HaplotypeMosaicPair`s. If later, haplotype segments must
+    be recorded in indices of the complete reference panel instead of the
+    compressed panel. 
 
 # Timers:
 - `t1` = Window-by-window intersection
@@ -465,6 +472,7 @@ function phase_fast!(
     compressed_Hunique::CompressedHaplotypes,
     haplotype1::AbstractVector,
     haplotype2::AbstractVector,
+    ultra_compress::Bool = false
     ) where T <: Real
 
     # declare some constants
@@ -533,6 +541,91 @@ function phase_fast!(
                 # record strand 2 info
                 update_phase!(ph[i].strand2, compressed_Hunique, bkpts[2],
                     hap2_prev, hap2_curr, w, start_prev, start_curr, end_curr)
+            end
+        end
+        next!(pmeter) # update progress
+    end
+    return sum(timers) ./ Threads.nthreads()
+end
+
+function phase_fast_compress!(
+    ph::Vector{HaplotypeMosaicPair},
+    X::AbstractMatrix{Union{Missing, T}},
+    compressed_Hunique::CompressedHaplotypes,
+    haplotype1::AbstractVector,
+    haplotype2::AbstractVector,
+    ) where T <: Real
+
+    # declare some constants
+    people = size(X, 2)
+    snps = size(X, 1)
+    haplotypes = nhaplotypes(compressed_Hunique)
+    winranges = compressed_Hunique.X_window_range
+    windows = length(haplotype1[1])
+
+    # working arrays
+    survivors1 = [Int32[] for _ in 1:Threads.nthreads()]
+    survivors2 = [Int32[] for _ in 1:Threads.nthreads()]
+    for id in 1:Threads.nthreads()
+        sizehint!(survivors1[id], haplotypes)
+        sizehint!(survivors2[id], haplotypes)
+    end
+    timers = [zeros(3*8) for _ in 1:Threads.nthreads()] # 8 for spacing
+    pmeter = Progress(people, 5, "Phasing...")
+
+    # phase person by person
+    # for i in 1:people
+    Threads.@threads for i in 1:people
+        id = Threads.threadid()
+
+        # First pass to phase each sample window-by-window
+        timers[id][8] += @elapsed phase_sample!(haplotype1[i], haplotype2[i],
+            compressed_Hunique, survivors1[id], survivors2[id])
+
+        # record info for first window
+        timers[id][24] += @elapsed begin
+            h1 = haplotype1[i][1]
+            h2 = haplotype2[i][1]
+            push!(ph[i].strand1.start, 1)
+            push!(ph[i].strand1.window, 1)
+            push!(ph[i].strand1.haplotypelabel, h1)
+            push!(ph[i].strand2.start, 1)
+            push!(ph[i].strand2.window, 1)
+            push!(ph[i].strand2.haplotypelabel, h2)
+        end
+
+        # Second pass to find optimal break points and record info to phase
+        @inbounds for w in 2:windows
+            # get genotype vector spanning 2 windows
+            start_prev = first(winranges[w - 1])
+            start_curr = first(winranges[w])
+            end_curr = last(winranges[w])
+            Xwi = view(X, start_prev:end_curr, i)
+
+            # previous and current haplotypes for both strands
+            hap1_prev = haplotype1[i][w - 1]
+            hap2_prev = haplotype2[i][w - 1]
+            hap1_curr = haplotype1[i][w]
+            hap2_curr = haplotype2[i][w]
+
+            # find optimal breakpoint if there is one
+            timers[id][16] += @elapsed begin
+            (hap1_curr, hap2_curr), bkpts = continue_haplotype(Xwi, 
+                compressed_Hunique, w, (hap1_prev, hap2_prev),
+                (hap1_curr, hap2_curr))
+            end
+
+            timers[id][24] += @elapsed begin
+                # strand 1
+                if bkpts[1] > -1 && bkpts[1] < length(Xwi)
+                    push!(ph[i].strand1.start, start_curr)
+                    push!(ph[i].strand1.haplotypelabel, hap1_curr)
+                end
+                # strand 2
+                if bkpts[2] > -1 && bkpts[2] < length(Xwi)
+                    push!(ph[i].strand2.start, start_curr)
+                    push!(ph[i].strand2.haplotypelabel, hap2_curr)
+                end
             end
         end
         next!(pmeter) # update progress
