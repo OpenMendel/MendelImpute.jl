@@ -98,6 +98,9 @@ function continue_haplotype(
     # else
     #     return (l, k), breakpt2
     # end
+    
+    # mid = first(compressed_Hunique.X_window_range[window])
+    # return (k, l), (mid, mid)
     return (k, l), (-1, -1)
 end
 

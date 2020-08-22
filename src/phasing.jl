@@ -152,8 +152,8 @@ function phase(
         phase!(ph, X, compressed_Hunique, redundant_haplotypes, X_pos,
             1:windows)
     elseif ultra_compress # phase window-by-window for outputing ultra compressed format
-        phasetimers = phase_fast_compress!(ph, X, compressed_Hunique, 
-            haplotype1, haplotype2)
+        phasetimers = phase_fast!(ph, X, compressed_Hunique, 
+            haplotype1, haplotype2, ultra_compress)
     else # phase window-by-window for outputing VCF files
         phasetimers = phase_fast!(ph, X, compressed_Hunique, haplotype1,
             haplotype2)
@@ -390,13 +390,15 @@ extend into the current one, but hopefully this is extremely rare.
 """
 function update_phase!(ph::HaplotypeMosaic,
     compressed_Hunique::CompressedHaplotypes, bkpt::Int, hap_prev, hap_curr,
-    window::Int, Xwi_start::Int, Xwi_mid::Int, Xwi_end::Int)
+    window::Int, Xwi_start::Int, Xwi_mid::Int, Xwi_end::Int, 
+    ultra_compress::Bool)
 
     X_bkpt_end = Xwi_start + bkpt
 
     # no breakpoints
     if bkpt == -1
-        h = complete_idx_to_unique_all_idx(hap_curr, window, compressed_Hunique)
+        h = ultra_compress ? hap_curr : 
+            complete_idx_to_unique_all_idx(hap_curr, window, compressed_Hunique)
         push!(ph.start, Xwi_mid)
         push!(ph.haplotypelabel, h)
         push!(ph.window, window)
@@ -405,7 +407,8 @@ function update_phase!(ph::HaplotypeMosaic,
 
     # previous window's haplotype completely covers current window
     if bkpt == length(Xwi_start:Xwi_end)
-        h = complete_idx_to_unique_all_idx(hap_prev, window, compressed_Hunique)
+        h = ultra_compress ? hap_prev : 
+            complete_idx_to_unique_all_idx(hap_prev, window, compressed_Hunique)
         push!(ph.start, Xwi_mid)
         push!(ph.haplotypelabel, h)
         push!(ph.window, window)
@@ -414,27 +417,28 @@ function update_phase!(ph::HaplotypeMosaic,
 
     if Xwi_mid <= X_bkpt_end <= Xwi_end
         # previous window extends to current window
-        h1 = complete_idx_to_unique_all_idx(hap_prev, window, 
-            compressed_Hunique)
+        h1 = ultra_compress ? hap_prev : 
+            complete_idx_to_unique_all_idx(hap_prev, window, compressed_Hunique)
         push!(ph.start, Xwi_mid)
         push!(ph.haplotypelabel, h1)
         push!(ph.window, window)
         # 2nd part of current window
-        h2 = complete_idx_to_unique_all_idx(hap_curr, window, 
-            compressed_Hunique)
+        h2 = ultra_compress ? hap_curr : 
+            complete_idx_to_unique_all_idx(hap_curr, window, compressed_Hunique)
         push!(ph.start, X_bkpt_end)
         push!(ph.haplotypelabel, h2)
         push!(ph.window, window)
     elseif X_bkpt_end < Xwi_mid
         # current window extends to previous window
-        h1 = complete_idx_to_unique_all_idx(hap_curr, window - 1, 
+        h1 = ultra_compress ? hap_curr : 
+            complete_idx_to_unique_all_idx(hap_curr, window - 1, 
             compressed_Hunique)
         push!(ph.start, X_bkpt_end)
         push!(ph.haplotypelabel, h1)
         push!(ph.window, window - 1)
         # update current window
-        h2 = complete_idx_to_unique_all_idx(hap_curr, window, 
-            compressed_Hunique)
+        h2 = ultra_compress ? hap_curr : 
+            complete_idx_to_unique_all_idx(hap_curr, window, compressed_Hunique)
         push!(ph.start, Xwi_mid)
         push!(ph.haplotypelabel, h2)
         push!(ph.window, window)
@@ -510,14 +514,18 @@ function phase_fast!(
         timers[id][24] += @elapsed begin
             hap1 = haplotype1[i][1] # complete idx
             hap2 = haplotype2[i][1] # complete idx
-            h1 = complete_idx_to_unique_all_idx(hap1, 1, compressed_Hunique)
-            h2 = complete_idx_to_unique_all_idx(hap2, 1, compressed_Hunique)
+            h1 = ultra_compress ? hap1 : 
+                complete_idx_to_unique_all_idx(hap1, 1, compressed_Hunique)
+            h2 = ultra_compress ? hap2 : 
+                complete_idx_to_unique_all_idx(hap2, 1, compressed_Hunique)
             push!(ph[i].strand1.start, 1)
-            push!(ph[i].strand1.window, 1)
             push!(ph[i].strand1.haplotypelabel, h1)
             push!(ph[i].strand2.start, 1)
-            push!(ph[i].strand2.window, 1)
             push!(ph[i].strand2.haplotypelabel, h2)
+            if !ultra_compress # if output is VCF format, also need window info
+                push!(ph[i].strand1.window, 1)
+                push!(ph[i].strand2.window, 1)
+            end
         end
 
         # Second pass to find optimal break points and record info to phase
@@ -542,91 +550,12 @@ function phase_fast!(
             timers[id][24] += @elapsed begin
                 # record strand 1 info
                 update_phase!(ph[i].strand1, compressed_Hunique, bkpts[1],
-                    hap1_prev, hap1_curr, w, start_prev, start_curr, end_curr)
+                    hap1_prev, hap1_curr, w, start_prev, start_curr, 
+                    end_curr, ultra_compress)
                 # record strand 2 info
                 update_phase!(ph[i].strand2, compressed_Hunique, bkpts[2],
-                    hap2_prev, hap2_curr, w, start_prev, start_curr, end_curr)
-            end
-        end
-        next!(pmeter) # update progress
-    end
-    return sum(timers) ./ Threads.nthreads()
-end
-
-function phase_fast_compress!(
-    ph::Vector{HaplotypeMosaicPair},
-    X::AbstractMatrix{Union{Missing, T}},
-    compressed_Hunique::CompressedHaplotypes,
-    haplotype1::AbstractVector,
-    haplotype2::AbstractVector,
-    ) where T <: Real
-
-    # declare some constants
-    people = size(X, 2)
-    snps = size(X, 1)
-    haplotypes = nhaplotypes(compressed_Hunique)
-    winranges = compressed_Hunique.X_window_range
-    windows = length(haplotype1[1])
-
-    # working arrays
-    survivors1 = [Int32[] for _ in 1:Threads.nthreads()]
-    survivors2 = [Int32[] for _ in 1:Threads.nthreads()]
-    for id in 1:Threads.nthreads()
-        sizehint!(survivors1[id], haplotypes)
-        sizehint!(survivors2[id], haplotypes)
-    end
-    timers = [zeros(3*8) for _ in 1:Threads.nthreads()] # 8 for spacing
-    pmeter = Progress(people, 5, "Phasing...")
-
-    # phase person by person
-    # for i in 1:people
-    Threads.@threads for i in 1:people
-        id = Threads.threadid()
-
-        # First pass to phase each sample window-by-window
-        timers[id][8] += @elapsed phase_sample!(haplotype1[i], haplotype2[i],
-            compressed_Hunique, survivors1[id], survivors2[id])
-
-        # record info for first window
-        timers[id][24] += @elapsed begin
-            h1 = haplotype1[i][1]
-            h2 = haplotype2[i][1]
-            push!(ph[i].strand1.start, 1)
-            push!(ph[i].strand1.haplotypelabel, h1)
-            push!(ph[i].strand2.start, 1)
-            push!(ph[i].strand2.haplotypelabel, h2)
-        end
-
-        # Second pass to find optimal break points and record info to phase
-        @inbounds for w in 2:windows
-            # get genotype vector spanning 2 windows
-            start_prev = first(winranges[w - 1])
-            start_curr = first(winranges[w])
-            end_curr = last(winranges[w])
-            Xwi = view(X, start_prev:end_curr, i)
-
-            # previous and current haplotypes for both strands
-            hap1_prev = haplotype1[i][w - 1]
-            hap2_prev = haplotype2[i][w - 1]
-            hap1_curr = haplotype1[i][w]
-            hap2_curr = haplotype2[i][w]
-
-            # find optimal breakpoint if there is one
-            timers[id][16] += @elapsed _, bkpts = continue_haplotype(Xwi, 
-                compressed_Hunique, w, (hap1_prev, hap2_prev),
-                (hap1_curr, hap2_curr))
-
-            timers[id][24] += @elapsed begin
-                # strand 1
-                if bkpts[1] > -1 && bkpts[1] < length(Xwi)
-                    push!(ph[i].strand1.start, start_curr)
-                    push!(ph[i].strand1.haplotypelabel, hap1_curr)
-                end
-                # strand 2
-                if bkpts[2] > -1 && bkpts[2] < length(Xwi)
-                    push!(ph[i].strand2.start, start_curr)
-                    push!(ph[i].strand2.haplotypelabel, hap2_curr)
-                end
+                    hap2_prev, hap2_curr, w, start_prev, start_curr,
+                    end_curr, ultra_compress)
             end
         end
         next!(pmeter) # update progress
