@@ -51,57 +51,29 @@ function convert_compressed(
     return X1, X2
 end
 
-"""
-Same as update_phase! but records complete haplotype index. Won't record
-if previous haplotype label is the same as current one. This helper function
-may not be needed. 
-"""
-function update_compressed_phase!(ph::HaplotypeMosaic, bkpt::Int, hap_prev,
-    hap_curr, Xwi_start::Int, Xwi_mid::Int, Xwi_end::Int)
+# function complete_idx_to_unique_all_idx!(
+#     sample_phase::HaplotypeMosaicPair,
+#     compressed_Hunique::CompressedHaplotypes,
+#     )
 
-    X_bkpt_end = Xwi_start + bkpt
+#     l1 = length(sample_phase.strand1.haplotypelabel)
+#     l2 = length(sample_phase.strand2.haplotypelabel)
 
-    # no breakpoints or double breakpoints
-    if bkpt == -1
-        ph.haplotypelabel[end] == hap_curr && return nothing # only push new segment
-        push!(ph.start, Xwi_mid)
-        push!(ph.haplotypelabel, hap_curr)
-        return nothing
-    end
+#     # strand1 
+#     for i in 1:l1
+#         h1 = sample_phase.strand1.haplotypelabel[i] # unique haplotype index
+#         w1 = sample_phase.strand1.window[i]
+#         H1 = unique_all_idx_to_complete_idx(h1, w1, 
+#             compressed_Hunique) # complete haplotype idx
+#         sample_phase.strand1.haplotypelabel[i] = H1
+#     end
 
-    # previous window's haplotype completely covers current window
-    if bkpt == length(Xwi_start:Xwi_end)
-        ph.haplotypelabel[end] == hap_prev && return nothing # only push new segment
-        push!(ph.start, Xwi_mid)
-        push!(ph.haplotypelabel, hap_prev)
-        return nothing
-    end
-
-    if Xwi_mid <= X_bkpt_end <= Xwi_end
-        # previous window extends to current window
-        if ph.haplotypelabel[end] != hap_prev
-            push!(ph.start, Xwi_mid)
-            push!(ph.haplotypelabel, hap_prev)
-        end
-        # 2nd part of current window
-        if ph.haplotypelabel[end] != hap_curr
-            push!(ph.start, X_bkpt_end)
-            push!(ph.haplotypelabel, hap_curr)
-        end
-    elseif X_bkpt_end < Xwi_mid
-        # current window extends to previous window
-        if ph.haplotypelabel[end] != hap_curr
-            push!(ph.start, X_bkpt_end)
-            push!(ph.haplotypelabel, hap_curr)
-        end
-        # update current window
-        if ph.haplotypelabel[end] != hap_curr
-            push!(ph.start, Xwi_mid)
-            push!(ph.haplotypelabel, hap_curr)
-        end
-    else
-        error("bkpt does not satisfy -1 <= bkpt <= 2width!")
-    end
-
-    return nothing
-end
+#     # strand2
+#     for i in 1:l2
+#         h2 = sample_phase.strand2.haplotypelabel[i] # unique haplotype index
+#         w2 = sample_phase.strand2.window[i]
+#         H2 = unique_all_idx_to_complete_idx(h2, w2, 
+#             compressed_Hunique) # complete haplotype idx 
+#         sample_phase.strand2.haplotypelabel[i] = H2
+#     end
+# end

@@ -397,7 +397,7 @@ function update_phase!(ph::HaplotypeMosaic,
     X_bkpt_end = Xwi_start + bkpt
 
     # no breakpoints or double breakpoints
-    if bkpt == -1
+    if bkpt == -1 || bkpt == -2
         h = complete_idx_to_unique_all_idx(hap_curr, window, compressed_Hunique)
         push!(ph.start, Xwi_mid)
         push!(ph.haplotypelabel, h)
@@ -533,6 +533,11 @@ function phase_fast!(
             hap1_curr = haplotype1[i][w]
             hap2_curr = haplotype2[i][w]
 
+            # if i == 24
+            #     println("sample 24 hap1 = ", hap1_curr)
+            #     println("sample 24 hap2 = ", hap2_curr, "\n")
+            # end
+
             # find optimal breakpoint if there is one
             timers[id][16] += @elapsed _, bkpts = continue_haplotype(Xwi, 
                 compressed_Hunique, w, (hap1_prev, hap2_prev),
@@ -557,8 +562,7 @@ function phase_fast_compressed!(
     X::AbstractMatrix{Union{Missing, T}},
     compressed_Hunique::CompressedHaplotypes,
     haplotype1::AbstractVector,
-    haplotype2::AbstractVector,
-    ultra_compress::Bool = false
+    haplotype2::AbstractVector
     ) where T <: Real
 
     # declare some constants
@@ -617,12 +621,26 @@ function phase_fast_compressed!(
                 (hap1_curr, hap2_curr))
 
             timers[id][24] += @elapsed begin
-                # record strand 1 info
-                update_compressed_phase!(ph[i].strand1, bkpts[1], hap1_prev, 
-                    hap1_curr, start_prev, start_curr, end_curr)
-                # record strand 2 info
-                update_compressed_phase!(ph[i].strand2, bkpts[2], hap2_prev, 
-                    hap2_curr, start_prev, start_curr, end_curr)
+                # strand1 single stranded breakpoint
+                if -1 < bkpts[1] < length(Xwi)
+                    push!(ph[i].strand1.start, start_prev + bkpts[1])
+                    push!(ph[i].strand1.haplotypelabel, hap1_curr)
+                end
+                # strand1 double stranded breakpoint
+                if bkpts[1] == -2
+                    push!(ph[i].strand1.start, start_curr)
+                    push!(ph[i].strand1.haplotypelabel, hap1_curr)
+                end
+                # strand2 single stranded breakpoint
+                if -1 < bkpts[2] < length(Xwi)
+                    push!(ph[i].strand2.start, start_prev + bkpts[2])
+                    push!(ph[i].strand2.haplotypelabel, hap2_curr)
+                end
+                # strand2 double stranded breakpoint
+                if bkpts[2] == -2
+                    push!(ph[i].strand2.start, start_curr)
+                    push!(ph[i].strand2.haplotypelabel, hap2_curr)
+                end
             end
         end
         next!(pmeter) # update progress
