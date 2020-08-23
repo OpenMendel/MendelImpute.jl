@@ -16,6 +16,7 @@ reference haplotype panel `H`
 # Output
 - `(X1, X2)`: Tuple of matrix where `X1` is allele1 and `X2` is allele2. Each 
     column is a sample. 
+- `sampleID`: The ID's of each imputed person. 
 """
 function convert_compressed(
     t::Type{T}, 
@@ -24,7 +25,11 @@ function convert_compressed(
     ) where T <: Real
     endswith(phaseinfo, ".jlso") || error("phaseinfo does not end with '.jlso'")
     H = convert_ht(Bool, reffile, trans=true, msg="importing reference data...")
-    return convert(t, JLSO.load(phaseinfo)[:ph], H)
+    loaded = JLSO.load(phaseinfo)
+    phase = loaded[:ph]
+
+    X1, X2 = convert(t, phase, H)
+    return X1, X2, phase[:sampleID]
 end
 
 function convert_compressed(
@@ -42,4 +47,59 @@ function convert_compressed(
     impute!(X1, X2, H, phaseinfo)
 
     return X1, X2
+end
+
+"""
+Same as update_phase! but records complete haplotype index. Won't record
+if previous haplotype label is the same as current one. This helper function
+may not be needed. 
+"""
+function update_compressed_phase!(ph::HaplotypeMosaic, bkpt::Int, hap_prev,
+    hap_curr, Xwi_start::Int, Xwi_mid::Int, Xwi_end::Int)
+
+    X_bkpt_end = Xwi_start + bkpt
+
+    # no breakpoints or double breakpoints
+    if bkpt == -1
+        ph.haplotypelabel[end] == hap_curr && return nothing # only push new segment
+        push!(ph.start, Xwi_mid)
+        push!(ph.haplotypelabel, hap_curr)
+        return nothing
+    end
+
+    # previous window's haplotype completely covers current window
+    if bkpt == length(Xwi_start:Xwi_end)
+        ph.haplotypelabel[end] == hap_prev && return nothing # only push new segment
+        push!(ph.start, Xwi_mid)
+        push!(ph.haplotypelabel, hap_prev)
+        return nothing
+    end
+
+    if Xwi_mid <= X_bkpt_end <= Xwi_end
+        # previous window extends to current window
+        if ph.haplotypelabel[end] != hap_prev
+            push!(ph.start, Xwi_mid)
+            push!(ph.haplotypelabel, hap_prev)
+        end
+        # 2nd part of current window
+        if ph.haplotypelabel[end] != hap_curr
+            push!(ph.start, X_bkpt_end)
+            push!(ph.haplotypelabel, hap_curr)
+        end
+    elseif X_bkpt_end < Xwi_mid
+        # current window extends to previous window
+        if ph.haplotypelabel[end] != hap_curr
+            push!(ph.start, X_bkpt_end)
+            push!(ph.haplotypelabel, hap_curr)
+        end
+        # update current window
+        if ph.haplotypelabel[end] != hap_curr
+            push!(ph.start, Xwi_mid)
+            push!(ph.haplotypelabel, hap_curr)
+        end
+    else
+        error("bkpt does not satisfy -1 <= bkpt <= 2width!")
+    end
+
+    return nothing
 end
