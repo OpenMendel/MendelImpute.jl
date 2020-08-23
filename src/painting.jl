@@ -1,6 +1,12 @@
 ###### This file is part of the MendelImpute.jl package.
-###### It contains relevant code to perform chromosome painting as well as
-###### code to decompress a vector of `HaplotypeMosaicPair` to a genotype matrix
+###### It contains relevant code to perform chromosome painting
+
+# function paint(
+#     sample_phase::HaplotypeMosaicPair,
+
+#     )
+
+# end
 
 function paint(
     sample_phase::HaplotypeMosaicPair,

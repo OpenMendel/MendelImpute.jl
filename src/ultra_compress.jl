@@ -25,11 +25,13 @@ function convert_compressed(
     ) where T <: Real
     endswith(phaseinfo, ".jlso") || error("phaseinfo does not end with '.jlso'")
     H = convert_ht(Bool, reffile, trans=true, msg="importing reference data...")
-    loaded = JLSO.load(phaseinfo)
-    phase = loaded[:ph]
+    
+    phase_and_sampleID = JLSO.load(phaseinfo)
+    phase = phase_and_sampleID[:ph]
+    sampleID = phase_and_sampleID[:sampleID]
 
-    X1, X2 = convert(t, phase, H)
-    return X1, X2, phase[:sampleID]
+    X1, X2 = convert_compressed(t, phase, H)
+    return X1, X2, phase, sampleID, H
 end
 
 function convert_compressed(

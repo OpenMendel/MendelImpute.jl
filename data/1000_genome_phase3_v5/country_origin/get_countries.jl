@@ -1,1 +1,0 @@
-download("ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/1000_genomes_project/data/ACB")
