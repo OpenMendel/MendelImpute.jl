@@ -16,14 +16,17 @@ struct HaplotypeMosaic
 end
 HaplotypeMosaic(len) = HaplotypeMosaic(len, Int64[], Int32[], Int32[])
 
-function push_Mosaic!(x::HaplotypeMosaic, y::Tuple{Int64, T}) where T <: Integer
+function push_Mosaic!(x::HaplotypeMosaic, y::Tuple{Int64, T}, i) where T <: Integer
     newstart, newlabel = y[1], y[2]
     xlen = length(x.start)
     if xlen != 0
+        # if i == 265
+        #     println("last(x.start) = $(last(x.start)), newstart = $newstart, x.haplotypelabel[xlen] = $(x.haplotypelabel[xlen]), newlabel = $newlabel")
+        # end
         # check if start occurs before previous start position, since searching
         # breakpoints for 2 consecutive windows can cause "overlaps"
         xstart = last(x.start)
-        if newstart < xstart
+        if newstart ≤ xstart
             deleteat!(x.start, xlen)
             deleteat!(x.haplotypelabel, xlen)
         end
@@ -39,7 +42,7 @@ function push_Mosaic!(x::HaplotypeMosaic, y::Tuple{Int64, T, T}) where T <: Inte
         # check if start occurs before previous start position, since searching
         # breakpoints for 2 consecutive windows can cause "overlaps"
         xstart = last(x.start)
-        if newstart < xstart
+        if newstart ≤ xstart
             deleteat!(x.start, xlen)
             deleteat!(x.haplotypelabel, xlen)
             deleteat!(x.window, xlen)
