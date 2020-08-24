@@ -1,14 +1,33 @@
 """
-`X` is a genotype vector spanning 2 windows. Haplotype pair for first window is
-`happair_prev`, the next 2 haplotype pair is `happair_next`. This function
-searches the breakpoint between them.
+    continue_haplotype(X, compressed_Hunique, window, happair_prev, happair_next)
+
+Searches the breakpoint between `happair_prev` and `happair_next`, if there is
+one. Currently breakpoint is set to the middle if there is double breakpoints. 
+
+# Arguments:
+- `X`: Genotype vector spanning 2 windows. 
+- `compressed_Hunique`: A `CompressedHaplotypes` keeping track of unique
+    haplotypes for each window and some other information
+- `window`: The current window being considered. It is the 2nd window of `X`. 
+- `happair_prev`: Haplotype pair for first window
+- `happair_next`: Haplotype pair for second window
+- `phased`: Boolean indicating whether `happair_prev` and `happair_next` have
+    been phased. If `false`, will try 2 different orientations. 
+
+# Output
+- `happair_next`: If `phase = false`, this is equal to `happair_next` for input. 
+    Otherwise it may be flipped
+- `bkpt`: Tuple of integer indicating optimal breakpoint starting from the 
+    previous window. `-1` indicates no breakpoints and `-2` indicates double 
+    breakpoint. 
 """
 function continue_haplotype(
     X::AbstractVector,
     compressed_Hunique::CompressedHaplotypes,
     window::Int,
     happair_prev::Tuple,
-    happair_next::Tuple
+    happair_next::Tuple;
+    phased::Bool = false
     )
 
     # indices for complete reference panel
@@ -19,7 +38,7 @@ function continue_haplotype(
     if i == k && j == l
         return (k, l), (-1, -1)
     end
-    if i == l && j == k
+    if i == l && j == k && !phased
         return (l, k), (-1, -1)
     end
 
@@ -43,7 +62,7 @@ function continue_haplotype(
 
         breakpt, errors = search_breakpoint(X, s1, s21, s22)
         return (k, l), (-1, breakpt)
-    elseif i == l && j ≠ k
+    elseif i == l && j ≠ k && !phased
         iu = complete_idx_to_unique_typed_idx(i, window - 1, compressed_Hunique)
         lu = complete_idx_to_unique_typed_idx(l, window, compressed_Hunique)
         ju1 = complete_idx_to_unique_typed_idx(j, window - 1, compressed_Hunique)
@@ -58,7 +77,7 @@ function continue_haplotype(
 
         breakpt, errors = search_breakpoint(X, s1, s21, s22)
         return (l, k), (-1, breakpt)
-    elseif j == k && i ≠ l
+    elseif j == k && i ≠ l && !phased
         ju = complete_idx_to_unique_typed_idx(j, window - 1, compressed_Hunique)
         ku = complete_idx_to_unique_typed_idx(k, window, compressed_Hunique)
         iu1 = complete_idx_to_unique_typed_idx(i, window - 1, compressed_Hunique)
@@ -98,9 +117,6 @@ function continue_haplotype(
     # else
     #     return (l, k), breakpt2
     # end
-    
-    # mid = first(compressed_Hunique.X_window_range[window])
-    # return (k, l), (mid, mid)
     return (k, l), (-2, -2)
 end
 

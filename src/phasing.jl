@@ -525,7 +525,7 @@ function phase_fast!(
             # find optimal breakpoint if there is one
             timers[id][16] += @elapsed _, bkpts = continue_haplotype(Xwi, 
                 compressed_Hunique, w, (hap1_prev, hap2_prev),
-                (hap1_curr, hap2_curr))
+                (hap1_curr, hap2_curr), phased=true)
 
             timers[id][24] += @elapsed begin
                 # record strand 1 info
@@ -581,8 +581,8 @@ function phase_fast_compressed!(
         timers[id][24] += @elapsed begin
             h1 = haplotype1[i][1] # complete idx
             h2 = haplotype2[i][1] # complete idx
-            push_Mosaic!(ph[i].strand1, (1, h1), i)
-            push_Mosaic!(ph[i].strand2, (1, h2), i)
+            push_Mosaic!(ph[i].strand1, (1, h1))
+            push_Mosaic!(ph[i].strand2, (1, h2))
         end
 
         # Second pass to find optimal break points and record info to phase
@@ -599,47 +599,32 @@ function phase_fast_compressed!(
             hap1_curr = haplotype1[i][w]
             hap2_curr = haplotype2[i][w]
 
-            # if i == 265 && hap1_curr == 123
-            #     println("s1 detected. w = $w, hap1_curr = 123, start_curr = $start_curr")
-            # end
-
             # find optimal breakpoint if there is one
             timers[id][16] += @elapsed begin
-                (hap1_curr, hap2_curr), bkpts = continue_haplotype(Xwi, 
-                    compressed_Hunique, w, (hap1_prev, hap2_prev),
-                    (hap1_curr, hap2_curr))
+                _, bkpts = continue_haplotype(Xwi, compressed_Hunique, w, 
+                    (hap1_prev, hap2_prev), (hap1_curr, hap2_curr), phased=true)
             end
-
-            # if i == 265 && hap1_curr == 123
-            #     println("bkpts = $bkpts")
-            #     println("(hap1_curr, hap2_curr) = $hap1_curr, $hap2_curr)")
-            #     println("(test1, test2) = $test1, $test2")
-            # end
 
             timers[id][24] += @elapsed begin
                 # strand1 single stranded breakpoint
                 if -1 < bkpts[1] < length(Xwi)
                     push_Mosaic!(ph[i].strand1, (start_prev + bkpts[1], 
-                        hap1_curr), i)
+                        hap1_curr))
                 end
                 # strand1 double stranded breakpoint
                 if bkpts[1] == -2
-                    push_Mosaic!(ph[i].strand1, (start_curr, hap1_curr), i)
+                    push_Mosaic!(ph[i].strand1, (start_curr, hap1_curr))
                 end
                 # strand2 single stranded breakpoint
                 if -1 < bkpts[2] < length(Xwi)
                     push_Mosaic!(ph[i].strand2, (start_prev + bkpts[2], 
-                        hap2_curr), i)
+                        hap2_curr))
                 end
                 # strand2 double stranded breakpoint
                 if bkpts[2] == -2
-                    push_Mosaic!(ph[i].strand2, (start_curr, hap2_curr), i)
+                    push_Mosaic!(ph[i].strand2, (start_curr, hap2_curr))
                 end
             end
-
-            # if i == 265 && hap1_curr == 123
-            #     println("ph[i].strand1 = $(ph[i].strand1)\n")
-            # end
         end
         next!(pmeter) # update progress
     end
