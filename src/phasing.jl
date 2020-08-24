@@ -391,53 +391,42 @@ might even overlap) since we can have the previous and next window both
 extend into the current one, but hopefully this is extremely rare.
 """
 function update_phase!(ph::HaplotypeMosaic,
-    compressed_Hunique::CompressedHaplotypes, bkpt::Int, hap_prev, hap_curr,
-    window::Int, Xwi_start::Int, Xwi_mid::Int, Xwi_end::Int)
+    compressed_Hunique::CompressedHaplotypes, bkpt::Int64, hap_prev::Int32, 
+    hap_curr::Int32, window::Int32, Xwi_start::Int64, Xwi_mid::Int64, 
+    Xwi_end::Int64)
 
     X_bkpt_end = Xwi_start + bkpt
 
     # no breakpoints or double breakpoints
     if bkpt == -1 || bkpt == -2
         h = complete_idx_to_unique_all_idx(hap_curr, window, compressed_Hunique)
-        push!(ph.start, Xwi_mid)
-        push!(ph.haplotypelabel, h)
-        push!(ph.window, window)
+        push_Mosaic!(ph, (Xwi_mid, h, window))
         return nothing
     end
 
     # previous window's haplotype completely covers current window
     if bkpt == length(Xwi_start:Xwi_end)
         h = complete_idx_to_unique_all_idx(hap_prev, window, compressed_Hunique)
-        push!(ph.start, Xwi_mid)
-        push!(ph.haplotypelabel, h)
-        push!(ph.window, window)
+        push_Mosaic!(ph, (Xwi_mid, h, window))
         return nothing
     end
 
     if Xwi_mid <= X_bkpt_end <= Xwi_end
         # previous window extends to current window
         h1 = complete_idx_to_unique_all_idx(hap_prev, window, compressed_Hunique)
-        push!(ph.start, Xwi_mid)
-        push!(ph.haplotypelabel, h1)
-        push!(ph.window, window)
+        push_Mosaic!(ph, (Xwi_mid, h1, window))
         # 2nd part of current window
         h2 = complete_idx_to_unique_all_idx(hap_curr, window, compressed_Hunique)
-        push!(ph.start, X_bkpt_end)
-        push!(ph.haplotypelabel, h2)
-        push!(ph.window, window)
+        push_Mosaic!(ph, (X_bkpt_end, h2, window))
     elseif X_bkpt_end < Xwi_mid
         # current window extends to previous window
-        h1 = complete_idx_to_unique_all_idx(hap_curr, window - 1, 
+        h1 = complete_idx_to_unique_all_idx(hap_curr, Int32(window - 1), 
             compressed_Hunique)
-        push!(ph.start, X_bkpt_end)
-        push!(ph.haplotypelabel, h1)
-        push!(ph.window, window - 1)
+        push_Mosaic!(ph, (X_bkpt_end, h1, Int32(window - 1)))
         # update current window
         h2 = complete_idx_to_unique_all_idx(hap_curr, window, 
             compressed_Hunique)
-        push!(ph.start, Xwi_mid)
-        push!(ph.haplotypelabel, h2)
-        push!(ph.window, window)
+        push_Mosaic!(ph, (Xwi_mid, h2, window))
     else
         error("update_phase!: bkpt does not satisfy -1 <= bkpt <= 2width!")
     end
@@ -533,11 +522,6 @@ function phase_fast!(
             hap1_curr = haplotype1[i][w]
             hap2_curr = haplotype2[i][w]
 
-            # if i == 24
-            #     println("sample 24 hap1 = ", hap1_curr)
-            #     println("sample 24 hap2 = ", hap2_curr, "\n")
-            # end
-
             # find optimal breakpoint if there is one
             timers[id][16] += @elapsed _, bkpts = continue_haplotype(Xwi, 
                 compressed_Hunique, w, (hap1_prev, hap2_prev),
@@ -545,11 +529,13 @@ function phase_fast!(
 
             timers[id][24] += @elapsed begin
                 # record strand 1 info
-                update_phase!(ph[i].strand1, compressed_Hunique, bkpts[1],
-                    hap1_prev, hap1_curr, w, start_prev, start_curr, end_curr)
+                update_phase!(ph[i].strand1, compressed_Hunique, 
+                    bkpts[1], hap1_prev, hap1_curr, Int32(w), 
+                    start_prev, start_curr, end_curr)
                 # record strand 2 info
-                update_phase!(ph[i].strand2, compressed_Hunique, bkpts[2],
-                    hap2_prev, hap2_curr, w, start_prev, start_curr, end_curr)
+                update_phase!(ph[i].strand2, compressed_Hunique, 
+                    bkpts[2], hap2_prev, hap2_curr, Int32(w), 
+                    start_prev, start_curr, end_curr)
             end
         end
         next!(pmeter) # update progress
@@ -595,10 +581,8 @@ function phase_fast_compressed!(
         timers[id][24] += @elapsed begin
             h1 = haplotype1[i][1] # complete idx
             h2 = haplotype2[i][1] # complete idx
-            push!(ph[i].strand1.start, 1)
-            push!(ph[i].strand1.haplotypelabel, h1)
-            push!(ph[i].strand2.start, 1)
-            push!(ph[i].strand2.haplotypelabel, h2)
+            push_Mosaic!(ph[i].strand1, (1, h1))
+            push_Mosaic!(ph[i].strand2, (1, h2))
         end
 
         # Second pass to find optimal break points and record info to phase
@@ -623,23 +607,21 @@ function phase_fast_compressed!(
             timers[id][24] += @elapsed begin
                 # strand1 single stranded breakpoint
                 if -1 < bkpts[1] < length(Xwi)
-                    push!(ph[i].strand1.start, start_prev + bkpts[1])
-                    push!(ph[i].strand1.haplotypelabel, hap1_curr)
+                    push_Mosaic!(ph[i].strand1, (start_prev + bkpts[1], 
+                        hap1_curr))
                 end
                 # strand1 double stranded breakpoint
                 if bkpts[1] == -2
-                    push!(ph[i].strand1.start, start_curr)
-                    push!(ph[i].strand1.haplotypelabel, hap1_curr)
+                    push_Mosaic!(ph[i].strand1, (start_curr, hap1_curr))
                 end
                 # strand2 single stranded breakpoint
                 if -1 < bkpts[2] < length(Xwi)
-                    push!(ph[i].strand2.start, start_prev + bkpts[2])
-                    push!(ph[i].strand2.haplotypelabel, hap2_curr)
+                    push_Mosaic!(ph[i].strand2, (start_prev + bkpts[2], 
+                        hap2_curr))
                 end
                 # strand2 double stranded breakpoint
                 if bkpts[2] == -2
-                    push!(ph[i].strand2.start, start_curr)
-                    push!(ph[i].strand2.haplotypelabel, hap2_curr)
+                    push_Mosaic!(ph[i].strand2, (start_curr, hap2_curr))
                 end
             end
         end

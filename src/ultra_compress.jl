@@ -34,6 +34,11 @@ function convert_compressed(
     return X1, X2, phase, sampleID, H
 end
 
+"""
+    convert_compressed(t, phaseinfo, H)
+
+Columns of `H` are haplotypes.
+"""
 function convert_compressed(
     t::Type{T},
     phaseinfo::Vector{HaplotypeMosaicPair},

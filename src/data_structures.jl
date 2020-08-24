@@ -9,12 +9,46 @@ in `window[i]`. The haplotype label is the column index of
 haplotype `haplotypelabel[end]` in `window[end]`
 """
 struct HaplotypeMosaic
-    length::Int
-    start::Vector{Int}
-    window::Vector{Int}
-    haplotypelabel::Vector{Int}
+    length::Int64
+    start::Vector{Int64}
+    window::Vector{Int32}
+    haplotypelabel::Vector{Int32}
 end
-HaplotypeMosaic(len) = HaplotypeMosaic(len, Int[], Int[], Int[])
+HaplotypeMosaic(len) = HaplotypeMosaic(len, Int64[], Int32[], Int32[])
+
+function push_Mosaic!(x::HaplotypeMosaic, y::Tuple{Int64, T}) where T <: Integer
+    newstart, newlabel = y[1], y[2]
+    xlen = length(x.start)
+    if xlen != 0
+        # check if start occurs before previous start position, since searching
+        # breakpoints for 2 consecutive windows can cause "overlaps"
+        xstart = last(x.start)
+        if newstart < xstart
+            deleteat!(x.start, xlen)
+            deleteat!(x.haplotypelabel, xlen)
+        end
+    end
+    push!(x.start, newstart)
+    push!(x.haplotypelabel, newlabel)
+end
+
+function push_Mosaic!(x::HaplotypeMosaic, y::Tuple{Int64, T, T}) where T <: Integer
+    newstart, newlabel, newwindow = y[1], y[2], y[3]
+    xlen = length(x.start)
+    if xlen != 0
+        # check if start occurs before previous start position, since searching
+        # breakpoints for 2 consecutive windows can cause "overlaps"
+        xstart = last(x.start)
+        if newstart < xstart
+            deleteat!(x.start, xlen)
+            deleteat!(x.haplotypelabel, xlen)
+            deleteat!(x.window, xlen)
+        end
+    end
+    push!(x.start, newstart)
+    push!(x.haplotypelabel, newlabel)
+    push!(x.window, newwindow)
+end
 
 # data structure for recording haplotype mosaic of two strands
 struct HaplotypeMosaicPair

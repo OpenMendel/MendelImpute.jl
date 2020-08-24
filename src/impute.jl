@@ -276,9 +276,6 @@ function update_marker_position!(
         end
         # update strand2's starting position
         for (i, idx) in enumerate(phaseinfo[j].strand2.start)
-            isnothing(idx) && println("hi")
-            isnothing(i) && println("i")
-            isnothing(XtoH_idx[idx]) && println("j = $j, idx = $idx")
             phaseinfo[j].strand2.start[i] = XtoH_idx[idx]
         end
     end
