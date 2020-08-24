@@ -55,30 +55,3 @@ function convert_compressed(
 
     return X1, X2
 end
-
-# function complete_idx_to_unique_all_idx!(
-#     sample_phase::HaplotypeMosaicPair,
-#     compressed_Hunique::CompressedHaplotypes,
-#     )
-
-#     l1 = length(sample_phase.strand1.haplotypelabel)
-#     l2 = length(sample_phase.strand2.haplotypelabel)
-
-#     # strand1 
-#     for i in 1:l1
-#         h1 = sample_phase.strand1.haplotypelabel[i] # unique haplotype index
-#         w1 = sample_phase.strand1.window[i]
-#         H1 = unique_all_idx_to_complete_idx(h1, w1, 
-#             compressed_Hunique) # complete haplotype idx
-#         sample_phase.strand1.haplotypelabel[i] = H1
-#     end
-
-#     # strand2
-#     for i in 1:l2
-#         h2 = sample_phase.strand2.haplotypelabel[i] # unique haplotype index
-#         w2 = sample_phase.strand2.window[i]
-#         H2 = unique_all_idx_to_complete_idx(h2, w2, 
-#             compressed_Hunique) # complete haplotype idx 
-#         sample_phase.strand2.haplotypelabel[i] = H2
-#     end
-# end
