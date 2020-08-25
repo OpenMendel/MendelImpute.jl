@@ -46,7 +46,10 @@ module MendelImpute
     export update_marker_position!
 
     # chromosome painting
-    export paint, unique_populations, convert_compressed
+    export paint, composition, unique_populations
+
+    # ultra-compressed
+    export convert_compressed
 
     include("compress.jl")
     include("data_structures.jl")

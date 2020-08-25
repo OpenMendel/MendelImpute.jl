@@ -2,17 +2,11 @@
 ###### It contains relevant code to perform chromosome painting and computing
 ###### computation of poplation admixtures.
 
-# function paint(
-#     sample_phase::HaplotypeMosaicPair,
-
-#     )
-
-# end
-
 """
-    paint(sample_phase, sample_to_population, compressed_Hunique, ...)
+    composition(sample_phase, panelID, refID_to_population, ...)
 
-Computes a sample's chromosome composition based on phase information.
+Computes a sample's chromosome composition based on phase information. This
+function is used for easier plotting a person's admixed proportions.
 
 # Arguments
 - `sample_phase`: A `HaplotypeMosaicPair` storing phase information for a
@@ -23,8 +17,12 @@ Computes a sample's chromosome composition based on phase information.
 
 # Optional inputs
 - `populations`: A unique list of populations present in `refID_to_population`
+
+# Output
+- `composition`: A list of percentages where `composition[i]` equals the
+    sample's ancestry (in %) from `populations[i]` 
 """
-function paint(
+function composition(
     sample_phase::HaplotypeMosaicPair,
     panelID::Vector{String},
     refID_to_population::Dict{String, String};
@@ -74,9 +72,6 @@ function paint(
         composition[idx] += length(cur_range)
     end
 
-    # This is not strictly enforced since a sample's phase could have overlapping
-    # regions due to breakpoint searching, which cases a very small region of snps
-    # to be double counted.
     sum(composition) == 2snps || error("composition should sum to number of snps")
     
     return composition ./ 2snps
@@ -94,4 +89,83 @@ function unique_populations(x::Dict{String, String})
         val ∉ populations && push!(populations, val)
     end
     return populations
+end
+
+"""
+    paint(sample_phase, panelID, refID_to_population, ...)
+
+Converts a person's phased haplotype lengths into segments of percentages. This
+function is used for easier plotting a "painted chromosome".
+
+# Arguments
+- `sample_phase`: A `HaplotypeMosaicPair` storing phase information for a
+    sample, includes haplotype start position and haplotype label.
+- `panelID`: Sample ID's in the reference haplotype panel
+- `refID_to_population`: A dictionary mapping each ID in the haplotype 
+    reference panel to its population origin. 
+
+# Optional inputs
+- `populations`: A unique list of populations present in `refID_to_population`
+
+# Output
+- `composition`: A list of percentages where `composition[i]` equals the
+    sample's ancestry (in %) from `populations[i]` 
+"""
+function paint(
+    sample_phase::HaplotypeMosaicPair,
+    panelID::Vector{String},
+    refID_to_population::Dict{String, String};
+    populations::Vector{String} = unique_populations(refID_to_population)
+    )
+    snps = sample_phase.strand1.length
+    @assert snps == sample_phase.strand2.length "strands have different length!"
+    
+    # length of strand 1 and 2
+    l1 = length(sample_phase.strand1.haplotypelabel)
+    l2 = length(sample_phase.strand2.haplotypelabel)
+
+    # return elements
+    s1_composition = (zeros(l1), Vector{String}(undef, l1))
+    s2_composition = (zeros(l2), Vector{String}(undef, l2))
+
+    # strand1 
+    for i in 1:l1
+        # get complete haplotype index and range of haplotype
+        h1 = sample_phase.strand1.haplotypelabel[i]
+        cur_range = (i == l1 ? 
+            (sample_phase.strand1.start[i]:sample_phase.strand1.length) : 
+            (sample_phase.strand1.start[i]:(sample_phase.strand1.start[i+1] 
+            - 1)))
+
+        # find current haplotype's population origin
+        ref_id = panelID[div(h1, 2, RoundUp)]
+        population = refID_to_population[ref_id]
+
+        # update composition
+        s1_composition[1][i] = length(cur_range) / snps
+        s1_composition[2][i] = population
+    end
+
+    # strand2
+    for i in 1:l2
+        # get complete haplotype index and range of haplotype
+        h2 = sample_phase.strand2.haplotypelabel[i]
+        cur_range = (i == l2 ? 
+            (sample_phase.strand2.start[i]:sample_phase.strand2.length) : 
+            (sample_phase.strand2.start[i]:(sample_phase.strand2.start[i+1] 
+            - 1)))
+
+        # find current haplotype's population origin
+        ref_id = panelID[div(h2, 2, RoundUp)]
+        population = refID_to_population[ref_id]
+
+        # update composition
+        s2_composition[1][i] = length(cur_range) / snps
+        s2_composition[2][i] = population
+    end
+
+    sum(s1_composition[1]) ≈ 1.0 || error("strand 1 compositions should sum to 1")
+    sum(s2_composition[1]) ≈ 1.0 || error("strand 1 compositions should sum to 1")
+
+    return s1_composition, s2_composition
 end
