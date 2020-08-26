@@ -534,24 +534,27 @@ function haplopair!(
         Mjk = M[j, k]
         i = 1
         # loop over individuals
-        for chunk in 1:chunks
+        for chunk in 1:chunks # unrolled loop, equivalent to for i in 1:n
             score = Mjk - N[i, j] - N[i, k]
             if score < hapmin[i]
                 hapmin[i], happair1[i], happair2[i] = score, j, k
             end
-            score = Mjk - N[i+1, j] - N[i+1, k]
-            if score < hapmin[i+1]
-                hapmin[i+1], happair1[i+1], happair2[i+1] = score, j, k
+            i += 1
+            score = Mjk - N[i, j] - N[i, k]
+            if score < hapmin[i]
+                hapmin[i], happair1[i], happair2[i] = score, j, k
             end
-            score = Mjk - N[i+2, j] - N[i+2, k]
-            if score < hapmin[i+2]
-                hapmin[i+2], happair1[i+2], happair2[i+2] = score, j, k
+            i += 1
+            score = Mjk - N[i, j] - N[i, k]
+            if score < hapmin[i]
+                hapmin[i], happair1[i], happair2[i] = score, j, k
             end
-            score = Mjk - N[i+3, j] - N[i+3, k]
-            if score < hapmin[i+3]
-                hapmin[i+3], happair1[i+3], happair2[i+3] = score, j, k
+            i += 1
+            score = Mjk - N[i, j] - N[i, k]
+            if score < hapmin[i]
+                hapmin[i], happair1[i], happair2[i] = score, j, k
             end
-            i += 4
+            i += 1
         end
         # handle remaining terms
         while i ≤ n
