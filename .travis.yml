@@ -28,3 +28,16 @@ after_success:
   - julia -e 'cd(Pkg.dir("MendelImpute")); Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder())'
   # push coverage results to Codecov
   - julia -e 'cd(Pkg.dir("MendelImpute")); Pkg.add("Coverage"); using Coverage; Codecov.submit(Codecov.process_folder())'
+
+jobs:
+  fast_finish: true
+  allow_failures:
+    - julia: nightly
+  include:
+    - stage: "Documentation"
+      julia: 1.5
+      os: osx
+      script:
+        - julia -e 'using Pkg; Pkg.add("Documenter")'
+        - julia -e 'using MendelImpute; include(joinpath(dirname(pathof(MendelImpute)), "..", "docs", "make.jl"))'
+      after_success: skip
