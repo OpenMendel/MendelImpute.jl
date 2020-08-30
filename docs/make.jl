@@ -4,7 +4,7 @@ using MendelImpute
 makedocs(
     sitename = "MendelImpute",
     format = Documenter.HTML(),
-    modules = [MendelImpute]
+    modules = [MendelImpute],
     pages = [
         "Home" => "index.md",
         "API"  => "man/api.md"
