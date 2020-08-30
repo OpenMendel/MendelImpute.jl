@@ -9,7 +9,7 @@
 	# 1 | 3
 	X .= H[:, 1] + [H[1:bkpt, 2]; H[bkpt+1:p, 3]]
 	X[mask] .= missing
-	bkpt_optim, err_optim = search_breakpoint(X, H[:, 1], H[:, 2], H[:, 3])
+	bkpt_optim, err_optim = MendelImpute.search_breakpoint(X, H[:, 1], H[:, 2], H[:, 3])
 
 	# @code_warntype search_breakpoint(X, H[:, 1], H[:, 2], H[:, 3])
 	@test bkpt_optim == 499
@@ -20,7 +20,7 @@
 	bkpt = 800
 	X .= H[:, 2] + [H[1:bkpt, 3]; H[bkpt+1:p, 4]]
 	X[mask] .= missing
-	bkpt_optim, err_optim = search_breakpoint(X, H[:, 2], H[:, 3], H[:, 4])
+	bkpt_optim, err_optim = MendelImpute.search_breakpoint(X, H[:, 2], H[:, 3], H[:, 4])
 
 	@test bkpt_optim == 800
 	@test err_optim == 0
@@ -30,7 +30,7 @@
 	bkpt = 200
 	X .= H[:, 5] + [H[1:bkpt, 4]; H[bkpt+1:p, 2]]
 	X[mask] .= missing
-	bkpt_optim, err_optim = search_breakpoint(X, H[:, 5], H[:, 4], H[:, 2])
+	bkpt_optim, err_optim = MendelImpute.search_breakpoint(X, H[:, 5], H[:, 4], H[:, 2])
 
 	@test bkpt_optim == 198
 	@test err_optim == 0
