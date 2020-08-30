@@ -1,3 +1,7 @@
+###### This file is part of the MendelImpute.jl package.
+###### It contains relevant code to solve the least squares criteria 
+###### `x ≈ hᵢ + hⱼ`. 
+
 """
     compute_optimal_haplotypes!(haplotype1, haplotype2, compressed_Hunique, ...)
 

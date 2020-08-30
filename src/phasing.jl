@@ -1,3 +1,7 @@
+###### This file is part of the MendelImpute.jl package.
+###### This is the main entry point of the MendelImpute package. 
+###### It also contains code to phase window-by-window. 
+
 """
     phase(tgtfile, reffile; [outfile], [impute], [phase], [width], [recreen], 
     [max_haplotypes], [stepwise], [thinning_factor], [scale_allelefreq], 
@@ -10,8 +14,8 @@ pool of haplotypes `reffile` by sliding windows and saves result in `outfile`.
 - `tgtfile`: VCF or PLINK files. VCF files should end in `.vcf` or `.vcf.gz`.
     PLINK files should exclude `.bim/.bed/.fam` suffixes but the trio must all
     be present in the same directory.
-- `reffile`: VCF or compressed Julia binary files. Files should end in 
-    `.vcf`, `.vcf.gz`, or `.jlso` (compressed binary files).
+- `reffile`: Reference haplotype file ending in `.vcf`, `.vcf.gz`, or `.jlso` 
+    (compressed binary files).
 
 # Optional Inputs
 - `outfile`: output filename ending in `.vcf.gz`, `.vcf`, or `.jlso`. VCF output

@@ -1,3 +1,7 @@
+###### This file is part of the MendelImpute.jl package.
+###### It contains relevant code to compress a reference haplotype panel into
+###### a `.jlso` or `.jld2` compressed panel. 
+
 """
 Data structure for keeping track of unique haplotypes in a window. 
 
@@ -164,7 +168,7 @@ run this function by themselves.
 * `reffile`: reference haplotype file name (ends in `.vcf` or `.vcf.gz`)
 * `tgtfile`: target genotype file name (ends in `.vcf` or `.vcf.gz`)
 * `outfile`: Output file name (ends in `.jlso`)
-* `d`: Max number of unique haplotypes per window. 
+* `d`: Max number of unique haplotypes per window (recommended `d = 1000`). 
 """
 function compress_haplotypes(
     reffile::AbstractString,
@@ -193,12 +197,6 @@ function compress_haplotypes(
     return nothing
 end
 
-"""
-    compress_haplotypes(H, X, outfile, ...)
-
-Compresses `H` window-by-window into `.jlso` format so that each window has `d`
-unique haplotypes determined by typed SNPs position in `X`. 
-"""
 function compress_haplotypes(H::AbstractMatrix, X::AbstractMatrix, 
     outfile::AbstractString, X_pos::AbstractVector, H_sampleID::AbstractVector, 
     H_chr::AbstractVector, H_pos::AbstractVector, H_ids::AbstractVector, 

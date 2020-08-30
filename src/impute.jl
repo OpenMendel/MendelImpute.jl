@@ -1,3 +1,6 @@
+###### This file is part of the MendelImpute.jl package.
+###### It contains relevant code to impute and output a genotype matrix
+
 """
     write(outfile, X, compressed_haplotypes, X_sampleID, XtoH_idx)
 

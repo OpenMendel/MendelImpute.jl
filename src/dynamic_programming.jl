@@ -1,3 +1,7 @@
+###### This file is part of the MendelImpute.jl package.
+###### It contains relevant code to perform phasing by dynamic programming,
+###### which finds the global solution to the minimum number of phase switches.
+
 """
 Helper function to calculate the squared Hamming difference between 2 
 unordered pair of integers.

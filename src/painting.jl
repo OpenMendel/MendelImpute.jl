@@ -3,7 +3,7 @@
 ###### computation of poplation admixtures.
 
 """
-    composition(sample_phase, panelID, refID_to_population, ...)
+    composition(sample_phase, panelID, refID_to_population, [populations])
 
 Computes a sample's chromosome composition based on phase information. This
 function is used for easier plotting a person's admixed proportions.
