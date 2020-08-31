@@ -3,7 +3,7 @@
 ###### to a genotype matrix
 
 """
-convert_compressed(t, phaseinfo, H)
+    convert_compressed(t<:Real, phaseinfo::AbstractString, reffile::AbstractString)
 
 Converts `phaseinfo` into a phased genotype matrix of type `t` using the full
 reference haplotype panel `H` 
@@ -14,9 +14,11 @@ reference haplotype panel `H`
 - `reffile`: The complete (uncompressed) haplotype reference file
 
 # Output
-- `(X1, X2)`: Tuple of matrix where `X1` is allele1 and `X2` is allele2. Each 
-    column is a sample. 
-- `sampleID`: The ID's of each imputed person. 
++ `X1`: allele 1 of the phased genotype. Each column is a sample. `X = X1 + X2`. 
++ `X2`: allele 2 of the phased genotype. Each column is a sample. `X = X1 + X2`. 
++ `phase`: the original data structure after phasing and imputation.
++ `sampleID`: The ID's of each imputed person. 
++ `H`: the complete reference haplotype panel.
 """
 function convert_compressed(
     t::Type{T}, 
@@ -35,7 +37,7 @@ function convert_compressed(
 end
 
 """
-    convert_compressed(t, phaseinfo, H)
+    convert_compressed(t<:Real, phaseinfo::Vector{HaplotypeMosaicPair}, H::AbstractMatrix)
 
 Columns of `H` are haplotypes.
 """

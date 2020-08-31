@@ -1,19 +1,20 @@
 
 # Preparing Target Data
 
-MendelImpute accepts VCF, compressed VCF, and PLINK files. Please make sure the following are true:
+MendelImpute accepts [VCF](https://samtools.github.io/hts-specs/VCFv4.3.pdf) and [PLINK](https://www.cog-genomics.org/plink2/formats#bed) files. Please make sure the following are true:
 
 + VCF file ends in `.vcf` or `.vcf.gz`
 + For PLINK files, all trios (`.bim`, `.bed`, `.fam`) are present in the same directory
 + Each file contains only 1 chromosome
 + Every record (SNP) is present in the reference panel. If this is untrue, you must [match markers in 2 VCF files](https://openmendel.github.io/VCFTools.jl/dev/man/conformgt/). 
++ Given a SNP, it's position is the same in target data and reference panel. MendelImpute use SNP position internally to align markers. 
 + The position of every SNP is unique (so multiallelic markers should be excluded instead of split)
 
 If the last criteria is not met, our code may or may not work. File an issue to let us know.
 
 # Preparing Reference Haplotype Panel
 
-Reference panels must be compressed into `.jlso` format first using the [compress_haplotypes](https://biona001.github.io/MendelImpute/dev/man/api/#MendelImpute.compress_haplotypes) function. One must specify `d`: the maximum number of unique haplotypes per window. Larger `d` slows down computation, but increases accuracy. For most purposes, we recommend $d \approx 1000$. A larger `d` may be needed for TOPMed or HRC data. 
+Reference panels must be compressed into `.jlso` format first using the [compress_haplotypes](https://biona001.github.io/MendelImpute/dev/man/api/#MendelImpute.compress_haplotypes) function. One must specify `d`: the maximum number of unique haplotypes per window. Larger `d` slows down computation, but increases accuracy. For most purposes, we recommend $d \approx 1000$. A larger `d` may be needed for TOPMed data. 
 
 # Detailed Example
 
@@ -22,9 +23,7 @@ We use the [1000 genomes chromosome 22](http://bochet.gcc.biostat.washington.edu
 
 ```julia
 # load necessary packages in Julia
-using MendelImpute
 using VCFTools
-using Random
 
 # compute simple summary statistics
 data = "chr22.1kg.phase3.v5a.vcf.gz"

@@ -15,6 +15,10 @@ Pkg.add(PackageSpec(url="https://github.com/OpenMendel/MendelImpute.jl.git"))
 ```
 This package supports Julia `v1.5`+.
 
+## Documentation
+
++ [**Latest**](https://biona001.github.io/MendelImpute/dev/)
+
 ## Usage
 
 Given a target genotype file (phased or unphased, may contain missing data, ending in `.vcf` or `.vcf.gz`) and a reference haplotype file (phased, no missing, ending in `.vcf`, `.vcf.gz` or `.jlso`), our software phases and imputes every SNP in the reference file to the target file. Like many other software, SNPs typed in target must all be present in the reference panel.

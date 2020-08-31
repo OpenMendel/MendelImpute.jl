@@ -9,6 +9,7 @@
 
 Main function of MendelImpute program. Phasing (haplotying) of `tgtfile` from a
 pool of haplotypes `reffile` by sliding windows and saves result in `outfile`.
+All SNPs in `tgtfile` must be present in `reffile`. 
 
 # Input
 - `tgtfile`: VCF or PLINK files. VCF files should end in `.vcf` or `.vcf.gz`.
@@ -22,8 +23,8 @@ pool of haplotypes `reffile` by sliding windows and saves result in `outfile`.
     genotypes will have no missing data. If ending in `.jlso`, will output
     ultra-compressed data structure recording `HaplotypeMosaicPair`s for 
     each sample
-- `impute`: If `true`, untyped SNPs will be imputed, otherwise only missing
-    snps in `tgtfile` will be imputed.
+- `impute`: If `true`, imputes every SNPs in `reffile` to `tgtfile`. Otherwise
+    only missing snps in `tgtfile` will be imputed.
 - `phase`: If `true`, all output genotypes will be phased. Otherwise all
     output genotypes will be unphased.
 - `dosage`: If `true`, will assume target matrix are dosages for imputation. 

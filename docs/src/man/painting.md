@@ -1,12 +1,12 @@
 
 # Estimating ancestry
 
-Other than phasing and imputation, MendelImpute can also be used for:
+If samples in the reference haplotype panel are labeled with a population origin, MendelImpute can also be used for:
 
-+ Estimate admixed proportions using a reference haplotype panel
-+ Chromosome painting using a reference haplotype panel
++ Estimate admixed proportions
++ Chromosome painting
 
-We use the [1000 genomes chromosome 22](http://bochet.gcc.biostat.washington.edu/beagle/1000_Genomes_phase3_v5a/b37.vcf/) as example to estimate ancestry proportions & perform *chromosome painting* from reference haplotype panels. Example code to generate plots are presented. Note the original chromosome data are filtered into target and reference panel the same way as the detailed example in Phasing and Imputation.
+We use the [1000 genomes chromosome 22](http://bochet.gcc.biostat.washington.edu/beagle/1000_Genomes_phase3_v5a/b37.vcf/) as illustration. Example code to generate plots are presented. 
 
 
 ```julia
@@ -20,11 +20,15 @@ using Plots
 using JLSO
 ```
 
-# Data preparation
+## Data preparation
 
-## Step 1. Download population data
+### Step 0. Filter chromosome data 
 
-Download [population code](ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/1000_genomes_project/data/) for each 1000 genomes sample. Different population code is explained [here](https://www.internationalgenome.org/category/population/). 
+The original chromosome data are filtered into target and reference panels. Follow [detailed example](https://biona001.github.io/MendelImpute/dev/man/Phasing+and+Imputation/#Detailed-Example) in Phasing and Imputation to obtain the same data.
+
+### Step 1. Get population data
+
+Download [population code](ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/1000_genomes_project/data/) for each 1000 genomes sample via the command below (note `wget` will probably not work on non-Mac OS). Different population code is explained [here](https://www.internationalgenome.org/category/population/). 
 
 
 ```julia
@@ -32,7 +36,7 @@ Download [population code](ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collect
 # wget -r -l3 -N --no-parent ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/1000_genomes_project/data/
 ```
 
-Copy the country of origin data into a folder called `data`. It should look contain these subfolders (where each population code contains the sample IDs that belong to the population):
+For easier processing, copy the country of origin data into a folder called `data`. It should look contain these subfolders (where each population code contains the sample IDs that belong to the population):
 
 
 ```julia
@@ -67,15 +71,18 @@ Copy the country of origin data into a folder called `data`. It should look cont
     YRI
 
 
-## Step 2. Process each sample's population origin
+### Step 2. Process each sample's population origin
 
-The population origin for different samples are encoded in weird subfolder directory way. Here we process them into a dictionary for easier access. Each key is a sample ID and the value is the population code.
+The goal here is to create a `Dict{key, value}` where each key is a sample ID and the value is the population code. This will be used for both the [paint](https://biona001.github.io/MendelImpute/dev/man/api/#MendelImpute.paint) and [composition](https://biona001.github.io/MendelImpute/dev/man/api/#MendelImpute.composition) function.
+
+Here the population origin for different samples are encoded in weird subfolder directory way. We process them into the desired dictionary structure.
 
 
 ```julia
 df = DataFrame(sample = String[], population = String[])
 refID_to_population = Dict{String, String}()
 for population in readdir("data/")
+    population == ".DS_Store" && continue # skip auxiliary files
     for sample in readdir("data/" * population)
         sample == ".DS_Store" && continue # skip auxiliary files
         push!(df, (sample, population))
@@ -118,13 +125,13 @@ refID_to_population
 
 
 
-## Step 3. Compute phase information using MendelImpute
+### Step 3. Compute phase information using MendelImpute
 
 This is equivalent to running a typical imputation. Please ensure that:
 + The output file name ends with `.jlso` (save output to ultra-compressed format)
 + `impute = true` (so the output contains the entire chromosome)
 
-Note data used here is prepared in the **Detailed Example** under **Phasing and Imputation** section. 
+Note data used here is prepared in [Detailed Example](https://biona001.github.io/MendelImpute/dev/man/Phasing+and+Imputation/#Detailed-Example).
 
 
 ```julia
@@ -145,33 +152,33 @@ outfile = "mendel.imputed.jlso"
     Total windows = 1634, averaging ~ 508 unique haplotypes per window.
     
     Timings: 
-        Data import                     = 13.1844 seconds
-            import target data             = 3.3029 seconds
-            import compressed haplotypes   = 9.88149 seconds
-        Computing haplotype pair        = 22.8714 seconds
-            BLAS3 mul! to get M and N      = 0.987876 seconds per thread
-            haplopair search               = 18.0698 seconds per thread
-            initializing missing           = 0.0944006 seconds per thread
-            allocating and viewing         = 0.388691 seconds per thread
-            index conversion               = 0.0100555 seconds per thread
-        Phasing by win-win intersection = 1.35694 seconds
-            Window-by-window intersection  = 0.535266 seconds per thread
-            Breakpoint search              = 0.298611 seconds per thread
-            Recording result               = 0.0519459 seconds per thread
-        Imputation                     = 3.08628 seconds
-            Imputing missing               = 0.0732398 seconds
-            Writing to file                = 3.01304 seconds
+        Data import                     = 12.8755 seconds
+            import target data             = 3.19177 seconds
+            import compressed haplotypes   = 9.68371 seconds
+        Computing haplotype pair        = 22.6357 seconds
+            BLAS3 mul! to get M and N      = 1.01138 seconds per thread
+            haplopair search               = 17.8065 seconds per thread
+            initializing missing           = 0.0905452 seconds per thread
+            allocating and viewing         = 0.325886 seconds per thread
+            index conversion               = 0.0097123 seconds per thread
+        Phasing by win-win intersection = 1.2638 seconds
+            Window-by-window intersection  = 0.520476 seconds per thread
+            Breakpoint search              = 0.231444 seconds per thread
+            Recording result               = 0.0500224 seconds per thread
+        Imputation                     = 3.0595 seconds
+            Imputing missing               = 0.0697154 seconds
+            Writing to file                = 2.98979 seconds
     
-        Total time                      = 40.6322 seconds
+        Total time                      = 39.9759 seconds
     
-     52.269779 seconds (109.80 M allocations: 6.143 GiB, 5.30% gc time)
+     51.214539 seconds (109.80 M allocations: 6.143 GiB, 5.08% gc time)
 
 
-# Estimate ancestry proportions
+## Estimate admixture proportions
 
 The [composition](https://biona001.github.io/MendelImpute/dev/man/api/#MendelImpute.composition) will compute a list of percentages where `composition[i]` equals the sample's ancestry (in %) from `populations[i]`. Thus we simply have to plot the result. This illustration depends on **data preparation** above. 
 
-## Step 1: import necessary data
+### Step 1: import necessary data
 
 
 ```julia
@@ -226,9 +233,9 @@ sample_population
 
 
 
-## Step 2: call `composition` function
+### Step 2: call `composition` function
 
-As explained above, the [composition](https://biona001.github.io/MendelImpute/dev/man/api/#MendelImpute.composition) will compute a list of percentages where `composition[i]` equals the sample's ancestry (in %) from `populations[i]`. 
+The [composition](https://biona001.github.io/MendelImpute/dev/man/api/#MendelImpute.composition) will compute a list of percentages where `composition[i]` equals the sample's ancestry (in %) from `populations[i]`. We are finally using the imputation result stored in `ph`.
 
 
 ```julia
@@ -238,9 +245,9 @@ populations = MendelImpute.unique_populations(refID_to_population)
 @time sample84_comp = composition(ph[84], panelID, refID_to_population) # origin LWK
 ```
 
-      0.004861 seconds (28 allocations: 2.719 KiB)
-      0.000390 seconds (8 allocations: 1.250 KiB)
-      0.000429 seconds (8 allocations: 1.250 KiB)
+      0.003716 seconds (28 allocations: 2.719 KiB)
+      0.000300 seconds (8 allocations: 1.250 KiB)
+      0.000320 seconds (8 allocations: 1.250 KiB)
 
 
 
@@ -276,7 +283,9 @@ populations = MendelImpute.unique_populations(refID_to_population)
 
 
 
-## Step 3: Plot the percentages
+### Step 3: Plot the percentages
+
+We computed the population percentages for sample 1, 4, and 84. Here `sample1_comp[i]` equals the sample's estimated ancestry (in %) from `populations[i]`. Thus we simply have to create a bar plot for each:
 
 
 ```julia
@@ -294,11 +303,13 @@ bar!(barplot, sample84_comp, label="Sample 84 (LWK)", alpha=0.8)
 
 
 
-# Chromosome painting
+## Chromosome painting
 
-The main function is the [paint](https://biona001.github.io/MendelImpute/dev/man/api/#MendelImpute.paint) function. It will convert the imputed haplotype segments into a list of percentages, which can be used for easy plotting. This illustration depends on **data preparation** above. 
+The main function is the [paint](https://biona001.github.io/MendelImpute/dev/man/api/#MendelImpute.paint) function. For an imputed sample, it will convert **each haplotype segment** into a percentage indicating the segment's length in the chromosome. Then the list can be used for easy plotting. 
 
-## Step 1: Choose your colors
+**Note:** this illustration depends on **data preparation** above. 
+
+### Step 1: Choose your colors
 
 In this example, colors are arranged such that:
 + Blue ≈ European/American
@@ -312,12 +323,12 @@ Of course, Julia lets you plot your favoriate colors. We pick our colors here: h
 # generated here: https://mdigi.tools/color-shades/#008000
 # Blue ≈ European/American, Red ≈ Asian, Green ≈ Africa
 goodcolors = [colorant"#c8c8ff", colorant"#ffeaea", colorant"#ffbfbf", colorant"#a4a4ff",
-            colorant"#8080ff", colorant"#e3ffe3", colorant"#aaffaa", colorant"#71ff71", 
-            colorant"#5b5bff", colorant"#ff9595", colorant"#39ff39", colorant"#ff6a6a",
-            colorant"#ff4040", colorant"#3737ff", colorant"#1212ff", colorant"#0000c8", 
-            colorant"#0000a4", colorant"#00ff00", colorant"#ff1515", colorant"#00c600", 
-            colorant"#ea0000", colorant"#bf0000", colorant"#008e00", colorant"#00005b",
-            colorant"#950000", colorant"#6a0000"]
+    colorant"#8080ff", colorant"#e3ffe3", colorant"#aaffaa", colorant"#71ff71", 
+    colorant"#5b5bff", colorant"#ff9595", colorant"#39ff39", colorant"#ff6a6a",
+    colorant"#ff4040", colorant"#3737ff", colorant"#1212ff", colorant"#0000c8", 
+    colorant"#0000a4", colorant"#00ff00", colorant"#ff1515", colorant"#00c600", 
+    colorant"#ea0000", colorant"#bf0000", colorant"#008e00", colorant"#00005b",
+    colorant"#950000", colorant"#6a0000"]
 ```
 
 
@@ -327,7 +338,7 @@ goodcolors = [colorant"#c8c8ff", colorant"#ffeaea", colorant"#ffbfbf", colorant"
 
 
 
-## Step 2: Run `paint` funcion
+### Step 2: Run `paint` funcion
 
 This function convert the imputed haplotype segments into a list of percentages (one list for each strand). This is simply a post-processing routine so that data can be used for easy plotting later.
 
@@ -339,14 +350,14 @@ populations = unique_populations(refID_to_population)
 @time sample84_s1_comp, sample84_s2_comp = paint(ph[84], panelID, refID_to_population);
 ```
 
-      0.000281 seconds (12 allocations: 19.125 KiB)
-      0.000237 seconds (12 allocations: 20.375 KiB)
-      0.000257 seconds (12 allocations: 22.875 KiB)
+      0.000257 seconds (12 allocations: 19.125 KiB)
+      0.000238 seconds (12 allocations: 20.375 KiB)
+      0.000253 seconds (12 allocations: 22.875 KiB)
 
 
-## Step 3: Generate plots for painted chromosomes
+### Step 3: Generate plots for painted chromosomes
 
-We found the StatsPlots package to be more useful for this purpose, but in general the code below did the plotting in a very roundabout way. 
+We found the [StatsPlots.jl](https://github.com/JuliaPlots/StatsPlots.jl) package to be more useful for this purpose, although the code below still did the plotting in a very roundabout way. 
 
 
 ```julia

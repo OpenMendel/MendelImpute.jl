@@ -6,7 +6,7 @@
 
 ## Package Features
 
-- Built-in support for imputing VCF (`.vcf`, `.vcf.gz`) and PLINK files.
+- Built-in support for imputing genotypes stored in [VCF files](https://samtools.github.io/hts-specs/VCFv4.3.pdf) (`.vcf`, `.vcf.gz`) or [PLINK files](https://www.cog-genomics.org/plink2/formats#bed).
 - Out-of-the-box multithreaded (shared memory) parallelism. 
 - Admixture estimation, with code examples to make pretty plots!
 - Ultra-compressed file for phased genotypes.
