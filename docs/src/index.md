@@ -32,6 +32,7 @@ Pages = [
     "man/Phasing+and+Imputation.md"
     "man/performance.md"
     "man/painting.md"
+    "man/ultra+compress.md"
     "man/api.md"
 ]
 Depth = 2

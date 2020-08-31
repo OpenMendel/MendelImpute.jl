@@ -10,7 +10,8 @@ makedocs(
         "Phasing and Imputation" => "man/Phasing+and+Imputation.md",
         "Performance Gotchas" => "man/performance.md",
         "Estimating ancestry" => "man/painting.md",
-        "API"  => "man/api.md"
+        "Ultra compression" => "man/ultra+compress.md",
+        "API" => "man/api.md"
     ]
 )
 
