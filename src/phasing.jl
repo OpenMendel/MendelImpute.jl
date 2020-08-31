@@ -3,9 +3,9 @@
 ###### It also contains code to phase window-by-window. 
 
 """
-    phase(tgtfile, reffile; [outfile], [impute], [phase], [width], [recreen], 
-    [max_haplotypes], [stepwise], [thinning_factor], [scale_allelefreq], 
-    [dynamic_programming])
+    phase(tgtfile, reffile; [outfile], [impute], [phase], [dosage], [max_d]
+    [recreen], [max_haplotypes], [stepwise], [thinning_factor], 
+    [scale_allelefreq], [dynamic_programming])
 
 Main function of MendelImpute program. Phasing (haplotying) of `tgtfile` from a
 pool of haplotypes `reffile` by sliding windows and saves result in `outfile`.
@@ -39,9 +39,9 @@ pool of haplotypes `reffile` by sliding windows and saves result in `outfile`.
     haplotype using global search.
 - `thinning_factor`: This option solves the least squares objective on only
     `thining_factor` unique haplotypes.
-- `scale_allelefreq` Boolean indicating whether to give rare SNPs more weight
+- `scale_allelefreq`: Boolean indicating whether to give rare SNPs more weight
     scaled by `wᵢ = 1 / √2p(1-p)` where max weight is 2. 
-- `dynamic_programming` Boolean indicating whether to phase with a global 
+- `dynamic_programming`: Boolean indicating whether to phase with a global 
     search that finds the longest haplotype stretch over all windows.
 """
 function phase(
