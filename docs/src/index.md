@@ -29,6 +29,9 @@ This package supports Julia `v1.5`+.
 
 ```@contents
 Pages = [
+    "man/Phasing+and+Imputation.md"
+    "man/performance.md"
+    "man/painting.md"
     "man/api.md"
 ]
 Depth = 2
