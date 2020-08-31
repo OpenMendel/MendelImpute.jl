@@ -71,6 +71,7 @@ function phase(
     ultra_compress && !phase && error("Ultra compressed output must be phased!")
 
     # import reference data
+    println("Number of threads = ", Threads.nthreads())
     println("Importing reference haplotype data..."); flush(stdout)
     ref_import_start = time()
     if endswith(reffile, ".jlso")

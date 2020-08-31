@@ -15,6 +15,5 @@ phase
 compress_haplotypes
 paint
 composition
-unique_populations
 convert_compressed
 ```

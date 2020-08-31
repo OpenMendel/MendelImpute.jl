@@ -17,11 +17,30 @@ Reference panels must be compressed into `.jlso` format first using the [compres
 
 # Detailed Example
 
-We use the [1000 genomes chromosome 22](http://bochet.gcc.biostat.washington.edu/beagle/1000_Genomes_phase3_v5a/b37.vcf/) as an example. 
+We use the [1000 genomes chromosome 22](http://bochet.gcc.biostat.washington.edu/beagle/1000_Genomes_phase3_v5a/b37.vcf/) as an example. As show below, this data contains 424147 SNPs and 2504 samples.
+
+
+```julia
+# load necessary packages in Julia
+using MendelImpute
+using VCFTools
+using Random
+
+# compute simple summary statistics
+data = "chr22.1kg.phase3.v5a.vcf.gz"
+@show nrecords(data)
+@show nsamples(data);
+```
+
+    nrecords(data) = 424147
+    nsamples(data) = 2504
+
+
+More summary statistics can be computed using the [gtstats](https://openmendel.github.io/VCFTools.jl/dev/man/api/#VCFTools.gtstats) function in `VCFTools.jl`, with example usage [here](https://openmendel.github.io/VCFTools.jl/dev/man/summaryinfo/#Summary-statistics).
 
 ## Step 1: generating realistic reference and target data 
 
-First we generate a reference panel and imputation target based on the 1000 genomes data. More specifically, 
+First we generate a reference panel and imputation target based on the 1000 genomes data. More specifically, we take the 1000 genomes chromosome 22 and divide it so that 
 + The first 100 samples are used as imputation targets, where
     - 100k SNPs with minor allele frequency $\ge 0.05$ are randomly selected to be the typed positions. 
     - 0.1% of typed SNPs are masked (mimicking GWAS errors)
@@ -224,7 +243,7 @@ tgtfile = ARGS[2] # second command line argument
 phase(tgtfile, reffile; outfile="mendel.imputed.chr22.vcf.gz", max_d = 1000)
 ```
 
-Then in the terminal/command-line, you can do
+Then in the terminal/command-prompt, you can do
 ```
 julia impute.jl ref.chr22.maxd1000.excludeTarget.jlso target.chr22.typedOnly.masked.vcf.gz
 ```
