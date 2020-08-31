@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
+ "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1"
+     width="180mm" height="25mm"
+     viewBox="0 0 26 1" preserveAspectRatio="none"
+     shape-rendering="crispEdges" stroke="none">
+<rect width=".86" height=".96" x="0" y="0" fill="#C8C8FF" />
+<rect width=".86" height=".96" x="1" y="0" fill="#FFEAEA" />
+<rect width=".86" height=".96" x="2" y="0" fill="#FFBFBF" />
+<rect width=".86" height=".96" x="3" y="0" fill="#A4A4FF" />
+<rect width=".86" height=".96" x="4" y="0" fill="#8080FF" />
+<rect width=".86" height=".96" x="5" y="0" fill="#E3FFE3" />
+<rect width=".86" height=".96" x="6" y="0" fill="#AAFFAA" />
+<rect width=".86" height=".96" x="7" y="0" fill="#71FF71" />
+<rect width=".86" height=".96" x="8" y="0" fill="#5B5BFF" />
+<rect width=".86" height=".96" x="9" y="0" fill="#FF9595" />
+<rect width=".86" height=".96" x="10" y="0" fill="#39FF39" />
+<rect width=".86" height=".96" x="11" y="0" fill="#FF6A6A" />
+<rect width=".86" height=".96" x="12" y="0" fill="#FF4040" />
+<rect width=".86" height=".96" x="13" y="0" fill="#3737FF" />
+<rect width=".86" height=".96" x="14" y="0" fill="#1212FF" />
+<rect width=".86" height=".96" x="15" y="0" fill="#0000C8" />
+<rect width=".86" height=".96" x="16" y="0" fill="#0000A4" />
+<rect width=".86" height=".96" x="17" y="0" fill="#00FF00" />
+<rect width=".86" height=".96" x="18" y="0" fill="#FF1515" />
+<rect width=".86" height=".96" x="19" y="0" fill="#00C600" />
+<rect width=".86" height=".96" x="20" y="0" fill="#EA0000" />
+<rect width=".86" height=".96" x="21" y="0" fill="#BF0000" />
+<rect width=".86" height=".96" x="22" y="0" fill="#008E00" />
+<rect width=".86" height=".96" x="23" y="0" fill="#00005B" />
+<rect width=".86" height=".96" x="24" y="0" fill="#950000" />
+<rect width=".86" height=".96" x="25" y="0" fill="#6A0000" />
+</svg>

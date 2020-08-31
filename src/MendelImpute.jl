@@ -15,7 +15,7 @@ module MendelImpute
     # main functions that users are exposed to
     export phase               # main function for imputation and phasing
     export compress_haplotypes # for compressing haplotype panels
-    export paint, composition  # chromosome painting and admix proportions
+    export paint, composition, unique_populations # chromosome painting and admix proportions
     export convert_compressed  # for ultra-compression outputs
 
     include("compress.jl")
