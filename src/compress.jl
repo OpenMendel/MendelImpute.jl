@@ -151,7 +151,7 @@ function complete_idx_to_unique_typed_idx(complete_idx, window,
 end
 
 """
-    compress_haplotypes(reffile, tgtfile, outfile, d)
+    compress_haplotypes(reffile::String, tgtfile::String, outfile::String, d::Int)
 
 Cuts a haplotype matrix `reffile` into windows of variable width so that each
 window has less than `d` unique haplotypes. Saves result to `outfile` as

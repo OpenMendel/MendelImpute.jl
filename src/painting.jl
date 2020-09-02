@@ -3,7 +3,8 @@
 ###### computation of poplation admixtures.
 
 """
-    composition(sample_phase, panelID, refID_to_population, [populations])
+    composition(sample_phase::HaplotypeMosaicPair, panelID::Vector{String}, 
+    refID_to_population::Dict{String, String}, [populations::Vector{String}])
 
 Computes a sample's chromosome composition based on phase information. This
 function is used for easier plotting a person's admixed proportions.
@@ -92,7 +93,8 @@ function unique_populations(x::Dict{String, String})
 end
 
 """
-    paint(sample_phase, panelID, refID_to_population, ...)
+    paint(sample_phase::HaplotypeMosaicPair, panelID::Vector{String},
+    refID_to_population::Dict{String, String}, populations::Vector{String})
 
 Converts a person's phased haplotype lengths into segments of percentages. This
 function is used for easier plotting a "painted chromosome".
