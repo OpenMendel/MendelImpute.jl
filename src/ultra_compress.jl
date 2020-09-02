@@ -3,7 +3,7 @@
 ###### to a genotype matrix
 
 """
-    convert_compressed(t<:Real, phaseinfo::AbstractString, reffile::AbstractString)
+    convert_compressed(t<:Real, phaseinfo::String, reffile::String)
 
 Converts `phaseinfo` into a phased genotype matrix of type `t` using the full
 reference haplotype panel `H` 

@@ -4,7 +4,7 @@
 
 """
     composition(sample_phase::HaplotypeMosaicPair, panelID::Vector{String}, 
-    refID_to_population::Dict{String, String}, [populations::Vector{String}])
+        refID_to_population::Dict{String, String}, [populations::Vector{String}])
 
 Computes a sample's chromosome composition based on phase information. This
 function is used for easier plotting a person's admixed proportions.
@@ -94,7 +94,7 @@ end
 
 """
     paint(sample_phase::HaplotypeMosaicPair, panelID::Vector{String},
-    refID_to_population::Dict{String, String}, populations::Vector{String})
+        refID_to_population::Dict{String, String}, populations::Vector{String})
 
 Converts a person's phased haplotype lengths into segments of percentages. This
 function is used for easier plotting a "painted chromosome".

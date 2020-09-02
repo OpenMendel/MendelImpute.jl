@@ -4,9 +4,9 @@
 
 """
     phase(tgtfile::String, reffile::String; [outfile::String], [impute::Bool],
-    [phase::Bool], [dosage::Bool], [max_d::Int], [recreen::Bool], 
-    [max_haplotypes::Int], [stepwise::Int], [thinning_factor::Int], 
-    [scale_allelefreq::Bool], [dynamic_programming::Bool])
+        [phase::Bool], [dosage::Bool], [max_d::Int], [recreen::Bool], 
+        [max_haplotypes::Int], [stepwise::Int], [thinning_factor::Int], 
+        [scale_allelefreq::Bool], [dynamic_programming::Bool])
 
 Main function of MendelImpute program. Phasing (haplotying) of `tgtfile` from a
 pool of haplotypes `reffile` by sliding windows and saves result in `outfile`.
