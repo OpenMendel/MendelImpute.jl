@@ -534,7 +534,7 @@ function phase_fast!(
             # find optimal breakpoint if there is one
             timers[id][16] += @elapsed _, bkpts = continue_haplotype(Xwi, 
                 compressed_Hunique, w, (hap1_prev, hap2_prev),
-                (hap1_curr, hap2_curr), phased=true)
+                (hap1_curr, hap2_curr), phased=true, search_double_bkpts=true)
 
             timers[id][24] += @elapsed begin
                 # record strand 1 info
@@ -611,7 +611,8 @@ function phase_fast_compressed!(
             # find optimal breakpoint if there is one
             timers[id][16] += @elapsed begin
                 _, bkpts = continue_haplotype(Xwi, compressed_Hunique, w, 
-                    (hap1_prev, hap2_prev), (hap1_curr, hap2_curr), phased=true)
+                    (hap1_prev, hap2_prev), (hap1_curr, hap2_curr), 
+                    phased=true, search_double_bkpts=true)
             end
 
             timers[id][24] += @elapsed begin

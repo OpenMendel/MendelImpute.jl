@@ -31,7 +31,8 @@ function continue_haplotype(
     window::Int,
     happair_prev::Tuple,
     happair_next::Tuple;
-    phased::Bool = false
+    phased::Bool = false,
+    search_double_bkpts::Bool = false
     )
 
     # indices for complete reference panel
@@ -60,7 +61,7 @@ function continue_haplotype(
         lu2 = complete_idx_to_unique_typed_idx(l, window, compressed_Hunique)
 
         # lazy concatenation 
-        s1  = ApplyArray(vcat, view(Hprev, :, iu), view(Hcurr, :, ku))
+        s1  = ApplyArray(vcat, view(Hprev, :, iu),  view(Hcurr, :, ku))
         s21 = ApplyArray(vcat, view(Hprev, :, ju1), view(Hcurr, :, ju2))
         s22 = ApplyArray(vcat, view(Hprev, :, lu1), view(Hcurr, :, lu2))
 
@@ -75,7 +76,7 @@ function continue_haplotype(
         ku2 = complete_idx_to_unique_typed_idx(k, window, compressed_Hunique)
 
         # lazy concatenation 
-        s1  = ApplyArray(vcat, view(Hprev, :, iu), view(Hcurr, :, lu))
+        s1  = ApplyArray(vcat, view(Hprev, :, iu),  view(Hcurr, :, lu))
         s21 = ApplyArray(vcat, view(Hprev, :, ju1), view(Hcurr, :, ju2))
         s22 = ApplyArray(vcat, view(Hprev, :, ku1), view(Hcurr, :, ku2))
 
@@ -90,7 +91,7 @@ function continue_haplotype(
         lu2 = complete_idx_to_unique_typed_idx(l, window, compressed_Hunique)
         
         # lazy concatenation 
-        s1  = ApplyArray(vcat, view(Hprev, :, ju), view(Hcurr, :, ku))
+        s1  = ApplyArray(vcat, view(Hprev, :, ju),  view(Hcurr, :, ku))
         s21 = ApplyArray(vcat, view(Hprev, :, iu1), view(Hcurr, :, iu2))
         s22 = ApplyArray(vcat, view(Hprev, :, lu1), view(Hcurr, :, lu2))
 
@@ -105,8 +106,8 @@ function continue_haplotype(
         ku2 = complete_idx_to_unique_typed_idx(k, window, compressed_Hunique)
 
         # lazy concatenation 
-        s1  = ApplyArray(vcat, view(Hprev,: , ju), view(Hcurr, :, lu))
-        s21 = ApplyArray(vcat, view(Hprev,: , iu1), view(Hcurr, :, iu2))
+        s1  = ApplyArray(vcat, view(Hprev, :, ju),  view(Hcurr, :, lu))
+        s21 = ApplyArray(vcat, view(Hprev, :, iu1), view(Hcurr, :, iu2))
         s22 = ApplyArray(vcat, view(Hprev, :, ku1), view(Hcurr, :, ku2))
 
         breakpt, errors = search_breakpoint(X, s1, s21, s22)
@@ -114,18 +115,41 @@ function continue_haplotype(
     end
 
     # both strand mismatch
-    # breakpt1, errors1 = search_breakpoint(X, H, (i, k), (j, l))
-    # breakpt2, errors2 = search_breakpoint(X, H, (i, l), (j, k))
-    # if errors1 < errors2
-    #     return (k, l), breakpt1
-    # else
-    #     return (l, k), breakpt2
-    # end
-    return (k, l), (-2, -2)
+    if search_double_bkpts
+        iu1 = complete_idx_to_unique_typed_idx(i, window - 1, compressed_Hunique)
+        iu2 = complete_idx_to_unique_typed_idx(i, window, compressed_Hunique)
+        ku1 = complete_idx_to_unique_typed_idx(k, window - 1, compressed_Hunique)
+        ku2 = complete_idx_to_unique_typed_idx(k, window, compressed_Hunique)
+        ju1 = complete_idx_to_unique_typed_idx(j, window - 1, compressed_Hunique)
+        ju2 = complete_idx_to_unique_typed_idx(j, window, compressed_Hunique)
+        lu1 = complete_idx_to_unique_typed_idx(l, window - 1, compressed_Hunique)
+        lu2 = complete_idx_to_unique_typed_idx(l, window, compressed_Hunique)
+
+        # lazy concatenation 
+        s11 = ApplyArray(vcat, view(Hprev, :, iu1), view(Hcurr, :, iu2))
+        s12 = ApplyArray(vcat, view(Hprev, :, ku1), view(Hcurr, :, ku2))
+        s21 = ApplyArray(vcat, view(Hprev, :, ju1), view(Hcurr, :, ju2))
+        s22 = ApplyArray(vcat, view(Hprev, :, lu1), view(Hcurr, :, lu2))
+
+        breakpt, errors = search_breakpoint(X, s11, s12, s21, s22)
+        return (k, l), breakpt
+
+        # Always assume double bkpt searches are phased. 
+        # breakpt1, errors1 = search_breakpoint(X, H, (i, k), (j, l))
+        # breakpt2, errors2 = search_breakpoint(X, H, (i, l), (j, k))
+        # if errors1 < errors2
+        #     return (k, l), breakpt1
+        # else
+        #     return (l, k), breakpt2
+        # end
+    else
+        return (k, l), (-2, -2)
+    end
 end
 
 """
     search_single_breakpoint(X, s1, s21, s22)
+
 Find the optimal break point between s21 and s22 in configuration
 s1 | s21
 s1 | s22
@@ -170,71 +194,76 @@ function search_breakpoint(
     return bkpt_optim, err_optim :: Int
 end
 
+"""
+    search_breakpoint(X, s11, s12, s21, s22)
 
+Find the optimal break point between s21 and s22 in configuration
+s11 | s21
+s12 | s22
+"""
+function search_breakpoint(
+    X::AbstractVector,
+    s11::AbstractVector,
+    s12::AbstractVector,
+    s21::AbstractVector,
+    s22::AbstractVector,
+    )
+    n = length(X)
+    length(s11) == length(s12) == length(s21) == length(s22) == n || 
+        error("search_breakpoint: all vectors should have same length but " *
+        "length X = $n, s1 = $(length(s1)), s21 = $(length(s21)), s22 = " *
+        "$(length(s22))")
 
-# """
-#     search_breakpoint(X, H, s1, s2)
-# Find the optimal break point between s2[1] and s2[2] in configuration
-# s1[1] | s2[1]
-# s1[2] | s2[2]
-# """
-# function search_breakpoint(
-#     X::AbstractVector,
-#     H::AbstractMatrix,
-#     s1::Tuple{Int, Int},
-#     s2::Tuple{Int, Int}
-#     )
+    err_optim   = typemax(Int)
+    bkpts_optim = (0, 0)
 
-#     err_optim   = typemax(Int)
-#     bkpts_optim = (0, 0)
+    # search over all combintations of break points in two strands
+    @inbounds for bkpt1 in 0:n
 
-#     # search over all combintations of break points in two strands
-#     @inbounds for bkpt1 in 0:length(X)
+        # count number of errors if second haplotype is all from s22
+        errors = 0
+        for pos in 1:bkpt1
+            if !ismissing(X[pos])
+                errors += X[pos] ≠ s11[pos] + s22[pos]
+            end
+        end
+        for pos in (bkpt1 + 1):length(X)
+            if !ismissing(X[pos])
+                errors += X[pos] ≠ s12[pos] +s22[pos]
+            end
+        end
+        if errors :: Int < err_optim
+            err_optim = errors
+            bkpts_optim = (bkpt1, 0)
 
-#         # count number of errors if second haplotype is all from H[:, s2[2]]
-#         errors = 0
-#         for pos in 1:bkpt1
-#             if !ismissing(X[pos])
-#                 errors += X[pos] ≠ H[pos, s1[1]] + H[pos, s2[2]]
-#             end
-#         end
-#         for pos in (bkpt1 + 1):length(X)
-#             if !ismissing(X[pos])
-#                 errors += X[pos] ≠ H[pos, s1[2]] + H[pos, s2[2]]
-#             end
-#         end
-#         if errors :: Int < err_optim
-#             err_optim = errors
-#             bkpts_optim = (bkpt1, 0)
+            # quick return if perfect match
+            err_optim == 0 && return bkpts_optim, err_optim :: Int
+        end
 
-#             # quick return if perfect match
-#             err_optim == 0 && return bkpts_optim, err_optim :: Int
-#         end
+        # extend haplotype H[:, s2[1]] position by position
+        for bkpt2 in 1:bkpt1
+            if !ismissing(X[bkpt2]) && s21[bkpt2] ≠ s22[bkpt2]
+                errors -= X[bkpt2] ≠ s11[bkpt2] + s22[bkpt2]
+                errors += X[bkpt2] ≠ s11[bkpt2] + s21[bkpt2]
+                if errors :: Int < err_optim
+                    err_optim = errors
+                    bkpts_optim = (bkpt1, bkpt2)
+                end
+            end
+        end
+        for bkpt2 in (bkpt1 + 1):length(X)
+            if !ismissing(X[bkpt2]) && s21[bkpt2] ≠ s22[bkpt2]
+                errors -= X[bkpt2] ≠ s12[bkpt2] + s22[bkpt2]
+                errors += X[bkpt2] ≠ s12[bkpt2] + s21[bkpt2]
+                if errors :: Int < err_optim
+                    err_optim = errors
+                    bkpts_optim = (bkpt1, bkpt2)
+                    # quick return if perfect match
+                    err_optim == 0 && return bkpts_optim, err_optim :: Int
+                end
+            end
+        end
+    end
 
-#         # extend haplotype H[:, s2[1]] position by position
-#         for bkpt2 in 1:bkpt1
-#             if !ismissing(X[bkpt2]) && H[bkpt2, s2[1]] ≠ H[bkpt2, s2[2]]
-#                 errors -= X[bkpt2] ≠ H[bkpt2, s1[1]] + H[bkpt2, s2[2]]
-#                 errors += X[bkpt2] ≠ H[bkpt2, s1[1]] + H[bkpt2, s2[1]]
-#                 if errors :: Int < err_optim
-#                     err_optim = errors
-#                     bkpts_optim = (bkpt1, bkpt2)
-#                 end
-#             end
-#         end
-#         for bkpt2 in (bkpt1 + 1):length(X)
-#             if !ismissing(X[bkpt2]) && H[bkpt2, s2[1]] ≠ H[bkpt2, s2[2]]
-#                 errors -= X[bkpt2] ≠ H[bkpt2, s1[2]] + H[bkpt2, s2[2]]
-#                 errors += X[bkpt2] ≠ H[bkpt2, s1[2]] + H[bkpt2, s2[1]]
-#                 if errors :: Int < err_optim
-#                     err_optim = errors
-#                     bkpts_optim = (bkpt1, bkpt2)
-#                     # quick return if perfect match
-#                     err_optim == 0 && return bkpts_optim, err_optim :: Int
-#                 end
-#             end
-#         end
-#     end
-
-#     return bkpts_optim, err_optim :: Int
-# end
+    return bkpts_optim, err_optim :: Int
+end
