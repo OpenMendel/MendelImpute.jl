@@ -28,7 +28,9 @@ All SNPs in `tgtfile` must be present in `reffile`.
     only missing snps in `tgtfile` will be imputed.
 - `phase`: If `true`, all output genotypes will be phased. Otherwise all
     output genotypes will be unphased.
-- `dosage`: If `true`, will assume target matrix are dosages for imputation. 
+- `dosage`: If `true`, will assume target matrix are dosages for imputation. Note
+    this means the genotype matrix will be entirely 
+    single precision. 
 - `max_d`: Maximum number of unique haplotypes in each window. Note this number
     is used in the compression step and nowhere else. 
 - `rescreen`: This option saves a number of top haplotype pairs when solving

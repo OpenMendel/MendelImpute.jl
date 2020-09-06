@@ -11,6 +11,7 @@ module MendelImpute
     using ProgressMeter
     using JLD2, FileIO, JLSO
     using Distances
+    using LazyArrays
 
     # main functions that users are exposed to
     export phase               # main function for imputation and phasing

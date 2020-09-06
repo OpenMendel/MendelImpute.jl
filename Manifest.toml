@@ -6,6 +6,12 @@ git-tree-sha1 = "0fac443759fa829ed8066db6cf1077d888bb6573"
 uuid = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
 version = "2.0.2"
 
+[[ArrayLayouts]]
+deps = ["FillArrays", "LinearAlgebra", "SparseArrays"]
+git-tree-sha1 = "2d8ac01e2d62d6bc9172e71ddcc9c904d478633f"
+uuid = "4c555306-a7a7-4459-81d9-ec55ddd5c99a"
+version = "0.4.6"
+
 [[Automa]]
 deps = ["DataStructures", "Printf", "Random", "Test", "TranscodingStreams"]
 git-tree-sha1 = "c81526bf5f6fb4616b4e22a3cd62ac20e255fd3c"
@@ -280,6 +286,12 @@ git-tree-sha1 = "b34d7cef7b337321e97d22242c3c2b91f476748e"
 uuid = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
 version = "0.21.0"
 
+[[LazyArrays]]
+deps = ["ArrayLayouts", "FillArrays", "LinearAlgebra", "MacroTools", "MatrixFactorizations", "SparseArrays", "StaticArrays"]
+git-tree-sha1 = "c5e7ee91076d458a2aac651282f0c2bd640ae1d9"
+uuid = "5078a376-72f3-5289-bfd5-ec5146d43c02"
+version = "0.18.0"
+
 [[LibGit2]]
 deps = ["Printf"]
 uuid = "76f85450-5226-5b5a-8eaa-529ad045b433"
@@ -306,9 +318,21 @@ git-tree-sha1 = "c91ec40b996132c96d1392e36e36383e579eb60f"
 uuid = "bdcacae8-1622-11e9-2a5c-532679323890"
 version = "0.8.24"
 
+[[MacroTools]]
+deps = ["Markdown", "Random"]
+git-tree-sha1 = "f7d2e3f654af75f01ec49be82c231c382214223a"
+uuid = "1914dd2f-81c6-5fcd-8719-6d5c9610ff09"
+version = "0.5.5"
+
 [[Markdown]]
 deps = ["Base64"]
 uuid = "d6f4376e-aef5-505a-96c1-9c027394607a"
+
+[[MatrixFactorizations]]
+deps = ["ArrayLayouts", "LinearAlgebra", "Random"]
+git-tree-sha1 = "cf040e1d053a83cde01ea964232e0c35a3dbed54"
+uuid = "a3b82374-2e81-5b9e-98ce-41277c0e4c87"
+version = "0.6.0"
 
 [[Memento]]
 deps = ["Dates", "Distributed", "JSON", "Serialization", "Sockets", "Syslogs", "Test", "TimeZones", "UUIDs"]
@@ -492,6 +516,12 @@ deps = ["OpenSpecFun_jll"]
 git-tree-sha1 = "d8d8b8a9f4119829410ecd706da4cc8594a1e020"
 uuid = "276daf66-3868-5448-9aa4-cd146d93841b"
 version = "0.10.3"
+
+[[StaticArrays]]
+deps = ["LinearAlgebra", "Random", "Statistics"]
+git-tree-sha1 = "016d1e1a00fabc556473b07161da3d39726ded35"
+uuid = "90137ffa-7385-5640-81b9-e52037218182"
+version = "0.12.4"
 
 [[Statistics]]
 deps = ["LinearAlgebra", "SparseArrays"]
