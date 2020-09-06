@@ -94,6 +94,21 @@ function max_width(reffile::String)
     compressed_Hunique = loaded[:compressed_Hunique]
     return max_width(compressed_Hunique)
 end
+function get_window_widths(Hunique::CompressedHaplotypes)
+    win = nwindows(Hunique)
+    widths = zeros(Int, win)
+    for w in 1:win
+        widths[w] = length(Hunique.X_window_range[w])
+    end
+    return widths
+end
+function get_window_widths(reffile::String)
+    endswith(reffile, ".jlso") || error("max_width can only" *
+        " be called on a `CompressedHaplotypes` or `.jlso` files.")
+    loaded = JLSO.load(reffile)
+    compressed_Hunique = loaded[:compressed_Hunique]
+    return get_window_widths(compressed_Hunique)
+end
 function count_haplotypes_per_window(Hunique::CompressedHaplotypes)
     win = nwindows(Hunique)
     unique_haplotype_counts = zeros(Int, win)
@@ -303,6 +318,7 @@ by recursively dividing windows into halves.
 # Inputs
 - `H`: The full haplotype matrix (on typed SNPs). Each column is a haplotype.
 - `d`: Number of unique haplotypes in each window
+- `minwidth`: Minimum window width
 - `low`: start of current window
 - `high`: end of current window
 - `intervals`: Vector of window ranges. This is also the return vector
