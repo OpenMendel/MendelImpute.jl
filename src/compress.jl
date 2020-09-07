@@ -78,21 +78,46 @@ CompressedHaplotypes(windows::Int, sampleID, chr, pos, SNPid, ref, alt, altfreq,
 
 nhaplotypes(x::CompressedHaplotypes) = 2length(x.sampleID)
 nwindows(x::CompressedHaplotypes) = length(x.CW)
-function max_width(Hunique::CompressedHaplotypes)
-    win = nwindows(Hunique)
-    mymax = 0
-    for w in 1:win
-        n = length(Hunique.X_window_range[w])
-        n > mymax && (mymax = n)
-    end
-    return mymax
-end
-function max_width(reffile::String)
+
+"""
+    max_dim(reffile::String)
+
+Searches each compressed window of the typed SNPs and outputs the maximum window
+width (i.e. number of SNPs) and maximum unique haplotypes per window
+"""
+function max_dim(reffile::String)
     endswith(reffile, ".jlso") || error("max_width can only" *
         " be called on a `CompressedHaplotypes` or `.jlso` files.")
     loaded = JLSO.load(reffile)
     compressed_Hunique = loaded[:compressed_Hunique]
-    return max_width(compressed_Hunique)
+    return max_dim(compressed_Hunique)
+end
+function max_dim(Hunique::CompressedHaplotypes)
+    win = nwindows(Hunique)
+    maxwidth = 0
+    max_d = 0
+    for w in 1:win
+        n = length(Hunique.X_window_range[w])
+        n > maxwidth && (maxwidth = n)
+
+        d = size(Hunique.CW_typed[w].uniqueH, 2)
+        d > max_d && (max_d = d)
+    end
+    return maxwidth, max_d
+end
+
+"""
+    get_window_widths(reffile::String)
+
+Searches each compressed window of the typed SNPs and output their window widths
+(i.e. number of SNPs per window) 
+"""
+function get_window_widths(reffile::String)
+    endswith(reffile, ".jlso") || error("max_width can only" *
+        " be called on a `CompressedHaplotypes` or `.jlso` files.")
+    loaded = JLSO.load(reffile)
+    compressed_Hunique = loaded[:compressed_Hunique]
+    return get_window_widths(compressed_Hunique)
 end
 function get_window_widths(Hunique::CompressedHaplotypes)
     win = nwindows(Hunique)
@@ -102,13 +127,13 @@ function get_window_widths(Hunique::CompressedHaplotypes)
     end
     return widths
 end
-function get_window_widths(reffile::String)
-    endswith(reffile, ".jlso") || error("max_width can only" *
-        " be called on a `CompressedHaplotypes` or `.jlso` files.")
-    loaded = JLSO.load(reffile)
-    compressed_Hunique = loaded[:compressed_Hunique]
-    return get_window_widths(compressed_Hunique)
-end
+
+"""
+    count_haplotypes_per_window(Hunique::CompressedHaplotypes)
+
+Searches each compressed window of the typed SNPs and output number of unique
+haplotypes per window
+"""
 function count_haplotypes_per_window(Hunique::CompressedHaplotypes)
     win = nwindows(Hunique)
     unique_haplotype_counts = zeros(Int, win)
@@ -124,6 +149,13 @@ function count_haplotypes_per_window(reffile::String)
     compressed_Hunique = loaded[:compressed_Hunique]
     return count_haplotypes_per_window(compressed_Hunique)
 end
+
+"""
+    avg_haplotypes_per_window(Hunique::CompressedHaplotypes)
+
+Searches each compressed window of the typed SNPs and output average number of
+unique haplotypes per window
+"""
 avg_haplotypes_per_window(Hunique::CompressedHaplotypes) = 
     mean(count_haplotypes_per_window(Hunique))
 avg_haplotypes_per_window(reffile::String) = 
@@ -184,12 +216,14 @@ run this function by themselves.
 * `tgtfile`: target genotype file name (ends in `.vcf` or `.vcf.gz`)
 * `outfile`: Output file name (ends in `.jlso`)
 * `d`: Max number of unique haplotypes per window (recommended `d = 1000`). 
+* `minwidth`: Minimum number of SNPs per window (default 20)
 """
 function compress_haplotypes(
     reffile::AbstractString,
     tgtfile::AbstractString,
     outfile::AbstractString,
     d::Int=1000,
+    minwidth::Int=20
     )
     endswith(outfile, ".jld2") || endswith(outfile, ".jlso") || 
         error("Unrecognized compression format: `outfile` can only end in " * 
@@ -207,7 +241,7 @@ function compress_haplotypes(
 
     # compress routine
     compress_haplotypes(H, X, outfile, X_pos, H_sampleID, H_chr, H_pos, H_ids, 
-        H_ref, H_alt, d)
+        H_ref, H_alt, d, minwidth)
 
     return nothing
 end
@@ -215,7 +249,7 @@ end
 function compress_haplotypes(H::AbstractMatrix, X::AbstractMatrix, 
     outfile::AbstractString, X_pos::AbstractVector, H_sampleID::AbstractVector, 
     H_chr::AbstractVector, H_pos::AbstractVector, H_ids::AbstractVector, 
-    H_ref::AbstractVector, H_alt::AbstractVector, d::Int)
+    H_ref::AbstractVector, H_alt::AbstractVector, d::Int, minwidth::Int)
 
     endswith(outfile, ".jld2") || endswith(outfile, ".jlso") || 
         error("Unrecognized compression format: `outfile` can only end in " * 
@@ -228,7 +262,7 @@ function compress_haplotypes(H::AbstractMatrix, X::AbstractMatrix,
     # compute window intervals based on typed SNPs
     XtoH_idx = indexin(X_pos, H_pos) # assumes all SNPs in X are in H
     Hw_typed = H[XtoH_idx, :]        # H with only typed snps
-    window_ranges = get_window_intervals(Hw_typed, d)
+    window_ranges = get_window_intervals(Hw_typed, d, minwidth)
     wins = length(window_ranges)
 
     # initialize compressed haplotype object
@@ -310,7 +344,7 @@ function compress_haplotypes(H::AbstractMatrix, X::AbstractMatrix,
 end
 
 """
-    get_window_intervals(H, d, low, high...)
+    get_window_intervals(H, d, minwidth, low, high, intervals, seen)
 
 Find window intervals so that every window has `d` or less unique haplotypes
 by recursively dividing windows into halves. 
@@ -318,7 +352,7 @@ by recursively dividing windows into halves.
 # Inputs
 - `H`: The full haplotype matrix (on typed SNPs). Each column is a haplotype.
 - `d`: Number of unique haplotypes in each window
-- `minwidth`: Minimum window width
+- `minwidth`: Minimum number of SNPs per window (default 20)
 - `low`: start of current window
 - `high`: end of current window
 - `intervals`: Vector of window ranges. This is also the return vector
@@ -330,20 +364,21 @@ by recursively dividing windows into halves.
 function get_window_intervals(
     H::AbstractMatrix,
     d::Int, 
+    minwidth::Int=20,
     low::Int=1, 
     high::Int=size(H, 1),
     intervals = UnitRange[],
     seen=BitSet(),
     )
-    
+
+    mid = (low + high) >> 1
     unique_columns_maps = groupslices(view(H, low:high, :), dims = 2)
     k = count_unique(unique_columns_maps, seen)
-    if k ≤ d
+    if k ≤ d || length(low:mid) ≤ minwidth
         push!(intervals, low:high)
     else
-        mid = (low + high) >>> 1
-        get_window_intervals(H, d, low,     mid,  intervals, seen)
-        get_window_intervals(H, d, mid + 1, high, intervals, seen)
+        get_window_intervals(H, d, minwidth, low,     mid,  intervals, seen)
+        get_window_intervals(H, d, minwidth, mid + 1, high, intervals, seen)
     end
 
     return sort!(intervals)
