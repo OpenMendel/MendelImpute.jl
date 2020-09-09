@@ -55,6 +55,7 @@ function compute_optimal_haplotypes!(
     threads = Threads.nthreads()
     inv_sqrt_allele_var = nothing
     winranges = compressed_Hunique.X_window_range
+    overlap = compressed_Hunique.overlap
 
     # allocate working arrays
     timers = [zeros(7*8) for _ in 1:threads] # 8 for spacing
@@ -86,11 +87,25 @@ function compute_optimal_haplotypes!(
 
     # for w in 1:windows
     Threads.@threads for w in 1:windows
-    # Threads.@threads for w in 1:windows
         id = Threads.threadid()
         t6 = @elapsed begin
             Hw_aligned = compressed_Hunique.CW_typed[w].uniqueH
-            Xw_aligned = view(X, winranges[w], :)
+            Xrange = winranges[w]
+            if overlap
+                flankwidth = size(Hw_aligned, 1) - length(winranges[w])
+                if w == 1
+                    Xstart = first(winranges[w])
+                    Xend = last(winranges[w]) + flankwidth
+                elseif w == windows
+                    Xstart = first(winranges[w]) - flankwidth
+                    Xend = last(winranges[w])
+                else
+                    Xstart = first(winranges[w]) - (flankwidth >> 1)
+                    Xend = last(winranges[w]) + (flankwidth >> 1)
+                end
+                Xrange = Xstart:Xend
+            end
+            Xw_aligned = view(X, Xrange, :)
             d = size(Hw_aligned, 2)
         end
 

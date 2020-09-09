@@ -197,7 +197,8 @@ end
 """
     search_breakpoint(X, s11, s12, s21, s22)
 
-Find the optimal break point between s21 and s22 in configuration
+Find the optimal break point between s11 and s12 as well as between s21 and s22
+in configuration
 s11 | s21
 s12 | s22
 """
@@ -211,8 +212,8 @@ function search_breakpoint(
     n = length(X)
     length(s11) == length(s12) == length(s21) == length(s22) == n || 
         error("search_breakpoint: all vectors should have same length but " *
-        "length X = $n, s1 = $(length(s1)), s21 = $(length(s21)), s22 = " *
-        "$(length(s22))")
+        "length X = $n, s11 = $(length(s11)), s12 = $(length(s12)), s21 = " *
+        "$(length(s21)), s22 = $(length(s22))")
 
     err_optim   = typemax(Int)
     bkpts_optim = (0, 0)
@@ -240,7 +241,7 @@ function search_breakpoint(
             err_optim == 0 && return bkpts_optim, err_optim :: Int
         end
 
-        # extend haplotype H[:, s2[1]] position by position
+        # extend haplotype s21 position by position
         for bkpt2 in 1:bkpt1
             if !ismissing(X[bkpt2]) && s21[bkpt2] ≠ s22[bkpt2]
                 errors -= X[bkpt2] ≠ s11[bkpt2] + s22[bkpt2]
