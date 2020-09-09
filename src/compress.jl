@@ -71,7 +71,7 @@ struct CompressedHaplotypes
     altallele::Vector{Vector{String}}
     altfreq::Vector{Float32}
     max_unique_haplotypes::Int
-    overlap::Bool
+    overlap::Float64
 end
 CompressedHaplotypes(windows::Int, sampleID, chr, pos, SNPid, ref, alt, altfreq,
     max_unique_haplotypes, overlap) = CompressedHaplotypes(
@@ -97,18 +97,16 @@ function max_dim(reffile::String)
     return max_dim(compressed_Hunique)
 end
 function max_dim(Hunique::CompressedHaplotypes)
-    overlap = Hunique.overlap
     win = nwindows(Hunique)
     maxwidth = 0
     max_d = 0
     for w in 1:win
-        n = length(Hunique.X_window_range[w])
+        n = size(Hunique.CW_typed[w].uniqueH, 1)
         n > maxwidth && (maxwidth = n)
 
         d = size(Hunique.CW_typed[w].uniqueH, 2)
         d > max_d && (max_d = d)
     end
-    overlap && (maxwidth += round(Int, 0.25maxwidth, RoundUp)) # 10% flanking 
     return maxwidth, max_d
 end
 
@@ -206,19 +204,19 @@ end
 """
     extend_to_overlap_range(Hunique::CompressedHaplotypes, window::Int, overlap::Bool)
 
-If `overlap=true`, the unique haplotype matrix will be larger than the genotype
-matrix in window `w`. This function computes the range of genotype matrix so
-that the ranges match up.  
+If genotype window overlap, the unique haplotype matrix will be larger than the
+genotype matrix in window `w`. This function computes the range of genotype
+matrix so that the ranges match up.  
 """
 function extend_to_overlap_range(
     Hunique::CompressedHaplotypes, 
     window::Int, 
-    overlap::Bool
+    overlap::Float64
     )
     winranges = Hunique.X_window_range
     Hw = Hunique.CW_typed[window].uniqueH
     Xrange = winranges[window]
-    if overlap
+    if overlap > 0.0
         extra_width = size(Hw, 1) - length(winranges[window])
         if window == 1 # first window
             Xstart = first(winranges[window])
@@ -285,7 +283,8 @@ run this function by themselves.
 * `outfile`: Output file name (ends in `.jlso`)
 * `d`: Max number of unique haplotypes per genotype window (recommended `d = 1000`). 
 * `minwidth`: Minimum number of typed SNPs per window (default 0)
-* `overlap`: Whether adjacent genotype windows should overlap by 10% (default false)
+* `overlap`: How much overlap between adjacent genotype windows in percentage of
+    each window's width (default 0.1)
 """
 function compress_haplotypes(
     reffile::AbstractString,
@@ -293,11 +292,12 @@ function compress_haplotypes(
     outfile::AbstractString,
     d::Int=1000,
     minwidth::Int=0,
-    overlap::Bool=true
+    overlap::Float64=0.1
     )
     endswith(outfile, ".jld2") || endswith(outfile, ".jlso") || 
         error("Unrecognized compression format: `outfile` can only end in " * 
         "`.jlso` or `.jld2`")
+    0.0 ≤ overlap ≤ 1.0 || error("overlap must be a percentage")
 
     # import reference haplotypes
     H, H_sampleID, H_chr, H_pos, H_ids, H_ref, H_alt = convert_ht(Bool, 
@@ -320,11 +320,12 @@ function compress_haplotypes(H::AbstractMatrix, X::AbstractMatrix,
     outfile::AbstractString, X_pos::AbstractVector, H_sampleID::AbstractVector, 
     H_chr::AbstractVector, H_pos::AbstractVector, H_ids::AbstractVector, 
     H_ref::AbstractVector, H_alt::AbstractVector, d::Int, minwidth::Int,
-    overlap::Bool)
+    overlap::Float64)
 
     endswith(outfile, ".jld2") || endswith(outfile, ".jlso") || 
         error("Unrecognized compression format: `outfile` can only end in " * 
         "`.jlso` or `.jld2`")
+    0.0 ≤ overlap ≤ 1.0 || error("overlap must be a percentage")
 
     # some constants
     ref_snps = size(H, 1)
@@ -351,8 +352,8 @@ function compress_haplotypes(H::AbstractMatrix, X::AbstractMatrix,
         # genotype matrix's current window ranges
         Xw_idx_start = first(window_ranges[w])
         Xw_idx_end = last(window_ranges[w])
-        if overlap # overlaps between adjacent windows
-            flankwidth = round(Int, 0.1 * (Xw_idx_end - Xw_idx_start), RoundUp)
+        if overlap > 0.0 # overlaps between adjacent windows
+            flankwidth = round(Int, overlap*(Xw_idx_end-Xw_idx_start), RoundUp)
             w == 1 || (Xw_idx_start -= flankwidth)
             w == wins || (Xw_idx_end += flankwidth)
         end

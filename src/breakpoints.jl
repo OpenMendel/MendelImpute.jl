@@ -53,7 +53,7 @@ function continue_haplotype(
 
     # get unique haplotypes with only typed snps
     overlap = compressed_Hunique.overlap
-    if overlap
+    if overlap > 0.0
         # create views on non-overlapping regions
         rprev = nonoverlap_range(compressed_Hunique, window - 1)
         rcurr = nonoverlap_range(compressed_Hunique, window)
