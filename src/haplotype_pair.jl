@@ -90,21 +90,7 @@ function compute_optimal_haplotypes!(
         id = Threads.threadid()
         t6 = @elapsed begin
             Hw_aligned = compressed_Hunique.CW_typed[w].uniqueH
-            Xrange = winranges[w]
-            if overlap
-                flankwidth = size(Hw_aligned, 1) - length(winranges[w])
-                if w == 1
-                    Xstart = first(winranges[w])
-                    Xend = last(winranges[w]) + flankwidth
-                elseif w == windows
-                    Xstart = first(winranges[w]) - flankwidth
-                    Xend = last(winranges[w])
-                else
-                    Xstart = first(winranges[w]) - (flankwidth >> 1)
-                    Xend = last(winranges[w]) + (flankwidth >> 1)
-                end
-                Xrange = Xstart:Xend
-            end
+            Xrange = extend_to_overlap_range(compressed_Hunique, w, overlap)
             Xw_aligned = view(X, Xrange, :)
             d = size(Hw_aligned, 2)
         end

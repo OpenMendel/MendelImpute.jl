@@ -49,9 +49,11 @@ Keeps a vector of `CompressedWindow`. Indexing off instances of
     `Hstart[i + 1]`
 - `Hstart`: `Hstart[i]` to `Hstart[i + 1]` is the range of H's SNPs (typed or
     untyped) that are in window `i`. It includes all SNP until the first 
-    typed snp of window `i + 1`. 
-- `X_window_range`: `X_window_range[w]` is the range of `X`'s (typed SNP's) 
-    index in window `w`. 
+    typed snp of window `i + 1`. Used to directly index into `H` like
+    `H[Hstart[i]:Hstart[i+1], :]`
+- `X_window_range`: `idx = X_window_range[w]` is the range of `X`'s (typed
+    SNP's) index in window `w`. Used to directly index into `X` like `X[idx, :]`.
+    Does not include overlapping SNPs. 
 - `sampleID`: Sample names as listed in the VCF file
 - `altfreq`: Alternate allele frequency (frequency of "1" in VCF file)
 - `max_unique_haplotypes`: Maximum number of unique haplotypes in each window. 
@@ -199,6 +201,68 @@ haplotype pool of just the typed SNPs in specified window.
 function complete_idx_to_unique_typed_idx(complete_idx, window, 
     Hunique::CompressedHaplotypes)
     return Hunique.CW_typed[window].to_unique[complete_idx]
+end
+
+"""
+    extend_to_overlap_range(Hunique::CompressedHaplotypes, window::Int, overlap::Bool)
+
+If `overlap=true`, the unique haplotype matrix will be larger than the genotype
+matrix in window `w`. This function computes the range of genotype matrix so
+that the ranges match up.  
+"""
+function extend_to_overlap_range(
+    Hunique::CompressedHaplotypes, 
+    window::Int, 
+    overlap::Bool
+    )
+    winranges = Hunique.X_window_range
+    Hw = Hunique.CW_typed[window].uniqueH
+    Xrange = winranges[window]
+    if overlap
+        extra_width = size(Hw, 1) - length(winranges[window])
+        if window == 1 # first window
+            Xstart = first(winranges[window])
+            Xend = last(winranges[window]) + extra_width
+        elseif window == length(winranges) # last window
+            Xstart = first(winranges[window]) - extra_width
+            Xend = last(winranges[window])
+        else
+            Xstart = first(winranges[window]) - (extra_width >> 1)
+            Xend = last(winranges[window]) + (extra_width >> 1)
+        end
+        Xrange = Xstart:Xend
+    end
+    return Xrange
+end
+
+"""
+    nonoverlap_range(Hunique::CompressedHaplotypes, window::Int, overlap::Bool)
+
+If windows overlap, the unique haplotype matrix will include extra SNPs on 
+both ends as paddings. This function calculates the range of SNPs of the unique
+haplotype matrix that are not in the overlapping regions. 
+"""
+function nonoverlap_range(
+    Hunique::CompressedHaplotypes, 
+    window::Int
+    )
+    winranges = Hunique.X_window_range
+    Hw = Hunique.CW_typed[window].uniqueH
+    Hw_width = size(Hw, 1)
+    extra_width = Hw_width - length(winranges[window])
+
+    if window == 1 # first window
+        Hstart = 1
+        Hend = Hw_width - extra_width
+    elseif window == length(winranges) # last window
+        Hstart = 1 + extra_width
+        Hend = Hw_width
+    else
+        Hstart = 1 + (extra_width >> 1)
+        Hend = Hw_width - (extra_width >> 1)
+    end
+    
+    return Hstart:Hend
 end
 
 """

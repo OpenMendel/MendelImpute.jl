@@ -6,7 +6,7 @@
     continue_haplotype(X, compressed_Hunique, window, happair_prev, happair_next)
 
 Searches the breakpoint between `happair_prev` and `happair_next`, if there is
-one. Currently breakpoint is set to the middle if there is double breakpoints. 
+one. 
 
 # Arguments:
 - `X`: Genotype vector spanning 2 windows. 
@@ -15,8 +15,12 @@ one. Currently breakpoint is set to the middle if there is double breakpoints.
 - `window`: The current window being considered. It is the 2nd window of `X`. 
 - `happair_prev`: Haplotype pair for first window
 - `happair_next`: Haplotype pair for second window
+
+# Optional arguments:
 - `phased`: Boolean indicating whether `happair_prev` and `happair_next` have
     been phased. If `false`, will try 2 different orientations. 
+- `search_double_bkpts`: If `true`, will search double breakpoints. If false 
+    the output `bkpt = (-2, -2)`
 
 # Output
 - `happair_next`: If `phase = false`, this is equal to `happair_next` for input. 
@@ -47,9 +51,18 @@ function continue_haplotype(
         return (l, k), (-1, -1)
     end
 
-    # unique haplotypes with only typed snps
-    Hprev = compressed_Hunique.CW_typed[window - 1].uniqueH
-    Hcurr = compressed_Hunique.CW_typed[window].uniqueH
+    # get unique haplotypes with only typed snps
+    overlap = compressed_Hunique.overlap
+    if overlap
+        # create views on non-overlapping regions
+        rprev = nonoverlap_range(compressed_Hunique, window - 1)
+        rcurr = nonoverlap_range(compressed_Hunique, window)
+        Hprev = view(compressed_Hunique.CW_typed[window - 1].uniqueH, rprev, :)
+        Hcurr = view(compressed_Hunique.CW_typed[window].uniqueH, rcurr, :)
+    else
+        Hprev = compressed_Hunique.CW_typed[window - 1].uniqueH
+        Hcurr = compressed_Hunique.CW_typed[window].uniqueH
+    end
 
     # only one strand matches
     if i == k && j ≠ l
