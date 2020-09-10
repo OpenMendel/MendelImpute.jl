@@ -157,7 +157,7 @@ function phase(
             haplotype1, haplotype2)
     else # phase window-by-window for outputing VCF files
         phasetimers = phase_fast!(ph, X, compressed_Hunique, haplotype1,
-            haplotype2)
+            haplotype2, impute)
     end
     phase_time = time() - phase_start
 
@@ -180,7 +180,7 @@ function phase(
             X2 = BitArray(undef, ref_snps, people)
 
             # impute and write to file
-            impute!(X1, X2, compressed_Hunique, ph)
+            impute!(X1, X2, compressed_Hunique, ph, impute)
             write_time += @elapsed write(outfile, (X1, X2), compressed_Hunique, 
                 X_sampleID)
         else # output genotypes all unphased
@@ -188,7 +188,7 @@ function phase(
             copyto!(@view(X_full[XtoH_idx, :]), X) # keep known entries
 
             # impute and write to file
-            impute_discard_phase!(X_full, compressed_Hunique, ph)
+            impute_discard_phase!(X_full, compressed_Hunique, ph, impute)
             write_time += @elapsed write(outfile, X_full, compressed_Hunique, 
                 X_sampleID)
         end
@@ -202,11 +202,11 @@ function phase(
             X2 = BitArray(undef, size(X, 1), size(X, 2))
 
             # impute and write to file
-            impute!(X1, X2, compressed_Hunique, ph)
+            impute!(X1, X2, compressed_Hunique, ph, impute)
             write_time += @elapsed write(outfile, (X1, X2), compressed_Hunique, 
                 X_sampleID, XtoH_idx)
         else
-            impute_discard_phase!(X, compressed_Hunique, ph)
+            impute_discard_phase!(X, compressed_Hunique, ph, impute)
             write_time += @elapsed write(outfile, X, compressed_Hunique, 
                 X_sampleID, XtoH_idx)
         end
@@ -386,26 +386,26 @@ isplink(tgtfile::AbstractString) = isfile(tgtfile * ".bed") &&
 Updates a person's phase information after breakpoints have been
 identified between windows `w - 1` and `w`. Every window have 0 or 1
 breakpoint. Here indices in `ph.start` are recorded in terms of X's index.
-
-Caveat: technically it is possible for a window to have 2 breakpoints (that
-might even overlap) since we can have the previous and next window both
-extend into the current one, but hopefully this is extremely rare.
 """
 function update_phase!(ph::HaplotypeMosaic,
     compressed_Hunique::CompressedHaplotypes, bkpt::Int64, hap_prev::Int32, 
     hap_curr::Int32, window::Int32, Xwi_start::Int64, Xwi_mid::Int64, 
-    Xwi_end::Int64)
+    Xwi_end::Int64, impute_untyped::Bool)
+
+    # specify conversion function
+    convert = impute_untyped ? complete_idx_to_unique_all_idx :
+        complete_idx_to_unique_typed_idx
 
     # no breakpoints or not searching double breakpoints
     if bkpt == -1 || bkpt == -2
-        h = complete_idx_to_unique_all_idx(hap_curr, window, compressed_Hunique)
+        h = convert(hap_curr, window, compressed_Hunique)
         push_Mosaic!(ph, (Xwi_mid, h, window))
         return nothing
     end
 
     # previous window's haplotype completely covers current window
     if bkpt == length(Xwi_start:Xwi_end)
-        h = complete_idx_to_unique_all_idx(hap_prev, window, compressed_Hunique)
+        h = convert(hap_prev, window, compressed_Hunique)
         push_Mosaic!(ph, (Xwi_mid, h, window))
         return nothing
     end
@@ -414,19 +414,17 @@ function update_phase!(ph::HaplotypeMosaic,
 
     if Xwi_mid <= X_bkpt_end <= Xwi_end
         # previous window extends to current window
-        h1 = complete_idx_to_unique_all_idx(hap_prev, window, compressed_Hunique)
+        h1 = convert(hap_prev, window, compressed_Hunique)
         push_Mosaic!(ph, (Xwi_mid, h1, window))
         # 2nd part of current window
-        h2 = complete_idx_to_unique_all_idx(hap_curr, window, compressed_Hunique)
+        h2 = convert(hap_curr, window, compressed_Hunique)
         push_Mosaic!(ph, (X_bkpt_end, h2, window))
     elseif X_bkpt_end < Xwi_mid
         # current window extends to previous window
-        h1 = complete_idx_to_unique_all_idx(hap_curr, Int32(window - 1), 
-            compressed_Hunique)
+        h1 = convert(hap_curr, Int32(window - 1), compressed_Hunique)
         push_Mosaic!(ph, (X_bkpt_end, h1, Int32(window - 1)))
         # update current window
-        h2 = complete_idx_to_unique_all_idx(hap_curr, window, 
-            compressed_Hunique)
+        h2 = convert(hap_curr, window, compressed_Hunique)
         push_Mosaic!(ph, (Xwi_mid, h2, window))
     else
         error("update_phase!: bkpt does not satisfy -1 <= bkpt <= 2width!")
@@ -436,7 +434,7 @@ function update_phase!(ph::HaplotypeMosaic,
 end
 
 """
-    phase_fast!(ph, X, compressed_Hunique, haplotype1, haplotype2)
+    phase_fast!(ph, X, compressed_Hunique, haplotype1, haplotype2, [impute_untyped])
 
 Given optimal haplotype pairs in each window, performs window-by-window 
 intersection heuristic to find longest spanning haplotypes (phasing) then
@@ -455,6 +453,7 @@ searches for optimal breakpoint.
     ultra-compressed `HaplotypeMosaicPair`s. If later, haplotype segments must
     be recorded in indices of the complete reference panel instead of the
     compressed panel. 
+* `impute_untyped`: Bool indicating whether untyped SNPs should be imputed. 
 
 # Timers:
 - `t1` = Window-by-window intersection
@@ -466,7 +465,8 @@ function phase_fast!(
     X::AbstractMatrix{Union{Missing, T}},
     compressed_Hunique::CompressedHaplotypes,
     haplotype1::AbstractVector,
-    haplotype2::AbstractVector
+    haplotype2::AbstractVector,
+    impute_untyped::Bool
     ) where T <: Real
 
     # declare some constants
@@ -532,11 +532,11 @@ function phase_fast!(
                 # record strand 1 info
                 update_phase!(ph[i].strand1, compressed_Hunique, 
                     bkpts[1], hap1_prev, hap1_curr, Int32(w), 
-                    start_prev, start_curr, end_curr)
+                    start_prev, start_curr, end_curr, impute_untyped)
                 # record strand 2 info
                 update_phase!(ph[i].strand2, compressed_Hunique, 
                     bkpts[2], hap2_prev, hap2_curr, Int32(w), 
-                    start_prev, start_curr, end_curr)
+                    start_prev, start_curr, end_curr, impute_untyped)
             end
         end
         next!(pmeter) # update progress
