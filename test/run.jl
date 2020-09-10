@@ -2700,3 +2700,41 @@ using CodecZlib
 using ProgressMeter
 using BenchmarkTools
 using GroupSlices
+
+
+struct test
+    x::Int
+    y::Int
+end
+hi = test(1, 2)
+@code_warntype hi.x
+
+struct test2
+    x::Int
+    y::Int
+    z::Vector{Int}
+end
+hi = test2(1, 2, collect(1:3))
+@code_warntype hi.x
+
+struct test3
+    x::Int
+    y::Float64
+end
+hi = test3(1, 2.0)
+@code_warntype hi.x
+
+struct test5{T, U}
+    x::T
+    y::U
+end
+hi = test5(1, 2.0)
+@code_warntype hi.x
+
+struct CW
+    uniqueindex::Vector{Int32}
+    hapmap::Dict{Int32, Vector{Int32}}
+    to_unique::Vector{Int32}
+    uniqueH::BitMatrix
+end
+fd = CW(rand(Int32, 0:4))

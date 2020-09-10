@@ -50,12 +50,12 @@ function compute_optimal_haplotypes!(
     # constants
     people = size(X, 2)
     ref_snps = length(compressed_Hunique.pos)
-    max_width = MendelImpute.max_width(compressed_Hunique)
+    max_width, max_d = MendelImpute.max_dim(compressed_Hunique)
     windows = length(haplotype1[1])
     threads = Threads.nthreads()
     inv_sqrt_allele_var = nothing
-    max_d = compressed_Hunique.max_unique_haplotypes
     winranges = compressed_Hunique.X_window_range
+    overlap = compressed_Hunique.overlap
 
     # allocate working arrays
     timers = [zeros(7*8) for _ in 1:threads] # 8 for spacing
@@ -87,11 +87,11 @@ function compute_optimal_haplotypes!(
 
     # for w in 1:windows
     Threads.@threads for w in 1:windows
-    # Threads.@threads for w in 1:windows
         id = Threads.threadid()
         t6 = @elapsed begin
             Hw_aligned = compressed_Hunique.CW_typed[w].uniqueH
-            Xw_aligned = view(X, winranges[w], :)
+            Xrange = extend_to_overlap_range(compressed_Hunique, w, overlap)
+            Xw_aligned = view(X, Xrange, :)
             d = size(Hw_aligned, 2)
         end
 

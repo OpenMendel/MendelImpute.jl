@@ -6,7 +6,7 @@
     continue_haplotype(X, compressed_Hunique, window, happair_prev, happair_next)
 
 Searches the breakpoint between `happair_prev` and `happair_next`, if there is
-one. Currently breakpoint is set to the middle if there is double breakpoints. 
+one. 
 
 # Arguments:
 - `X`: Genotype vector spanning 2 windows. 
@@ -15,8 +15,12 @@ one. Currently breakpoint is set to the middle if there is double breakpoints.
 - `window`: The current window being considered. It is the 2nd window of `X`. 
 - `happair_prev`: Haplotype pair for first window
 - `happair_next`: Haplotype pair for second window
+
+# Optional arguments:
 - `phased`: Boolean indicating whether `happair_prev` and `happair_next` have
     been phased. If `false`, will try 2 different orientations. 
+- `search_double_bkpts`: If `true`, will search double breakpoints. If false 
+    the output `bkpt = (-2, -2)`
 
 # Output
 - `happair_next`: If `phase = false`, this is equal to `happair_next` for input. 
@@ -47,9 +51,18 @@ function continue_haplotype(
         return (l, k), (-1, -1)
     end
 
-    # unique haplotypes with only typed snps
-    Hprev = compressed_Hunique.CW_typed[window - 1].uniqueH
-    Hcurr = compressed_Hunique.CW_typed[window].uniqueH
+    # get unique haplotypes with only typed snps
+    overlap = compressed_Hunique.overlap
+    if overlap
+        # create views on non-overlapping regions
+        rprev = nonoverlap_range(compressed_Hunique, window - 1)
+        rcurr = nonoverlap_range(compressed_Hunique, window)
+        Hprev = view(compressed_Hunique.CW_typed[window - 1].uniqueH, rprev, :)
+        Hcurr = view(compressed_Hunique.CW_typed[window].uniqueH, rcurr, :)
+    else
+        Hprev = compressed_Hunique.CW_typed[window - 1].uniqueH
+        Hcurr = compressed_Hunique.CW_typed[window].uniqueH
+    end
 
     # only one strand matches
     if i == k && j ≠ l
@@ -197,7 +210,8 @@ end
 """
     search_breakpoint(X, s11, s12, s21, s22)
 
-Find the optimal break point between s21 and s22 in configuration
+Find the optimal break point between s11 and s12 as well as between s21 and s22
+in configuration
 s11 | s21
 s12 | s22
 """
@@ -211,8 +225,8 @@ function search_breakpoint(
     n = length(X)
     length(s11) == length(s12) == length(s21) == length(s22) == n || 
         error("search_breakpoint: all vectors should have same length but " *
-        "length X = $n, s1 = $(length(s1)), s21 = $(length(s21)), s22 = " *
-        "$(length(s22))")
+        "length X = $n, s11 = $(length(s11)), s12 = $(length(s12)), s21 = " *
+        "$(length(s21)), s22 = $(length(s22))")
 
     err_optim   = typemax(Int)
     bkpts_optim = (0, 0)
@@ -240,7 +254,7 @@ function search_breakpoint(
             err_optim == 0 && return bkpts_optim, err_optim :: Int
         end
 
-        # extend haplotype H[:, s2[1]] position by position
+        # extend haplotype s21 position by position
         for bkpt2 in 1:bkpt1
             if !ismissing(X[bkpt2]) && s21[bkpt2] ≠ s22[bkpt2]
                 errors -= X[bkpt2] ≠ s11[bkpt2] + s22[bkpt2]

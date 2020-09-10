@@ -3,6 +3,11 @@
 ###### a `.jlso` or `.jld2` compressed panel. 
 
 """
+Highest level of abstraction of a compressed object
+"""
+abstract type Compressed end
+
+"""
 Data structure for keeping track of unique haplotypes in a window. 
 
 # Every window contains:
@@ -49,18 +54,21 @@ Keeps a vector of `CompressedWindow`. Indexing off instances of
     `Hstart[i + 1]`
 - `Hstart`: `Hstart[i]` to `Hstart[i + 1]` is the range of H's SNPs (typed or
     untyped) that are in window `i`. It includes all SNP until the first 
-    typed snp of window `i + 1`. 
-- `X_window_range`: `X_window_range[w]` is the range of `X`'s (typed SNP's) 
-    index in window `w`. 
+    typed snp of window `i + 1`. Used to directly index into `H` like
+    `H[Hstart[i]:Hstart[i+1], :]`
+- `X_window_range`: `idx = X_window_range[w]` is the range of `X`'s (typed
+    SNP's) index in window `w`. Used to directly index into `X` like `X[idx, :]`.
+    Does not include overlapping SNPs. 
 - `sampleID`: Sample names as listed in the VCF file
 - `altfreq`: Alternate allele frequency (frequency of "1" in VCF file)
 - `max_unique_haplotypes`: Maximum number of unique haplotypes in each window. 
+- `overlap`: Boolean indicating whether adjacent windows of typed SNPs overlap. 
 """
 struct CompressedHaplotypes
     CW::Vector{CompressedWindow}
     CW_typed::Vector{CompressedWindow}
     Hstart::Vector{Int} # we need the starting point more often than the range
-    X_window_range::Vector{UnitRange}
+    X_window_range::Vector{UnitRange{Int}}
     sampleID::Vector{String}
     chr::Vector{String}
     pos::Vector{Int}
@@ -69,31 +77,73 @@ struct CompressedHaplotypes
     altallele::Vector{Vector{String}}
     altfreq::Vector{Float32}
     max_unique_haplotypes::Int
+    overlap::Bool
 end
 CompressedHaplotypes(windows::Int, sampleID, chr, pos, SNPid, ref, alt, altfreq,
-    max_unique_haplotypes) = CompressedHaplotypes(Vector{CompressedWindow}(
-    undef, windows), Vector{CompressedWindow}(undef, windows), 
-    zeros(windows), [1:0 for _ in 1:windows], sampleID, chr, pos,
-    SNPid, ref, alt, altfreq, max_unique_haplotypes)
+    max_unique_haplotypes, overlap) = CompressedHaplotypes(
+    Vector{CompressedWindow}( undef, windows), Vector{CompressedWindow}(undef,
+    windows), zeros(windows), [1:0 for _ in 1:windows], sampleID, chr, pos,
+    SNPid, ref, alt, altfreq, max_unique_haplotypes, overlap)
 
 nhaplotypes(x::CompressedHaplotypes) = 2length(x.sampleID)
 nwindows(x::CompressedHaplotypes) = length(x.CW)
-function max_width(Hunique::CompressedHaplotypes)
-    win = nwindows(Hunique)
-    mymax = 0
-    for w in 1:win
-        n = length(Hunique.X_window_range[w])
-        n > mymax && (mymax = n)
-    end
-    return mymax
-end
-function max_width(reffile::String)
+
+"""
+    max_dim(reffile::String)
+
+Searches each compressed window of the typed SNPs and outputs the maximum window
+width (i.e. number of SNPs) and maximum unique haplotypes per window. If windows
+are overlapping, extra padding will be automatically inserted
+"""
+function max_dim(reffile::String)
     endswith(reffile, ".jlso") || error("max_width can only" *
         " be called on a `CompressedHaplotypes` or `.jlso` files.")
     loaded = JLSO.load(reffile)
     compressed_Hunique = loaded[:compressed_Hunique]
-    return max_width(compressed_Hunique)
+    return max_dim(compressed_Hunique)
 end
+function max_dim(Hunique::CompressedHaplotypes)
+    win = nwindows(Hunique)
+    maxwidth = 0
+    max_d = 0
+    for w in 1:win
+        n = size(Hunique.CW_typed[w].uniqueH, 1)
+        n > maxwidth && (maxwidth = n)
+
+        d = size(Hunique.CW_typed[w].uniqueH, 2)
+        d > max_d && (max_d = d)
+    end
+    return maxwidth, max_d
+end
+
+"""
+    get_window_widths(reffile::String)
+
+Searches each compressed window of the typed SNPs and output their window widths
+(i.e. number of SNPs per window) 
+"""
+function get_window_widths(reffile::String)
+    endswith(reffile, ".jlso") || error("max_width can only" *
+        " be called on a `CompressedHaplotypes` or `.jlso` files.")
+    loaded = JLSO.load(reffile)
+    compressed_Hunique = loaded[:compressed_Hunique]
+    return get_window_widths(compressed_Hunique)
+end
+function get_window_widths(Hunique::CompressedHaplotypes)
+    win = nwindows(Hunique)
+    widths = zeros(Int, win)
+    for w in 1:win
+        widths[w] = length(Hunique.X_window_range[w])
+    end
+    return widths
+end
+
+"""
+    count_haplotypes_per_window(Hunique::CompressedHaplotypes)
+
+Searches each compressed window of the typed SNPs and output number of unique
+haplotypes per window
+"""
 function count_haplotypes_per_window(Hunique::CompressedHaplotypes)
     win = nwindows(Hunique)
     unique_haplotype_counts = zeros(Int, win)
@@ -109,6 +159,13 @@ function count_haplotypes_per_window(reffile::String)
     compressed_Hunique = loaded[:compressed_Hunique]
     return count_haplotypes_per_window(compressed_Hunique)
 end
+
+"""
+    avg_haplotypes_per_window(Hunique::CompressedHaplotypes)
+
+Searches each compressed window of the typed SNPs and output average number of
+unique haplotypes per window
+"""
 avg_haplotypes_per_window(Hunique::CompressedHaplotypes) = 
     mean(count_haplotypes_per_window(Hunique))
 avg_haplotypes_per_window(reffile::String) = 
@@ -151,6 +208,68 @@ function complete_idx_to_unique_typed_idx(complete_idx, window,
 end
 
 """
+    extend_to_overlap_range(Hunique::CompressedHaplotypes, window::Int, overlap::Bool)
+
+If genotype window overlap, the unique haplotype matrix will be larger than the
+genotype matrix in window `w`. This function computes the range of genotype
+matrix so that the ranges match up.  
+"""
+function extend_to_overlap_range(
+    Hunique::CompressedHaplotypes, 
+    window::Int, 
+    overlap::Bool
+    )
+    winranges = Hunique.X_window_range
+    Hw = Hunique.CW_typed[window].uniqueH
+    Xrange = winranges[window]
+    if overlap
+        extra_width = size(Hw, 1) - length(winranges[window])
+        if window == 1 # first window
+            Xstart = first(winranges[window])
+            Xend = last(winranges[window]) + extra_width
+        elseif window == length(winranges) # last window
+            Xstart = first(winranges[window]) - extra_width
+            Xend = last(winranges[window])
+        else
+            Xstart = first(winranges[window]) - (extra_width >> 1)
+            Xend = last(winranges[window]) + (extra_width >> 1)
+        end
+        Xrange = Xstart:Xend
+    end
+    return Xrange
+end
+
+"""
+    nonoverlap_range(Hunique::CompressedHaplotypes, window::Int, overlap::Bool)
+
+If windows overlap, the unique haplotype matrix will include extra SNPs on 
+both ends as paddings. This function calculates the range of SNPs of the unique
+haplotype matrix that are not in the overlapping regions. 
+"""
+function nonoverlap_range(
+    Hunique::CompressedHaplotypes, 
+    window::Int
+    )
+    winranges = Hunique.X_window_range
+    Hw = Hunique.CW_typed[window].uniqueH
+    Hw_width = size(Hw, 1)
+    extra_width = Hw_width - length(winranges[window])
+
+    if window == 1 # first window
+        Hstart = 1
+        Hend = Hw_width - extra_width
+    elseif window == length(winranges) # last window
+        Hstart = 1 + extra_width
+        Hend = Hw_width
+    else
+        Hstart = 1 + (extra_width >> 1)
+        Hend = Hw_width - (extra_width >> 1)
+    end
+    
+    return Hstart:Hend
+end
+
+"""
     compress_haplotypes(reffile::String, tgtfile::String, outfile::String, d::Int)
 
 Cuts a haplotype matrix `reffile` into windows of variable width so that each
@@ -168,17 +287,23 @@ run this function by themselves.
 * `reffile`: reference haplotype file name (ends in `.vcf` or `.vcf.gz`)
 * `tgtfile`: target genotype file name (ends in `.vcf` or `.vcf.gz`)
 * `outfile`: Output file name (ends in `.jlso`)
-* `d`: Max number of unique haplotypes per window (recommended `d = 1000`). 
+* `d`: Max number of unique haplotypes per genotype window (recommended `d = 1000`). 
+* `minwidth`: Minimum number of typed SNPs per window (default 0)
+* `overlap`: How much overlap between adjacent genotype windows in percentage of
+    each window's width (default 0.1)
 """
 function compress_haplotypes(
     reffile::AbstractString,
     tgtfile::AbstractString,
     outfile::AbstractString,
     d::Int=1000,
+    minwidth::Int=0,
+    overlap::Float64=0.1
     )
     endswith(outfile, ".jld2") || endswith(outfile, ".jlso") || 
         error("Unrecognized compression format: `outfile` can only end in " * 
         "`.jlso` or `.jld2`")
+    0.0 ≤ overlap ≤ 1.0 || error("overlap must be a percentage")
 
     # import reference haplotypes
     H, H_sampleID, H_chr, H_pos, H_ids, H_ref, H_alt = convert_ht(Bool, 
@@ -192,7 +317,7 @@ function compress_haplotypes(
 
     # compress routine
     compress_haplotypes(H, X, outfile, X_pos, H_sampleID, H_chr, H_pos, H_ids, 
-        H_ref, H_alt, d)
+        H_ref, H_alt, d, minwidth, overlap)
 
     return nothing
 end
@@ -200,11 +325,13 @@ end
 function compress_haplotypes(H::AbstractMatrix, X::AbstractMatrix, 
     outfile::AbstractString, X_pos::AbstractVector, H_sampleID::AbstractVector, 
     H_chr::AbstractVector, H_pos::AbstractVector, H_ids::AbstractVector, 
-    H_ref::AbstractVector, H_alt::AbstractVector, d::Int)
+    H_ref::AbstractVector, H_alt::AbstractVector, d::Int, minwidth::Int,
+    overlap::Float64)
 
     endswith(outfile, ".jld2") || endswith(outfile, ".jlso") || 
         error("Unrecognized compression format: `outfile` can only end in " * 
         "`.jlso` or `.jld2`")
+    0.0 ≤ overlap ≤ 1.0 || error("overlap must be a percentage")
 
     # some constants
     ref_snps = size(H, 1)
@@ -212,23 +339,32 @@ function compress_haplotypes(H::AbstractMatrix, X::AbstractMatrix,
 
     # compute window intervals based on typed SNPs
     XtoH_idx = indexin(X_pos, H_pos) # assumes all SNPs in X are in H
+    any(isnothing, XtoH_idx) && error("Found SNPs in target " * 
+        "file that are not in reference file! Please filter them out first!")
     Hw_typed = H[XtoH_idx, :]        # H with only typed snps
-    window_ranges = get_window_intervals(Hw_typed, d)
+    window_ranges = get_window_intervals(Hw_typed, d, minwidth)
     wins = length(window_ranges)
 
     # initialize compressed haplotype object
     alt_freq = reshape(sum(H, dims=2), size(H, 1)) ./ size(H, 2)
     compressed_Hunique = CompressedHaplotypes(wins, H_sampleID,
-        H_chr, H_pos, H_ids, H_ref, H_alt, convert(Vector{Float32},alt_freq), d)
+        H_chr, H_pos, H_ids, H_ref, H_alt, convert(Vector{Float32},alt_freq),
+        d, overlap > 0.0)
     compressed_Hunique.X_window_range .= window_ranges
 
     # record unique haplotypes and mappings window by window
     Hw_idx_start = 1
     for w in 1:length(window_ranges)
-        # current window ranges
+        # genotype matrix's current window ranges
         Xw_idx_start = first(window_ranges[w])
         Xw_idx_end = last(window_ranges[w])
-        Xw_pos_end = X_pos[Xw_idx_end]
+        if overlap > 0.0 # overlaps between adjacent windows
+            flankwidth = round(Int, overlap*(Xw_idx_end-Xw_idx_start), RoundUp)
+            w == 1 || (Xw_idx_start -= flankwidth)
+            w == wins || (Xw_idx_end += flankwidth)
+        end
+
+        # haplotype reference panel's window ranges
         Xw_pos_next_start = (w == wins ? X_pos[end] : 
             X_pos[first(window_ranges[w + 1])])
         Hw_idx_end = (w == wins ? length(H_pos) : 
@@ -240,7 +376,7 @@ function compress_haplotypes(H::AbstractMatrix, X::AbstractMatrix,
         Xw_pos = @view(X_pos[Xw_idx_start:Xw_idx_end])
         XwtoH_idx = indexin(Xw_pos, H_pos) # assumes all SNPs in X are in H
         Hw = @view(H[Hw_idx_start:Hw_idx_end, :]) # including all snps
-        Hw_typed = H[XwtoH_idx, :]                # including only typed snps
+        Hw_typed = @view(H[XwtoH_idx, :])         # including only typed snps
 
         # find unique haplotypes on all SNPs
         mapping = groupslices(Hw, dims = 2)
@@ -295,7 +431,7 @@ function compress_haplotypes(H::AbstractMatrix, X::AbstractMatrix,
 end
 
 """
-    get_window_intervals(H, d, low, high...)
+    get_window_intervals(H, d, minwidth, low, high, intervals, seen)
 
 Find window intervals so that every window has `d` or less unique haplotypes
 by recursively dividing windows into halves. 
@@ -303,6 +439,7 @@ by recursively dividing windows into halves.
 # Inputs
 - `H`: The full haplotype matrix (on typed SNPs). Each column is a haplotype.
 - `d`: Number of unique haplotypes in each window
+- `minwidth`: Minimum number of SNPs per window (default 20)
 - `low`: start of current window
 - `high`: end of current window
 - `intervals`: Vector of window ranges. This is also the return vector
@@ -314,20 +451,21 @@ by recursively dividing windows into halves.
 function get_window_intervals(
     H::AbstractMatrix,
     d::Int, 
+    minwidth::Int=20,
     low::Int=1, 
     high::Int=size(H, 1),
     intervals = UnitRange[],
     seen=BitSet(),
     )
-    
+
+    mid = (low + high) >> 1
     unique_columns_maps = groupslices(view(H, low:high, :), dims = 2)
     k = count_unique(unique_columns_maps, seen)
-    if k ≤ d
+    if k ≤ d || length(low:mid) ≤ minwidth
         push!(intervals, low:high)
     else
-        mid = (low + high) >>> 1
-        get_window_intervals(H, d, low,     mid,  intervals, seen)
-        get_window_intervals(H, d, mid + 1, high, intervals, seen)
+        get_window_intervals(H, d, minwidth, low,     mid,  intervals, seen)
+        get_window_intervals(H, d, minwidth, mid + 1, high, intervals, seen)
     end
 
     return sort!(intervals)

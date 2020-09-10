@@ -133,10 +133,11 @@ function write_snp!(pb::IOBuffer, X::Tuple{AbstractMatrix, AbstractMatrix}, i::I
 end
 
 """
-    impute!(X1, X2, H, phase)
+    impute!(X1, X2, H, phase, [impute_untyped])
 
 Imputes `X = X1 + X2` completely using haplotype segments of `H`, where segments
-information are stored in `phase`. `X1` is strand1 and `X2` is strand 2.
+information are stored in `phase`. `X1` is strand1 and `X2` is strand 2. If 
+`impute_untyped=false`, untyped SNPs will not be imputed. 
 
 Non-missing entries in `X` can be different after imputation.
 """
@@ -144,47 +145,54 @@ function impute!(
     X1::AbstractMatrix,
     X2::AbstractMatrix,
     compressed_Hunique::CompressedHaplotypes,
-    phase::Vector{HaplotypeMosaicPair}
+    phase::Vector{HaplotypeMosaicPair},
+    impute_untyped::Bool=true
     )
 
     fill!(X1, 0)
     fill!(X2, 0)
 
     # loop over individuals
-    @inbounds for i in 1:size(X1, 2)
+    for i in 1:size(X1, 2)
         # strand 1
-        for s in 1:(length(phase[i].strand1.start) - 1)
+        for s in 1:(length(phase[i].strand1.start) - 1) # first w-1 windows
             X_idx = phase[i].strand1.start[s]:(phase[i].strand1.start[s + 1] - 1)
             w = phase[i].strand1.window[s]
-            H = compressed_Hunique.CW[w].uniqueH
-            H_start = abs(phase[i].strand1.start[s] - 
-                compressed_Hunique.Hstart[w]) + 1
+            H = impute_untyped ? compressed_Hunique.CW[w].uniqueH : 
+                compressed_Hunique.CW_typed[w].uniqueH
+            H_start = impute_untyped ? (abs(phase[i].strand1.start[s] - 
+                compressed_Hunique.Hstart[w]) + 1) : 1
             H_idx = H_start:(H_start + length(X_idx) - 1)
             X1[X_idx, i] = H[H_idx, phase[i].strand1.haplotypelabel[s]]
         end
-        w = phase[i].strand1.window[end]
-        X_idx = phase[i].strand1.start[end]:phase[i].strand1.length
-        H_start = abs(phase[i].strand1.start[end] - 
-            compressed_Hunique.Hstart[w]) + 1
+        w = phase[i].strand1.window[end] # last window
+        X_end = impute_untyped ? phase[i].strand1.length : size(X1, 1)
+        X_idx = phase[i].strand1.start[end]:X_end
+        H_start = impute_untyped ? (abs(phase[i].strand1.start[end] - 
+            compressed_Hunique.Hstart[w]) + 1) : 1
         H_idx = H_start:(H_start + length(X_idx) - 1)
-        H = compressed_Hunique.CW[w].uniqueH
+        H = impute_untyped ? compressed_Hunique.CW[w].uniqueH : 
+            compressed_Hunique.CW_typed[w].uniqueH
         X1[X_idx, i] = H[H_idx, phase[i].strand1.haplotypelabel[end]]
 
         # strand 2
-        for s in 1:(length(phase[i].strand2.start) - 1)
+        for s in 1:(length(phase[i].strand2.start) - 1) # first w-1 windows
             X_idx = phase[i].strand2.start[s]:(phase[i].strand2.start[s + 1] - 1)
             w = phase[i].strand2.window[s]
-            H = compressed_Hunique.CW[w].uniqueH
-            H_start = abs(phase[i].strand2.start[s] - 
-                compressed_Hunique.Hstart[w]) + 1
+            H = impute_untyped ? compressed_Hunique.CW[w].uniqueH : 
+                compressed_Hunique.CW_typed[w].uniqueH
+            H_start = impute_untyped ? (abs(phase[i].strand2.start[s] - 
+                compressed_Hunique.Hstart[w]) + 1) : 1
             H_idx = H_start:(H_start + length(X_idx) - 1)
             X2[X_idx, i] = H[H_idx, phase[i].strand2.haplotypelabel[s]]
         end
-        X_idx = phase[i].strand2.start[end]:phase[i].strand2.length
-        w = phase[i].strand2.window[end]
-        H = compressed_Hunique.CW[w].uniqueH
-        H_start = abs(phase[i].strand2.start[end] - 
-            compressed_Hunique.Hstart[w]) + 1
+        w = phase[i].strand2.window[end] # last window
+        X_end = impute_untyped ? phase[i].strand1.length : size(X2, 1)
+        X_idx = phase[i].strand2.start[end]:X_end
+        H = impute_untyped ? compressed_Hunique.CW[w].uniqueH : 
+            compressed_Hunique.CW_typed[w].uniqueH
+        H_start = impute_untyped ? (abs(phase[i].strand2.start[end] - 
+            compressed_Hunique.Hstart[w]) + 1) : 1
         H_idx = H_start:(H_start + length(X_idx) - 1)
         X2[X_idx, i] = H[H_idx, phase[i].strand2.haplotypelabel[end]]
     end
@@ -194,7 +202,7 @@ function impute!(
     X1::AbstractMatrix,
     X2::AbstractMatrix,
     H::AbstractMatrix,
-    phase::Vector{HaplotypeMosaicPair}
+    phase::Vector{HaplotypeMosaicPair},
     )
 
     fill!(X1, 0)
@@ -218,7 +226,7 @@ function impute!(
 end
 
 """
-    impute_discard_phase!(X, H, phase)
+    impute_discard_phase!(X, H, phase, [impute_untyped])
 
 Imputes missing entries of `X` using corresponding haplotypes `H` via `phase`
 information. Non-missing entries in `X` will not change, but X and H has to be
@@ -227,7 +235,8 @@ aligned. This does NOT preserve phase information.
 function impute_discard_phase!(
     X::AbstractMatrix,
     compressed_Hunique::CompressedHaplotypes,
-    phase::Vector{HaplotypeMosaicPair}
+    phase::Vector{HaplotypeMosaicPair},
+    impute_untyped::Bool=true
     )
 
     p, n = size(X)
@@ -249,8 +258,10 @@ function impute_discard_phase!(
                 i2 = snp - compressed_Hunique.Hstart[w2] + 1
 
                 # imputation step
-                H1 = compressed_Hunique.CW[w1].uniqueH
-                H2 = compressed_Hunique.CW[w2].uniqueH
+                H1 = impute_untyped ? compressed_Hunique.CW[w1].uniqueH : 
+                    compressed_Hunique.CW_typed[w1].uniqueH
+                H2 = impute_untyped ? compressed_Hunique.CW[w2].uniqueH : 
+                    compressed_Hunique.CW_typed[w2].uniqueH
                 X[snp, person] = H1[i1, h1] + H2[i2, h2]
             end
         end
