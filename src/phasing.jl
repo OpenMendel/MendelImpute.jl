@@ -66,7 +66,7 @@ function phase(
         error("Currently dynamic programming routine is broken! Sorry!")
     end
     if !impute
-        error("Due to a bug in phase!, currently one cannot impute only typed SNPs! Sorry!")
+        error("Due to a bug in impute!, currently cannot impute only typed SNPs! Sorry!")
     end
     ultra_compress = endswith(outfile, ".jlso") ? true : false
     ultra_compress && !phase && error("Ultra compressed output must be phased!")
