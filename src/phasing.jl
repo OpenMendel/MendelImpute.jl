@@ -4,9 +4,9 @@
 
 """
     phase(tgtfile::String, reffile::String; [outfile::String], [impute::Bool],
-        [phase::Bool], [dosage::Bool], [max_d::Int], [recreen::Bool], 
-        [max_haplotypes::Int], [stepwise::Int], [thinning_factor::Int], 
-        [scale_allelefreq::Bool], [dynamic_programming::Bool])
+        [phase::Bool], [dosage::Bool], [recreen::Bool], [max_haplotypes::Int], 
+        [stepwise::Int], [thinning_factor::Int], [scale_allelefreq::Bool], 
+        [dynamic_programming::Bool])
 
 Main function of MendelImpute program. Phasing (haplotying) of `tgtfile` from a
 pool of haplotypes `reffile` by sliding windows and saves result in `outfile`.
@@ -31,18 +31,16 @@ All SNPs in `tgtfile` must be present in `reffile`.
 - `dosage`: If `true`, will assume target matrix are dosages for imputation. Note
     this means the genotype matrix will be entirely 
     single precision. 
-- `max_d`: Maximum number of unique haplotypes in each window. Note this number
-    is used in the compression step and nowhere else. 
 - `rescreen`: This option saves a number of top haplotype pairs when solving
     the least squares objective, and re-minimize least squares on just
     observed data.
 - `max_haplotypes` Maximum number of haplotypes for using to global search. 
     This number should be specified along with `stepscreen` or `thinning_factor`
-- `stepwise`: This option solves the least squares objective by first finding
-    `stepwise` top haplotypes using a stepwise heuristic then finds the next
-    haplotype using global search.
-- `thinning_factor`: This option solves the least squares objective on only
-    `thining_factor` unique haplotypes.
+- `stepwise`: If an integer is specified, will solve the least squares objective
+    by first finding `stepwise` top haplotypes using a stepwise heuristic then
+    finds the next haplotype using global search.
+- `thinning_factor`: If an integer is specified, will solve the least squares
+    objective on only `thining_factor` unique haplotypes.
 - `scale_allelefreq`: Boolean indicating whether to give rare SNPs more weight
     scaled by `wᵢ = 1 / √2p(1-p)` where max weight is 2. 
 - `dynamic_programming`: Boolean indicating whether to phase with a global 
@@ -55,7 +53,6 @@ function phase(
     impute::Bool = true,
     phase::Bool = true,
     dosage::Bool = false,
-    max_d::Int = 1000,
     rescreen::Bool = false,
     max_haplotypes::Int = 800,
     stepwise::Union{Nothing, Int} = nothing,
@@ -81,14 +78,9 @@ function phase(
     if endswith(reffile, ".jlso")
         loaded = JLSO.load(reffile)
         compressed_Hunique = loaded[:compressed_Hunique]
-        max_d == compressed_Hunique.max_unique_haplotypes || 
-            error("Specified maximum haplotypes $max_d does not equal " *
-            "$(compressed_Hunique.max_unique_haplotypes) listed in .jlso file")
     elseif endswith(reffile, ".vcf") || endswith(reffile, ".vcf.gz")
-        # compress and filter VCF files for unique haplotypes in each window
-        @info "VCF files detected: compressing reference file to .jlso format.."
-        compressed_Hunique = compress_haplotypes(reffile, tgtfile,
-            "compressed." * reffile, max_d)
+        error("reference panel is in VCF for: please first compress reference" *
+            " file to .jlso format using the compress_haplotypes() function.")
     elseif endswith(reffile, ".jld2")
         @load reffile compressed_Hunique 
     else
@@ -404,9 +396,7 @@ function update_phase!(ph::HaplotypeMosaic,
     hap_curr::Int32, window::Int32, Xwi_start::Int64, Xwi_mid::Int64, 
     Xwi_end::Int64)
 
-    X_bkpt_end = Xwi_start + bkpt
-
-    # no breakpoints or double breakpoints
+    # no breakpoints or not searching double breakpoints
     if bkpt == -1 || bkpt == -2
         h = complete_idx_to_unique_all_idx(hap_curr, window, compressed_Hunique)
         push_Mosaic!(ph, (Xwi_mid, h, window))
@@ -419,6 +409,8 @@ function update_phase!(ph::HaplotypeMosaic,
         push_Mosaic!(ph, (Xwi_mid, h, window))
         return nothing
     end
+
+    X_bkpt_end = Xwi_start + bkpt
 
     if Xwi_mid <= X_bkpt_end <= Xwi_end
         # previous window extends to current window
