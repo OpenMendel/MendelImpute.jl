@@ -3,6 +3,11 @@
 ###### a `.jlso` or `.jld2` compressed panel. 
 
 """
+Highest level of abstraction of a compressed object
+"""
+abstract type Compressed end
+
+"""
 Data structure for keeping track of unique haplotypes in a window. 
 
 # Every window contains:
@@ -57,12 +62,13 @@ Keeps a vector of `CompressedWindow`. Indexing off instances of
 - `sampleID`: Sample names as listed in the VCF file
 - `altfreq`: Alternate allele frequency (frequency of "1" in VCF file)
 - `max_unique_haplotypes`: Maximum number of unique haplotypes in each window. 
+- `overlap`: Boolean indicating whether adjacent windows of typed SNPs overlap. 
 """
 struct CompressedHaplotypes
     CW::Vector{CompressedWindow}
     CW_typed::Vector{CompressedWindow}
     Hstart::Vector{Int} # we need the starting point more often than the range
-    X_window_range::Vector{UnitRange}
+    X_window_range::Vector{UnitRange{Int}}
     sampleID::Vector{String}
     chr::Vector{String}
     pos::Vector{Int}
@@ -71,7 +77,7 @@ struct CompressedHaplotypes
     altallele::Vector{Vector{String}}
     altfreq::Vector{Float32}
     max_unique_haplotypes::Int
-    overlap::Float64
+    overlap::Bool
 end
 CompressedHaplotypes(windows::Int, sampleID, chr, pos, SNPid, ref, alt, altfreq,
     max_unique_haplotypes, overlap) = CompressedHaplotypes(
@@ -211,12 +217,12 @@ matrix so that the ranges match up.
 function extend_to_overlap_range(
     Hunique::CompressedHaplotypes, 
     window::Int, 
-    overlap::Float64
+    overlap::Bool
     )
     winranges = Hunique.X_window_range
     Hw = Hunique.CW_typed[window].uniqueH
     Xrange = winranges[window]
-    if overlap > 0.0
+    if overlap
         extra_width = size(Hw, 1) - length(winranges[window])
         if window == 1 # first window
             Xstart = first(winranges[window])
@@ -343,7 +349,7 @@ function compress_haplotypes(H::AbstractMatrix, X::AbstractMatrix,
     alt_freq = reshape(sum(H, dims=2), size(H, 1)) ./ size(H, 2)
     compressed_Hunique = CompressedHaplotypes(wins, H_sampleID,
         H_chr, H_pos, H_ids, H_ref, H_alt, convert(Vector{Float32},alt_freq),
-        d, overlap)
+        d, overlap > 0.0)
     compressed_Hunique.X_window_range .= window_ranges
 
     # record unique haplotypes and mappings window by window
