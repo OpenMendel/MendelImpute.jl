@@ -34,8 +34,9 @@ All SNPs in `tgtfile` must be present in `reffile`.
 - `rescreen`: This option saves a number of top haplotype pairs when solving
     the least squares objective, and re-minimize least squares on just
     observed data.
-- `max_haplotypes` Maximum number of haplotypes for using to global search. 
-    This number should be specified along with `stepscreen` or `thinning_factor`
+- `max_haplotypes` Maximum number of haplotypes for using global search. Windows
+    exceeding this number of unique haplotypes will be searched using a
+    heuristic. A non-zero `stepscreen` or `thinning_factor` need to be specified 
 - `stepwise`: If an integer is specified, will solve the least squares objective
     by first finding `stepwise` top haplotypes using a stepwise heuristic then
     finds the next haplotype using global search.
