@@ -287,10 +287,13 @@ run this function by themselves.
 * `reffile`: reference haplotype file name (ends in `.vcf` or `.vcf.gz`)
 * `tgtfile`: target genotype file name (ends in `.vcf` or `.vcf.gz`)
 * `outfile`: Output file name (ends in `.jlso`)
-* `d`: Max number of unique haplotypes per genotype window (recommended `d = 1000`). 
+
+# Optional Inputs
+* `d`: Max number of unique haplotypes per genotype window (recommended 
+    `d = 1000`). 
 * `minwidth`: Minimum number of typed SNPs per window (default 0)
 * `overlap`: How much overlap between adjacent genotype windows in percentage of
-    each window's width (default 0.1)
+    each window's width (default 0.0)
 """
 function compress_haplotypes(
     reffile::AbstractString,
@@ -298,7 +301,7 @@ function compress_haplotypes(
     outfile::AbstractString,
     d::Int=1000,
     minwidth::Int=0,
-    overlap::Float64=0.1
+    overlap::Float64=0.0
     )
     endswith(outfile, ".jld2") || endswith(outfile, ".jlso") || 
         error("Unrecognized compression format: `outfile` can only end in " * 

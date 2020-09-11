@@ -7,7 +7,7 @@ MendelImpute accepts [VCF](https://samtools.github.io/hts-specs/VCFv4.3.pdf) and
 + For PLINK files, all trios (`.bim`, `.bed`, `.fam`) are present in the same directory
 + Each file contains only 1 chromosome
 + Every record (SNP) is present in the reference panel. If this is untrue, you must [match markers in 2 VCF files](https://openmendel.github.io/VCFTools.jl/dev/man/conformgt/). 
-+ Given a SNP, it's position is the same in target data and reference panel. MendelImpute use SNP position internally to align markers. 
++ Given a SNP, it's CHROM, POS, REF, and  ALT fields are the same in target data and reference panel. MendelImpute use SNP position internally to align markers. Note this is not explicitly checked. 
 + The position of every SNP is unique (so multiallelic markers should be excluded instead of split)
 
 If the last criteria is not met, our code may or may not work. File an issue to let us know.
@@ -153,6 +153,9 @@ MendelImpute requires one to pre-process the reference panel for faster reading.
 
 
 ```julia
+# load necessary packages in Julia
+using MendelImpute
+
 max_d = 1000 # maximum number of unique haplotypes per window
 reffile = "ref.chr22.excludeTarget.vcf.gz"
 tgtfile = "target.chr22.typedOnly.masked.vcf.gz"
@@ -160,60 +163,62 @@ outfile = "ref.chr22.maxd1000.excludeTarget.jlso"
 @time compress_haplotypes(reffile, tgtfile, outfile, max_d)
 ```
 
-    [32mimporting reference data...100%|████████████████████████| Time: 0:01:55[39m
+    ┌ Info: Precompiling MendelImpute [e47305d1-6a61-5370-bc5d-77554d143183]
+    └ @ Base loading.jl:1278
+    [32mimporting reference data...100%|████████████████████████| Time: 0:02:09[39m
 
 
-    284.456419 seconds (2.08 G allocations: 209.110 GiB, 10.89% gc time)
+    315.248677 seconds (2.09 G allocations: 209.326 GiB, 10.75% gc time)
 
 
 ## Step 3: Run imputation and phasing
 
-The main function is the [phase](https://biona001.github.io/MendelImpute/dev/man/api/#MendelImpute.phase) function. The code below runs it in a single thread:
+Below runs the main [phase](https://biona001.github.io/MendelImpute/dev/man/api/#MendelImpute.phase) function in a single thread. By default all output genotypes will be phased and non-missing. A list of optional inputs can be found in the [API](https://biona001.github.io/MendelImpute/dev/man/api/#MendelImpute.phase).
 
 
 ```julia
 reffile = "ref.chr22.maxd1000.excludeTarget.jlso" # jlso reference file
 tgtfile = "target.chr22.typedOnly.masked.vcf.gz"  # target genotype file
 outfile = "mendel.imputed.chr22.vcf.gz"           # output file name
-d       = 1000 # this should be the equal to max_d in previous code block
-phase(tgtfile, reffile; outfile=outfile, max_d = d);
+phase(tgtfile, reffile; outfile=outfile);
 ```
 
+    Number of threads = 1
     Importing reference haplotype data...
 
 
-    [32mComputing optimal haplotypes...100%|████████████████████| Time: 0:00:21[39m
+    [32mComputing optimal haplotypes...100%|████████████████████| Time: 0:00:20[39m
 
 
     Total windows = 1634, averaging ~ 508 unique haplotypes per window.
     
     Timings: 
-        Data import                     = 11.719 seconds
-            import target data             = 2.23359 seconds
-            import compressed haplotypes   = 9.48538 seconds
-        Computing haplotype pair        = 22.1275 seconds
-            BLAS3 mul! to get M and N      = 0.978357 seconds per thread
-            haplopair search               = 17.6055 seconds per thread
-            initializing missing           = 0.092384 seconds per thread
-            allocating and viewing         = 0.300453 seconds per thread
-            index conversion               = 0.00979729 seconds per thread
-        Phasing by win-win intersection = 1.45252 seconds
-            Window-by-window intersection  = 0.571672 seconds per thread
-            Breakpoint search              = 0.319126 seconds per thread
-            Recording result               = 0.0618488 seconds per thread
-        Imputation                     = 3.24156 seconds
-            Imputing missing               = 0.149169 seconds
-            Writing to file                = 3.09239 seconds
+        Data import                     = 10.2399 seconds
+            import target data             = 1.75293 seconds
+            import compressed haplotypes   = 8.48693 seconds
+        Computing haplotype pair        = 20.5148 seconds
+            BLAS3 mul! to get M and N      = 1.07082 seconds per thread
+            haplopair search               = 19.0659 seconds per thread
+            initializing missing           = 0.10454 seconds per thread
+            allocating and viewing         = 0.245575 seconds per thread
+            index conversion               = 0.0134011 seconds per thread
+        Phasing by win-win intersection = 3.85712 seconds
+            Window-by-window intersection  = 0.538605 seconds per thread
+            Breakpoint search              = 3.16116 seconds per thread
+            Recording result               = 0.142876 seconds per thread
+        Imputation                     = 3.0431 seconds
+            Imputing missing               = 0.246241 seconds
+            Writing to file                = 2.79686 seconds
     
-        Total time                      = 38.6959 seconds
+        Total time                      = 37.6559 seconds
     
 
 
-Inputs after the first `;` are all optional, which is why an equal sign is needed. If left not specified, MendelImpute uses the default values. A list of optional inputs can be found in the [phase( ) API](https://biona001.github.io/MendelImpute/dev/man/api/#MendelImpute.phase). The second `;` hides the output, or else the screen will be too jammed. 
+Inputs after the first `;` are all optional. The second `;` hides the output, or else the screen will be too jammed. 
 
 !!! note
 
-    To run MendelImpute in parallel, type `export JULIA_NUM_THREADS=4` **before** starting Julia. For optimal performance, set threads equal to the number of physical cores on your machine. Verify the Julia session is running is parallel by executing `Threads.nthreads()` in Julia. **Finally**, set the number of BLAS threads to be 1 by `using LinearAlgebra; BLAS.set_num_threads(1)`, to avoid oversubscription. 
+    To run MendelImpute in parallel, type `export JULIA_NUM_THREADS=4` **before** starting Julia. See Performance Gotchas #1 on the left for details.
 
 ## Step 4: (only for simulated data) check imputation accuracy
 
@@ -227,23 +232,28 @@ n, p = size(X_mendel)
 println("error overall = $(sum(X_mendel .!= X_truth) / n / p)")
 ```
 
-    error overall = 0.005397602533930585
+    error overall = 0.00527504782243333
 
 
 # Run MendelImpute as script
 
-If you don't want to run `MendelImpute.jl` in a Julia session (e.g. you want to run batch jobs on a cluster), you can do so by putting the code above in a Julia file. For instance, create a file called `impute.jl` which contains:
+If you don't want to run `MendelImpute.jl` in a Julia session (e.g. you want to run batch jobs on a cluster), you can do so by putting the code above in a Julia file. For example, in order to run with 8 threads, create a file called `impute.jl` which contains:
 
 ```julia
 # place these code in a file called impute.jl
-using MendelImpute, VCFTools
-reffile = ARGS[1] # first command line argument
-tgtfile = ARGS[2] # second command line argument
-phase(tgtfile, reffile; outfile="mendel.imputed.chr22.vcf.gz", max_d = 1000)
+using MendelImpute, VCFTools, LinearAlgebra
+
+# setup code goes here
+reffile = ARGS[1]       # first command line argument
+tgtfile = ARGS[2]       # second command line argument
+BLAS.set_num_threads(1) # set BLAS threads to 1 (see performance gotchas)
+
+# run MendelImpute with default options
+phase(tgtfile, reffile; outfile="mendel.imputed.chr22.vcf.gz")
 ```
 
 Then in the terminal/command-prompt, you can do
 ```
-julia impute.jl ref.chr22.maxd1000.excludeTarget.jlso target.chr22.typedOnly.masked.vcf.gz
+export JULIA_NUM_THREADS=8
+julia impute.jl your.reference.file.jlso your.target.file.vcf.gz
 ```
-

@@ -17,8 +17,8 @@ reference haplotype panel `H`
 + `X1`: allele 1 of the phased genotype. Each column is a sample. `X = X1 + X2`. 
 + `X2`: allele 2 of the phased genotype. Each column is a sample. `X = X1 + X2`. 
 + `phase`: the original data structure after phasing and imputation.
-+ `sampleID`: The ID's of each imputed person. 
-+ `H`: the complete reference haplotype panel.
++ `sampleID`: The ID's of each imputed person.  
++ `H`: the complete reference haplotype panel. Columns of `H` are haplotypes.
 """
 function convert_compressed(
     t::Type{T}, 

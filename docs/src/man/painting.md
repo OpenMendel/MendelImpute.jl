@@ -139,39 +139,39 @@ Note data used here is prepared in [Detailed Example](https://biona001.github.io
 tgtfile = "target.chr22.typedOnly.masked.vcf.gz"
 reffile = "ref.chr22.maxd1000.excludeTarget.jlso"
 outfile = "mendel.imputed.jlso"
-@time ph = phase(tgtfile, reffile, outfile=outfile, impute=true, max_d=1000);
+@time ph = phase(tgtfile, reffile, outfile=outfile);
 ```
 
     Number of threads = 1
     Importing reference haplotype data...
 
 
-    [32mComputing optimal haplotypes...100%|████████████████████| Time: 0:00:22[39m
+    [32mComputing optimal haplotypes...100%|████████████████████| Time: 0:00:20[39m
 
 
     Total windows = 1634, averaging ~ 508 unique haplotypes per window.
     
     Timings: 
-        Data import                     = 12.8755 seconds
-            import target data             = 3.19177 seconds
-            import compressed haplotypes   = 9.68371 seconds
-        Computing haplotype pair        = 22.6357 seconds
-            BLAS3 mul! to get M and N      = 1.01138 seconds per thread
-            haplopair search               = 17.8065 seconds per thread
-            initializing missing           = 0.0905452 seconds per thread
-            allocating and viewing         = 0.325886 seconds per thread
-            index conversion               = 0.0097123 seconds per thread
-        Phasing by win-win intersection = 1.2638 seconds
-            Window-by-window intersection  = 0.520476 seconds per thread
-            Breakpoint search              = 0.231444 seconds per thread
-            Recording result               = 0.0500224 seconds per thread
-        Imputation                     = 3.0595 seconds
-            Imputing missing               = 0.0697154 seconds
-            Writing to file                = 2.98979 seconds
+        Data import                     = 10.2246 seconds
+            import target data             = 2.21667 seconds
+            import compressed haplotypes   = 8.00795 seconds
+        Computing haplotype pair        = 20.127 seconds
+            BLAS3 mul! to get M and N      = 1.01193 seconds per thread
+            haplopair search               = 18.724 seconds per thread
+            initializing missing           = 0.0977775 seconds per thread
+            allocating and viewing         = 0.273912 seconds per thread
+            index conversion               = 0.00868801 seconds per thread
+        Phasing by win-win intersection = 3.82254 seconds
+            Window-by-window intersection  = 0.559845 seconds per thread
+            Breakpoint search              = 3.23837 seconds per thread
+            Recording result               = 0.00971604 seconds per thread
+        Imputation                     = 0.141786 seconds
+            Imputing missing               = 0.0315422 seconds
+            Writing to file                = 0.110244 seconds
     
-        Total time                      = 39.9759 seconds
+        Total time                      = 34.3168 seconds
     
-     51.214539 seconds (109.80 M allocations: 6.143 GiB, 5.08% gc time)
+     34.316709 seconds (33.53 M allocations: 2.517 GiB, 2.50% gc time)
 
 
 ## Estimate admixture proportions
@@ -245,43 +245,45 @@ populations = MendelImpute.unique_populations(refID_to_population)
 @time sample84_comp = composition(ph[84], panelID, refID_to_population) # origin LWK
 ```
 
-      0.003716 seconds (28 allocations: 2.719 KiB)
-      0.000300 seconds (8 allocations: 1.250 KiB)
-      0.000320 seconds (8 allocations: 1.250 KiB)
+      0.004665 seconds (28 allocations: 2.719 KiB)
+      0.000369 seconds (8 allocations: 1.250 KiB)
+      0.000383 seconds (8 allocations: 1.250 KiB)
 
 
 
 
 
     26-element Array{Float64,1}:
-     0.0320057171449708
-     0.004297435185340359
-     0.018110277693318744
-     0.002775975541728215
-     0.0014975185005183258
-     0.11653590812346927
-     0.010756755592052499
-     0.21362083454036596
-     0.03346971804515778
-     0.004278282270865305
-     0.0735579650986016
-     0.0003950288610479996
-     0.005562724597848649
-     0.013571036962730822
-     0.0639467932035883
-     0.0072230428714049385
-     0.0006930960925660357
-     0.19267353139042978
-     0.01657325630669562
-     0.06172744923879136
-     0.0003351760033134542
-     0.0043297557285170134
-     0.1120026526786548
-     0.006926172697041593
-     0.0027065462267561427
-     0.0004273494042246541
+     0.03159153536944775
+     0.004281873442329377
+     0.0183269450383178
+     0.0025138200248509064
+     0.0014987155576730166
+     0.11780598576459632
+     0.0104802353893189
+     0.21297801484829695
+     0.0338623527918964
+     0.004151394212468068
+     0.07204967308369105
+     0.0002681408026507634
+     0.004550014244980141
+     0.013386690160908423
+     0.06359485840010917
+     0.006903428611102466
+     0.0006188785489751994
+     0.1910251836884204
+     0.01634940661876842
+     0.06281796830671477
+     0.0004357288043074905
+     0.003690527207912069
+     0.11661611095283356
+     0.006875896296544575
+     0.0028884989142691606
+     0.0004381229186168723
 
 
+
+Note the first run is slower because Julia has to compile the code. 
 
 ### Step 3: Plot the percentages
 
@@ -299,7 +301,7 @@ bar!(barplot, sample84_comp, label="Sample 84 (LWK)", alpha=0.8)
 
 
 
-![svg](output_16_0.svg)
+![svg](output_17_0.svg)
 
 
 
@@ -334,7 +336,7 @@ goodcolors = [colorant"#c8c8ff", colorant"#ffeaea", colorant"#ffbfbf", colorant"
 
 
 
-![svg](output_18_0.svg)
+![svg](output_19_0.svg)
 
 
 
@@ -350,9 +352,9 @@ populations = unique_populations(refID_to_population)
 @time sample84_s1_comp, sample84_s2_comp = paint(ph[84], panelID, refID_to_population);
 ```
 
-      0.000257 seconds (12 allocations: 19.125 KiB)
-      0.000238 seconds (12 allocations: 20.375 KiB)
-      0.000253 seconds (12 allocations: 22.875 KiB)
+      0.000323 seconds (12 allocations: 19.125 KiB)
+      0.000310 seconds (12 allocations: 20.375 KiB)
+      0.000307 seconds (12 allocations: 22.875 KiB)
 
 
 ### Step 3: Generate plots for painted chromosomes
@@ -423,7 +425,7 @@ chrom_plt = groupedbar(mydata, bar_position = :stack, bar_width=0.7, label=:none
 
 
 
-![svg](output_23_0.svg)
+![svg](output_24_0.svg)
 
 
 
