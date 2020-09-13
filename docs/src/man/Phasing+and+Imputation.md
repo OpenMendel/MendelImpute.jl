@@ -40,7 +40,7 @@ More summary statistics can be computed using the [gtstats](https://openmendel.g
 ## Step 1: generating realistic reference and target data 
 
 First we generate a reference panel and imputation target based on the 1000 genomes data. More specifically, we take the 1000 genomes chromosome 22 and divide it so that 
-+ The first 100 samples are used as imputation targets, where
++ 100 samples are randomly selected as imputation targets, where
     - 100k SNPs with minor allele frequency $\ge 0.05$ are randomly selected to be the typed positions. 
     - 0.1% of typed SNPs are masked (mimicking GWAS errors)
     - Genotypes are unphased

@@ -9,7 +9,7 @@
 Computes a sample's chromosome composition based on phase information. This
 function is used for easier plotting a person's admixed proportions.
 
-# Arguments
+# Inputs
 - `sample_phase`: A `HaplotypeMosaicPair` storing phase information for a
     sample, includes haplotype start position and haplotype label.
 - `panelID`: Sample ID's in the reference haplotype panel
@@ -99,7 +99,7 @@ end
 Converts a person's phased haplotype lengths into segments of percentages. This
 function is used for easier plotting a "painted chromosome".
 
-# Arguments
+# Inputs
 - `sample_phase`: A `HaplotypeMosaicPair` storing phase information for a
     sample, includes haplotype start position and haplotype label.
 - `panelID`: Sample ID's in the reference haplotype panel
