@@ -14,7 +14,7 @@ If the last criteria is not met, our code may or may not work. File an issue to 
 
 # Preparing Reference Haplotype Panel
 
-Reference panels must be compressed into `.jlso` format first using the [compress_haplotypes](https://biona001.github.io/MendelImpute/dev/man/api/#MendelImpute.compress_haplotypes) function. One must specify `d`: the maximum number of unique haplotypes per window. Larger `d` slows down computation, but increases accuracy. For most purposes, we recommend $d \approx 1000$. A larger `d` may be needed for TOPMed data. 
+Reference panels must be compressed into `.jlso` format first using the [compress_haplotypes](https://OpenMendel.github.io/MendelImpute/dev/man/api/#MendelImpute.compress_haplotypes) function. One must specify `d`: the maximum number of unique haplotypes per window. Larger `d` slows down computation, but increases accuracy. For most purposes, we recommend $d \approx 1000$. A larger `d` may be needed for TOPMed data. 
 
 # Detailed Example
 
@@ -149,7 +149,7 @@ You also generated/downloaded:
 
 ## Step 2: generating `.jlso` compressed reference panel
 
-MendelImpute requires one to pre-process the reference panel for faster reading. This is achieved via the [compress_haplotypes](https://biona001.github.io/MendelImpute/dev/man/api/#MendelImpute.compress_haplotypes) function.
+MendelImpute requires one to pre-process the reference panel for faster reading. This is achieved via the [compress_haplotypes](https://openmendel.github.io/MendelImpute/dev/man/api/#MendelImpute.compress_haplotypes) function.
 
 
 ```julia
@@ -173,7 +173,7 @@ outfile = "ref.chr22.maxd1000.excludeTarget.jlso"
 
 ## Step 3: Run imputation and phasing
 
-Below runs the main [phase](https://biona001.github.io/MendelImpute/dev/man/api/#MendelImpute.phase) function in a single thread. By default all output genotypes will be phased and non-missing. A list of optional inputs can be found in the [API](https://biona001.github.io/MendelImpute/dev/man/api/#MendelImpute.phase).
+Below runs the main [phase](https://openmendel.github.io/MendelImpute/dev/man/api/#MendelImpute.phase) function in a single thread. By default all output genotypes will be phased and non-missing. A list of optional inputs can be found in the [API](https://openmendel.github.io/MendelImpute/dev/man/api/#MendelImpute.phase).
 
 
 ```julia

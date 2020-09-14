@@ -98,7 +98,7 @@ haplotype_start = phaseinfo[1].strand1.start # strand1
 
 ## Loading
 
-The function [convert_compressed](https://biona001.github.io/MendelImpute/dev/man/api/#MendelImpute.convert_compressed) will load the ultra-compressed data into genotype matrices and the original `phaseinfo` data structure. 
+The function [convert_compressed](https://OpenMendel.github.io/MendelImpute/dev/man/api/#MendelImpute.convert_compressed) will load the ultra-compressed data into genotype matrices and the original `phaseinfo` data structure. 
 
 **Note: Decompressing requires loading the original haplotype reference panel.** 
 
@@ -112,7 +112,7 @@ X1, X2, phaseinfo, sampleID, H = convert_compressed(Float64, tgtfile, reffile);
     [32mimporting reference data...100%|████████████████████████| Time: 0:01:55[39m
 
 
-Check this compression protocol exhibit same error rate with [standard VCF compression](https://biona001.github.io/MendelImpute/dev/man/Phasing+and+Imputation/#Step-4:-%28only-for-simulated-data%29-check-imputation-accuracy). Note that `X1`, `X2`, and `H` are transposed. 
+Check this compression protocol exhibit same error rate with [standard VCF compression](https://OpenMendel.github.io/MendelImpute/dev/man/Phasing+and+Imputation/#Step-4:-%28only-for-simulated-data%29-check-imputation-accuracy). Note that `X1`, `X2`, and `H` are transposed. 
 
 
 ```julia

@@ -10,7 +10,7 @@ To run `MendelImpute.jl` in parallel,
 
 !!! note
 
-    We recommend number of threads equal to the number of physical CPU cores on your machine. **Do not use hyper-threading!!** In other words, don't set the number of Julia threads to be more than number of physical CPU cores. Hyperthreading is valuable for I/O operations (in our experience), but not for linear algebra routines used throughout MendelImpute. 
+    We recommend number of threads equal to the number of physical CPU cores on your machine. **Number of Julia threads should never exceed number of physical CPU cores!!** Hyperthreading is valuable for I/O operations (in our experience), but not for linear algebra routines used throughout MendelImpute. 
 
 ## Gotcha 2: `max_d` too high (or too low)
 
@@ -36,8 +36,8 @@ While MendelImpute uses the least RAM compared to competing softwares (as of 202
 
 There are 4 things that require lots of memory:
 + The target genotype matrix $\mathbf{X}_{n \times p}$ requires $n \times p \times 8$ bits. If $\mathbf{X}$ is dosage data, then you need instead $n \times p \times 32$ bits
-+ The matrix $\mathbf{M}_{d \times d}$ requires $c \times d \times d \times 32$ bits, where $c$ is the number of parallel threads used and $d$ is the number specified in the [compress_haplotypes](https://biona001.github.io/MendelImpute/dev/man/api/#MendelImpute.compress_haplotypes) function.
-+ The matrix $\mathbf{N}_{n \times d}$ requires $c \times n \times d \times 32$ bits, where $c$ is the number of parallel threads used and $d$ is the number specified in the [compress_haplotypes](https://biona001.github.io/MendelImpute/dev/man/api/#MendelImpute.compress_haplotypes) function.
-+ The compressed reference haplotype panel produced by the [compress_haplotypes](https://biona001.github.io/MendelImpute/dev/man/api/#MendelImpute.compress_haplotypes) function. This typically requires about $3r$ gigabytes of RAM where $r$ is your panel's size in `.vcf.gz`. 
++ The matrix $\mathbf{M}_{d \times d}$ requires $c \times d \times d \times 32$ bits, where $c$ is the number of parallel threads used and $d$ is the number specified in the [compress_haplotypes](https://openmendel.github.io/MendelImpute/dev/man/api/#MendelImpute.compress_haplotypes) function.
++ The matrix $\mathbf{N}_{n \times d}$ requires $c \times n \times d \times 32$ bits, where $c$ is the number of parallel threads used and $d$ is the number specified in the [compress_haplotypes](https://openmendel.github.io/MendelImpute/dev/man/api/#MendelImpute.compress_haplotypes) function.
++ The compressed reference haplotype panel produced by the [compress_haplotypes](https://openmendel.github.io/MendelImpute/dev/man/api/#MendelImpute.compress_haplotypes) function. This typically requires about $3r$ gigabytes of RAM where $r$ is your panel's size in `.vcf.gz`. 
 
 If you do not have the above issues and your code is still running slow, file an issue on GitHub and we will take a look at it ASAP. 

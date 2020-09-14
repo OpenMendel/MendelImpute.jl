@@ -2,7 +2,7 @@
 
 | **Documentation** | **Build Status** | **Code Coverage**  |
 |-------------------|------------------|--------------------|
-| [![](https://img.shields.io/badge/docs-latest-blue.svg)](https://biona001.github.io/MendelImpute/dev/) | [![Build Status](https://travis-ci.com/biona001/MendelImpute.svg?branch=master)](https://travis-ci.com/github/biona001/MendelImpute) | [![Coverage Status](https://coveralls.io/repos/github/biona001/MendelImpute/badge.svg?branch=master)](https://coveralls.io/github/biona001/MendelImpute?branch=master) |
+| [![](https://img.shields.io/badge/docs-latest-blue.svg)](https://OpenMendel.github.io/MendelImpute/dev/) | [![Build Status](https://travis-ci.com/OpenMendel/MendelImpute.svg?branch=master)](https://travis-ci.com/github/OpenMendel/MendelImpute) | [![Coverage Status](https://coveralls.io/repos/github/OpenMendel/MendelImpute/badge.svg?branch=master)](https://coveralls.io/github/OpenMendel/MendelImpute?branch=master) |
 
 ## Installation
 
@@ -17,7 +17,7 @@ This package supports Julia `v1.5`+.
 
 ## Documentation
 
-+ [**Latest**](https://biona001.github.io/MendelImpute/dev/)
++ [**Latest**](https://OpenMendel.github.io/MendelImpute/dev/)
 
 ## Usage
 

@@ -19,6 +19,6 @@ makedocs(
 # See "Hosting Documentation" and deploydocs() in the Documenter manual
 # for more information.
 deploydocs(
-    repo   = "github.com/biona001/MendelImpute.git",
+    repo   = "github.com/OpenMendel/MendelImpute.git",
     target = "build"
 )

@@ -24,7 +24,7 @@ using JLSO
 
 ### Step 0. Filter chromosome data 
 
-The original chromosome data are filtered into target and reference panels. Follow [detailed example](https://biona001.github.io/MendelImpute/dev/man/Phasing+and+Imputation/#Detailed-Example) in Phasing and Imputation to obtain the same data.
+The original chromosome data are filtered into target and reference panels. Follow [detailed example](https://openmendel.github.io/MendelImpute/dev/man/Phasing+and+Imputation/#Detailed-Example) in Phasing and Imputation to obtain the same data.
 
 ### Step 1. Get population data
 
@@ -73,7 +73,7 @@ For easier processing, copy the country of origin data into a folder called `dat
 
 ### Step 2. Process each sample's population origin
 
-The goal here is to create a `Dict{key, value}` where each key is a sample ID and the value is the population code. This will be used for both the [paint](https://biona001.github.io/MendelImpute/dev/man/api/#MendelImpute.paint) and [composition](https://biona001.github.io/MendelImpute/dev/man/api/#MendelImpute.composition) function.
+The goal here is to create a `Dict{key, value}` where each key is a sample ID and the value is the population code. This will be used for both the [paint](https://openmendel.github.io/MendelImpute/dev/man/api/#MendelImpute.paint) and [composition](https://openmendel.github.io/MendelImpute/dev/man/api/#MendelImpute.composition) function.
 
 Here the population origin for different samples are encoded in weird subfolder directory way. We process them into the desired dictionary structure.
 
@@ -131,7 +131,7 @@ This is equivalent to running a typical imputation. Please ensure that:
 + The output file name ends with `.jlso` (save output to ultra-compressed format)
 + `impute = true` (so the output contains the entire chromosome)
 
-Note data used here is prepared in [Detailed Example](https://biona001.github.io/MendelImpute/dev/man/Phasing+and+Imputation/#Detailed-Example).
+Note data used here is prepared in [Detailed Example](https://openmendel.github.io/MendelImpute/dev/man/Phasing+and+Imputation/#Detailed-Example).
 
 
 ```julia
@@ -176,7 +176,7 @@ outfile = "mendel.imputed.jlso"
 
 ## Estimate admixture proportions
 
-The [composition](https://biona001.github.io/MendelImpute/dev/man/api/#MendelImpute.composition) will compute a list of percentages where `composition[i]` equals the sample's ancestry (in %) from `populations[i]`. Thus we simply have to plot the result. This illustration depends on **data preparation** above. 
+The [composition](https://openmendel.github.io/MendelImpute/dev/man/api/#MendelImpute.composition) will compute a list of percentages where `composition[i]` equals the sample's ancestry (in %) from `populations[i]`. Thus we simply have to plot the result. This illustration depends on **data preparation** above. 
 
 ### Step 1: import necessary data
 
@@ -235,7 +235,7 @@ sample_population
 
 ### Step 2: call `composition` function
 
-The [composition](https://biona001.github.io/MendelImpute/dev/man/api/#MendelImpute.composition) will compute a list of percentages where `composition[i]` equals the sample's ancestry (in %) from `populations[i]`. We are finally using the imputation result stored in `ph`.
+The [composition](https://openmendel.github.io/MendelImpute/dev/man/api/#MendelImpute.composition) will compute a list of percentages where `composition[i]` equals the sample's ancestry (in %) from `populations[i]`. We are finally using the imputation result stored in `ph`.
 
 
 ```julia
