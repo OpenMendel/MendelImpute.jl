@@ -11,7 +11,7 @@ Download and install [Julia](https://julialang.org/downloads/). Within Julia, co
 using Pkg
 Pkg.add(PackageSpec(url="https://github.com/OpenMendel/SnpArrays.jl.git"))
 Pkg.add(PackageSpec(url="https://github.com/OpenMendel/VCFTools.jl.git"))
-Pkg.add(PackageSpec(url="https://github.com/OpenMendel/MendelImpute.jl.git"))
+Pkg.add(PackageSpec(url="https://github.com/OpenMendel/MendelImpute.git"))
 ```
 This package supports Julia `v1.5`+.
 

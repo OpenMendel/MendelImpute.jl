@@ -1,6 +1,5 @@
 ###### This file is part of the MendelImpute.jl package.
 ###### It contains relevant code to search breakpoints. 
-###### Currently code for double breakpoint search is broken and commented out. 
 
 """
     continue_haplotype(X, compressed_Hunique, window, happair_prev, happair_next)
