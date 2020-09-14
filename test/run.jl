@@ -59,11 +59,11 @@ function bits_to_int(v::AbstractVector)
     total = BigInt(0)
     for i in 1:l
         cur = l - i + 1
-        if v[i] == 1 
+        if v[i] == 1
             total += 2^BigInt(cur - 1)
         end
     end
-    return total 
+    return total
 end
 
 #concatenate bits to string then parse to BigInt
@@ -74,10 +74,10 @@ end
 
 #concatenate bits to string in buffer, then parse to BigInt
 function bits_to_int3(v::AbstractVector)
-    io = IOBuffer() 
-    for entry in v 
-        print(io, entry) 
-    end 
+    io = IOBuffer()
+    for entry in v
+        print(io, entry)
+    end
     str = String(take!(io))
     concat = join(str)
     return parse(BigInt, concat, base=2)
@@ -198,7 +198,7 @@ Random.seed!(123)
 
 function julia_unique(H)
     uH = unique(H, dims=1)
-    return convert(Matrix{Float32}, uH)  
+    return convert(Matrix{Float32}, uH)
 end
 
 p = 8     # number of SNPs within a window
@@ -348,12 +348,12 @@ windows = ceil(Int, p / width)
 unique_hap = UniqueHaplotypes(windows, d)
 fast_data_type = Dict(8=>UInt8, 16=>UInt16, 32=>UInt32, 64=>UInt64, 128=>UInt128)
 
-HR = reinterpret(fast_data_type[width], storage.chunks) 
+HR = reinterpret(fast_data_type[width], storage.chunks)
 
 
 #128000 by 10000 H, width = 64,  43.702105 seconds (47.99 k allocations: 378.702 MiB, 0.57% gc time)
 #128000 by 10000 H, width = 128, 35.878729 seconds (49.97 k allocations: 712.912 MiB, 0.96% gc time)
-@time unique_hap = fast_elimination(H, windows, width, H[1:width, :], fast_data_type) 
+@time unique_hap = fast_elimination(H, windows, width, H[1:width, :], fast_data_type)
 
 #128000 by 10000 H, width = 64, 15.323239 seconds (272.48 k allocations: 3.146 GiB, 3.46% gc time)
 #128000 by 10000 H, width = 128, 14.234709 seconds (135.48 k allocations: 1.573 GiB, 2.94% gc time)
@@ -365,7 +365,7 @@ Hunique = unique_haplotypes(H, 64, 'T')
 storage = zeros(Int, 1000)
 hii = groupslices(H, 2)
 groupslices!(storage, H, 2)
-# unique(groupslices(H, 2)) 
+# unique(groupslices(H, 2))
 # unique_haplotype_idx(H)
 
 @benchmark unique_haplotypes(H, 1:128)
@@ -617,7 +617,7 @@ end
 
 
 
-# take away: don't use sparse arrays 
+# take away: don't use sparse arrays
 using SparseArrays
 using BenchmarkTools
 
@@ -779,7 +779,7 @@ Xm_original = copy(Xm)
 width = 64
 windows = floor(Int, p / width)
 
-hapset, phase = phase2(Xm, H, width=700); 
+hapset, phase = phase2(Xm, H, width=700);
 
 vcffile = "test.08Jun17.d8b.vcf"
 des = "phased." * vcffile
@@ -837,8 +837,8 @@ windows = floor(Int, p / width)
 ph = phase(Xm, H, width=64)
 
 @benchmark phase(Xm, H, width=64) seconds=15   # width 64  : 3.914 s, 401.31 MiB, 11887397 alloc (this includes calculating optimal hapset)
-@benchmark phase(Xm, H, width=400) seconds=15  # width 400 : 
-@benchmark phase(Xm, H, width=1200) seconds=15 # width 1200: 
+@benchmark phase(Xm, H, width=400) seconds=15  # width 400 :
+@benchmark phase(Xm, H, width=1200) seconds=15 # width 1200:
 
 
 using Revise
@@ -1066,7 +1066,7 @@ using GeneticVariation
 using Random
 cd("/Users/biona001/.julia/dev/MendelImpute/simulation")
 
-# impute 
+# impute
 tgtfile = "./compare6/target_masked.vcf.gz"
 reffile = "./compare6/haplo_ref.vcf"
 outfile = "./compare6/imputed_target.vcf.gz"
@@ -1094,7 +1094,7 @@ error_rate = sum(X_mendel .!= X_complete) / n / p
 # 3462.416399 seconds (77.81 G allocations: 3.402 TiB, 12.66% gc time)
 # error = 0.00037152087475149104
 
-# searching only 1 strand's bkpt (w = 800): 
+# searching only 1 strand's bkpt (w = 800):
 # 35.990546 seconds (98.16 M allocations: 9.233 GiB, 3.80% gc time)
 # error = 0.0005958889520022721
 
@@ -1106,7 +1106,7 @@ error_rate = sum(X_mendel .!= X_complete) / n / p
 
 # different haplopair! strategy:
 # keep best pair only (orignal code): error = 0.00025205907412666857, 187.475166 sec
-# keep all happairs that are equally good: error = 0.0002509940357852883, 183.600139 sec 
+# keep all happairs that are equally good: error = 0.0002509940357852883, 183.600139 sec
 # keep top 10 haplotype pairs: 0.0003010508378301619, 175.682698 sec
 # keep all previous best pairs: error = 0.00023839108207895484, 186.741630 sec
 # keep all previous best pairs and equally good pairs: 0.0002378585629082647, 189.419958 sec
@@ -1119,7 +1119,7 @@ using GeneticVariation
 using Random
 cd("/Users/biona001/.julia/dev/MendelImpute/simulation")
 
-# impute 
+# impute
 tgtfile = "./compare6/target_masked.vcf.gz"
 reffile = "./compare6/haplo_ref.vcf"
 outfile = "./compare6/imputed_target.vcf.gz"
@@ -1218,7 +1218,7 @@ MendelImpute.connect_happairs!(hapset[3], memory=mymemory, sol_path=sol_path, pa
 # test if adding/looking up dictionaries is efficient
 function mytest()
     mydict = [Dict{Tuple{Int, Int}, Float64}() for i in 1:length(hapset[3])]
-    
+
     my_arbitrary_sum = 0.0
     for i in 1:length(hapset[3])
         # add to dictionaries
@@ -1324,7 +1324,7 @@ function write_test(ph, H)
     # loop over each record
     for (i, record) in enumerate(reader)
         gtkey = VCF.findgenokey(record, "GT")
-        if !isnothing(gtkey) 
+        if !isnothing(gtkey)
             # loop over samples
             for (j, geno) in enumerate(record.genotype)
                 # if missing = '.' = 0x2e
@@ -1333,7 +1333,7 @@ function write_test(ph, H)
                     hap1_position = searchsortedlast(ph[j].strand1.start, i)
                     hap2_position = searchsortedlast(ph[j].strand2.start, i)
 
-                    #find the correct haplotypes 
+                    #find the correct haplotypes
                     hap1 = ph[j].strand1.haplotypelabel[hap1_position]
                     hap2 = ph[j].strand2.haplotypelabel[hap2_position]
 
@@ -1348,7 +1348,7 @@ function write_test(ph, H)
         write(writer, record)
     end
 
-    # close 
+    # close
     flush(writer); close(reader); close(writer)
 end
 
@@ -1414,9 +1414,9 @@ Hi = @view(H[1:2width, :])
 
 
 # measure allocation
-search_breakpoint(Xi, Hi, (1, 3), (4, 5)) 
+search_breakpoint(Xi, Hi, (1, 3), (4, 5))
 Profile.clear_malloc_data()
-search_breakpoint(Xi, Hi, (1, 3), (4, 5)) 
+search_breakpoint(Xi, Hi, (1, 3), (4, 5))
 
 
 
@@ -1468,7 +1468,7 @@ function write_test(ph, H)
     # loop over each record
     for (i, record) in enumerate(reader)
         gtkey = VCF.findgenokey(record, "GT")
-        if !isnothing(gtkey) 
+        if !isnothing(gtkey)
             # loop over samples
             for (j, geno) in enumerate(record.genotype)
                 # if missing = '.' = 0x2e
@@ -1477,7 +1477,7 @@ function write_test(ph, H)
                     hap1_position = searchsortedlast(ph[j].strand1.start, i)
                     hap2_position = searchsortedlast(ph[j].strand2.start, i)
 
-                    #find the correct haplotypes 
+                    #find the correct haplotypes
                     hap1 = ph[j].strand1.haplotypelabel[hap1_position]
                     hap2 = ph[j].strand2.haplotypelabel[hap2_position]
 
@@ -1492,7 +1492,7 @@ function write_test(ph, H)
         write(writer, record)
     end
 
-    # close 
+    # close
     flush(writer); close(reader); close(writer)
 end
 
@@ -1503,7 +1503,7 @@ function write_test2(ph, H)
     # loop over each record
     for (i, record) in enumerate(reader)
         gtkey = VCF.findgenokey(record, "GT")
-        if !isnothing(gtkey) 
+        if !isnothing(gtkey)
             # loop over samples
             for (j, geno) in enumerate(record.genotype)
                 # if missing = '.' = 0x2e
@@ -1517,7 +1517,7 @@ function write_test2(ph, H)
         write(writer, record)
     end
 
-    # close 
+    # close
     flush(writer); close(reader); close(writer)
 end
 
@@ -1640,10 +1640,10 @@ happairs
 
 
 # single thread original code
-@benchmark haplopair_test!(happairs, hapscore, M, N) # 4.894 s, 4.06 KiB, 1 alloc 
+@benchmark haplopair_test!(happairs, hapscore, M, N) # 4.894 s, 4.06 KiB, 1 alloc
 
 # 4 threads, parallelizing by sample
-@benchmark haplopair_test!(happairs, hapscore, M, N) # 3.891 s, 6.92 KiB, 31 alloc 
+@benchmark haplopair_test!(happairs, hapscore, M, N) # 3.891 s, 6.92 KiB, 31 alloc
 
 
 
@@ -1726,7 +1726,7 @@ X, pos = convert_gt(Float64, vcffile, trans=true, save_pos=true)
 # match indices
 X_pos = [41, 51, 76]
 H_pos = collect(10:100)
-XtoH_idx = indexin(X_pos, H_pos) 
+XtoH_idx = indexin(X_pos, H_pos)
 
 
 i = 1
@@ -1785,7 +1785,7 @@ sum_skipmissing_avx2(x)
 
 
 
-# learn to write to file fast 
+# learn to write to file fast
 using Random
 using CodecZlib
 using BenchmarkTools
@@ -1990,7 +1990,7 @@ function filter_and_mask(chr::Int, maf::Float64)
     println("filtering for unique snps")
     data = "HRC.r1-1.EGA.GRCh37.chr$chr.haplotypes.vcf.gz"
     full_record_index = .!find_duplicate_marker(data)
-    @time VCFTools.filter(data, full_record_index, 1:nsamples(data), 
+    @time VCFTools.filter(data, full_record_index, 1:nsamples(data),
         des = "chr$chr.uniqueSNPs.vcf.gz")
 
     # summarize data
@@ -2003,21 +2003,21 @@ function filter_and_mask(chr::Int, maf::Float64)
     sample_idx = falses(samples)
     sample_idx[1:n] .= true
     shuffle!(sample_idx)
-    @time VCFTools.filter("chr$chr.uniqueSNPs.vcf.gz", 1:total_snps, 
+    @time VCFTools.filter("chr$chr.uniqueSNPs.vcf.gz", 1:total_snps,
         sample_idx, des = "target.chr$chr.full.vcf.gz", allow_multiallelic=false)
 
     # also generate reference panel without target samples
     println("generating reference panel without target samples")
-    @time VCFTools.filter("chr$chr.uniqueSNPs.vcf.gz", 1:total_snps, 
+    @time VCFTools.filter("chr$chr.uniqueSNPs.vcf.gz", 1:total_snps,
         .!sample_idx, des = "ref.chr$chr.excludeTarget.vcf.gz", allow_multiallelic=false)
 
     # generate target file with 1000 samples and typed snps with certain maf
     println("generating target file with typed snps only")
-    my_maf = findall(x -> x > maf, maf_by_record)  
+    my_maf = findall(x -> x > maf, maf_by_record)
     p = length(my_maf)
     record_idx = falses(total_snps)
     record_idx[my_maf] .= true
-    @time VCFTools.filter("chr$chr.uniqueSNPs.vcf.gz", record_idx, sample_idx, 
+    @time VCFTools.filter("chr$chr.uniqueSNPs.vcf.gz", record_idx, sample_idx,
         des = "target.chr$chr.typedOnly.maf$maf.vcf.gz", allow_multiallelic=false)
 
     # unphase and mask 1% entries in target file
@@ -2027,7 +2027,7 @@ function filter_and_mask(chr::Int, maf::Float64)
     for j in 1:n, i in 1:p
         rand() < missingprop && (masks[i, j] = true)
     end
-    @time mask_gt("target.chr$chr.typedOnly.maf$maf.vcf.gz", masks, 
+    @time mask_gt("target.chr$chr.typedOnly.maf$maf.vcf.gz", masks,
         des="target.chr$chr.typedOnly.maf$maf.masked.vcf.gz", unphase=true)
 
     # finally compress reference file to jlso format
@@ -2148,24 +2148,24 @@ b = rand(1000);
 
 
 
-using BenchmarkTools, Random
+using BenchmarkTools, Random, Lasso
 
 """
-Find minimum of `M_jk - N_ij - N_ik` for each i. M is upper triangular. 
+Find minimum of `M_jk - N_ij - N_ik` for each i. M is upper triangular.
 
-Saves minimum value in `best_err` and `j, k` index in `row` and `col`. 
+Saves minimum value in `best_err` and `j, k` index in `row` and `col`.
 """
 function best_index!(
     best_err::Vector{T},
-    row::Vector{Int},
-    col::Vector{Int},
+    row::Vector{Int32},
+    col::Vector{Int32},
     M::AbstractMatrix{T},
     N::AbstractMatrix{T},
     ) where T <: Real
 
     n, d = size(N)
 
-    @inbounds for k in 1:d, j in 1:k 
+    @inbounds for k in 1:d, j in 1:k
         @simd for i in 1:n
             score = M[j, k] - N[i, j] - N[i, k]
 
@@ -2182,13 +2182,16 @@ n = 100
 p = 100
 d = 5000
 
-row_index, col_index = ones(Int, n), ones(Int, n)
-best_err = [typemax(Float64) for _ in 1:n]
-M = rand(d, d)
-N = rand(n, d)
+row_index, col_index = ones(Int32, n), ones(Int32, n)
+best_err = [typemax(Float32) for _ in 1:n]
+M = rand(Float32, d, d)
+N = rand(Float32, n, d)
 
-@btime best_index!($best_err, $row_index, $col_index, $M, $N)
+# use Int64: 886.923 ms (0 allocations: 0 bytes)
+@btime best_index!($best_err, $row_index, $col_index, $M, $N) setup=(fill!(best_err, Inf32); row_index = ones(Int, n); col_index = ones(Int, n))
 
+# use Int32: 892.310 ms (0 allocations: 0 bytes)
+@btime best_index!($best_err, $row_index, $col_index, $M, $N) setup=(fill!(best_err, Inf32); row_index = ones(Int32, n); col_index = ones(Int32, n))
 
 
 using Revise
@@ -2213,6 +2216,525 @@ compress_haplotypes(reffile, tgtfile, outfile, width)
 
 
 
+using Revise
+using VCFTools
+using MendelImpute
+using GeneticVariation
+using Random
+using StatsBase
+using CodecZlib
+using ProgressMeter
+using JLD2, FileIO, JLSO
+using BenchmarkTools
+using GroupSlices
+
+Random.seed!(2020)
+n = 1000
+p = 512
+d = 1000
+
+X = rand(UInt8, p, n)
+H = bitrand(p, d)
+
+@btime haplopair_thin(X, H, keep=100)  #224.270 ms (5478 allocations: 8.17 MiB)
+@btime haplopair_thin2(X, H, keep=100) #69.389 ms (5018 allocations: 15.55 MiB)
+
+
+@btime haplopair_thin(X, H, keep=600)  #1.708 s (6507 allocations: 10.50 MiB)
+@btime haplopair_thin2(X, H, keep=600) #1.159 s (5019 allocations: 15.55 MiB)
 
 
 
+
+
+
+using Revise
+using VCFTools
+using MendelImpute
+using GeneticVariation
+using Random
+using StatsBase
+using CodecZlib
+using ProgressMeter
+using JLD2, FileIO, JLSO
+using BenchmarkTools
+using GroupSlices
+using Lasso
+
+Random.seed!(2020)
+n = 1000
+p = 512
+d = 1000
+
+X = rand(p, n)
+H = rand(0.:1., p, d)
+happairs, hapscore = haplopair(X, H)
+
+# try lasso on x1
+x1 = X[:, 1];
+path = fit(LassoPath, H, x1, Normal(), IdentityLink(), λ=collect(0.035:0.001:0.039))
+path.coefs[:, 3] # picks 335 and 443
+happairs[1][1], happairs[2][1] # our code picks (453, 543)
+
+# try lasso on x2
+x2 = X[:, 2];
+path = fit(LassoPath, H, x2, Normal(), IdentityLink(), λ=collect(0.035:0.001:0.039))
+path.coefs[:, 3] # picks 139 and 983
+happairs[1][2], happairs[2][2] # our code picks (428, 518)
+
+
+# find λ so that only 2 β is non-zero
+function bisection()
+    λtop = 1.0
+    λlow = 0.0
+    while true
+        λmid = (λtop + λlow) / 2
+        path = fit(LassoPath, H, x2, Normal(), IdentityLink(), λ=[λmid])
+
+        nz = count(!iszero, path.coefs)
+        if nz == 2
+            println(path.coefs.rowval)
+            println("λtop = $λtop, λlow = $λlow, λmid = $λmid, nz = $nz")
+            break
+        else
+            # bisection search
+            nz < 2 ? (λtop = λmid) : (λlow = λmid)
+        end
+        println("λtop = $λtop, λlow = $λlow, λmid = $λmid, nz = $nz")
+    end
+end
+bisection()
+
+
+
+
+using MendelImpute, JLSO, UnicodePlots, StatsBase
+
+@time loaded = JLSO.load("ref.chr20.w64.maf0.01.excludeTarget.jlso") # roughly 30 sec
+compressed_Hunique = loaded[:compressed_Hunique];
+x = count_haplotypes_per_window(compressed_Hunique)
+UnicodePlots.histogram(x, nbins=50)
+
+
+
+
+
+using Revise
+using VCFTools
+using MendelImpute
+using JLSO, JLD2, FileIO
+using LinearAlgebra
+cd("/home/biona001/HRC")
+
+# to load:
+@load "example_data.jld2" Ms Ns
+Ms[1] # M for width = 64
+Ms[2] # M for width = 128
+Ns[1] # N for width = 64 ... etc
+
+
+# width = 64 averages 873 haplotype per window. Total win =2789
+# width = 128 averages 2497 haplotype per window. Total win = 1394
+# width = 256 averages 6985 haplotype per window. Total win =697
+# width = 512 averages 17234 haplotype per window. Total win = 348
+# width = 1024 averages 32428 haplotype per window. Total win = 174
+
+function create_M_and_N()
+    w = 1 # choose a window
+    widths = [64, 128, 256, 512, 1024]
+    Ms = Vector{Matrix{Float32}}(undef, 5)
+    Ns = Vector{Matrix{Float32}}(undef, 5)
+
+    # genotype data
+    tgtfile = "target.chr20.typedOnly.maf0.01.masked.vcf.gz"
+    X, X_sampleID, X_chr, X_pos, X_ids, X_ref, X_alt = VCFTools.convert_gt(UInt8, tgtfile, trans=true, save_snp_info=true, msg = "Importing genotype file...")
+
+    for (i, width) in enumerate(widths)
+        # load data (takes roughly 30 sec)
+        @time loaded = JLSO.load("ref.chr20.w$width.maf0.01.excludeTarget.jlso")
+        compressed_Hunique = loaded[:compressed_Hunique];
+        Hw_aligned = compressed_Hunique.CW_typed[w].uniqueH
+        Xw_idx_start = (w - 1) * width + 1
+        Xw_idx_end = (w == windows ? length(X_pos) : w * width)
+        Xw_aligned = X[Xw_idx_start:Xw_idx_end, :]
+
+        # haplopair and haplopair! in haplotype_pair.jl
+        p, n  = size(Xw_aligned)
+        d     = size(Hw_aligned, 2)
+        Xwork = zeros(Float32, p, n)
+        Hwork = convert(Matrix{Float32}, Hw_aligned)
+        MendelImpute.initXfloat!(Xw_aligned, Xwork) # initializes missing
+        M = zeros(Float32, d, d)
+        N = zeros(Float32, n, d)
+
+        # assemble M
+        mul!(M, Transpose(Hwork), Hwork)
+        for j in 1:d, i in 1:(j - 1) # off-diagonal
+            M[i, j] = 2M[i, j] + M[i, i] + M[j, j]
+        end
+        for j in 1:d # diagonal
+            M[j, j] *= 4
+        end
+        # assemble N
+        mul!(N, Transpose(Xwork), Hwork)
+        @simd for I in eachindex(N)
+            N[I] *= 2
+        end
+
+        Ms[i] = M
+        Ns[i] = N
+    end
+    return Ms, Ns
+end
+Ms, Ns = create_M_and_N()
+@save "example_data.jld2" Ms Ns
+
+
+
+using Random
+using SparseArrays
+using DataFrames
+
+Random.seed!(2020)
+x = sprandn(1_000_000, 10_000, 0.1)
+I, J, V = findnz(x)
+df = DataFrame([:I => I, :J => J, :V => V])
+CSV.write("/tmp/spmatrix.csv", df)
+
+
+
+using Random
+using BenchmarkTools
+
+function set_index!(x, idx)
+    x .= false
+    for i in idx
+        x[i] = true
+    end
+end
+
+x = bitrand(10000)
+idx = rand(1:10000, 1000)
+
+@benchmark set_index!($x, $idx) setup=(idx = rand(1:10000, 1000))
+
+
+
+struct bitv
+    v::BitVector
+end
+
+function set_index!(x::bitv, idx)
+    x.v .= false
+    @inbounds for i in idx
+        x.v[i] = true
+    end
+end
+x = bitv(bitrand(10000))
+idx = rand(1:10000, 1000)
+
+@benchmark set_index!($x, $idx) setup=(idx = rand(1:10000, 1000))
+
+
+
+
+using Random
+using BenchmarkTools
+
+function noelapse(n)
+    s = 0.0
+    for i in 1:n
+        s += rand()
+    end
+    s
+end
+
+function elapse(n)
+    s = 0.0
+    t = @elapsed begin
+        for i in 1:n
+            s += rand()
+        end
+    end
+    s, t
+end
+
+function elapse2(n)
+    s = 0.0
+    t = 0.0
+    @inbounds for i in 1:n
+        t += @elapsed s += rand()
+    end
+    s, t
+end
+
+@benchmark x = noelapse(100)
+@benchmark x, t = elapse(100)
+@benchmark x, t = elapse2(100)
+
+
+
+
+
+
+
+using Random
+using BenchmarkTools
+
+# see post https://discourse.julialang.org/t/editing-an-array-with-multiple-threads/25364/9
+function f(spacing)
+    n = 1_000_000
+    x = rand(n)
+
+    s = zeros(Threads.nthreads()*spacing) # sum of x
+    c = zeros(Threads.nthreads()*spacing) # count additions in each thread
+
+    Threads.@threads for i = 1:n
+        s[Threads.threadid()*spacing] += x[i] # thread i adds to s[i]
+        c[Threads.threadid()*spacing] += 1    # thread i adds to c[i]
+    end
+    return sum(s), c
+end
+
+@btime f(1); #17.915 ms (35 allocations: 7.63 MiB)
+@btime f(8); #1.513 ms (35 allocations: 7.63 MiB)
+
+
+
+# Phase genotypes with beagle 5.1
+java -jar ../beagle.18May20.d20.jar gt=target.typedOnly.maf0.01.masked.vcf.gz ref=ref.excludeTarget.vcf.gz out=beagle.target.phased nthreads=8 impute=false
+
+# run tabix to get tabix index for .vcf.gz files
+tabix -p vcf beagle.target.phased.vcf.gz
+tabix -p vcf ref.excludeTarget.vcf.gz
+
+# Run impute 5
+impute5 --h ref.excludeTarget.vcf.gz --m ../maps/genetic_maps.b37.tar/chr20.b37.gmap.gz --g beagle.target.phased.vcf.gz --r 20 --o impute5.imputed.vcf.gz
+
+
+let 
+    tot = 0
+    for (key, val) in compressed_Hunique.CW_typed[1].hapmap
+        if length(val) > 196
+            tot += 1
+        end
+    end
+    println(tot)
+end
+
+
+using Revise
+using LinearAlgebra
+using BenchmarkTools
+using ThreadPools
+
+BLAS.set_num_threads(1)
+
+function test_multiply()
+    threads = Threads.nthreads()
+    A = [rand(1000, 1000) for _ in 1:threads]
+    B = [rand(1000, 1000) for _ in 1:threads]
+    C = [rand(1001, 1001) for _ in 1:threads]
+    # Threads.@threads for i in 1:10000
+    ThreadPools.@qthreads for i in 1:10000
+            id = Threads.threadid()
+        mul!(view(C[id], 1:1000, 1:1000), A[id], B[id])
+    end
+    return C
+end
+test_multiply();
+
+
+
+
+
+
+using Revise
+using VCFTools
+using GroupSlices
+
+cd(".julia/dev/MendelImpute/simulation/compare2")
+H = convert_ht(Bool, "ref.excludeTarget.vcf.gz", trans=true)
+result = get_window_intervals(H, 1000)
+
+
+# experiment with parallel write
+using Revise
+using VCFTools
+using MendelImpute
+using GeneticVariation
+using Random
+using StatsBase
+using CodecZlib
+using ProgressMeter
+using BenchmarkTools
+using GroupSlices
+
+function Base.write(
+    outfile::AbstractString,
+    X::AbstractMatrix,
+    )
+    # write minimal meta information to outfile
+    io = openvcf(outfile, "w")
+    pb = PipeBuffer()
+    print(pb, "##fileformat=VCFv4.2\n")
+    print(pb, "##source=MendelImpute\n")
+    print(pb, "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n")
+
+    pmeter = Progress(size(X, 1), 5, "Writing to file...")
+    @inbounds for i in 1:size(X, 1)
+        # print ith record
+        write_snp!(pb, @view(X[i, :]))
+
+        (bytesavailable(pb) > (1024*1024)) && write(io, take!(pb))
+        next!(pmeter)
+    end
+    write(io, take!(pb))
+
+    # close & return
+    close(io); close(pb)
+    return nothing
+end
+"""
+Helper function for saving a record (SNP), not tracking phase information.
+"""
+function write_snp!(pb::IOBuffer, X::AbstractVector)
+    n = length(X)
+    @inbounds for j in 1:n
+        if X[j] == 0
+            print(pb, "\t0/0")
+        elseif X[j] == 1
+            print(pb, "\t1/0")
+        elseif X[j] == 2
+            print(pb, "\t1/1")
+        else
+            error("imputed genotypes can only be 0, 1, 2 but got $(X[j])")
+        end
+    end
+    print(pb, "\n")
+    nothing
+end
+
+function write_threaded(
+    outfile::AbstractString,
+    X::AbstractMatrix,
+    )
+    threads = Threads.nthreads()
+    snps = size(X, 1)
+    len = div(snps, threads)
+    files = ["tmp$i.vcf.gz" for i in 1:threads]
+
+    # write minimal meta information to outfile
+    io = [openvcf(files[i], "w") for i in 1:threads]
+    pb = [PipeBuffer() for _ in 1:threads]
+    print(pb[1], "##fileformat=VCFv4.2\n")
+    print(pb[1], "##source=MendelImpute\n")
+    print(pb[1], "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n")
+    pmeter = Progress(snps, 5, "Writing to file...")
+
+    # each thread writes `len` SNPs
+    Threads.@threads for t in 1:threads
+        id = Threads.threadid()
+        cur_ranges = (id == threads ? ((threads-1)*len+1:snps) : (1:len) .+ (t-1)*len)
+        @inbounds for i in cur_ranges
+            write_snp!(pb[id], @view(X[i, :]))
+            (bytesavailable(pb[id]) > (1024*1024)) && write(io[id], take!(pb[id])) 
+            next!(pmeter)
+        end
+        write(io[id], take!(pb[id]))
+    end
+    close.(io); close.(pb) # close io and buffer
+
+    # concatenate all files into 1 VCF file
+    run(pipeline(`cat $files`, stdout=outfile))
+
+    # delete intermediate files
+    for i in 1:threads
+        rm("tmp$i.vcf.gz", force=true)
+    end
+
+    return nothing
+end
+
+
+Random.seed!(2020)
+p = 100_000
+n = 1000
+X = convert(Matrix{UInt8}, rand(0:2, p, n))
+Y = convert(Matrix{UInt8}, rand(0:2, 10, 10))
+outfile = "test.vcf.gz"
+
+@time write(outfile, X) # 23.534699 seconds (60.28 k allocations: 384.933 MiB, 0.39% gc time)
+@time write_threaded(outfile, X) #
+
+
+# minimal example
+using CodecZlib
+for i in 1:3
+    file = "file$i.gz"
+    x = rand(2, 2)
+    io = GzipCompressorStream(open(file, "w"))
+    write(io, "hello, testing from i = $i")
+    # close(io)
+end
+
+files = ["file1.gz", "file2.gz", "file3.gz"]
+run(pipeline(`cat $files`, stdout="allfiles.gz"))
+
+
+
+
+using ProfileView
+@profview write(outfile, Y) 
+@profview write(outfile, X) 
+
+
+# experiment with parallel read
+using Revise
+using VCFTools
+using MendelImpute
+using GeneticVariation
+using Random
+using StatsBase
+using CodecZlib
+using ProgressMeter
+using BenchmarkTools
+using GroupSlices
+
+
+struct test
+    x::Int
+    y::Int
+end
+hi = test(1, 2)
+@code_warntype hi.x
+
+struct test2
+    x::Int
+    y::Int
+    z::Vector{Int}
+end
+hi = test2(1, 2, collect(1:3))
+@code_warntype hi.x
+
+struct test3
+    x::Int
+    y::Float64
+end
+hi = test3(1, 2.0)
+@code_warntype hi.x
+
+struct test5{T, U}
+    x::T
+    y::U
+end
+hi = test5(1, 2.0)
+@code_warntype hi.x
+
+struct CW
+    uniqueindex::Vector{Int32}
+    hapmap::Dict{Int32, Vector{Int32}}
+    to_unique::Vector{Int32}
+    uniqueH::BitMatrix
+end
+fd = CW(rand(Int32, 0:4))

@@ -7,8 +7,7 @@ os:
   - windows
 
 julia:
-  - 1.0
-  - 1.4
+  - 1.5
   - nightly
 
 notifications:
@@ -19,7 +18,7 @@ git:
 
 before_script: # install dependent unregistered packages
   - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
-  - julia -e 'using Pkg; Pkg.add([PackageSpec(url="https://github.com/OpenMendel/VCFTools.jl.git")]);'
+  - julia -e 'using Pkg; Pkg.add([PackageSpec(url="https://github.com/OpenMendel/SnpArrays.jl.git"), PackageSpec(url="https://github.com/OpenMendel/VCFTools.jl.git")]);'
 
 after_script:
   - julia -e 'using Pkg, MendelImpute; cd(joinpath(dirname(pathof(MendelImpute)), "..")); Pkg.add("Coverage"); using Coverage; Codecov.submit(process_folder()); Coveralls.submit(process_folder())'
@@ -29,3 +28,16 @@ after_success:
   - julia -e 'cd(Pkg.dir("MendelImpute")); Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder())'
   # push coverage results to Codecov
   - julia -e 'cd(Pkg.dir("MendelImpute")); Pkg.add("Coverage"); using Coverage; Codecov.submit(Codecov.process_folder())'
+
+jobs:
+  fast_finish: true
+  allow_failures:
+    - julia: nightly
+  include:
+    - stage: "Documentation"
+      julia: 1.5
+      os: osx
+      script:
+        - julia -e 'using Pkg; Pkg.add("Documenter")'
+        - julia -e 'using MendelImpute; include(joinpath(dirname(pathof(MendelImpute)), "..", "docs", "make.jl"))'
+      after_success: skip
