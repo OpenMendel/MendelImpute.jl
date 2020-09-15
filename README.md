@@ -2,7 +2,7 @@
 
 | **Documentation** | **Build Status** | **Code Coverage**  |
 |-------------------|------------------|--------------------|
-| [![](https://img.shields.io/badge/docs-latest-blue.svg)](https://OpenMendel.github.io/MendelImpute/dev/) | [![Build Status](https://travis-ci.com/OpenMendel/MendelImpute.svg?branch=master)](https://travis-ci.com/github/OpenMendel/MendelImpute) | [![Coverage Status](https://coveralls.io/repos/github/OpenMendel/MendelImpute/badge.svg?branch=master)](https://coveralls.io/github/OpenMendel/MendelImpute?branch=master) |
+| [![](https://img.shields.io/badge/docs-latest-blue.svg)](https://OpenMendel.github.io/MendelImpute.jl/dev/) | [![Build Status](https://travis-ci.com/OpenMendel/MendelImpute.jl.svg?branch=master)](https://travis-ci.com/github/OpenMendel/MendelImpute.jl) | [![Coverage Status](https://coveralls.io/repos/github/OpenMendel/MendelImpute.jl/badge.svg?branch=master)](https://coveralls.io/github/OpenMendel/MendelImpute.jl?branch=master) |
 
 ## Installation
 
@@ -11,13 +11,13 @@ Download and install [Julia](https://julialang.org/downloads/). Within Julia, co
 using Pkg
 Pkg.add(PackageSpec(url="https://github.com/OpenMendel/SnpArrays.jl.git"))
 Pkg.add(PackageSpec(url="https://github.com/OpenMendel/VCFTools.jl.git"))
-Pkg.add(PackageSpec(url="https://github.com/OpenMendel/MendelImpute.git"))
+Pkg.add(PackageSpec(url="https://github.com/OpenMendel/MendelImpute.jl.git"))
 ```
 This package supports Julia `v1.5`+.
 
 ## Documentation
 
-+ [**Latest**](https://OpenMendel.github.io/MendelImpute/dev/)
++ [**Latest**](https://OpenMendel.github.io/MendelImpute.jl/dev/)
 
 ## Usage
 

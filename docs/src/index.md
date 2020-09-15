@@ -2,7 +2,7 @@
 
 *Fast genotype imputation, phasing, and admixture estimation!*
 
-`MendelImpute.jl` is the fastest and least memory-consuming software for phasing and genotype imputation, as of 2020. It is also capable of ancestry estimation.
+`MendelImpute.jl` is the fastest and most memory-efficient software for phasing and genotype imputation, as of 2020. It is also capable of ancestry estimation.
 
 ## Package Features
 
