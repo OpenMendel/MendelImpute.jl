@@ -25,3 +25,4 @@ GBR_data.csv
 *.bson
 *.h5
 *.bref3
+*.pvals
