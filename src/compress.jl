@@ -3,11 +3,6 @@
 ###### a `.jlso` or `.jld2` compressed panel. 
 
 """
-Highest level of abstraction of a compressed object
-"""
-abstract type Compressed end
-
-"""
 Data structure for keeping track of unique haplotypes in a window. 
 
 # Every window contains:
