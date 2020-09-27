@@ -11,6 +11,7 @@ stores result in `haplotype1` and `haplotype2`.
 # Arguments
 - `haplotype1`: Person `i` strand1 haplotype in window `w` is `haplotype1[i][w]`
 - `haplotype2`: Person `i` strand2 haplotype in window `w` is `haplotype2[i][w]`
+- `haploscore`: Least square error for each person in each window. 
 - `compressed_Hunique`: A `CompressedHaplotypes` object
 - `X`: the full genotype matrix possibly with missings. Each column is an 
     individual.
@@ -38,6 +39,7 @@ stores result in `haplotype1` and `haplotype2`.
 function compute_optimal_haplotypes!(
     haplotype1::AbstractVector,
     haplotype2::AbstractVector,
+    haploscore::AbstractVector,
     compressed_Hunique::CompressedHaplotypes,
     X::AbstractMatrix,
     X_pos::AbstractVector,
@@ -137,8 +139,8 @@ function compute_optimal_haplotypes!(
         end
 
         # save result 
-        t7 = @elapsed save_haplotypes!(haplotype1, haplotype2, happair1[id], 
-            happair2[id], compressed_Hunique, w)
+        t7 = @elapsed save_haplotypes!(haplotype1, haplotype2, haploscore,
+        happair1[id], happair2[id], hapscore[id], compressed_Hunique, w)
 
         # record timings and haplotypes (× 8 to avoid false sharing)
         timers[id][8]  += t1
@@ -165,27 +167,34 @@ indices of full haplotype pool, and store them in `haplotype`s.
 # Arguments
 - `haplotype1`: Person `i` strand1 haplotype in window `w` is `haplotype1[i][w]`
 - `haplotype2`: Person `i` strand2 haplotype in window `w` is `haplotype2[i][w]`
+- `haploscore`: Least square error for each person in each window. 
 - `happair1`: Optimal haplotype pair in strand1 of current window, indexes off
     of unique haplotypes.
 - `happair2`: Optimal haplotype pair in strand2 of current window, indexes off
     of unique haplotypes.
+- `hapscore`: Error induced by optimal haplotype pair in current window, for 
+    each person.
 - `compressed_Hunique`: A `CompressedHaplotypes` object
 - `window` current window.
 """
 function save_haplotypes!(
     haplotype1::Vector{Vector{Int32}},
     haplotype2::Vector{Vector{Int32}},
+    haploscore::Vector{Vector{Float32}},
     happair1::Vector{Int32},
     happair2::Vector{Int32},
+    hapscore::Vector{Float32},
     compressed_Hunique::CompressedHaplotypes,
     window::Int,
     )
+
     people = length(haplotype1)
     @inbounds for i in 1:people
         haplotype1[i][window] = unique_idx_to_complete_idx(
             happair1[i], window, compressed_Hunique)
         haplotype2[i][window] = unique_idx_to_complete_idx(
             happair2[i], window, compressed_Hunique)
+        haploscore[i][window] = hapscore[i]
     end
     return nothing
 end
