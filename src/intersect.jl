@@ -44,11 +44,11 @@ function phase_sample!(
 
     @inbounds for w in 2:windows
         # consider all haplotypes if error rate too high
-        if hapscore[w] > 50
-            lifespan1 += 1
-            lifespan2 += 1
-            continue
-        end
+        # if hapscore[w] > 50
+        #     lifespan1 += 1
+        #     lifespan2 += 1
+        #     continue
+        # end
 
         # get current window's best haplotypes
         h1 = happair1[w]
