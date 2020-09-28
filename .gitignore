@@ -13,6 +13,7 @@ GBR_data.csv
 test/*.gz
 simulation/*/*.gz
 simulation/*/*.vcf
+simulation/*/*.jlso
 simulation/*.gz
 test/*.vcf
 test/*.vcf.gz
@@ -24,8 +25,11 @@ data/uniqueSNPs.vcf.gz
 
 # don't track real data 
 data/1000_genome_phase3_v5/*/*.gz
+data/1000_genome_phase3_v5/*/*.jlso
 data/HRC/*.gz
+data/HRC/*.jlso
 docs/src/man/*.gz
+docs/src/man/*.jlso
 *.m3vcf
 *.m3vcf.gz
 *.info
@@ -34,7 +38,6 @@ docs/src/man/*.gz
 *eagle
 *.tbi
 *.jld2
-*.jlso
 *.bson
 *.h5
 *.bref3
