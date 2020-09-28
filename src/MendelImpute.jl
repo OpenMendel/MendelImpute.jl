@@ -32,5 +32,7 @@ module MendelImpute
     include("intersect.jl")
     include("painting.jl")
     include("ultra_compress.jl")
-    
+
+    # test data directory
+    datadir(parts...) = joinpath(@__DIR__, "..", "data", parts...)    
 end # module

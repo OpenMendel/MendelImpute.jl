@@ -10,9 +10,22 @@ AFRped_geno.txt
 GBR_data.csv
 
 # don't track simulations 
-*.gz
-*.vcf
-*.vcf.gz
+test/*.gz
+simulation/*/*.gz
+simulation/*/*.vcf
+simulation/*.gz
+test/*.vcf
+test/*.vcf.gz
+
+# example data only track target genotype, reference haplotype, and true genotypes
+data/full.vcf
+data/target.typedOnly.vcf.gz
+data/uniqueSNPs.vcf.gz
+
+# don't track real data 
+data/1000_genome_phase3_v5/*/*.gz
+data/HRC/*.gz
+docs/src/man/*.gz
 *.m3vcf
 *.m3vcf.gz
 *.info
@@ -26,3 +39,4 @@ GBR_data.csv
 *.h5
 *.bref3
 *.pvals
+
