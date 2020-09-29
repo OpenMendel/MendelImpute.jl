@@ -15,15 +15,27 @@ Pkg.add(PackageSpec(url="https://github.com/OpenMendel/MendelImpute.jl.git"))
 ```
 This package supports Julia `v1.5`+.
 
+Example run:
+
+```julia
+# first compress reference haplotypes to .jlso forma
+using MendelImpute                         # load package
+cd(normpath(MendelImpute.datadir())        # change to data directory
+reffile = "ref.excludeTarget.vcf.gz"       # specify reference VCF file
+tgtfile = "target.typedOnly.masked.vcf.gz" # specify target VCF file (GWAS file)
+outfile = "ref.excludeTarget.jlso"         # output file name (end in .jlso)
+compress_haplotypes(reffile, tgtfile, outfile)
+
+# phase & impute
+tgtfile = "target.typedOnly.masked.vcf.gz" # target VCF file (GWAS file)
+reffile = "ref.excludeTarget.jlso"         # compressed ref file
+outfile = "imputed.vcf.gz"                 # output file name (phased & imputed GWAS data)
+phase(tgtfile, reffile, outfile = outfile)
+```
+
 ## Documentation
 
 + [**Latest**](https://OpenMendel.github.io/MendelImpute.jl/dev/)
-
-## Usage
-
-Given a target genotype file (phased or unphased, may contain missing data, ending in `.vcf` or `.vcf.gz`) and a reference haplotype file (phased, no missing, ending in `.vcf`, `.vcf.gz` or `.jlso`), our software phases and imputes every SNP in the reference file to the target file. Like many other software, SNPs typed in target must all be present in the reference panel.
-
-Also check out [VCFTools.jl](https://github.com/OpenMendel/VCFTools.jl) and [SnpArrays.jl](https://github.com/OpenMendel/SnpArrays.jl) for intuitive manipulation of VCF and PLINK files. 
 
 ## Bug Fixes and User support
 
