@@ -6,12 +6,15 @@
     phase_sample!(happair1, happair2, compressed_Hunique, [seen])
 
 Phases `happair1` and `happair2` window-by-window using a heuristic strategy.
-`happair1[w]` can be mutated to an equivalent haplotype in window `w` such
+`happair1` and `happair1` index off the complete haplotype panel and can be 
+many other haplotypes in window `w`. We want to pick just 1 in this pool such
 that overall windows the number of haplotype switches is minimzed.
 
 # Arguments
 - `happair1`: `happair1[w]` is the haplotype index for strand1 in window `w`
 - `happair2`: `happair2[w]` is the haplotype index for strand2 in window `w`
+- `hapscore`: Error induced by optimal haplotype pair in current window, for 
+    each person.
 - `compressed_Hunique`: A `CompressedHaplotypes` object
 
 # Optional storage argument
@@ -20,6 +23,7 @@ that overall windows the number of haplotype switches is minimzed.
 function phase_sample!(
     happair1::AbstractVector{<:Integer},
     happair2::AbstractVector{<:Integer},
+    hapscore::AbstractVector{Float32},
     compressed_Hunique::CompressedHaplotypes,
     # preallocated items
     survivors1::AbstractVector{<:Integer}=Int32[],
@@ -39,6 +43,13 @@ function phase_sample!(
     store!(survivors2, get(compressed_Hunique.CW_typed[1].hapmap, h2, h2))
 
     @inbounds for w in 2:windows
+        # consider all haplotypes if error rate too high
+        # if hapscore[w] > 50
+        #     lifespan1 += 1
+        #     lifespan2 += 1
+        #     continue
+        # end
+
         # get current window's best haplotypes
         h1 = happair1[w]
         h2 = happair2[w]

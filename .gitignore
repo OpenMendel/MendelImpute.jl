@@ -10,9 +10,28 @@ AFRped_geno.txt
 GBR_data.csv
 
 # don't track simulations 
-*.gz
-*.vcf
-*.vcf.gz
+test/*.gz
+simulation/*/*.gz
+simulation/*/*.vcf
+simulation/*/*.jlso
+simulation/*.gz
+test/*.vcf
+test/*.vcf.gz
+
+# example data only track target genotype, reference haplotype, and true genotypes
+data/full.vcf
+data/target.typedOnly.vcf.gz
+data/uniqueSNPs.vcf.gz
+data/imputed.vcf.gz
+data/imputed.sample.error
+
+# don't track real data 
+data/1000_genome_phase3_v5/*/*.gz
+data/1000_genome_phase3_v5/*/*.jlso
+data/HRC/*.gz
+data/HRC/*.jlso
+docs/src/man/*.gz
+docs/src/man/*.jlso
 *.m3vcf
 *.m3vcf.gz
 *.info
@@ -21,8 +40,8 @@ GBR_data.csv
 *eagle
 *.tbi
 *.jld2
-*.jlso
 *.bson
 *.h5
 *.bref3
 *.pvals
+

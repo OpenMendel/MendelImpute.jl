@@ -19,11 +19,29 @@ This package supports Julia `v1.5`+.
 
 + [**Latest**](https://OpenMendel.github.io/MendelImpute.jl/dev/)
 
-## Usage
+## Example run:
 
-Given a target genotype file (phased or unphased, may contain missing data, ending in `.vcf` or `.vcf.gz`) and a reference haplotype file (phased, no missing, ending in `.vcf`, `.vcf.gz` or `.jlso`), our software phases and imputes every SNP in the reference file to the target file. Like many other software, SNPs typed in target must all be present in the reference panel.
+The following uses data under the `data/` directory.
 
-Also check out [VCFTools.jl](https://github.com/OpenMendel/VCFTools.jl) and [SnpArrays.jl](https://github.com/OpenMendel/SnpArrays.jl) for intuitive manipulation of VCF and PLINK files. 
+```julia
+# load package & cd to data directory
+using MendelImpute                         
+cd(normpath(MendelImpute.datadir()))
+
+# compress reference haplotypes from .vcf.gz to .jlso format
+reffile = "ref.excludeTarget.vcf.gz"       # reference VCF file
+tgtfile = "target.typedOnly.masked.vcf.gz" # target VCF file (GWAS file)
+outfile = "ref.excludeTarget.jlso"         # output file name (end in .jlso)
+compress_haplotypes(reffile, tgtfile, outfile)
+
+# phase & impute
+tgtfile = "target.typedOnly.masked.vcf.gz" # target VCF file (GWAS file)
+reffile = "ref.excludeTarget.jlso"         # compressed reference file
+outfile = "imputed.vcf.gz"                 # output file name
+phase(tgtfile, reffile, outfile = outfile);
+```
+
+For more realistic example, see [detailed example in documentation](https://openmendel.github.io/MendelImpute.jl/dev/man/Phasing+and+Imputation/#Detailed-Example)
 
 ## Bug Fixes and User support
 

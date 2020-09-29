@@ -3,18 +3,22 @@
 
 MendelImpute accepts [VCF](https://samtools.github.io/hts-specs/VCFv4.3.pdf) and [PLINK](https://www.cog-genomics.org/plink2/formats#bed) files. Please make sure the following are true:
 
-+ VCF file ends in `.vcf` or `.vcf.gz`
++ VCF file ends in `.vcf` or `.vcf.gz` (phased or unphased and may contain missing data)
 + For PLINK files, all trios (`.bim`, `.bed`, `.fam`) are present in the same directory
-+ Each file contains only 1 chromosome
++ Each file contains only 1 (non-sex) chromosome
 + Every record (SNP) is present in the reference panel. If this is untrue, you must [match markers in 2 VCF files](https://openmendel.github.io/VCFTools.jl/dev/man/conformgt/). 
 + Given a SNP, it's CHROM, POS, REF, and  ALT fields are the same in target data and reference panel. MendelImpute use SNP position internally to align markers. Note this is not explicitly checked. 
-+ The position of every SNP is unique (so multiallelic markers should be excluded instead of split)
++ The position of every SNP is unique: so multiallelic markers should be excluded instead of split (this requirement will eventually be lifted). 
 
-If the last criteria is not met, our code may or may not work. File an issue to let us know.
+The following are not necessary but recommended for pre-imputation quality control:
+
++ Exclude markers with Hardy-Weinberg p-values $< 10^{-5}$. 
++ Exclude markers with minor allele frequency $< 10^{-6}$
++ Exclude samples with $>3\%$ missing genotypes
 
 # Preparing Reference Haplotype Panel
 
-Reference panels must be compressed into `.jlso` format first using the [compress_haplotypes](https://OpenMendel.github.io/MendelImpute.jl/dev/man/api/#MendelImpute.compress_haplotypes) function. One must specify `d`: the maximum number of unique haplotypes per window. Larger `d` slows down computation, but increases accuracy. For most purposes, we recommend $d \approx 1000$. A larger `d` may be needed for TOPMed data. 
+Reference samples must all be phased and contain no missing genotypes. Reference VCF panels must be compressed into `.jlso` format first using the [compress_haplotypes](https://OpenMendel.github.io/MendelImpute.jl/dev/man/api/#MendelImpute.compress_haplotypes) function. One must specify `d`: the maximum number of unique haplotypes per window. Larger `d` slows down computation, but increases accuracy. For most purposes, we recommend $d \approx 1000$. A larger `d` may be needed for TOPMed data. 
 
 # Detailed Example
 
@@ -163,12 +167,10 @@ outfile = "ref.chr22.maxd1000.excludeTarget.jlso"
 @time compress_haplotypes(reffile, tgtfile, outfile, max_d)
 ```
 
-    ┌ Info: Precompiling MendelImpute [e47305d1-6a61-5370-bc5d-77554d143183]
-    └ @ Base loading.jl:1278
-    [32mimporting reference data...100%|████████████████████████| Time: 0:02:09[39m
+    [32mimporting reference data...100%|████████████████████████| Time: 0:02:00[39m
 
 
-    315.248677 seconds (2.09 G allocations: 209.326 GiB, 10.75% gc time)
+    295.546081 seconds (2.09 G allocations: 209.215 GiB, 10.53% gc time)
 
 
 ## Step 3: Run imputation and phasing
@@ -177,6 +179,7 @@ Below runs the main [phase](https://openmendel.github.io/MendelImpute.jl/dev/man
 
 
 ```julia
+# note: run twice for more accurate timing
 reffile = "ref.chr22.maxd1000.excludeTarget.jlso" # jlso reference file
 tgtfile = "target.chr22.typedOnly.masked.vcf.gz"  # target genotype file
 outfile = "mendel.imputed.chr22.vcf.gz"           # output file name
@@ -187,30 +190,30 @@ phase(tgtfile, reffile; outfile=outfile);
     Importing reference haplotype data...
 
 
-    [32mComputing optimal haplotypes...100%|████████████████████| Time: 0:00:20[39m
+    [32mComputing optimal haplotypes...100%|████████████████████| Time: 0:00:22[39m
 
 
     Total windows = 1634, averaging ~ 508 unique haplotypes per window.
     
     Timings: 
-        Data import                     = 10.2399 seconds
-            import target data             = 1.75293 seconds
-            import compressed haplotypes   = 8.48693 seconds
-        Computing haplotype pair        = 20.5148 seconds
-            BLAS3 mul! to get M and N      = 1.07082 seconds per thread
-            haplopair search               = 19.0659 seconds per thread
-            initializing missing           = 0.10454 seconds per thread
-            allocating and viewing         = 0.245575 seconds per thread
-            index conversion               = 0.0134011 seconds per thread
-        Phasing by win-win intersection = 3.85712 seconds
-            Window-by-window intersection  = 0.538605 seconds per thread
-            Breakpoint search              = 3.16116 seconds per thread
-            Recording result               = 0.142876 seconds per thread
-        Imputation                     = 3.0431 seconds
-            Imputing missing               = 0.246241 seconds
-            Writing to file                = 2.79686 seconds
+        Data import                     = 11.7924 seconds
+            import target data             = 2.19475 seconds
+            import compressed haplotypes   = 9.59764 seconds
+        Computing haplotype pair        = 22.7438 seconds
+            BLAS3 mul! to get M and N      = 1.02485 seconds per thread
+            haplopair search               = 17.9195 seconds per thread
+            initializing missing           = 0.10093 seconds per thread
+            allocating and viewing         = 0.23331 seconds per thread
+            index conversion               = 0.0167426 seconds per thread
+        Phasing by win-win intersection = 4.82003 seconds
+            Window-by-window intersection  = 0.470939 seconds per thread
+            Breakpoint search              = 3.18628 seconds per thread
+            Recording result               = 0.191996 seconds per thread
+        Imputation                     = 3.53341 seconds
+            Imputing missing               = 0.153846 seconds
+            Writing to file                = 3.37957 seconds
     
-        Total time                      = 37.6559 seconds
+        Total time                      = 43.0812 seconds
     
 
 
@@ -220,7 +223,7 @@ Inputs after the first `;` are all optional. The second `;` hides the output, or
 
     To run MendelImpute in parallel, type `export JULIA_NUM_THREADS=4` **before** starting Julia. See Performance Gotchas #1 on the left for details.
 
-## Step 4: (only for simulated data) check imputation accuracy
+## Step 3.5: (only for simulated data) check imputation accuracy
 
 Since we simulated data, we can check imputation accuracy.
 
@@ -235,25 +238,32 @@ println("error overall = $(sum(X_mendel .!= X_truth) / n / p)")
     error overall = 0.00527504782243333
 
 
-# Run MendelImpute as script
+## Step 4: Post-Imputation Quality Control
 
-If you don't want to run `MendelImpute.jl` in a Julia session (e.g. you want to run batch jobs on a cluster), you can do so by putting the code above in a Julia file. For example, in order to run with 8 threads, create a file called `impute.jl` which contains:
+MendelImpute also computes a rough quality score (file ending in `sample.error`) for measuring how well each sample is imputed. This value is the sum of the least squares error in each window. A value of 0 is best, and high values mean worse. For more detail, please refer to our paper. 
+
 
 ```julia
-# place these code in a file called impute.jl
-using MendelImpute, VCFTools, LinearAlgebra
-
-# setup code goes here
-reffile = ARGS[1]       # first command line argument
-tgtfile = ARGS[2]       # second command line argument
-BLAS.set_num_threads(1) # set BLAS threads to 1 (see performance gotchas)
-
-# run MendelImpute with default options
-phase(tgtfile, reffile; outfile="mendel.imputed.chr22.vcf.gz")
+using CSV, UnicodePlots
+quality = CSV.read("mendel.imputed.chr22.sample.error") # import quality score 
+histogram(quality[:error]) # plot in histogram
 ```
 
-Then in the terminal/command-prompt, you can do
-```
-export JULIA_NUM_THREADS=8
-julia impute.jl your.reference.file.jlso your.target.file.vcf.gz
-```
+
+
+
+    [90m                  ┌                                        ┐[39m 
+       [0m[90m[[0m  0.0[90m, [0m100.0[90m)[0m[90m ┤[39m[32m▇[39m[0m 2                                     [90m [39m 
+       [0m[90m[[0m100.0[90m, [0m200.0[90m)[0m[90m ┤[39m[32m▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇[39m[0m 58 [90m [39m 
+       [0m[90m[[0m200.0[90m, [0m300.0[90m)[0m[90m ┤[39m[32m▇▇▇▇▇▇▇▇▇▇▇[39m[0m 17                          [90m [39m 
+       [0m[90m[[0m300.0[90m, [0m400.0[90m)[0m[90m ┤[39m[32m▇▇▇▇[39m[0m 7                                  [90m [39m 
+       [0m[90m[[0m400.0[90m, [0m500.0[90m)[0m[90m ┤[39m[32m▇▇▇▇▇▇[39m[0m 9                                [90m [39m 
+       [0m[90m[[0m500.0[90m, [0m600.0[90m)[0m[90m ┤[39m[32m▇▇[39m[0m 3                                    [90m [39m 
+       [0m[90m[[0m600.0[90m, [0m700.0[90m)[0m[90m ┤[39m[32m▇▇[39m[0m 3                                    [90m [39m 
+       [0m[90m[[0m700.0[90m, [0m800.0[90m)[0m[90m ┤[39m[32m▇[39m[0m 1                                     [90m [39m 
+    [90m                  └                                        ┘[39m 
+    [0m                                  Frequency
+
+
+
+We want this histogram to look like this: most samples have small error (well imputed), and only a few have large error (not imputed well, relatively speaking). A histogram with large right tail indicates poor imputation. 

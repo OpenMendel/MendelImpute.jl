@@ -10,7 +10,8 @@
 
 Main function of MendelImpute program. Phasing (haplotying) of `tgtfile` from a
 pool of haplotypes `reffile` by sliding windows and saves result in `outfile`.
-All SNPs in `tgtfile` must be present in `reffile`. 
+All SNPs in `tgtfile` must be present in `reffile`. Per-sample imputation score
+(lower is better) will be saved in a file ending in `sample.error`.
 
 # Input
 - `tgtfile`: VCF or PLINK files. VCF files should end in `.vcf` or `.vcf.gz`.
@@ -69,6 +70,9 @@ function phase(
     if !impute
         error("Due to a bug in impute!, currently cannot impute only typed SNPs! Sorry!")
     end
+    endswith(outfile, ".jlso") || endswith(outfile, ".vcf") || 
+        endswith(outfile, ".vcf.gz") || error("Output file name must end with" * 
+        " .vcf or .vcf.gz or .jlso!")
     ultra_compress = endswith(outfile, ".jlso") ? true : false
     ultra_compress && !phase && error("Ultra compressed output must be phased!")
 
@@ -129,6 +133,7 @@ function phase(
     ph = [HaplotypeMosaicPair(ref_snps) for i in 1:people]
     haplotype1 = [zeros(Int32, windows) for i in 1:people]
     haplotype2 = [zeros(Int32, windows) for i in 1:people]
+    haploscore = [zeros(Float32, windows) for i in 1:people]
     # if dynamic_programming
     #     redundant_haplotypes = [[Tuple{Int32, Int32}[] for i in
     #         1:num_windows_per_chunks] for j in 1:people]
@@ -140,7 +145,7 @@ function phase(
     # find best happairs for each window
     #
     calculate_happairs_start = time()
-    haptimers = compute_optimal_haplotypes!(haplotype1, haplotype2, 
+    haptimers = compute_optimal_haplotypes!(haplotype1, haplotype2, haploscore,
         compressed_Hunique, X, X_pos, stepwise, thinning_factor,
         scale_allelefreq, max_haplotypes, rescreen)
     # screen_flanking_windows!(haplotype1, haplotype2, compressed_Hunique, X)
@@ -158,7 +163,7 @@ function phase(
             haplotype1, haplotype2)
     else # phase window-by-window for outputing VCF files
         phasetimers = phase_fast!(ph, X, compressed_Hunique, haplotype1,
-            haplotype2, impute)
+            haplotype2, haploscore, impute)
     end
     phase_time = time() - phase_start
 
@@ -210,6 +215,23 @@ function phase(
             impute_discard_phase!(X, compressed_Hunique, ph, impute)
             write_time += @elapsed write(outfile, X, compressed_Hunique, 
                 X_sampleID, XtoH_idx)
+        end
+    end
+    # write per-sample error to output file
+    if endswith(outfile, ".jlso")
+        strip_chr = 4
+    elseif endswith(outfile, ".vcf")
+        strip_chr = 3
+    else # .vcf.gz
+        strip_chr = 6
+    end
+    error_filename = outfile[1:end-strip_chr]
+    write_time += @elapsed begin
+        open(error_filename * "sample.error", "w") do io
+            print(io, "ID,error\n")
+            for i in eachindex(X_sampleID)
+                @inbounds print(io, X_sampleID[i], ",", sum(haploscore[i]), "\n")
+            end
         end
     end
     impute_time = time() - impute_start
@@ -266,7 +288,7 @@ function phase(
     println("    Total time                      = ", 
         round(total_time, sigdigits=6), " seconds\n")
 
-    return ph
+    return ph, haploscore
 end
 
 isplink(tgtfile::AbstractString) = isfile(tgtfile * ".bed") && 
@@ -450,10 +472,8 @@ searches for optimal breakpoint.
     haplotypes for each window and some other information
 * `haplotype1`: `haplotype1[w]` stores a optimal haplotype for window `w`. 
 * `haplotype2`: `haplotype2[w]` stores a optimal haplotype for window `w`. 
-* `ultra_compress`: Boolean indicating whether eventual output file is VCF or 
-    ultra-compressed `HaplotypeMosaicPair`s. If later, haplotype segments must
-    be recorded in indices of the complete reference panel instead of the
-    compressed panel. 
+* `hapscore`: Error induced by optimal haplotype pair in current window, for 
+    each person
 * `impute_untyped`: Bool indicating whether untyped SNPs should be imputed. 
 
 # Timers:
@@ -467,6 +487,7 @@ function phase_fast!(
     compressed_Hunique::CompressedHaplotypes,
     haplotype1::AbstractVector,
     haplotype2::AbstractVector,
+    hapscore::AbstractVector,
     impute_untyped::Bool
     ) where T <: Real
 
@@ -494,7 +515,7 @@ function phase_fast!(
 
         # First pass to phase each sample window-by-window
         timers[id][8] += @elapsed phase_sample!(haplotype1[i], haplotype2[i],
-            compressed_Hunique, survivors1[id], survivors2[id])
+        hapscore[i], compressed_Hunique, survivors1[id], survivors2[id])
 
         # record info for first window
         timers[id][24] += @elapsed begin
@@ -525,7 +546,7 @@ function phase_fast!(
             hap2_curr = haplotype2[i][w]
 
             # find optimal breakpoint if there is one
-            timers[id][16] += @elapsed _, bkpts = continue_haplotype(Xwi, 
+            timers[id][16] += @elapsed _, bkpts, err = continue_haplotype(Xwi, 
                 compressed_Hunique, w, (hap1_prev, hap2_prev),
                 (hap1_curr, hap2_curr), phased=true, search_double_bkpts=true)
 

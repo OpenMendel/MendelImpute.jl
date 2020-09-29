@@ -6,7 +6,7 @@ Data structure for recording haplotype mosaic of one strand:
 `start[i]` to `start[i+1]` has haplotype `haplotypelabel[i]`
 in `window[i]`. The haplotype label is the column index of
 `CW_typed[window[i]].uniqueH`. `start[end]` to`length` has 
-haplotype `haplotypelabel[end]` in `window[end]`
+haplotype `haplotypelabel[end]` in `window[end]`.
 """
 struct HaplotypeMosaic
     length::Int64
@@ -50,7 +50,9 @@ function push_Mosaic!(x::HaplotypeMosaic, y::Tuple{Int64, T, T}) where T <: Inte
     push!(x.window, newwindow)
 end
 
-# data structure for recording haplotype mosaic of two strands
+"""
+data structure for recording haplotype mosaic of two strands
+"""
 struct HaplotypeMosaicPair
     strand1::HaplotypeMosaic
     strand2::HaplotypeMosaic

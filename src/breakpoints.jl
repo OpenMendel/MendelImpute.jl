@@ -44,10 +44,10 @@ function continue_haplotype(
 
     # both strands match
     if i == k && j == l
-        return (k, l), (-1, -1)
+        return (k, l), (-1, -1), 0
     end
     if i == l && j == k && !phased
-        return (l, k), (-1, -1)
+        return (l, k), (-1, -1), 0
     end
 
     # get unique haplotypes with only typed snps
@@ -78,7 +78,7 @@ function continue_haplotype(
         s22 = ApplyArray(vcat, view(Hprev, :, lu1), view(Hcurr, :, lu2))
 
         breakpt, errors = search_breakpoint(X, s1, s21, s22)
-        return (k, l), (-1, breakpt)
+        return (k, l), (-1, breakpt), errors
     elseif i == l && j ≠ k && !phased
         iu = complete_idx_to_unique_typed_idx(i, window - 1, compressed_Hunique)
         lu = complete_idx_to_unique_typed_idx(l, window, compressed_Hunique)
@@ -93,7 +93,7 @@ function continue_haplotype(
         s22 = ApplyArray(vcat, view(Hprev, :, ku1), view(Hcurr, :, ku2))
 
         breakpt, errors = search_breakpoint(X, s1, s21, s22)
-        return (l, k), (-1, breakpt)
+        return (l, k), (-1, breakpt), errors
     elseif j == k && i ≠ l && !phased
         ju = complete_idx_to_unique_typed_idx(j, window - 1, compressed_Hunique)
         ku = complete_idx_to_unique_typed_idx(k, window, compressed_Hunique)
@@ -108,7 +108,7 @@ function continue_haplotype(
         s22 = ApplyArray(vcat, view(Hprev, :, lu1), view(Hcurr, :, lu2))
 
         breakpt, errors = search_breakpoint(X, s1, s21, s22)
-        return (l, k), (breakpt, -1)
+        return (l, k), (breakpt, -1), errors
     elseif j == l && i ≠ k
         ju = complete_idx_to_unique_typed_idx(j, window - 1, compressed_Hunique)
         lu = complete_idx_to_unique_typed_idx(l, window, compressed_Hunique)
@@ -123,7 +123,7 @@ function continue_haplotype(
         s22 = ApplyArray(vcat, view(Hprev, :, ku1), view(Hcurr, :, ku2))
 
         breakpt, errors = search_breakpoint(X, s1, s21, s22)
-        return (k, l), (breakpt, -1)
+        return (k, l), (breakpt, -1), errors
     end
 
     # both strand mismatch
@@ -136,27 +136,26 @@ function continue_haplotype(
         ju2 = complete_idx_to_unique_typed_idx(j, window, compressed_Hunique)
         lu1 = complete_idx_to_unique_typed_idx(l, window - 1, compressed_Hunique)
         lu2 = complete_idx_to_unique_typed_idx(l, window, compressed_Hunique)
-
-        # lazy concatenation 
         s11 = ApplyArray(vcat, view(Hprev, :, iu1), view(Hcurr, :, iu2))
         s12 = ApplyArray(vcat, view(Hprev, :, ku1), view(Hcurr, :, ku2))
         s21 = ApplyArray(vcat, view(Hprev, :, ju1), view(Hcurr, :, ju2))
         s22 = ApplyArray(vcat, view(Hprev, :, lu1), view(Hcurr, :, lu2))
 
-        breakpt, errors = search_breakpoint(X, s11, s12, s21, s22)
-        return (k, l), breakpt
+        breakpt1, errors1 = search_breakpoint(X, s11, s12, s21, s22)
+        return (k, l), breakpt1, errors1
 
-        # Always assume double bkpt searches are phased. 
+        # No need for 2nd double bkpt config, since window-by-window intersection
+        # already took care of phasing  
         # breakpt1, errors1 = search_breakpoint(X, H, (i, k), (j, l))
         # breakpt2, errors2 = search_breakpoint(X, H, (i, l), (j, k))
         # if errors1 < errors2
-        #     return (k, l), breakpt1
+        #     return (k, l), breakpt1, errors1
         # else
-        #     return (l, k), breakpt2
+        #     return (l, k), breakpt2, errors2
         # end
-    else
-        return (k, l), (-2, -2)
     end
+
+    return (k, l), (-2, -2), 0
 end
 
 """
