@@ -15,7 +15,9 @@ Pkg.add(PackageSpec(url="https://github.com/OpenMendel/MendelImpute.jl.git"))
 ```
 This package supports Julia `v1.5`+.
 
-Example run:
+### Example run:
+
+The following uses data under the `data/` directory.
 
 ```julia
 # first compress reference haplotypes to .jlso forma
@@ -32,6 +34,8 @@ reffile = "ref.excludeTarget.jlso"         # compressed ref file
 outfile = "imputed.vcf.gz"                 # output file name (phased & imputed GWAS data)
 phase(tgtfile, reffile, outfile = outfile)
 ```
+
+For more realistic example, see [detailed example in documentation](https://openmendel.github.io/MendelImpute.jl/dev/man/Phasing+and+Imputation/#Detailed-Example)
 
 ## Documentation
 

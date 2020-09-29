@@ -2,7 +2,9 @@
 
 *Fast genotype imputation, phasing, and admixture estimation!*
 
-`MendelImpute.jl` is the fastest and most memory-efficient software for phasing and genotype imputation, as of 2020. It is also capable of ancestry estimation.
+`MendelImpute.jl` is the fastest and most memory-efficient software for phasing and genotype imputation, as of 2020. It is also capable of local and global ancestry estimation.
+
+Given a target genotype file (phased or unphased and may contain missing data) and a reference haplotype file (phased, no missing), our software imputes every SNP in the reference file to the target file, outputing phased or unphased genotypes. Like many other software, SNPs typed in target must all be present in the reference panel. 
 
 ## Package Features
 
@@ -11,8 +13,6 @@
 - Admixture estimation, with code examples to make pretty plots!
 - Ultra-compressed file for phased genotypes.
 - Imputation on dosage data.
-
-Given a target genotype file (phased or unphased and may contain missing data) and a reference haplotype file (phased, no missing), our software imputes every SNP in the reference file to the target file, outputing phased or unphased genotypes. Like many other software, SNPs typed in target must all be present in the reference panel. 
 
 ## Installation
 
@@ -33,6 +33,7 @@ Pages = [
     "man/performance.md"
     "man/painting.md"
     "man/ultra+compress.md"
+    "man/script.md"
     "man/api.md"
 ]
 Depth = 2
