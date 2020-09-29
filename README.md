@@ -15,31 +15,33 @@ Pkg.add(PackageSpec(url="https://github.com/OpenMendel/MendelImpute.jl.git"))
 ```
 This package supports Julia `v1.5`+.
 
-### Example run:
+## Documentation
+
++ [**Latest**](https://OpenMendel.github.io/MendelImpute.jl/dev/)
+
+## Example run:
 
 The following uses data under the `data/` directory.
 
 ```julia
-# first compress reference haplotypes to .jlso forma
-using MendelImpute                         # load package
-cd(normpath(MendelImpute.datadir())        # change to data directory
-reffile = "ref.excludeTarget.vcf.gz"       # specify reference VCF file
-tgtfile = "target.typedOnly.masked.vcf.gz" # specify target VCF file (GWAS file)
+# load package & cd to data directory
+using MendelImpute                         
+cd(normpath(MendelImpute.datadir()))
+
+# compress reference haplotypes from .vcf.gz to .jlso format
+reffile = "ref.excludeTarget.vcf.gz"       # reference VCF file
+tgtfile = "target.typedOnly.masked.vcf.gz" # target VCF file (GWAS file)
 outfile = "ref.excludeTarget.jlso"         # output file name (end in .jlso)
 compress_haplotypes(reffile, tgtfile, outfile)
 
 # phase & impute
 tgtfile = "target.typedOnly.masked.vcf.gz" # target VCF file (GWAS file)
-reffile = "ref.excludeTarget.jlso"         # compressed ref file
-outfile = "imputed.vcf.gz"                 # output file name (phased & imputed GWAS data)
-phase(tgtfile, reffile, outfile = outfile)
+reffile = "ref.excludeTarget.jlso"         # compressed reference file
+outfile = "imputed.vcf.gz"                 # output file name
+phase(tgtfile, reffile, outfile = outfile);
 ```
 
 For more realistic example, see [detailed example in documentation](https://openmendel.github.io/MendelImpute.jl/dev/man/Phasing+and+Imputation/#Detailed-Example)
-
-## Documentation
-
-+ [**Latest**](https://OpenMendel.github.io/MendelImpute.jl/dev/)
 
 ## Bug Fixes and User support
 
