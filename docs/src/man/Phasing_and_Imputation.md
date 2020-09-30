@@ -29,6 +29,7 @@ We use the [1000 genomes chromosome 22](http://bochet.gcc.biostat.washington.edu
 # load necessary packages in Julia
 using VCFTools
 
+
 # compute simple summary statistics
 data = "chr22.1kg.phase3.v5a.vcf.gz"
 @show nrecords(data)
@@ -183,41 +184,41 @@ Below runs the main [phase](https://openmendel.github.io/MendelImpute.jl/dev/man
 reffile = "ref.chr22.maxd1000.excludeTarget.jlso" # jlso reference file
 tgtfile = "target.chr22.typedOnly.masked.vcf.gz"  # target genotype file
 outfile = "mendel.imputed.chr22.vcf.gz"           # output file name
-phase(tgtfile, reffile; outfile=outfile);
+phase(tgtfile, reffile, outfile);
 ```
 
     Number of threads = 1
     Importing reference haplotype data...
 
 
-    [32mComputing optimal haplotypes...100%|████████████████████| Time: 0:00:22[39m
+    [32mComputing optimal haplotypes...100%|████████████████████| Time: 0:00:21[39m
 
 
     Total windows = 1634, averaging ~ 508 unique haplotypes per window.
     
     Timings: 
-        Data import                     = 11.7924 seconds
-            import target data             = 2.19475 seconds
-            import compressed haplotypes   = 9.59764 seconds
-        Computing haplotype pair        = 22.7438 seconds
-            BLAS3 mul! to get M and N      = 1.02485 seconds per thread
-            haplopair search               = 17.9195 seconds per thread
-            initializing missing           = 0.10093 seconds per thread
-            allocating and viewing         = 0.23331 seconds per thread
-            index conversion               = 0.0167426 seconds per thread
-        Phasing by win-win intersection = 4.82003 seconds
-            Window-by-window intersection  = 0.470939 seconds per thread
-            Breakpoint search              = 3.18628 seconds per thread
-            Recording result               = 0.191996 seconds per thread
-        Imputation                     = 3.53341 seconds
-            Imputing missing               = 0.153846 seconds
-            Writing to file                = 3.37957 seconds
+        Data import                     = 10.8014 seconds
+            import target data             = 1.93501 seconds
+            import compressed haplotypes   = 8.8664 seconds
+        Computing haplotype pair        = 21.8223 seconds
+            BLAS3 mul! to get M and N      = 1.11953 seconds per thread
+            haplopair search               = 20.2571 seconds per thread
+            initializing missing           = 0.111455 seconds per thread
+            allocating and viewing         = 0.296929 seconds per thread
+            index conversion               = 0.0247472 seconds per thread
+        Phasing by win-win intersection = 4.57452 seconds
+            Window-by-window intersection  = 0.592015 seconds per thread
+            Breakpoint search              = 3.81349 seconds per thread
+            Recording result               = 0.153751 seconds per thread
+        Imputation                     = 3.16606 seconds
+            Imputing missing               = 0.122859 seconds
+            Writing to file                = 3.0432 seconds
     
-        Total time                      = 43.0812 seconds
+        Total time                      = 40.3656 seconds
     
 
 
-Inputs after the first `;` are all optional. The second `;` hides the output, or else the screen will be too jammed. 
+The `;` hides the output, or else the screen will be too jammed. 
 
 !!! note
 
@@ -244,26 +245,18 @@ MendelImpute also computes a rough quality score (file ending in `sample.error`)
 
 
 ```julia
-using CSV, UnicodePlots
+using CSV, Plots
 quality = CSV.read("mendel.imputed.chr22.sample.error") # import quality score 
-histogram(quality[:error]) # plot in histogram
+
+# visualize error distribution
+histogram(quality[:error], label=:none, xlabel="error", ylabel="Number of samples") 
 ```
 
 
 
 
-    [90m                  ┌                                        ┐[39m 
-       [0m[90m[[0m  0.0[90m, [0m100.0[90m)[0m[90m ┤[39m[32m▇[39m[0m 2                                     [90m [39m 
-       [0m[90m[[0m100.0[90m, [0m200.0[90m)[0m[90m ┤[39m[32m▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇[39m[0m 58 [90m [39m 
-       [0m[90m[[0m200.0[90m, [0m300.0[90m)[0m[90m ┤[39m[32m▇▇▇▇▇▇▇▇▇▇▇[39m[0m 17                          [90m [39m 
-       [0m[90m[[0m300.0[90m, [0m400.0[90m)[0m[90m ┤[39m[32m▇▇▇▇[39m[0m 7                                  [90m [39m 
-       [0m[90m[[0m400.0[90m, [0m500.0[90m)[0m[90m ┤[39m[32m▇▇▇▇▇▇[39m[0m 9                                [90m [39m 
-       [0m[90m[[0m500.0[90m, [0m600.0[90m)[0m[90m ┤[39m[32m▇▇[39m[0m 3                                    [90m [39m 
-       [0m[90m[[0m600.0[90m, [0m700.0[90m)[0m[90m ┤[39m[32m▇▇[39m[0m 3                                    [90m [39m 
-       [0m[90m[[0m700.0[90m, [0m800.0[90m)[0m[90m ┤[39m[32m▇[39m[0m 1                                     [90m [39m 
-    [90m                  └                                        ┘[39m 
-    [0m                                  Frequency
+![svg](output_15_0.svg)
 
 
 
-We want this histogram to look like this: most samples have small error (well imputed), and only a few have large error (not imputed well, relatively speaking). A histogram with large right tail indicates poor imputation. 
+We want this histogram to look like this: most samples have small error (e.g. less than 200), indicating they are relatively well imputed. Only a few have large errors. A histogram with large right tail indicates poor imputation. 

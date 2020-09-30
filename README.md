@@ -38,7 +38,7 @@ compress_haplotypes(reffile, tgtfile, outfile)
 tgtfile = "target.typedOnly.masked.vcf.gz" # target VCF file (GWAS file)
 reffile = "ref.excludeTarget.jlso"         # compressed reference file
 outfile = "imputed.vcf.gz"                 # output file name
-phase(tgtfile, reffile, outfile = outfile);
+phase(tgtfile, reffile, outfile);
 ```
 
 For more realistic example, see [detailed example in documentation](https://openmendel.github.io/MendelImpute.jl/dev/man/Phasing+and+Imputation/#Detailed-Example)

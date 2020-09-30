@@ -17,7 +17,7 @@ using VCFTools
 tgtfile = "target.chr22.typedOnly.masked.vcf.gz"
 reffile = "ref.chr22.maxd1000.excludeTarget.jlso"
 outfile = "mendel.imputed.jlso" # output file name ends in jlso!
-@time phaseinfo = phase(tgtfile, reffile, outfile=outfile);
+@time phaseinfo = phase(tgtfile, reffile, outfile);
 ```
 
     Number of threads = 1
@@ -31,26 +31,26 @@ outfile = "mendel.imputed.jlso" # output file name ends in jlso!
     Total windows = 1634, averaging ~ 508 unique haplotypes per window.
     
     Timings: 
-        Data import                     = 14.5022 seconds
-            import target data             = 3.87545 seconds
-            import compressed haplotypes   = 10.6268 seconds
-        Computing haplotype pair        = 23.5375 seconds
-            BLAS3 mul! to get M and N      = 1.02915 seconds per thread
-            haplopair search               = 18.3499 seconds per thread
-            initializing missing           = 0.100449 seconds per thread
-            allocating and viewing         = 0.286666 seconds per thread
-            index conversion               = 0.00989394 seconds per thread
-        Phasing by win-win intersection = 5.48704 seconds
-            Window-by-window intersection  = 0.552811 seconds per thread
-            Breakpoint search              = 3.94575 seconds per thread
-            Recording result               = 0.0102354 seconds per thread
-        Imputation                     = 3.7252 seconds
-            Imputing missing               = 0.140427 seconds
-            Writing to file                = 3.58477 seconds
+        Data import                     = 13.5855 seconds
+            import target data             = 2.99557 seconds
+            import compressed haplotypes   = 10.5899 seconds
+        Computing haplotype pair        = 23.5138 seconds
+            BLAS3 mul! to get M and N      = 1.02228 seconds per thread
+            haplopair search               = 18.3673 seconds per thread
+            initializing missing           = 0.101495 seconds per thread
+            allocating and viewing         = 0.270367 seconds per thread
+            index conversion               = 0.0212053 seconds per thread
+        Phasing by win-win intersection = 5.17088 seconds
+            Window-by-window intersection  = 0.499549 seconds per thread
+            Breakpoint search              = 3.71212 seconds per thread
+            Recording result               = 0.00855205 seconds per thread
+        Imputation                     = 3.04347 seconds
+            Imputing missing               = 0.0513904 seconds
+            Writing to file                = 2.99208 seconds
     
-        Total time                      = 47.4236 seconds
+        Total time                      = 45.5041 seconds
     
-     62.687155 seconds (127.92 M allocations: 7.048 GiB, 4.93% gc time)
+     60.231372 seconds (124.56 M allocations: 6.857 GiB, 5.31% gc time)
 
 
 The object saved to `mendel.imputed.jlso` is literally the `phaseinfo` variable. We can inspect its element:
@@ -109,7 +109,7 @@ reffile = "ref.chr22.excludeTarget.vcf.gz" # original haplotype reference file
 X1, X2, phaseinfo, sampleID, H = convert_compressed(Float64, tgtfile, reffile);
 ```
 
-    [32mimporting reference data...100%|████████████████████████| Time: 0:01:55[39m
+    [32mimporting reference data...100%|████████████████████████| Time: 0:01:51[39m
 
 
 Check this compression protocol exhibit same error rate with [standard VCF compression](https://OpenMendel.github.io/MendelImpute.jl/dev/man/Phasing+and+Imputation/#Step-4:-%28only-for-simulated-data%29-check-imputation-accuracy). Note that `X1`, `X2`, and `H` are transposed. 

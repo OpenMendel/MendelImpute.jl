@@ -7,10 +7,11 @@ makedocs(
     modules = [MendelImpute],
     pages = [
         "Home" => "index.md",
-        "Phasing and Imputation" => "man/Phasing+and+Imputation.md",
+        "Phasing and Imputation" => "man/Phasing_and_Imputation.md",
         "Performance Gotchas" => "man/performance.md",
         "Estimating ancestry" => "man/painting.md",
         "Ultra compression" => "man/ultra+compress.md",
+        "Run as script" => "man/script.md",
         "API" => "man/api.md"
     ]
 )

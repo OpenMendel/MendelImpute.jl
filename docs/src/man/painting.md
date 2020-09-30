@@ -20,6 +20,10 @@ using Plots
 using JLSO
 ```
 
+    ┌ Info: Precompiling MendelImpute [e47305d1-6a61-5370-bc5d-77554d143183]
+    └ @ Base loading.jl:1278
+
+
 ## Data preparation
 
 ### Step 0. Filter chromosome data 
@@ -139,39 +143,39 @@ Note data used here is prepared in [Detailed Example](https://openmendel.github.
 tgtfile = "target.chr22.typedOnly.masked.vcf.gz"
 reffile = "ref.chr22.maxd1000.excludeTarget.jlso"
 outfile = "mendel.imputed.jlso"
-@time ph = phase(tgtfile, reffile, outfile=outfile);
+@time ph = phase(tgtfile, reffile, outfile);
 ```
 
     Number of threads = 1
     Importing reference haplotype data...
 
 
-    [32mComputing optimal haplotypes...100%|████████████████████| Time: 0:00:20[39m
+    [32mComputing optimal haplotypes...100%|████████████████████| Time: 0:00:22[39m
 
 
     Total windows = 1634, averaging ~ 508 unique haplotypes per window.
     
     Timings: 
-        Data import                     = 10.2246 seconds
-            import target data             = 2.21667 seconds
-            import compressed haplotypes   = 8.00795 seconds
-        Computing haplotype pair        = 20.127 seconds
-            BLAS3 mul! to get M and N      = 1.01193 seconds per thread
-            haplopair search               = 18.724 seconds per thread
-            initializing missing           = 0.0977775 seconds per thread
-            allocating and viewing         = 0.273912 seconds per thread
-            index conversion               = 0.00868801 seconds per thread
-        Phasing by win-win intersection = 3.82254 seconds
-            Window-by-window intersection  = 0.559845 seconds per thread
-            Breakpoint search              = 3.23837 seconds per thread
-            Recording result               = 0.00971604 seconds per thread
-        Imputation                     = 0.141786 seconds
-            Imputing missing               = 0.0315422 seconds
-            Writing to file                = 0.110244 seconds
+        Data import                     = 13.1989 seconds
+            import target data             = 3.39344 seconds
+            import compressed haplotypes   = 9.80547 seconds
+        Computing haplotype pair        = 22.7262 seconds
+            BLAS3 mul! to get M and N      = 0.990657 seconds per thread
+            haplopair search               = 17.9241 seconds per thread
+            initializing missing           = 0.0950638 seconds per thread
+            allocating and viewing         = 0.262792 seconds per thread
+            index conversion               = 0.0134224 seconds per thread
+        Phasing by win-win intersection = 4.74799 seconds
+            Window-by-window intersection  = 0.490777 seconds per thread
+            Breakpoint search              = 3.28471 seconds per thread
+            Recording result               = 0.00808895 seconds per thread
+        Imputation                     = 3.06857 seconds
+            Imputing missing               = 0.0608952 seconds
+            Writing to file                = 3.00767 seconds
     
-        Total time                      = 34.3168 seconds
+        Total time                      = 43.917 seconds
     
-     34.316709 seconds (33.53 M allocations: 2.517 GiB, 2.50% gc time)
+     51.409108 seconds (99.91 M allocations: 5.675 GiB, 4.56% gc time)
 
 
 ## Estimate admixture proportions
@@ -245,9 +249,9 @@ populations = MendelImpute.unique_populations(refID_to_population)
 @time sample84_comp = composition(ph[84], panelID, refID_to_population) # origin LWK
 ```
 
-      0.004665 seconds (28 allocations: 2.719 KiB)
-      0.000369 seconds (8 allocations: 1.250 KiB)
-      0.000383 seconds (8 allocations: 1.250 KiB)
+      0.003916 seconds (28 allocations: 2.719 KiB)
+      0.000336 seconds (8 allocations: 1.250 KiB)
+      0.000370 seconds (8 allocations: 1.250 KiB)
 
 
 
@@ -283,11 +287,11 @@ populations = MendelImpute.unique_populations(refID_to_population)
 
 
 
-Note the first run is slower because Julia has to compile the code. 
+We computed the population percentages for sample 1, 4, and 84 with respect to the 26 reference populations. Note the first run is slower because Julia has to compile the code. 
 
 ### Step 3: Plot the percentages
 
-We computed the population percentages for sample 1, 4, and 84. Here `sample1_comp[i]` equals the sample's estimated ancestry (in %) from `populations[i]`. Thus we simply have to create a bar plot for each:
+Here `sample1_comp[i]` equals the sample's estimated ancestry (in %) from `populations[i]`. Thus we simply have to create a bar plot for each:
 
 
 ```julia
@@ -352,9 +356,9 @@ populations = unique_populations(refID_to_population)
 @time sample84_s1_comp, sample84_s2_comp = paint(ph[84], panelID, refID_to_population);
 ```
 
-      0.000323 seconds (12 allocations: 19.125 KiB)
-      0.000310 seconds (12 allocations: 20.375 KiB)
-      0.000307 seconds (12 allocations: 22.875 KiB)
+      0.000260 seconds (12 allocations: 19.125 KiB)
+      0.000234 seconds (12 allocations: 20.375 KiB)
+      0.000252 seconds (12 allocations: 22.875 KiB)
 
 
 ### Step 3: Generate plots for painted chromosomes

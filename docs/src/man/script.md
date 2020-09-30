@@ -10,14 +10,15 @@ using MendelImpute, VCFTools, LinearAlgebra
 # setup code goes here
 reffile = ARGS[1]       # first command line argument
 tgtfile = ARGS[2]       # second command line argument
+outfile = ARGS[3]       # third command line argument
 BLAS.set_num_threads(1) # set BLAS threads to 1 (see performance gotchas)
 
 # run MendelImpute with default options
-phase(tgtfile, reffile; outfile="mendel.imputed.chr22.vcf.gz")
+phase(tgtfile, reffile, outfile)
 ```
 
 Then in the terminal/command-prompt, you can do
 ```
 export JULIA_NUM_THREADS=8
-julia impute.jl your.reference.file.jlso your.target.file.vcf.gz
+julia impute.jl ref.jlso target.vcf.gz output.vcf.gz
 ```
