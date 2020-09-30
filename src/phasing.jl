@@ -19,12 +19,12 @@ All SNPs in `tgtfile` must be present in `reffile`. Per-sample imputation score
     be present in the same directory.
 - `reffile`: Reference haplotype file ending in `.vcf`, `.vcf.gz`, or `.jlso` 
     (compressed binary files).
-
-# Optional Inputs
 - `outfile`: output filename ending in `.vcf.gz`, `.vcf`, or `.jlso`. VCF output
     genotypes will have no missing data. If ending in `.jlso`, will output
     ultra-compressed data structure recording `HaplotypeMosaicPair`s for 
-    each sample
+    each sample.
+
+# Optional Inputs
 - `impute`: If `true`, imputes every SNPs in `reffile` to `tgtfile`. Otherwise
     only missing snps in `tgtfile` will be imputed.
 - `phase`: If `true`, all output genotypes will be phased. Otherwise all
@@ -50,8 +50,8 @@ All SNPs in `tgtfile` must be present in `reffile`. Per-sample imputation score
 """
 function phase(
     tgtfile::AbstractString,
-    reffile::AbstractString;
-    outfile::AbstractString = "imputed." * tgtfile,
+    reffile::AbstractString,
+    outfile::AbstractString;
     impute::Bool = true,
     phase::Bool = true,
     dosage::Bool = false,
@@ -160,7 +160,7 @@ function phase(
             1:windows)
     elseif ultra_compress # phase window-by-window for outputing ultra compressed format
         phasetimers = phase_fast_compressed!(ph, X, compressed_Hunique, 
-            haplotype1, haplotype2)
+            haplotype1, haplotype2, haploscore)
     else # phase window-by-window for outputing VCF files
         phasetimers = phase_fast!(ph, X, compressed_Hunique, haplotype1,
             haplotype2, haploscore, impute)
@@ -288,7 +288,7 @@ function phase(
     println("    Total time                      = ", 
         round(total_time, sigdigits=6), " seconds\n")
 
-    return ph, haploscore
+    return ph
 end
 
 isplink(tgtfile::AbstractString) = isfile(tgtfile * ".bed") && 
@@ -515,7 +515,7 @@ function phase_fast!(
 
         # First pass to phase each sample window-by-window
         timers[id][8] += @elapsed phase_sample!(haplotype1[i], haplotype2[i],
-        hapscore[i], compressed_Hunique, survivors1[id], survivors2[id])
+            hapscore[i], compressed_Hunique, survivors1[id], survivors2[id])
 
         # record info for first window
         timers[id][24] += @elapsed begin
@@ -571,7 +571,8 @@ function phase_fast_compressed!(
     X::AbstractMatrix{Union{Missing, T}},
     compressed_Hunique::CompressedHaplotypes,
     haplotype1::AbstractVector,
-    haplotype2::AbstractVector
+    haplotype2::AbstractVector,
+    hapscore::AbstractVector
     ) where T <: Real
 
     # declare some constants
@@ -598,7 +599,7 @@ function phase_fast_compressed!(
 
         # First pass to phase each sample window-by-window
         timers[id][8] += @elapsed phase_sample!(haplotype1[i], haplotype2[i],
-            compressed_Hunique, survivors1[id], survivors2[id])
+            hapscore[i], compressed_Hunique, survivors1[id], survivors2[id])
 
         # record info for first window
         timers[id][24] += @elapsed begin
