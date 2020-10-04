@@ -25,7 +25,7 @@ The following uses data under the `data/` directory.
 
 ```julia
 # load package & cd to data directory
-using MendelImpute                         
+using MendelImpute
 cd(normpath(MendelImpute.datadir()))
 
 # compress reference haplotypes from .vcf.gz to .jlso format

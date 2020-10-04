@@ -3,7 +3,7 @@
 ###### It also contains code to phase window-by-window. 
 
 """
-    phase(tgtfile::String, reffile::String; [outfile::String], [impute::Bool],
+    phase(tgtfile::String, reffile::String, outfile::String; [impute::Bool],
         [phase::Bool], [dosage::Bool], [recreen::Bool], [max_haplotypes::Int], 
         [stepwise::Int], [thinning_factor::Int], [scale_allelefreq::Bool], 
         [dynamic_programming::Bool])
