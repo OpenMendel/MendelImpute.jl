@@ -61,6 +61,8 @@ function compute_optimal_haplotypes!(
 
     # allocate working arrays
     timers = [zeros(7*8) for _ in 1:threads] # 8 for spacing
+    per_snp_error = zeros(size(X, 1))
+    per_snp_missing = zeros(size(X, 1))
     timers[1][48] += @elapsed begin # time for allocating
         happair1 = [ones(Int32, people)               for _ in 1:threads]
         happair2 = [ones(Int32, people)               for _ in 1:threads]
@@ -140,7 +142,12 @@ function compute_optimal_haplotypes!(
 
         # save result 
         t7 = @elapsed save_haplotypes!(haplotype1, haplotype2, haploscore,
-        happair1[id], happair2[id], hapscore[id], compressed_Hunique, w)
+            happair1[id], happair2[id], hapscore[id], compressed_Hunique, w)
+        
+        # calculate each (typed) SNP's imputation quality
+        t7 += @elapsed typed_snps_error!(@view(per_snp_error[Xrange]),
+            Xw_aligned, Hw_aligned, happair1[id], happair1[id], 
+            @view(per_snp_missing[Xrange]))
 
         # record timings and haplotypes (× 8 to avoid false sharing)
         timers[id][8]  += t1
@@ -197,6 +204,47 @@ function save_haplotypes!(
         haploscore[i][window] = hapscore[i]
     end
     return nothing
+end
+
+"""
+    typed_snps_error!(typed_snps_error, Xw, Hw, happair1, happair2, [missing_counter])
+
+Calculates each SNP's imputation score in a window. The score is the percentage
+number of samples where the 2 chosen haplotypes match the observed genotype.
+
+# Inputs
+- `typed_snps_error`: `typed_snps_error[i]` is the % of SNPs correctly imputed
+- `Xw`: Genotype matrix in current window
+- `Hw`: Haplotype matrix in current window (contains only unique haplotypes)
+- `happair1`: The first optimal haplotype for each sample
+- `happair2`: The second optimal haplotype for each sample
+- `missing_counter`: A counter keeping track of number of missing for each SNP
+"""
+function typed_snps_error!(
+    typed_snps_error::AbstractVector,
+    Xw::AbstractMatrix,
+    Hw::AbstractMatrix,
+    happair1::Vector{Int32},
+    happair2::Vector{Int32},
+    missing_counter::AbstractVector = zeros(lenth(typed_snps_error)),
+    )
+    T = eltype(Xw)
+    snps, samples = size(Xw, 1), size(Xw, 2)
+    length(typed_snps_error) == snps || error("typed_snps_error!: check vector length")
+    @inbounds for j in 1:samples
+        h1 = view(Hw, :, happair1[j])
+        h2 = view(Hw, :, happair2[j])
+        for i in 1:snps
+            if Xw[i, j] === missing
+                missing_counter[i] += 1
+                continue
+            end
+            typed_snps_error[i] += Xw[i, j] == convert(T, h1[i] + h2[i])
+        end
+    end
+    for i in 1:snps
+        @inbounds typed_snps_error[i] /= samples - missing_counter[i]
+    end
 end
 
 # """
