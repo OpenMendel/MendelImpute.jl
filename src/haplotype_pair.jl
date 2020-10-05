@@ -16,6 +16,8 @@ stores result in `haplotype1` and `haplotype2`.
 - `X`: the full genotype matrix possibly with missings. Each column is an 
     individual.
 - `X_pos`: Position of each SNP in `X`
+- `typed_snps_error`: `typed_snps_error[i]` is the % of SNPs correctly imputed.
+    `1` is best, `0` is worse.
 - `stepscreen`: Boolean indicating whether to use a stepwise heuristic to screen
     for top haplotypes instead of performing global search
 - `tf`: This option solves the least squares objective on only
@@ -43,6 +45,7 @@ function compute_optimal_haplotypes!(
     compressed_Hunique::CompressedHaplotypes,
     X::AbstractMatrix,
     X_pos::AbstractVector,
+    per_snp_error::AbstractVector,
     stepscreen::Union{Nothing, Int},
     tf::Union{Nothing, Int}, # thinning factor
     scale_allelefreq::Bool,
@@ -61,7 +64,6 @@ function compute_optimal_haplotypes!(
 
     # allocate working arrays
     timers = [zeros(7*8) for _ in 1:threads] # 8 for spacing
-    per_snp_error = zeros(size(X, 1))
     per_snp_missing = zeros(size(X, 1))
     timers[1][48] += @elapsed begin # time for allocating
         happair1 = [ones(Int32, people)               for _ in 1:threads]
