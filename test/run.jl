@@ -2738,3 +2738,13 @@ struct CW
     uniqueH::BitMatrix
 end
 fd = CW(rand(Int32, 0:4))
+
+
+
+# import per SNP quality score (postimputation)
+using GeneticVariation
+using VCFTools
+
+cd("/Users/biona001/.julia/dev/MendelImpute/simulation/compare2")
+vcf = "mendel.imputed.vcf.gz"
+reader = VCF.Reader(openvcf(vcf, "r"))
