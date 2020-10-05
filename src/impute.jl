@@ -5,8 +5,15 @@
     write(outfile, X, compressed_haplotypes, X_sampleID, XtoH_idx)
 
 Writes imputed `X` into `outfile`. All genotypes in `outfile` are non-missing.
-If `X` is a matrix, output VCF will be unphased. Otherwise if `X` is a Tuple
-of matrix (i.e. `X = X1 + X2`), then all output will be phased. 
+
+# Inputs
+- `outfile`: Output file name (ending in `.vcf.gz` or `.vcf`)
+- `X`: Imputed matrix. If `X` is a matrix, output VCF will be unphased. Otherwise if `X` is a Tuple
+    of matrix (i.e. `X = X1 + X2`), then all output will be phased. 
+- `compressed_Hunique`: A `CompressedHaplotypes` object
+- `X_sampleID`: Sample ID of imputation target
+- `snp_score`: Imputation score for each typed SNP. `1` is best, `0` is worse
+- `XtoH_idx`: Vector aligning typed SNPs with all SNPs in reference panel
 
 # Notes
 Here the writing routine is emulating `write_dlm` in Base at 
@@ -17,6 +24,7 @@ function Base.write(
     X::Union{AbstractMatrix, Tuple{AbstractMatrix, AbstractMatrix}},
     compressed_haplotypes::CompressedHaplotypes,
     X_sampleID::AbstractVector,
+    snp_score::AbstractVector,
     XtoH_idx::Union{Nothing, AbstractVector} = nothing,
     )
     threads = Threads.nthreads()
@@ -42,6 +50,8 @@ function Base.write(
     print(pb[1], "##fileformat=VCFv4.2\n")
     print(pb[1], "##source=MendelImpute\n")
     print(pb[1], "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n")
+    print(pb[1], "##INFO=<ID=IMPQ,Number=0,Type=Float,Description=" * 
+        "\"Quality of imputed marker. 1 is best, 0 is worse. Only present for typed SNPs\">\n")
 
     # header line should match reffile (i.e. sample ID's should match)
     print(pb[1], "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT")
@@ -59,9 +69,11 @@ function Base.write(
             ((threads-1)*len+1:snps) : (1:len) .+ (t-1)*len)
 
         @inbounds for i in cur_ranges
-            # write meta info (chrom/pos/snpid/ref/alt)
+            # write meta info (chrom/pos/snpid/ref/alt/imputation-quality)
             print(pb[id], chr[i], "\t", string(pos[i]), "\t", ids[i][1], "\t", 
-                ref[i], "\t", alt[i][1], "\t.\tPASS\t.\tGT")
+                ref[i], "\t", alt[i][1], "\t.\tPASS\t")
+            ismissing(snp_score[i]) ? print(pb[id], ".\tGT") : 
+                print(pb[id], "IMPQ=", round(snp_score[i], digits=3), "\tGT")
             # print ith record
             write_snp!(pb[id], X, i) 
             bytesavailable(pb[id]) > 1048576 && write(io[id], take!(pb[id]))

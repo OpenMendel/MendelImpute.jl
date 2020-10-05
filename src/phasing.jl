@@ -134,6 +134,7 @@ function phase(
     haplotype1 = [zeros(Int32, windows) for i in 1:people]
     haplotype2 = [zeros(Int32, windows) for i in 1:people]
     haploscore = [zeros(Float32, windows) for i in 1:people]
+    snpscore = zeros(Float32, tgt_snps)
     # if dynamic_programming
     #     redundant_haplotypes = [[Tuple{Int32, Int32}[] for i in
     #         1:num_windows_per_chunks] for j in 1:people]
@@ -146,7 +147,7 @@ function phase(
     #
     calculate_happairs_start = time()
     haptimers = compute_optimal_haplotypes!(haplotype1, haplotype2, haploscore,
-        compressed_Hunique, X, X_pos, stepwise, thinning_factor,
+        compressed_Hunique, X, X_pos, snpscore, stepwise, thinning_factor,
         scale_allelefreq, max_haplotypes, rescreen)
     # screen_flanking_windows!(haplotype1, haplotype2, compressed_Hunique, X)
     calculate_happairs_time = time() - calculate_happairs_start
@@ -174,6 +175,9 @@ function phase(
     write_time = 0.0
     XtoH_idx = indexin(X_pos, compressed_Hunique.pos)
     if impute # imputes typed and untyped SNPs
+        complete_snpscore = Vector{Union{Missing, Float64}}(missing, ref_snps)
+        copyto!(@view(complete_snpscore[XtoH_idx]), snpscore)
+
         # convert phase's starting position from X's index to H's index
         update_marker_position!(ph, XtoH_idx)
 
@@ -188,7 +192,7 @@ function phase(
             # impute and write to file
             impute!(X1, X2, compressed_Hunique, ph, impute)
             write_time += @elapsed write(outfile, (X1, X2), compressed_Hunique, 
-                X_sampleID)
+                X_sampleID, complete_snpscore)
         else # output genotypes all unphased
             X_full = Matrix{Union{Missing, UInt8}}(missing, ref_snps, people)
             copyto!(@view(X_full[XtoH_idx, :]), X) # keep known entries
@@ -196,7 +200,7 @@ function phase(
             # impute and write to file
             impute_discard_phase!(X_full, compressed_Hunique, ph, impute)
             write_time += @elapsed write(outfile, X_full, compressed_Hunique, 
-                X_sampleID)
+                X_sampleID, complete_snpscore)
         end
     else # impute only missing entries in typed SNPs
         if ultra_compress # output ultra-compressed, phased genotypes in 
@@ -210,11 +214,11 @@ function phase(
             # impute and write to file
             impute!(X1, X2, compressed_Hunique, ph, impute)
             write_time += @elapsed write(outfile, (X1, X2), compressed_Hunique, 
-                X_sampleID, XtoH_idx)
+                X_sampleID, snpscore, XtoH_idx)
         else
             impute_discard_phase!(X, compressed_Hunique, ph, impute)
             write_time += @elapsed write(outfile, X, compressed_Hunique, 
-                X_sampleID, XtoH_idx)
+                X_sampleID, snpscore, XtoH_idx)
         end
     end
     # write per-sample error to output file
