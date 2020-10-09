@@ -175,8 +175,8 @@ function phase(
     write_time = 0.0
     XtoH_idx = indexin(X_pos, compressed_Hunique.pos)
     if impute # imputes typed and untyped SNPs
-        complete_snpscore = Vector{Union{Missing, Float64}}(missing, ref_snps)
-        copyto!(@view(complete_snpscore[XtoH_idx]), snpscore)
+        # get each snp's imputation score
+        complete_snpscore = assign_snpscore(ref_snps, snpscore, XtoH_idx)
 
         # convert phase's starting position from X's index to H's index
         update_marker_position!(ph, XtoH_idx)

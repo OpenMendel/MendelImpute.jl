@@ -314,3 +314,43 @@ function update_marker_position!(
 
     return nothing
 end
+
+"""
+    assign_snpscore(total_snps, typed_snp_scores, typed_index)
+
+For each untyped SNP, average the nearest 2 typed SNP's quality score and
+return a vector of quality scores for all SNPs, typed and untyped.
+
+# Inputs
+- `total_snps`: Total number of SNPs, typed and untyped
+- `typed_snp_scores`: Vector of scores for each typed SNP
+- `typed_index`: Typed SNP's indices
+"""
+function assign_snpscore(
+    total_snps::Int,
+    typed_snp_scores::AbstractVector,
+    typed_index::AbstractVector
+    )
+    # copy typed SNPs' quality score into vector of complete SNPs
+    complete_snpscore = Vector{eltype(typed_snp_scores)}(undef, total_snps)
+    copyto!(@view(complete_snpscore[typed_index]), typed_snp_scores)
+    println(complete_snpscore[1:20])
+
+    # all untyped SNPs before first typed SNPs gets same quality score
+    cur_range = 1:(typed_index[1] - 1)
+    complete_snpscore[cur_range] .= typed_snp_scores[1]
+
+    # loop through every segments of untyped SNPs
+    for i in 2:length(typed_index)
+        cur_range = (typed_index[i - 1] + 1):(typed_index[i] - 1)
+        avg_score = (typed_snp_scores[i - 1] + typed_snp_scores[i]) / 2
+        complete_snpscore[cur_range] .= avg_score
+    end
+
+    # last segment of untyped SNPs
+    cur_range = (typed_index[end] + 1):total_snps
+    complete_snpscore[cur_range] .= typed_snp_scores[end]
+
+    println(complete_snpscore[1:20])
+    return complete_snpscore
+end
