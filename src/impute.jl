@@ -334,7 +334,6 @@ function assign_snpscore(
     # copy typed SNPs' quality score into vector of complete SNPs
     complete_snpscore = Vector{eltype(typed_snp_scores)}(undef, total_snps)
     copyto!(@view(complete_snpscore[typed_index]), typed_snp_scores)
-    println(complete_snpscore[1:20])
 
     # all untyped SNPs before first typed SNPs gets same quality score
     cur_range = 1:(typed_index[1] - 1)
@@ -351,6 +350,5 @@ function assign_snpscore(
     cur_range = (typed_index[end] + 1):total_snps
     complete_snpscore[cur_range] .= typed_snp_scores[end]
 
-    println(complete_snpscore[1:20])
     return complete_snpscore
 end
