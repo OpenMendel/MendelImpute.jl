@@ -192,7 +192,7 @@ function phase(
             # impute and write to file
             impute!(X1, X2, compressed_Hunique, ph, impute)
             write_time += @elapsed write(outfile, (X1, X2), compressed_Hunique, 
-                X_sampleID, complete_snpscore)
+                X_sampleID, complete_snpscore, XtoH_idx)
         else # output genotypes all unphased
             X_full = Matrix{Union{Missing, UInt8}}(missing, ref_snps, people)
             copyto!(@view(X_full[XtoH_idx, :]), X) # keep known entries
@@ -200,7 +200,7 @@ function phase(
             # impute and write to file
             impute_discard_phase!(X_full, compressed_Hunique, ph, impute)
             write_time += @elapsed write(outfile, X_full, compressed_Hunique, 
-                X_sampleID, complete_snpscore)
+                X_sampleID, complete_snpscore, XtoH_idx)
         end
     else # impute only missing entries in typed SNPs
         if ultra_compress # output ultra-compressed, phased genotypes in 
@@ -214,11 +214,11 @@ function phase(
             # impute and write to file
             impute!(X1, X2, compressed_Hunique, ph, impute)
             write_time += @elapsed write(outfile, (X1, X2), compressed_Hunique, 
-                X_sampleID, snpscore, XtoH_idx)
+                X_sampleID, snpscore, XtoH_idx, false)
         else
             impute_discard_phase!(X, compressed_Hunique, ph, impute)
             write_time += @elapsed write(outfile, X, compressed_Hunique, 
-                X_sampleID, snpscore, XtoH_idx)
+                X_sampleID, snpscore, XtoH_idx, false)
         end
     end
     # write per-sample error to output file

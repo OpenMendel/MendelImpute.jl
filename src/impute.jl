@@ -13,7 +13,8 @@ Writes imputed `X` into `outfile`. All genotypes in `outfile` are non-missing.
 - `compressed_Hunique`: A `CompressedHaplotypes` object
 - `X_sampleID`: Sample ID of imputation target
 - `snp_score`: Imputation score for each typed SNP. `1` is best, `0` is worse
-- `XtoH_idx`: Vector aligning typed SNPs with all SNPs in reference panel
+- `XtoH_idx`: Position of typed SNPs in complete set of SNPs
+- `impute`: Boolean indicating whether to impute untyped SNPs (default true)
 
 # Notes
 Here the writing routine is emulating `write_dlm` in Base at 
@@ -25,24 +26,22 @@ function Base.write(
     compressed_haplotypes::CompressedHaplotypes,
     X_sampleID::AbstractVector,
     snp_score::AbstractVector,
-    XtoH_idx::Union{Nothing, AbstractVector} = nothing,
+    XtoH_idx::AbstractVector,
+    impute::Bool = true
     )
     threads = Threads.nthreads()
     snps = typeof(X) <: AbstractMatrix ? size(X, 1) : size(X[1], 1)
     len = div(snps, threads)
     files = ["tmp$i.vcf.gz" for i in 1:threads]
+    typed = falses(snps)
+    typed[XtoH_idx] .= true
 
     # retrieve reference file information
-    chr = (isnothing(XtoH_idx) ? compressed_haplotypes.chr : 
-                                 compressed_haplotypes.chr[XtoH_idx])
-    pos = (isnothing(XtoH_idx) ? compressed_haplotypes.pos : 
-                                 compressed_haplotypes.pos[XtoH_idx])
-    ids = (isnothing(XtoH_idx) ? compressed_haplotypes.SNPid : 
-                                 compressed_haplotypes.SNPid[XtoH_idx])
-    ref = (isnothing(XtoH_idx) ? compressed_haplotypes.refallele : 
-                                 compressed_haplotypes.refallele[XtoH_idx])
-    alt = (isnothing(XtoH_idx) ? compressed_haplotypes.altallele : 
-                                 compressed_haplotypes.altallele[XtoH_idx])
+    chr = impute ? compressed_haplotypes.chr : @view(compressed_haplotypes.chr[XtoH_idx])
+    pos = impute ? compressed_haplotypes.pos : @view(compressed_haplotypes.pos[XtoH_idx])
+    ids = impute ? compressed_haplotypes.SNPid : @view(compressed_haplotypes.SNPid[XtoH_idx])
+    ref = impute ? compressed_haplotypes.refallele : @view(compressed_haplotypes.refallele[XtoH_idx])
+    alt = impute ? compressed_haplotypes.altallele : @view(compressed_haplotypes.altallele[XtoH_idx])
 
     # write minimal meta information to outfile
     io = [openvcf(files[i], "w") for i in 1:threads]
@@ -51,7 +50,8 @@ function Base.write(
     print(pb[1], "##source=MendelImpute\n")
     print(pb[1], "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n")
     print(pb[1], "##INFO=<ID=IMPQ,Number=0,Type=Float,Description=" * 
-        "\"Quality of imputed marker. 1 is best, 0 is worse. Only present for typed SNPs\">\n")
+        "\"Quality of marker. 1 is best, 0 is worse. Present for all SNPs\">\n")
+    print(pb[1], "##INFO=<ID=IMP,Number=0,Type=Flag,Description=\"Imputed marker\">\n")
 
     # header line should match reffile (i.e. sample ID's should match)
     print(pb[1], "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT")
@@ -72,8 +72,8 @@ function Base.write(
             # write meta info (chrom/pos/snpid/ref/alt/imputation-quality)
             print(pb[id], chr[i], "\t", string(pos[i]), "\t", ids[i][1], "\t", 
                 ref[i], "\t", alt[i][1], "\t.\tPASS\t")
-            ismissing(snp_score[i]) ? print(pb[id], ".\tGT") : 
-                print(pb[id], "IMPQ=", round(snp_score[i], digits=3), "\tGT")
+            print(pb[id], "IMPQ=", round(snp_score[i], digits=3))
+            typed[i] ? print(pb[id], ";IMP\tGT") : print(pb[id], "\tGT")
             # print ith record
             write_snp!(pb[id], X, i) 
             bytesavailable(pb[id]) > 1048576 && write(io[id], take!(pb[id]))
