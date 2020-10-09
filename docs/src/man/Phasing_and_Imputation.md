@@ -188,29 +188,34 @@ outfile = "mendel.imputed.chr22.vcf.gz"           # output file name
 phase(tgtfile, reffile, outfile);
 ```
 
-    Number of threads = 8
+    Number of threads = 1
     Importing reference haplotype data...
+
+
+    [32mComputing optimal haplotypes...100%|████████████████████| Time: 0:00:20[39m
+
+
     Total windows = 1634, averaging ~ 508 unique haplotypes per window.
     
     Timings: 
-        Data import                     = 11.418 seconds
-            import target data             = 2.20146 seconds
-            import compressed haplotypes   = 9.21653 seconds
-        Computing haplotype pair        = 4.3153 seconds
-            BLAS3 mul! to get M and N      = 0.205143 seconds per thread
-            haplopair search               = 3.57334 seconds per thread
-            initializing missing           = 0.0197778 seconds per thread
-            allocating and viewing         = 0.0561284 seconds per thread
-            index conversion               = 0.0140931 seconds per thread
-        Phasing by win-win intersection = 0.715199 seconds
-            Window-by-window intersection  = 0.088971 seconds per thread
-            Breakpoint search              = 0.522174 seconds per thread
-            Recording result               = 0.0221809 seconds per thread
-        Imputation                     = 1.04392 seconds
-            Imputing missing               = 0.144794 seconds
-            Writing to file                = 0.89913 seconds
+        Data import                     = 10.1839 seconds
+            import target data             = 1.78449 seconds
+            import compressed haplotypes   = 8.39945 seconds
+        Computing haplotype pair        = 20.8186 seconds
+            BLAS3 mul! to get M and N      = 1.09855 seconds per thread
+            haplopair search               = 19.2442 seconds per thread
+            initializing missing           = 0.100835 seconds per thread
+            allocating and viewing         = 0.284366 seconds per thread
+            index conversion               = 0.0800866 seconds per thread
+        Phasing by win-win intersection = 4.06343 seconds
+            Window-by-window intersection  = 0.536747 seconds per thread
+            Breakpoint search              = 3.24288 seconds per thread
+            Recording result               = 0.269504 seconds per thread
+        Imputation                     = 2.99534 seconds
+            Imputing missing               = 0.113144 seconds
+            Writing to file                = 2.8822 seconds
     
-        Total time                      = 17.4938 seconds
+        Total time                      = 38.0624 seconds
     
 
 
@@ -237,24 +242,25 @@ println("error overall = ", sum(X_mendel .!= X_truth) / n / p)
 
 ## Post-imputation: per-SNP Imputation Quality Score
 
-By default, MendelImpute outputs a per-SNP imputation quality score **for the typed SNPs only**. The score is the percentage number of samples where the 2 chosen haplotypes match the observed genotype. Consequently, a score of 1 is best, 0 is worst. 
+By default, MendelImpute outputs a per-SNP imputation quality score. A score of 1 is best, 0 is worst. It is the percentage number of samples where the 2 chosen haplotypes match the observed genotype. For untyped (i.e. imputed) SNPs, the quality score is the average of the closest 2 typed SNP's score.
 
 To extract this score from a VCF file, we recommend the following. We will develop a better pipeline for importing this quality score if someone demands it from us. 
 
-```julia
-using GeneticVariation
-reader = VCF.Reader(openvcf("mendel.imputed.chr22.vcf.gz", "r"))
 
-# loop over SNPs
-for record in reader
-    try 
-        score = VCF.info(record)[1].second
-        # do something with score here
-    catch
-        continue
-    end
-end
+```julia
+# plot histogram of SNP scores
+using Plots
+histogram(snpscores, label=:none, xlabel="error", ylabel="SNP counts")
 ```
+
+
+
+
+![svg](output_15_0.svg)
+
+
+
+**Conclusion:** Most SNPs have imputation quality $> 0.5$, but some have quality score below $0.5$. We recommend those SNPs to be [filtered out](https://openmendel.github.io/VCFTools.jl/dev/man/filter/#Subsetting-VCF-files-using-array-masks). 
 
 Note the popular correlation metric $r^2$ such as [this one](https://genome.sph.umich.edu/wiki/Minimac3_Info_File#Rsq) is NOT a good metric for measuring imputation accuracy under MendelImpute's model, because all imputed SNPs will have $r^2 = 1$. For details, please see our paper. 
 
@@ -264,7 +270,7 @@ MendelImpute also computes a rough quality score (file ending in `sample.error`)
 
 
 ```julia
-using CSV, Plots
+using CSV
 quality = CSV.read("mendel.imputed.chr22.sample.error") # import quality score 
 
 # visualize error distribution
@@ -274,7 +280,7 @@ histogram(quality[:error], label=:none, xlabel="error", ylabel="Number of sample
 
 
 
-![svg](output_15_0.svg)
+![svg](output_18_0.svg)
 
 
 
