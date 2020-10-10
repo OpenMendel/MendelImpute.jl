@@ -165,49 +165,58 @@ function impute!(
     fill!(X2, 0)
 
     # loop over individuals
-    for i in 1:size(X1, 2)
+    @inbounds for i in 1:size(X1, 2)
         # strand 1
-        for s in 1:(length(phase[i].strand1.start) - 1) # first w-1 windows
-            X_idx = phase[i].strand1.start[s]:(phase[i].strand1.start[s + 1] - 1)
-            w = phase[i].strand1.window[s]
-            H = impute_untyped ? compressed_Hunique.CW[w].uniqueH : 
-                compressed_Hunique.CW_typed[w].uniqueH
-            H_start = impute_untyped ? (abs(phase[i].strand1.start[s] - 
-                compressed_Hunique.Hstart[w]) + 1) : 1
-            H_idx = H_start:(H_start + length(X_idx) - 1)
-            X1[X_idx, i] = H[H_idx, phase[i].strand1.haplotypelabel[s]]
+        for segment in 1:length(phase[i].strand1.start)
+            Xrange, haplotype = _get_impute_ranges(segment, phase[i].strand1, 
+                compressed_Hunique, impute_untyped, size(X1, 1))
+            X1[Xrange, i] = haplotype
         end
-        w = phase[i].strand1.window[end] # last window
-        X_end = impute_untyped ? phase[i].strand1.length : size(X1, 1)
-        X_idx = phase[i].strand1.start[end]:X_end
-        H_start = impute_untyped ? (abs(phase[i].strand1.start[end] - 
-            compressed_Hunique.Hstart[w]) + 1) : 1
-        H_idx = H_start:(H_start + length(X_idx) - 1)
-        H = impute_untyped ? compressed_Hunique.CW[w].uniqueH : 
-            compressed_Hunique.CW_typed[w].uniqueH
-        X1[X_idx, i] = H[H_idx, phase[i].strand1.haplotypelabel[end]]
 
         # strand 2
-        for s in 1:(length(phase[i].strand2.start) - 1) # first w-1 windows
-            X_idx = phase[i].strand2.start[s]:(phase[i].strand2.start[s + 1] - 1)
-            w = phase[i].strand2.window[s]
-            H = impute_untyped ? compressed_Hunique.CW[w].uniqueH : 
-                compressed_Hunique.CW_typed[w].uniqueH
-            H_start = impute_untyped ? (abs(phase[i].strand2.start[s] - 
-                compressed_Hunique.Hstart[w]) + 1) : 1
-            H_idx = H_start:(H_start + length(X_idx) - 1)
-            X2[X_idx, i] = H[H_idx, phase[i].strand2.haplotypelabel[s]]
+        for segment in 1:length(phase[i].strand2.start)
+            Xrange, haplotype = _get_impute_ranges(segment, phase[i].strand2, 
+                compressed_Hunique, impute_untyped, size(X2, 1))
+            X2[Xrange, i] = haplotype
         end
-        w = phase[i].strand2.window[end] # last window
-        X_end = impute_untyped ? phase[i].strand1.length : size(X2, 1)
-        X_idx = phase[i].strand2.start[end]:X_end
-        H = impute_untyped ? compressed_Hunique.CW[w].uniqueH : 
-            compressed_Hunique.CW_typed[w].uniqueH
-        H_start = impute_untyped ? (abs(phase[i].strand2.start[end] - 
-            compressed_Hunique.Hstart[w]) + 1) : 1
-        H_idx = H_start:(H_start + length(X_idx) - 1)
-        X2[X_idx, i] = H[H_idx, phase[i].strand2.haplotypelabel[end]]
     end
+end
+
+"""
+    _get_impute_ranges(segment, strand, compressed_Hunique, impute_untyped, 
+        num_typed_snps)
+
+Helper function for impute! that computes the range of `X` and `H` in window `w`
+"""
+function _get_impute_ranges(
+    segment::Int,
+    strand::HaplotypeMosaic,
+    compressed_Hunique::CompressedHaplotypes,
+    impute_untyped::Bool,
+    num_typed_snps::Int
+    )
+    window = strand.window[segment]
+    is_last_window = segment == length(strand.window)
+
+    # get X range
+    Xstart = strand.start[segment]
+    if is_last_window 
+        X_end = impute_untyped ? strand.length : num_typed_snps
+    else
+        X_end = strand.start[segment + 1] - 1
+    end
+    Xrange = Xstart:X_end
+
+    # get haplotype vector
+    H = impute_untyped ? compressed_Hunique.CW[window].uniqueH : 
+        compressed_Hunique.CW_typed[window].uniqueH
+    H_start = impute_untyped ? (abs(strand.start[segment] - 
+        compressed_Hunique.Hstart[window]) + 1) : 1
+    Hrange = H_start:(H_start + length(Xrange) - 1)
+    Hlabel = strand.haplotypelabel[segment]
+    haplotype = @view(H[Hrange, strand.haplotypelabel[segment]])
+
+    return Xrange, haplotype
 end
 
 function impute!(
@@ -334,6 +343,7 @@ function assign_snpscore(
     # copy typed SNPs' quality score into vector of complete SNPs
     complete_snpscore = Vector{eltype(typed_snp_scores)}(undef, total_snps)
     copyto!(@view(complete_snpscore[typed_index]), typed_snp_scores)
+    # println(complete_snpscore[1:20], "\n")
 
     # all untyped SNPs before first typed SNPs gets same quality score
     cur_range = 1:(typed_index[1] - 1)
@@ -349,6 +359,7 @@ function assign_snpscore(
     # last segment of untyped SNPs
     cur_range = (typed_index[end] + 1):total_snps
     complete_snpscore[cur_range] .= typed_snp_scores[end]
+    # println(complete_snpscore[1:20], "\n")
 
     return complete_snpscore
 end
