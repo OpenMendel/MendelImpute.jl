@@ -173,7 +173,11 @@ function phase(
     #
     impute_start = time()
     write_time = 0.0
+
+    # record number of untyped SNPs between each window
     XtoH_idx = indexin(X_pos, compressed_Hunique.pos)
+    compute_padding!(ph, XtoH_idx)
+
     if impute # imputes typed and untyped SNPs
         # get each snp's imputation score
         complete_snpscore = assign_snpscore(ref_snps, snpscore, XtoH_idx)
@@ -221,6 +225,7 @@ function phase(
                 X_sampleID, snpscore, XtoH_idx, false)
         end
     end
+    
     # write per-sample error to output file
     if endswith(outfile, ".jlso")
         strip_chr = 4

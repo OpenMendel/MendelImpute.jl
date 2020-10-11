@@ -169,52 +169,78 @@ function impute!(
         # strand 1
         for segment in 1:length(phase[i].strand1.start)
             Xrange, haplotype = _get_impute_ranges(segment, phase[i].strand1, 
-                compressed_Hunique, impute_untyped, size(X1, 1))
+                compressed_Hunique, true)
             X1[Xrange, i] = haplotype
         end
 
         # strand 2
         for segment in 1:length(phase[i].strand2.start)
             Xrange, haplotype = _get_impute_ranges(segment, phase[i].strand2, 
-                compressed_Hunique, impute_untyped, size(X2, 1))
+                compressed_Hunique, true)
             X2[Xrange, i] = haplotype
         end
     end
 end
 
 """
-    _get_impute_ranges(segment, strand, compressed_Hunique, impute_untyped, 
-        num_typed_snps)
+    _get_impute_ranges(segment, strand, compressed_Hunique, impute_untyped)
 
-Helper function for impute! that computes the range of `X` and `H` in window `w`
+Helper function for impute! that computes the range of `X` and `H` in window
+`w`. Note that between 2 windows, `X` and `H`'s ranges should extend into 
+the untyped SNPs.
 """
 function _get_impute_ranges(
     segment::Int,
     strand::HaplotypeMosaic,
     compressed_Hunique::CompressedHaplotypes,
-    impute_untyped::Bool,
-    num_typed_snps::Int
+    impute_untyped::Bool
     )
+    impute_untyped == false && error("currently imputing only typed SNPs is not allowed")
+
     window = strand.window[segment]
+    is_first_window = segment == 1
     is_last_window = segment == length(strand.window)
+    start_padding = is_first_window ? 0 : strand.padding[segment - 1] >> 1
+    end_padding = is_last_window ? 0 : strand.padding[segment] >> 1
 
-    # get X range
+    # get X range, including padding for untyped SNPs between windows
     Xstart = strand.start[segment]
-    if is_last_window 
-        X_end = impute_untyped ? strand.length : num_typed_snps
-    else
-        X_end = strand.start[segment + 1] - 1
-    end
-    Xrange = Xstart:X_end
+    X_end = is_last_window ? strand.length : strand.start[segment + 1] - 1
+    Xrange = (Xstart - start_padding):(X_end + end_padding)
 
-    # get haplotype vector
-    H = impute_untyped ? compressed_Hunique.CW[window].uniqueH : 
-        compressed_Hunique.CW_typed[window].uniqueH
-    H_start = impute_untyped ? (abs(strand.start[segment] - 
-        compressed_Hunique.Hstart[window]) + 1) : 1
-    Hrange = H_start:(H_start + length(Xrange) - 1)
-    Hlabel = strand.haplotypelabel[segment]
-    haplotype = @view(H[Hrange, strand.haplotypelabel[segment]])
+    # haplotype vector in current window
+    H = compressed_Hunique.CW[window].uniqueH
+    H_start = abs(strand.start[segment] - compressed_Hunique.Hstart[window]) + 1
+    Hrange = H_start:(H_start + length(Xstart:X_end) - 1)
+    Hlabel = strand.haplotypelabel[segment] # index off CW (typed + untyped SNPs)
+    haplotype_cur = @view(H[Hrange, strand.haplotypelabel[segment]])
+
+    # get haplotype paddings
+    if is_first_window || window == strand.window[segment - 1]
+        haplotype_prev = BitArray[]
+    else
+        Hlabel_complete = unique_all_idx_to_complete_idx(Hlabel, window, 
+            compressed_Hunique)
+        Hlabel_prev = complete_idx_to_unique_all_idx(Hlabel_complete, 
+            window - 1, compressed_Hunique)
+        Hprev = compressed_Hunique.CW[window - 1].uniqueH
+        Hrange_prev = (size(Hprev, 1) - start_padding + 1):size(Hprev, 1)
+        haplotype_prev = @view(Hprev[Hrange_prev, Hlabel_prev])
+    end
+    if is_last_window || window == strand.window[segment + 1]
+        haplotype_next = BitArray[]
+    else
+        Hlabel_complete = unique_all_idx_to_complete_idx(Hlabel, window, 
+            compressed_Hunique)
+        Hlabel_next = complete_idx_to_unique_all_idx(Hlabel_complete, 
+            window + 1, compressed_Hunique)
+        Hnext = compressed_Hunique.CW[window + 1].uniqueH
+        Hrange_next = 1:end_padding
+        haplotype_next = @view(Hnext[Hrange_next, Hlabel_next])
+    end
+
+    # concatenate haplotypes including paddings
+    haplotype = ApplyArray(vcat, haplotype_prev, haplotype_cur, haplotype_next)
 
     return Xrange, haplotype
 end
@@ -292,7 +318,7 @@ function impute_discard_phase!(
 end
 
 """
-    update_marker_position!(phaseinfo, tgtfile, reffile)
+    update_marker_position!(phaseinfo, XtoH_idx)
 
 Converts `phaseinfo`'s strand1 and strand2's starting position in
 terms of matrix rows of `X` to starting position in terms matrix
@@ -305,7 +331,7 @@ function update_marker_position!(
     people = length(phaseinfo)
 
     @inbounds for j in 1:people
-        # update strand1's starting position
+        # update strand1's starting position and record padding
         for (i, idx) in enumerate(phaseinfo[j].strand1.start)
             phaseinfo[j].strand1.start[i] = XtoH_idx[idx]
         end
@@ -319,6 +345,52 @@ function update_marker_position!(
     @inbounds for j in 1:people
         phaseinfo[j].strand1.start[1] = 1
         phaseinfo[j].strand2.start[1] = 1
+    end
+
+    return nothing
+end
+
+
+"""
+    compute_padding!(phaseinfo, XtoH_idx)
+
+Computes the number of untyped SNPs between every window. 
+"""
+function compute_padding!(
+    phaseinfo::Vector{HaplotypeMosaicPair},
+    XtoH_idx::AbstractVector,
+    )
+    people = length(phaseinfo)
+
+    @inbounds for j in 1:people
+        # compute strand1's padding
+        for i in eachindex(phaseinfo[j].strand1.start)
+            next_start = phaseinfo[j].strand1.start[i + 1]
+            same_window = phaseinfo[j].strand1.window[i] == 
+                phaseinfo[j].strand1.window[i + 1]
+            if same_window
+                push!(phaseinfo[j].strand1.padding, 0)
+            else
+                cur_end = next_start - 1
+                padding = i == length(phaseinfo[j].strand1.start) ? 0 :
+                    XtoH_idx[next_start] - XtoH_idx[cur_end] - 1
+                push!(phaseinfo[j].strand1.padding, padding)
+            end
+        end
+        # compute strand2's padding
+        for i in eachindex(phaseinfo[j].strand2.start)
+            next_start = phaseinfo[j].strand2.start[i + 1]
+            same_window = phaseinfo[j].strand2.window[i] == 
+                phaseinfo[j].strand2.window[i + 1]
+            if same_window
+                push!(phaseinfo[j].strand2.padding, 0)
+            else
+                cur_end = next_start - 1
+                padding = i == length(phaseinfo[j].strand2.start) ? 0 :
+                    XtoH_idx[next_start] - XtoH_idx[cur_end] - 1
+                push!(phaseinfo[j].strand2.padding, padding)
+            end    
+        end
     end
 
     return nothing

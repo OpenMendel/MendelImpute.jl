@@ -7,14 +7,18 @@ Data structure for recording haplotype mosaic of one strand:
 in `window[i]`. The haplotype label is the column index of
 `CW_typed[window[i]].uniqueH`. `start[end]` to`length` has 
 haplotype `haplotypelabel[end]` in `window[end]`.
+
+`padding[i]` stores the number of untyped SNPs between `window[i]` and
+`window[i + 1]`
 """
 struct HaplotypeMosaic
     length::Int64
     start::Vector{Int64}
+    padding::Vector{Int64}
     window::Vector{Int32}
     haplotypelabel::Vector{Int32}
 end
-HaplotypeMosaic(len) = HaplotypeMosaic(len, Int64[], Int32[], Int32[])
+HaplotypeMosaic(len) = HaplotypeMosaic(len, Int64[], Int64[], Int32[], Int32[])
 
 function push_Mosaic!(x::HaplotypeMosaic, y::Tuple{Int64, T}) where T <: Integer
     newstart, newlabel = y[1], y[2]
