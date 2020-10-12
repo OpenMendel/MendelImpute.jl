@@ -169,14 +169,14 @@ function impute!(
         # strand 1
         for segment in 1:length(phase[i].strand1.start)
             Xrange, haplotype = _get_impute_ranges(segment, phase[i].strand1, 
-                compressed_Hunique, true)
+                compressed_Hunique, impute_untyped)
             X1[Xrange, i] = haplotype
         end
 
         # strand 2
         for segment in 1:length(phase[i].strand2.start)
             Xrange, haplotype = _get_impute_ranges(segment, phase[i].strand2, 
-                compressed_Hunique, true)
+                compressed_Hunique, impute_untyped)
             X2[Xrange, i] = haplotype
         end
     end
@@ -186,8 +186,12 @@ end
     _get_impute_ranges(segment, strand, compressed_Hunique, impute_untyped)
 
 Helper function for impute! that computes the range of `X` and `H` in window
-`w`. Note that between 2 windows, `X` and `H`'s ranges should extend into 
-the untyped SNPs.
+`w`. 
+
+# Note:
+- Between 2 windows, `X` and `H`'s ranges should extend into the untyped SNPs
+- Between 2 windows, all untyped SNPs are automatically included in the previous
+    window. So end paddings need to subtract not extend. 
 """
 function _get_impute_ranges(
     segment::Int,
@@ -198,25 +202,27 @@ function _get_impute_ranges(
     impute_untyped == false && error("currently imputing only typed SNPs is not allowed")
 
     window = strand.window[segment]
-    is_first_window = segment == 1
-    is_last_window = segment == length(strand.window)
-    start_padding = is_first_window ? 0 : strand.padding[segment - 1] >> 1
-    end_padding = is_last_window ? 0 : strand.padding[segment] >> 1
+    is_first_segment = segment == 1
+    is_last_segment = segment == length(strand.start)
+    start_padding = is_first_segment ? 0 : strand.padding[segment - 1] >> 1
+    end_padding = is_last_segment ? 0 : strand.padding[segment] >> 1
 
-    # get X range, including padding for untyped SNPs between windows
-    Xstart = strand.start[segment]
-    X_end = is_last_window ? strand.length : strand.start[segment + 1] - 1
-    Xrange = (Xstart - start_padding):(X_end + end_padding)
+    # get X range, including padding on both ends
+    Xstart = is_first_segment ? 1 : strand.start[segment] - start_padding
+    Xend = is_last_segment ? strand.length :
+        strand.start[segment + 1] - 1 - end_padding
+    Xrange = Xstart:Xend
 
     # haplotype vector in current window
+    Hstart = strand.start[segment] - compressed_Hunique.Hstart[window] + 1
+    Hend = Hstart + length((Xstart+start_padding):Xend) - 1
+    Hrange = Hstart:Hend
     H = compressed_Hunique.CW[window].uniqueH
-    H_start = abs(strand.start[segment] - compressed_Hunique.Hstart[window]) + 1
-    Hrange = H_start:(H_start + length(Xstart:X_end) - 1)
-    Hlabel = strand.haplotypelabel[segment] # index off CW (typed + untyped SNPs)
+    Hlabel = strand.haplotypelabel[segment]
     haplotype_cur = @view(H[Hrange, strand.haplotypelabel[segment]])
-
-    # get haplotype paddings
-    if is_first_window || window == strand.window[segment - 1]
+    
+    # get beginning haplotype paddings
+    if is_first_segment || window == strand.window[segment - 1]
         haplotype_prev = BitArray[]
     else
         Hlabel_complete = unique_all_idx_to_complete_idx(Hlabel, window, 
@@ -227,20 +233,9 @@ function _get_impute_ranges(
         Hrange_prev = (size(Hprev, 1) - start_padding + 1):size(Hprev, 1)
         haplotype_prev = @view(Hprev[Hrange_prev, Hlabel_prev])
     end
-    if is_last_window || window == strand.window[segment + 1]
-        haplotype_next = BitArray[]
-    else
-        Hlabel_complete = unique_all_idx_to_complete_idx(Hlabel, window, 
-            compressed_Hunique)
-        Hlabel_next = complete_idx_to_unique_all_idx(Hlabel_complete, 
-            window + 1, compressed_Hunique)
-        Hnext = compressed_Hunique.CW[window + 1].uniqueH
-        Hrange_next = 1:end_padding
-        haplotype_next = @view(Hnext[Hrange_next, Hlabel_next])
-    end
 
     # concatenate haplotypes including paddings
-    haplotype = ApplyArray(vcat, haplotype_prev, haplotype_cur, haplotype_next)
+    haplotype = ApplyArray(vcat, haplotype_prev, haplotype_cur)
 
     return Xrange, haplotype
 end
