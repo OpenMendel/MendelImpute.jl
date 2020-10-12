@@ -10,7 +10,7 @@ Writes imputed `X` into `outfile`. All genotypes in `outfile` are non-missing.
 - `outfile`: Output file name (ending in `.vcf.gz` or `.vcf`)
 - `X`: Imputed matrix. If `X` is a matrix, output VCF will be unphased. Otherwise if `X` is a Tuple
     of matrix (i.e. `X = X1 + X2`), then all output will be phased. 
-- `compressed_Hunique`: A `CompressedHaplotypes` object
+- `compressed_haplotypes`: A `CompressedHaplotypes` object
 - `X_sampleID`: Sample ID of imputation target
 - `snp_score`: Imputation score for each typed SNP. `1` is best, `0` is worse
 - `XtoH_idx`: Position of typed SNPs in complete set of SNPs
@@ -321,7 +321,7 @@ function update_marker_position!(
 end
 
 """
-    assign_snpscore(total_snps, typed_snp_scores, typed_index)
+    untyped_snpscore(total_snps, typed_snp_scores, typed_index)
 
 For each untyped SNP, average the nearest 2 typed SNP's quality score and
 return a vector of quality scores for all SNPs, typed and untyped.
@@ -331,7 +331,7 @@ return a vector of quality scores for all SNPs, typed and untyped.
 - `typed_snp_scores`: Vector of scores for each typed SNP
 - `typed_index`: Typed SNP's indices
 """
-function assign_snpscore(
+function untyped_snpscore(
     total_snps::Int,
     typed_snp_scores::AbstractVector,
     typed_index::AbstractVector
@@ -358,4 +358,39 @@ function assign_snpscore(
     # println(complete_snpscore[1:20], "\n")
 
     return complete_snpscore
+end
+
+
+"""
+    typed_snpscore(snps, typed_snp_scores, typed_index)
+
+For each typed SNP, compute the % of samples where the 2 selected haplotypes 
+match. This only works for hard genotypes. Dosage data need alternative.
+
+# Inputs
+- `X`: Genotype matrix. Each row is a typed SNP and each column is a person. 
+- `phaseinfo`: A vector of `HaplotypeMosaicPair` keeping track of each person's
+    phase information. `Haplotypelabels` point to complete haplotype set
+- `compressed_haplotypes`: A `CompressedHaplotypes` object
+"""
+function typed_snpscore(
+    X::AbstractMatrix,
+    phaseinfo::Vector{HaplotypeMosaicPair},
+    compressed_haplotypes::CompressedHaplotypes,
+    )
+    snps, samples = size(X, 1)
+    scores = zeros(snps)
+    Xobs = zeros(Union{UInt8, Missing}, snps) # observed data for each sample
+    Ximp = zeros(UInt8, snps) # imputed data for each sample
+
+    for i in 1:samples
+        # sync data
+        copyto!(Xobs, @view(X[:, i]))
+        fill!(Ximp, 0)
+
+        # impute
+        for s in phaseinfo[i].strand1
+
+        end
+    end
 end
