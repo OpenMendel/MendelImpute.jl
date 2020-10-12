@@ -133,7 +133,6 @@ function phase(
     ph = [HaplotypeMosaicPair(ref_snps) for i in 1:people]
     haplotype1 = [zeros(Int32, windows) for i in 1:people]
     haplotype2 = [zeros(Int32, windows) for i in 1:people]
-    haploscore = [zeros(Float32, windows) for i in 1:people]
     snpscore = zeros(Float32, tgt_snps)
     # if dynamic_programming
     #     redundant_haplotypes = [[Tuple{Int32, Int32}[] for i in
@@ -146,8 +145,8 @@ function phase(
     # find best happairs for each window
     #
     calculate_happairs_start = time()
-    haptimers = compute_optimal_haplotypes!(haplotype1, haplotype2, haploscore,
-        compressed_Hunique, X, X_pos, snpscore, stepwise, thinning_factor,
+    haptimers = compute_optimal_haplotypes!(haplotype1, haplotype2, 
+        compressed_Hunique, X, X_pos, stepwise, thinning_factor,
         scale_allelefreq, max_haplotypes, rescreen)
     # screen_flanking_windows!(haplotype1, haplotype2, compressed_Hunique, X)
     calculate_happairs_time = time() - calculate_happairs_start
@@ -161,10 +160,10 @@ function phase(
             1:windows)
     elseif ultra_compress # phase window-by-window for outputing ultra compressed format
         phasetimers = phase_fast_compressed!(ph, X, compressed_Hunique, 
-            haplotype1, haplotype2, haploscore)
+            haplotype1, haplotype2)
     else # phase window-by-window for outputing VCF files
         phasetimers = phase_fast!(ph, X, compressed_Hunique, haplotype1,
-            haplotype2, haploscore, impute)
+            haplotype2, impute)
     end
     phase_time = time() - phase_start
 
@@ -229,15 +228,15 @@ function phase(
     else # .vcf.gz
         strip_chr = 6
     end
-    error_filename = outfile[1:end-strip_chr]
-    write_time += @elapsed begin
-        open(error_filename * "sample.error", "w") do io
-            print(io, "ID,error\n")
-            for i in eachindex(X_sampleID)
-                @inbounds print(io, X_sampleID[i], ",", sum(haploscore[i]), "\n")
-            end
-        end
-    end
+    # error_filename = outfile[1:end-strip_chr]
+    # write_time += @elapsed begin
+    #     open(error_filename * "sample.error", "w") do io
+    #         print(io, "ID,error\n")
+    #         for i in eachindex(X_sampleID)
+    #             @inbounds print(io, X_sampleID[i], ",", sum(haploscore[i]), "\n")
+    #         end
+    #     end
+    # end
     impute_time = time() - impute_start
     impute_nonwrite_time = impute_time - write_time
 
@@ -476,8 +475,6 @@ searches for optimal breakpoint.
     haplotypes for each window and some other information
 * `haplotype1`: `haplotype1[w]` stores a optimal haplotype for window `w`. 
 * `haplotype2`: `haplotype2[w]` stores a optimal haplotype for window `w`. 
-* `hapscore`: Error induced by optimal haplotype pair in current window, for 
-    each person
 * `impute_untyped`: Bool indicating whether untyped SNPs should be imputed. 
 
 # Timers:
@@ -491,7 +488,6 @@ function phase_fast!(
     compressed_Hunique::CompressedHaplotypes,
     haplotype1::AbstractVector,
     haplotype2::AbstractVector,
-    hapscore::AbstractVector,
     impute_untyped::Bool
     ) where T <: Real
 
@@ -519,7 +515,7 @@ function phase_fast!(
 
         # First pass to phase each sample window-by-window
         timers[id][8] += @elapsed phase_sample!(haplotype1[i], haplotype2[i],
-            hapscore[i], compressed_Hunique, survivors1[id], survivors2[id])
+            compressed_Hunique, survivors1[id], survivors2[id])
 
         # record info for first window
         timers[id][24] += @elapsed begin
@@ -576,7 +572,6 @@ function phase_fast_compressed!(
     compressed_Hunique::CompressedHaplotypes,
     haplotype1::AbstractVector,
     haplotype2::AbstractVector,
-    hapscore::AbstractVector
     ) where T <: Real
 
     # declare some constants
@@ -603,7 +598,7 @@ function phase_fast_compressed!(
 
         # First pass to phase each sample window-by-window
         timers[id][8] += @elapsed phase_sample!(haplotype1[i], haplotype2[i],
-            hapscore[i], compressed_Hunique, survivors1[id], survivors2[id])
+            compressed_Hunique, survivors1[id], survivors2[id])
 
         # record info for first window
         timers[id][24] += @elapsed begin

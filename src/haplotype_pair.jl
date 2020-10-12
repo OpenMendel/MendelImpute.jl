@@ -11,7 +11,6 @@ stores result in `haplotype1` and `haplotype2`.
 # Arguments
 - `haplotype1`: Person `i` strand1 haplotype in window `w` is `haplotype1[i][w]`
 - `haplotype2`: Person `i` strand2 haplotype in window `w` is `haplotype2[i][w]`
-- `haploscore`: Least square error for each person in each window. 
 - `compressed_Hunique`: A `CompressedHaplotypes` object
 - `X`: the full genotype matrix possibly with missings. Each column is an 
     individual.
@@ -41,11 +40,9 @@ stores result in `haplotype1` and `haplotype2`.
 function compute_optimal_haplotypes!(
     haplotype1::AbstractVector,
     haplotype2::AbstractVector,
-    haploscore::AbstractVector,
     compressed_Hunique::CompressedHaplotypes,
     X::AbstractMatrix,
     X_pos::AbstractVector,
-    per_snp_error::AbstractVector,
     stepscreen::Union{Nothing, Int},
     tf::Union{Nothing, Int}, # thinning factor
     scale_allelefreq::Bool,
@@ -64,7 +61,6 @@ function compute_optimal_haplotypes!(
 
     # allocate working arrays
     timers = [zeros(7*8) for _ in 1:threads] # 8 for spacing
-    per_snp_missing = zeros(size(X, 1))
     timers[1][48] += @elapsed begin # time for allocating
         happair1 = [ones(Int32, people)               for _ in 1:threads]
         happair2 = [ones(Int32, people)               for _ in 1:threads]
@@ -143,13 +139,8 @@ function compute_optimal_haplotypes!(
         end
 
         # save result 
-        t7 = @elapsed save_haplotypes!(haplotype1, haplotype2, haploscore,
-            happair1[id], happair2[id], hapscore[id], compressed_Hunique, w)
-        
-        # calculate each (typed) SNP's imputation quality
-        t7 += @elapsed typed_snps_error!(@view(per_snp_error[Xrange]),
-            Xw_aligned, Hw_aligned, happair1[id], happair1[id], 
-            @view(per_snp_missing[Xrange]))
+        t7 = @elapsed save_haplotypes!(haplotype1, haplotype2, happair1[id], 
+            happair2[id], compressed_Hunique, w)
 
         # record timings and haplotypes (× 8 to avoid false sharing)
         timers[id][8]  += t1
@@ -176,23 +167,18 @@ indices of full haplotype pool, and store them in `haplotype`s.
 # Arguments
 - `haplotype1`: Person `i` strand1 haplotype in window `w` is `haplotype1[i][w]`
 - `haplotype2`: Person `i` strand2 haplotype in window `w` is `haplotype2[i][w]`
-- `haploscore`: Least square error for each person in each window. 
 - `happair1`: Optimal haplotype pair in strand1 of current window, indexes off
     of unique haplotypes.
 - `happair2`: Optimal haplotype pair in strand2 of current window, indexes off
     of unique haplotypes.
-- `hapscore`: Error induced by optimal haplotype pair in current window, for 
-    each person.
 - `compressed_Hunique`: A `CompressedHaplotypes` object
 - `window` current window.
 """
 function save_haplotypes!(
     haplotype1::Vector{Vector{Int32}},
     haplotype2::Vector{Vector{Int32}},
-    haploscore::Vector{Vector{Float32}},
     happair1::Vector{Int32},
     happair2::Vector{Int32},
-    hapscore::Vector{Float32},
     compressed_Hunique::CompressedHaplotypes,
     window::Int,
     )
@@ -203,7 +189,6 @@ function save_haplotypes!(
             happair1[i], window, compressed_Hunique)
         haplotype2[i][window] = unique_idx_to_complete_idx(
             happair2[i], window, compressed_Hunique)
-        haploscore[i][window] = hapscore[i]
     end
     return nothing
 end

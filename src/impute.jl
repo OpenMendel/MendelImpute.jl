@@ -169,14 +169,14 @@ function impute!(
         # strand 1
         for segment in 1:length(phase[i].strand1.start)
             Xrange, haplotype = _get_impute_ranges(segment, phase[i].strand1, 
-                compressed_Hunique, impute_untyped, size(X1, 1))
+                compressed_Hunique, impute_untyped)
             X1[Xrange, i] = haplotype
         end
 
         # strand 2
         for segment in 1:length(phase[i].strand2.start)
             Xrange, haplotype = _get_impute_ranges(segment, phase[i].strand2, 
-                compressed_Hunique, impute_untyped, size(X2, 1))
+                compressed_Hunique, impute_untyped)
             X2[Xrange, i] = haplotype
         end
     end
@@ -193,25 +193,21 @@ function _get_impute_ranges(
     strand::HaplotypeMosaic,
     compressed_Hunique::CompressedHaplotypes,
     impute_untyped::Bool,
-    num_typed_snps::Int
     )
+    impute_untyped == true || error("Currently cannot impute typed SNPs only!")
     window = strand.window[segment]
-    is_last_window = segment == length(strand.window)
+    is_last_segment = segment == length(strand.start)
 
     # get X range
     Xstart = strand.start[segment]
-    if is_last_window 
-        X_end = impute_untyped ? strand.length : num_typed_snps
-    else
-        X_end = strand.start[segment + 1] - 1
-    end
+    X_end = is_last_segment ? strand.length : strand.start[segment + 1] - 1
     Xrange = Xstart:X_end
 
     # get haplotype vector
     H = impute_untyped ? compressed_Hunique.CW[window].uniqueH : 
         compressed_Hunique.CW_typed[window].uniqueH
-    H_start = impute_untyped ? (abs(strand.start[segment] - 
-        compressed_Hunique.Hstart[window]) + 1) : 1
+    H_start = impute_untyped ? (strand.start[segment] - 
+        compressed_Hunique.Hstart[window] + 1) : 1 #TODO: 1 is not correct since previous window can extend into current one
     Hrange = H_start:(H_start + length(Xrange) - 1)
     Hlabel = strand.haplotypelabel[segment]
     haplotype = @view(H[Hrange, strand.haplotypelabel[segment]])
