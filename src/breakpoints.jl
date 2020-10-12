@@ -181,7 +181,7 @@ function search_breakpoint(
     errors = 0
     @inbounds for pos in 1:n
         if !ismissing(X[pos])
-            errors += X[pos] ≠ s1[pos] + s22[pos]
+            errors += abs2(X[pos] - s1[pos] - s22[pos])
         end
     end
     bkpt_optim, err_optim = 0, errors
@@ -192,8 +192,8 @@ function search_breakpoint(
     # extend haplotype s21 position by position
     @inbounds for bkpt in 1:n
         if !ismissing(X[bkpt]) && s21[bkpt] ≠ s22[bkpt]
-            errors -= X[bkpt] ≠ s1[bkpt] + s22[bkpt]
-            errors += X[bkpt] ≠ s1[bkpt] + s21[bkpt]
+            errors -= abs2(X[bkpt] - s1[bkpt] - s22[bkpt])
+            errors += abs2(X[bkpt] - s1[bkpt] - s21[bkpt])
             if errors :: Int < err_optim
                 bkpt_optim, err_optim = bkpt, errors
                 # quick return if perfect match
@@ -236,12 +236,12 @@ function search_breakpoint(
         errors = 0
         for pos in 1:bkpt1
             if !ismissing(X[pos])
-                errors += X[pos] ≠ s11[pos] + s22[pos]
+                errors += abs2(X[pos] - s11[pos] - s22[pos])
             end
         end
         for pos in (bkpt1 + 1):length(X)
             if !ismissing(X[pos])
-                errors += X[pos] ≠ s12[pos] +s22[pos]
+                errors += abs2(X[pos] - s12[pos] - s22[pos])
             end
         end
         if errors :: Int < err_optim
@@ -255,8 +255,8 @@ function search_breakpoint(
         # extend haplotype s21 position by position
         for bkpt2 in 1:bkpt1
             if !ismissing(X[bkpt2]) && s21[bkpt2] ≠ s22[bkpt2]
-                errors -= X[bkpt2] ≠ s11[bkpt2] + s22[bkpt2]
-                errors += X[bkpt2] ≠ s11[bkpt2] + s21[bkpt2]
+                errors -= abs2(X[bkpt2] - s11[bkpt2] - s22[bkpt2])
+                errors += abs2(X[bkpt2] - s11[bkpt2] - s21[bkpt2])
                 if errors :: Int < err_optim
                     err_optim = errors
                     bkpts_optim = (bkpt1, bkpt2)
@@ -265,8 +265,8 @@ function search_breakpoint(
         end
         for bkpt2 in (bkpt1 + 1):length(X)
             if !ismissing(X[bkpt2]) && s21[bkpt2] ≠ s22[bkpt2]
-                errors -= X[bkpt2] ≠ s12[bkpt2] + s22[bkpt2]
-                errors += X[bkpt2] ≠ s12[bkpt2] + s21[bkpt2]
+                errors -= abs2(X[bkpt2] - s12[bkpt2] - s22[bkpt2])
+                errors += abs2(X[bkpt2] - s12[bkpt2] - s21[bkpt2])
                 if errors :: Int < err_optim
                     err_optim = errors
                     bkpts_optim = (bkpt1, bkpt2)

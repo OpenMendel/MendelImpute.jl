@@ -133,7 +133,6 @@ function phase(
     ph = [HaplotypeMosaicPair(ref_snps) for i in 1:people]
     haplotype1 = [zeros(Int32, windows) for i in 1:people]
     haplotype2 = [zeros(Int32, windows) for i in 1:people]
-    snpscore = zeros(Float32, tgt_snps)
     # if dynamic_programming
     #     redundant_haplotypes = [[Tuple{Int32, Int32}[] for i in
     #         1:num_windows_per_chunks] for j in 1:people]
@@ -175,7 +174,9 @@ function phase(
     XtoH_idx = indexin(X_pos, compressed_Hunique.pos)
     if impute # imputes typed and untyped SNPs
         # get each snp's imputation score
-        complete_snpscore = assign_snpscore(ref_snps, snpscore, XtoH_idx)
+        # snpscore = typed_snpscore(tgt_snps, )
+        snpscore = zeros(tgt_snps)
+        complete_snpscore = untyped_snpscore(ref_snps, snpscore, XtoH_idx)
 
         # convert phase's starting position from X's index to H's index
         update_marker_position!(ph, XtoH_idx)
@@ -624,7 +625,7 @@ function phase_fast_compressed!(
 
             # find optimal breakpoint if there is one
             timers[id][16] += @elapsed begin
-                _, bkpts = continue_haplotype(Xwi, compressed_Hunique, w, 
+                _, bkpts, err = continue_haplotype(Xwi, compressed_Hunique, w, 
                     (hap1_prev, hap2_prev), (hap1_curr, hap2_curr), 
                     phased=true, search_double_bkpts=true)
             end
@@ -635,19 +636,18 @@ function phase_fast_compressed!(
                     push_Mosaic!(ph[i].strand1, (start_prev + bkpts[1], 
                         hap1_curr))
                 end
-                # strand1 double stranded breakpoint
-                if bkpts[1] == -2
-                    push_Mosaic!(ph[i].strand1, (start_curr, hap1_curr))
-                end
                 # strand2 single stranded breakpoint
                 if -1 < bkpts[2] < length(Xwi)
                     push_Mosaic!(ph[i].strand2, (start_prev + bkpts[2], 
                         hap2_curr))
                 end
-                # strand2 double stranded breakpoint
-                if bkpts[2] == -2
-                    push_Mosaic!(ph[i].strand2, (start_curr, hap2_curr))
-                end
+                # if not searching double bkpts, need to uncomment below
+                # if bkpts[1] == -2
+                #     push_Mosaic!(ph[i].strand1, (start_curr, hap1_curr))
+                # end
+                # if bkpts[2] == -2
+                #     push_Mosaic!(ph[i].strand2, (start_curr, hap2_curr))
+                # end
             end
         end
         next!(pmeter) # update progress
