@@ -50,7 +50,7 @@ function Base.write(
     print(pb[1], "##source=MendelImpute\n")
     print(pb[1], "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n")
     print(pb[1], "##INFO=<ID=IMPQ,Number=0,Type=Float,Description=" * 
-        "\"Quality of marker. 0 is best, 1 is worse.\">\n")
+        "\"Quality of marker. 0 is best, larger is worse.\">\n")
     print(pb[1], "##INFO=<ID=IMP,Number=0,Type=Flag,Description=\"Imputed marker\">\n")
 
     # header line should match reffile (i.e. sample ID's should match)
@@ -339,7 +339,8 @@ end
     untyped_snpscore(total_snps, typed_snp_scores, typed_index)
 
 For each untyped SNP, average the nearest 2 typed SNP's quality score and
-return a vector of quality scores for all SNPs, typed and untyped.
+return a vector of quality scores for all SNPs, typed and untyped. 0 is best,
+larger is worse. 
 
 # Inputs
 - `total_snps`: Total number of SNPs, typed and untyped
@@ -377,11 +378,12 @@ end
 """
     typed_snpscore(snps, typed_snp_scores, typed_index)
 
-For each typed SNP, compute its average least square error over all samples
+For each typed SNP, compute its average least square error over all samples.
+0 is best, larger is worse. 
 
 # Inputs
 - `X`: Genotype matrix. Each row is a typed SNP and each column is a person. 
-- `phaseinfo`: A vector of `HaplotypeMosaicPair` keeping track of each person's
+- `phase`: A vector of `HaplotypeMosaicPair` keeping track of each person's
     phase information. `Haplotypelabels` point to complete haplotype set
 - `compressed_haplotypes`: A `CompressedHaplotypes` object
 """
@@ -397,7 +399,7 @@ function typed_snpscore(
     missing_counter = zeros(Int, snps)
     typed_snps_error = zeros(Float64, snps)
 
-    for i in 1:samples
+    @inbounds for i in 1:samples
         fill!(Ximp, 0)
         # add strand1 to Ximp
         for segment in 1:length(phase[i].strand1.start)
@@ -430,45 +432,4 @@ function typed_snpscore(
     end
 
     return typed_snps_error
-end
-
-"""
-    typed_snps_error!(typed_snps_error, Xw, Hw, happair1, happair2, [missing_counter])
-
-Calculates each SNP's imputation score in a window. The score is the percentage
-number of samples where the 2 chosen haplotypes match the observed genotype.
-
-# Inputs
-- `typed_snps_error`: `typed_snps_error[i]` is the % of SNPs correctly imputed
-- `Xw`: Genotype matrix in current window
-- `Hw`: Haplotype matrix in current window (contains only unique haplotypes)
-- `happair1`: The first optimal haplotype for each sample
-- `happair2`: The second optimal haplotype for each sample
-- `missing_counter`: A counter keeping track of number of missing for each SNP
-"""
-function typed_snps_error!(
-    typed_snps_error::AbstractVector,
-    Xw::AbstractMatrix,
-    Hw::AbstractMatrix,
-    happair1::Vector{Int32},
-    happair2::Vector{Int32},
-    missing_counter::AbstractVector = zeros(length(typed_snps_error)),
-    )
-    T = eltype(Xw)
-    snps, samples = size(Xw, 1), size(Xw, 2)
-    length(typed_snps_error) == snps || error("typed_snps_error!: check vector length")
-    @inbounds for j in 1:samples
-        h1 = view(Hw, :, happair1[j])
-        h2 = view(Hw, :, happair2[j])
-        for i in 1:snps
-            if Xw[i, j] === missing
-                missing_counter[i] += 1
-                continue
-            end
-            typed_snps_error[i] += Xw[i, j] == convert(T, h1[i] + h2[i])
-        end
-    end
-    for i in 1:snps
-        @inbounds typed_snps_error[i] /= samples - missing_counter[i]
-    end
 end
