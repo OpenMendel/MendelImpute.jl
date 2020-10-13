@@ -34,7 +34,7 @@ function Base.write(
     len = div(snps, threads)
     files = ["tmp$i.vcf.gz" for i in 1:threads]
     typed = falses(snps)
-    typed[XtoH_idx] .= true
+    impute ? (typed[XtoH_idx] .= true) : (typed .= true)
 
     # retrieve reference file information
     chr = impute ? compressed_haplotypes.chr : @view(compressed_haplotypes.chr[XtoH_idx])
@@ -170,14 +170,14 @@ function impute!(
         for segment in 1:length(phase[i].strand1.start)
             Xrange, haplotype = _get_impute_ranges(segment, phase[i].strand1, 
                 compressed_Hunique, impute_untyped)
-            X1[Xrange, i] = haplotype
+            X1[Xrange, i] .= haplotype
         end
 
         # strand 2
         for segment in 1:length(phase[i].strand2.start)
             Xrange, haplotype = _get_impute_ranges(segment, phase[i].strand2, 
                 compressed_Hunique, impute_untyped)
-            X2[Xrange, i] = haplotype
+            X2[Xrange, i] .= haplotype
         end
     end
 end
@@ -194,24 +194,25 @@ function _get_impute_ranges(
     compressed_Hunique::CompressedHaplotypes,
     impute_untyped::Bool,
     )
-    impute_untyped == true || error("Currently cannot impute typed SNPs only!")
     window = strand.window[segment]
     is_last_segment = segment == length(strand.start)
+    total_snps = impute_untyped ? strand.length :
+        last(compressed_Hunique.X_window_range[end])
 
     # get X range
     Xstart = strand.start[segment]
-    X_end = is_last_segment ? strand.length : strand.start[segment + 1] - 1
+    X_end = is_last_segment ? total_snps : strand.start[segment + 1] - 1
     Xrange = Xstart:X_end
 
     # get haplotype vector
     H = impute_untyped ? compressed_Hunique.CW[window].uniqueH : 
-        compressed_Hunique.CW_typed[window].uniqueH
-    H_start = impute_untyped ? (strand.start[segment] - 
-        compressed_Hunique.Hstart[window] + 1) : 1 #TODO: 1 is not correct since previous window can extend into current one
-    Hrange = H_start:(H_start + length(Xrange) - 1)
+                         compressed_Hunique.CW_typed[window].uniqueH
+    offset = impute_untyped ? compressed_Hunique.Hstart[window] : 
+        first(compressed_Hunique.X_window_range[window])
+    Hstart = strand.start[segment] - offset + 1
+    Hrange = Hstart:(Hstart + length(Xrange) - 1)
     Hlabel = strand.haplotypelabel[segment]
     haplotype = @view(H[Hrange, strand.haplotypelabel[segment]])
-
     return Xrange, haplotype
 end
 
@@ -375,7 +376,7 @@ match. This only works for hard genotypes. Dosage data need alternative.
 """
 function typed_snpscore(
     X::AbstractMatrix,
-    phaseinfo::Vector{HaplotypeMosaicPair},
+    phase::Vector{HaplotypeMosaicPair},
     compressed_haplotypes::CompressedHaplotypes,
     )
     snps, samples = size(X, 1)
@@ -388,9 +389,20 @@ function typed_snpscore(
         copyto!(Xobs, @view(X[:, i]))
         fill!(Ximp, 0)
 
-        # impute
-        for s in phaseinfo[i].strand1
-
+        # add strand1 to Ximp
+        for j in 1:(length(phase[i].strand1.start) - 1)
+            Xrange, haplotype = _get_impute_ranges(segment, phase[i].strand1, 
+                compressed_Hunique, false)
+            Xobs[Xrange] += haplotype
         end
+
+        # add strand2 to Ximp
+        for j in 1:(length(phase[i].strand2.start) - 1)
+            Xrange, haplotype = _get_impute_ranges(segment, phase[i].strand2, 
+                compressed_Hunique, false)
+            Xobs[Xrange] += haplotype
+        end
+
+        # accumulate error
     end
 end

@@ -67,9 +67,6 @@ function phase(
     if dynamic_programming
         error("Currently dynamic programming routine is broken! Sorry!")
     end
-    if !impute
-        error("Due to a bug in impute!, currently cannot impute only typed SNPs! Sorry!")
-    end
     endswith(outfile, ".jlso") || endswith(outfile, ".vcf") || 
         endswith(outfile, ".vcf.gz") || error("Output file name must end with" * 
         " .vcf or .vcf.gz or .jlso!")
@@ -172,12 +169,11 @@ function phase(
     impute_start = time()
     write_time = 0.0
     XtoH_idx = indexin(X_pos, compressed_Hunique.pos)
+    # get each snp's imputation score
+    # snpscore = typed_snpscore(tgt_snps, )
+    snpscore = zeros(tgt_snps)
+    impute && (complete_snpscore = untyped_snpscore(ref_snps, snpscore, XtoH_idx))
     if impute # imputes typed and untyped SNPs
-        # get each snp's imputation score
-        # snpscore = typed_snpscore(tgt_snps, )
-        snpscore = zeros(tgt_snps)
-        complete_snpscore = untyped_snpscore(ref_snps, snpscore, XtoH_idx)
-
         # convert phase's starting position from X's index to H's index
         update_marker_position!(ph, XtoH_idx)
 
@@ -522,8 +518,12 @@ function phase_fast!(
         timers[id][24] += @elapsed begin
             hap1 = haplotype1[i][1] # complete idx
             hap2 = haplotype2[i][1] # complete idx
-            h1 = complete_idx_to_unique_all_idx(hap1, 1, compressed_Hunique)
-            h2 = complete_idx_to_unique_all_idx(hap2, 1, compressed_Hunique)
+            h1 = impute_untyped ? complete_idx_to_unique_all_idx(hap1, 1, 
+                compressed_Hunique) : 
+                complete_idx_to_unique_typed_idx(hap1, 1, compressed_Hunique)
+            h2 = impute_untyped ? complete_idx_to_unique_all_idx(hap2, 1, 
+                compressed_Hunique) : 
+                complete_idx_to_unique_typed_idx(hap2, 1, compressed_Hunique)
             push!(ph[i].strand1.start, 1)
             push!(ph[i].strand1.haplotypelabel, h1)
             push!(ph[i].strand2.start, 1)
