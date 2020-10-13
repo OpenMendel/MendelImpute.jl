@@ -185,6 +185,16 @@ function unique_all_idx_to_complete_idx(unique_idx, window,
 end
 
 """
+For an index in unique haplotype (of all snps), finds the haplotype in the 
+unique haplotype (of typed SNPs only) pool for the specified window. 
+"""
+function unique_all_idx_to_unique_typed_idx(all_idx, window,
+    Hunique::CompressedHaplotypes)
+    complete_idx = unique_all_idx_to_complete_idx(all_idx, window, Hunique)
+    return complete_idx_to_unique_typed_idx(complete_idx, window, Hunique)
+end
+
+"""
 For an index in the complete haplotype pool, find its index in the unique
 haplotype pool of all SNPs (typed + untyped) in specified window. 
 """

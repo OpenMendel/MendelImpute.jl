@@ -169,14 +169,14 @@ function impute!(
         # strand 1
         for segment in 1:length(phase[i].strand1.start)
             Xrange, haplotype = _get_impute_ranges(segment, phase[i].strand1, 
-                compressed_Hunique, impute_untyped)
+                compressed_Hunique, impute_untyped=impute_untyped)
             X1[Xrange, i] .= haplotype
         end
 
         # strand 2
         for segment in 1:length(phase[i].strand2.start)
             Xrange, haplotype = _get_impute_ranges(segment, phase[i].strand2, 
-                compressed_Hunique, impute_untyped)
+                compressed_Hunique, impute_untyped=impute_untyped)
             X2[Xrange, i] .= haplotype
         end
     end
@@ -187,12 +187,23 @@ end
         num_typed_snps)
 
 Helper function for impute! that computes the range of `X` and `H` in window `w`
+
+# Inputs:
+- `segment`: Current segment of a `HaplotypeMosaic`
+- `strand`: A `HaplotypeMosaic` (1 strand of haplotype for a person, contains
+    many segments)
+- `compressed_Hunique`: A `CompressedHaplotypes` object
+- `impute_untyped`: If `true`, all untyped SNPs will be considered in indexing. 
+- `haplabel_typedonly`: If `true`, `strand.haplotypelabel` stores haplotype index with
+    respect to `compressed_Hunique.CW`. Otherwise index is with respect
+    to `compressed_Hunique.CW_typed`
 """
 function _get_impute_ranges(
     segment::Int,
     strand::HaplotypeMosaic,
-    compressed_Hunique::CompressedHaplotypes,
-    impute_untyped::Bool,
+    compressed_Hunique::CompressedHaplotypes;
+    impute_untyped::Bool = true,
+    haplabel_typedonly::Bool = false
     )
     window = strand.window[segment]
     is_last_segment = segment == length(strand.start)
@@ -212,7 +223,10 @@ function _get_impute_ranges(
     Hstart = strand.start[segment] - offset + 1
     Hrange = Hstart:(Hstart + length(Xrange) - 1)
     Hlabel = strand.haplotypelabel[segment]
-    haplotype = @view(H[Hrange, strand.haplotypelabel[segment]])
+    haplabel_typedonly && (Hlabel = unique_all_idx_to_unique_typed_idx(Hlabel,
+        window, compressed_Hunique))
+    haplotype = @view(H[Hrange, Hlabel])
+
     return Xrange, haplotype
 end
 
@@ -340,7 +354,7 @@ function untyped_snpscore(
     # copy typed SNPs' quality score into vector of complete SNPs
     complete_snpscore = Vector{eltype(typed_snp_scores)}(undef, total_snps)
     copyto!(@view(complete_snpscore[typed_index]), typed_snp_scores)
-    # println(complete_snpscore[1:20], "\n")
+    println(complete_snpscore[1:20], "\n")
 
     # all untyped SNPs before first typed SNPs gets same quality score
     cur_range = 1:(typed_index[1] - 1)
@@ -356,17 +370,15 @@ function untyped_snpscore(
     # last segment of untyped SNPs
     cur_range = (typed_index[end] + 1):total_snps
     complete_snpscore[cur_range] .= typed_snp_scores[end]
-    # println(complete_snpscore[1:20], "\n")
+    println(complete_snpscore[1:20], "\n")
 
     return complete_snpscore
 end
 
-
 """
     typed_snpscore(snps, typed_snp_scores, typed_index)
 
-For each typed SNP, compute the % of samples where the 2 selected haplotypes 
-match. This only works for hard genotypes. Dosage data need alternative.
+For each typed SNP, compute its average least square error over all samples
 
 # Inputs
 - `X`: Genotype matrix. Each row is a typed SNP and each column is a person. 
@@ -379,30 +391,85 @@ function typed_snpscore(
     phase::Vector{HaplotypeMosaicPair},
     compressed_haplotypes::CompressedHaplotypes,
     )
-    snps, samples = size(X, 1)
+    snps, samples = size(X)
     scores = zeros(snps)
-    Xobs = zeros(Union{UInt8, Missing}, snps) # observed data for each sample
-    Ximp = zeros(UInt8, snps) # imputed data for each sample
+    Ximp = zeros(eltype(X), snps)
+    Xerr = zeros(Float64, snps)
+    missing_counter = zeros(Int, snps)
+    typed_snps_error = zeros(Float64, snps)
 
     for i in 1:samples
-        # sync data
-        copyto!(Xobs, @view(X[:, i]))
         fill!(Ximp, 0)
-
         # add strand1 to Ximp
-        for j in 1:(length(phase[i].strand1.start) - 1)
+        for segment in 1:length(phase[i].strand1.start)
             Xrange, haplotype = _get_impute_ranges(segment, phase[i].strand1, 
-                compressed_Hunique, false)
-            Xobs[Xrange] += haplotype
+                compressed_haplotypes, impute_untyped=false, 
+                haplabel_typedonly=true)
+            Ximp[Xrange] .= haplotype
         end
 
         # add strand2 to Ximp
-        for j in 1:(length(phase[i].strand2.start) - 1)
+        for segment in 1:length(phase[i].strand2.start)
             Xrange, haplotype = _get_impute_ranges(segment, phase[i].strand2, 
-                compressed_Hunique, false)
-            Xobs[Xrange] += haplotype
+                compressed_haplotypes, impute_untyped=false, 
+                haplabel_typedonly=true)
+            Ximp[Xrange] += haplotype
         end
 
         # accumulate error
+        for j in 1:snps
+            if ismissing(X[j, i])
+                missing_counter[j] += 1
+                continue
+            end
+            typed_snps_error[j] += abs2(X[j, i] - Ximp[j])
+        end
+    end
+
+    for i in 1:snps
+        @inbounds typed_snps_error[i] /= samples - missing_counter[i]
+    end
+
+    return typed_snps_error
+end
+
+"""
+    typed_snps_error!(typed_snps_error, Xw, Hw, happair1, happair2, [missing_counter])
+
+Calculates each SNP's imputation score in a window. The score is the percentage
+number of samples where the 2 chosen haplotypes match the observed genotype.
+
+# Inputs
+- `typed_snps_error`: `typed_snps_error[i]` is the % of SNPs correctly imputed
+- `Xw`: Genotype matrix in current window
+- `Hw`: Haplotype matrix in current window (contains only unique haplotypes)
+- `happair1`: The first optimal haplotype for each sample
+- `happair2`: The second optimal haplotype for each sample
+- `missing_counter`: A counter keeping track of number of missing for each SNP
+"""
+function typed_snps_error!(
+    typed_snps_error::AbstractVector,
+    Xw::AbstractMatrix,
+    Hw::AbstractMatrix,
+    happair1::Vector{Int32},
+    happair2::Vector{Int32},
+    missing_counter::AbstractVector = zeros(length(typed_snps_error)),
+    )
+    T = eltype(Xw)
+    snps, samples = size(Xw, 1), size(Xw, 2)
+    length(typed_snps_error) == snps || error("typed_snps_error!: check vector length")
+    @inbounds for j in 1:samples
+        h1 = view(Hw, :, happair1[j])
+        h2 = view(Hw, :, happair2[j])
+        for i in 1:snps
+            if Xw[i, j] === missing
+                missing_counter[i] += 1
+                continue
+            end
+            typed_snps_error[i] += Xw[i, j] == convert(T, h1[i] + h2[i])
+        end
+    end
+    for i in 1:snps
+        @inbounds typed_snps_error[i] /= samples - missing_counter[i]
     end
 end

@@ -170,8 +170,9 @@ function phase(
     write_time = 0.0
     XtoH_idx = indexin(X_pos, compressed_Hunique.pos)
     # get each snp's imputation score
-    # snpscore = typed_snpscore(tgt_snps, )
-    snpscore = zeros(tgt_snps)
+    snpscore = typed_snpscore(X, ph, compressed_Hunique)
+    println(snpscore)
+    fdsa
     impute && (complete_snpscore = untyped_snpscore(ref_snps, snpscore, XtoH_idx))
     if impute # imputes typed and untyped SNPs
         # convert phase's starting position from X's index to H's index
