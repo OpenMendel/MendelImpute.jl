@@ -10,7 +10,7 @@ Writes imputed `X` into `outfile`. All genotypes in `outfile` are non-missing.
 - `outfile`: Output file name (ending in `.vcf.gz` or `.vcf`)
 - `X`: Imputed matrix. If `X` is a matrix, output VCF will be unphased. Otherwise if `X` is a Tuple
     of matrix (i.e. `X = X1 + X2`), then all output will be phased. 
-- `compressed_Hunique`: A `CompressedHaplotypes` object
+- `compressed_haplotypes`: A `CompressedHaplotypes` object
 - `X_sampleID`: Sample ID of imputation target
 - `snp_score`: Imputation score for each typed SNP. `1` is best, `0` is worse
 - `XtoH_idx`: Position of typed SNPs in complete set of SNPs
@@ -34,7 +34,7 @@ function Base.write(
     len = div(snps, threads)
     files = ["tmp$i.vcf.gz" for i in 1:threads]
     typed = falses(snps)
-    typed[XtoH_idx] .= true
+    impute ? (typed[XtoH_idx] .= true) : (typed .= true)
 
     # retrieve reference file information
     chr = impute ? compressed_haplotypes.chr : @view(compressed_haplotypes.chr[XtoH_idx])
@@ -50,7 +50,7 @@ function Base.write(
     print(pb[1], "##source=MendelImpute\n")
     print(pb[1], "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n")
     print(pb[1], "##INFO=<ID=IMPQ,Number=0,Type=Float,Description=" * 
-        "\"Quality of marker. 1 is best, 0 is worse. Present for all SNPs\">\n")
+        "\"Quality of marker. 0 is best, larger is worse.\">\n")
     print(pb[1], "##INFO=<ID=IMP,Number=0,Type=Flag,Description=\"Imputed marker\">\n")
 
     # header line should match reffile (i.e. sample ID's should match)
@@ -73,7 +73,7 @@ function Base.write(
             print(pb[id], chr[i], "\t", string(pos[i]), "\t", ids[i][1], "\t", 
                 ref[i], "\t", alt[i][1], "\t.\tPASS\t")
             print(pb[id], "IMPQ=", round(snp_score[i], digits=3))
-            typed[i] ? print(pb[id], ";IMP\tGT") : print(pb[id], "\tGT")
+            typed[i] ? print(pb[id], "\tGT") : print(pb[id], ";IMP\tGT")
             # print ith record
             write_snp!(pb[id], X, i) 
             bytesavailable(pb[id]) > 1048576 && write(io[id], take!(pb[id]))
@@ -169,15 +169,15 @@ function impute!(
         # strand 1
         for segment in 1:length(phase[i].strand1.start)
             Xrange, haplotype = _get_impute_ranges(segment, phase[i].strand1, 
-                compressed_Hunique, impute_untyped, size(X1, 1))
-            X1[Xrange, i] = haplotype
+                compressed_Hunique, impute_untyped=impute_untyped)
+            X1[Xrange, i] .= haplotype
         end
 
         # strand 2
         for segment in 1:length(phase[i].strand2.start)
             Xrange, haplotype = _get_impute_ranges(segment, phase[i].strand2, 
-                compressed_Hunique, impute_untyped, size(X2, 1))
-            X2[Xrange, i] = haplotype
+                compressed_Hunique, impute_untyped=impute_untyped)
+            X2[Xrange, i] .= haplotype
         end
     end
 end
@@ -187,34 +187,45 @@ end
         num_typed_snps)
 
 Helper function for impute! that computes the range of `X` and `H` in window `w`
+
+# Inputs:
+- `segment`: Current segment of a `HaplotypeMosaic`
+- `strand`: A `HaplotypeMosaic` (1 strand of haplotype for a person, contains
+    many segments)
+- `compressed_Hunique`: A `CompressedHaplotypes` object
+- `impute_untyped`: If `true`, all untyped SNPs will be considered in indexing. 
+- `haplabel_typedonly`: If `true`, `strand.haplotypelabel` stores haplotype index with
+    respect to `compressed_Hunique.CW`. Otherwise index is with respect
+    to `compressed_Hunique.CW_typed`
 """
 function _get_impute_ranges(
     segment::Int,
     strand::HaplotypeMosaic,
-    compressed_Hunique::CompressedHaplotypes,
-    impute_untyped::Bool,
-    num_typed_snps::Int
+    compressed_Hunique::CompressedHaplotypes;
+    impute_untyped::Bool = true,
+    haplabel_typedonly::Bool = false
     )
     window = strand.window[segment]
-    is_last_window = segment == length(strand.window)
+    is_last_segment = segment == length(strand.start)
+    total_snps = impute_untyped ? strand.length :
+        last(compressed_Hunique.X_window_range[end])
 
     # get X range
     Xstart = strand.start[segment]
-    if is_last_window 
-        X_end = impute_untyped ? strand.length : num_typed_snps
-    else
-        X_end = strand.start[segment + 1] - 1
-    end
+    X_end = is_last_segment ? total_snps : strand.start[segment + 1] - 1
     Xrange = Xstart:X_end
 
     # get haplotype vector
     H = impute_untyped ? compressed_Hunique.CW[window].uniqueH : 
-        compressed_Hunique.CW_typed[window].uniqueH
-    H_start = impute_untyped ? (abs(strand.start[segment] - 
-        compressed_Hunique.Hstart[window]) + 1) : 1
-    Hrange = H_start:(H_start + length(Xrange) - 1)
+                         compressed_Hunique.CW_typed[window].uniqueH
+    offset = impute_untyped ? compressed_Hunique.Hstart[window] : 
+        first(compressed_Hunique.X_window_range[window])
+    Hstart = strand.start[segment] - offset + 1
+    Hrange = Hstart:(Hstart + length(Xrange) - 1)
     Hlabel = strand.haplotypelabel[segment]
-    haplotype = @view(H[Hrange, strand.haplotypelabel[segment]])
+    haplabel_typedonly && (Hlabel = unique_all_idx_to_unique_typed_idx(Hlabel,
+        window, compressed_Hunique))
+    haplotype = @view(H[Hrange, Hlabel])
 
     return Xrange, haplotype
 end
@@ -325,25 +336,26 @@ function update_marker_position!(
 end
 
 """
-    assign_snpscore(total_snps, typed_snp_scores, typed_index)
+    untyped_snpscore(total_snps, typed_snp_scores, typed_index)
 
 For each untyped SNP, average the nearest 2 typed SNP's quality score and
-return a vector of quality scores for all SNPs, typed and untyped.
+return a vector of quality scores for all SNPs, typed and untyped. 0 is best,
+larger is worse. 
 
 # Inputs
 - `total_snps`: Total number of SNPs, typed and untyped
 - `typed_snp_scores`: Vector of scores for each typed SNP
 - `typed_index`: Typed SNP's indices
 """
-function assign_snpscore(
+function untyped_snpscore(
     total_snps::Int,
     typed_snp_scores::AbstractVector,
     typed_index::AbstractVector
     )
+
     # copy typed SNPs' quality score into vector of complete SNPs
     complete_snpscore = Vector{eltype(typed_snp_scores)}(undef, total_snps)
     copyto!(@view(complete_snpscore[typed_index]), typed_snp_scores)
-    # println(complete_snpscore[1:20], "\n")
 
     # all untyped SNPs before first typed SNPs gets same quality score
     cur_range = 1:(typed_index[1] - 1)
@@ -359,7 +371,65 @@ function assign_snpscore(
     # last segment of untyped SNPs
     cur_range = (typed_index[end] + 1):total_snps
     complete_snpscore[cur_range] .= typed_snp_scores[end]
-    # println(complete_snpscore[1:20], "\n")
 
     return complete_snpscore
+end
+
+"""
+    typed_snpscore(snps, typed_snp_scores, typed_index)
+
+For each typed SNP, compute its average least square error over all samples.
+0 is best, larger is worse. 
+
+# Inputs
+- `X`: Genotype matrix. Each row is a typed SNP and each column is a person. 
+- `phase`: A vector of `HaplotypeMosaicPair` keeping track of each person's
+    phase information. `Haplotypelabels` point to complete haplotype set
+- `compressed_haplotypes`: A `CompressedHaplotypes` object
+"""
+function typed_snpscore(
+    X::AbstractMatrix,
+    phase::Vector{HaplotypeMosaicPair},
+    compressed_haplotypes::CompressedHaplotypes,
+    )
+    snps, samples = size(X)
+    scores = zeros(snps)
+    Ximp = zeros(eltype(X), snps)
+    Xerr = zeros(Float64, snps)
+    missing_counter = zeros(Int, snps)
+    typed_snps_error = zeros(Float64, snps)
+
+    @inbounds for i in 1:samples
+        fill!(Ximp, 0)
+        # add strand1 to Ximp
+        for segment in 1:length(phase[i].strand1.start)
+            Xrange, haplotype = _get_impute_ranges(segment, phase[i].strand1, 
+                compressed_haplotypes, impute_untyped=false, 
+                haplabel_typedonly=true)
+            Ximp[Xrange] .= haplotype
+        end
+
+        # add strand2 to Ximp
+        for segment in 1:length(phase[i].strand2.start)
+            Xrange, haplotype = _get_impute_ranges(segment, phase[i].strand2, 
+                compressed_haplotypes, impute_untyped=false, 
+                haplabel_typedonly=true)
+            Ximp[Xrange] += haplotype
+        end
+
+        # accumulate error
+        for j in 1:snps
+            if ismissing(X[j, i])
+                missing_counter[j] += 1
+                continue
+            end
+            typed_snps_error[j] += abs2(X[j, i] - Ximp[j])
+        end
+    end
+
+    for i in 1:snps
+        @inbounds typed_snps_error[i] /= samples - missing_counter[i]
+    end
+
+    return typed_snps_error
 end

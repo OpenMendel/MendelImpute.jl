@@ -27,26 +27,28 @@ All SNPs in `tgtfile` must be present in `reffile`. Per-sample imputation score
 # Optional Inputs
 - `impute`: If `true`, imputes every SNPs in `reffile` to `tgtfile`. Otherwise
     only missing snps in `tgtfile` will be imputed.
-- `phase`: If `true`, all output genotypes will be phased. Otherwise all
-    output genotypes will be unphased.
+- `phase`: If `true`, all output genotypes will be phased, but observed data 
+    (minor allele count) may be changed. If `phase=false` all output genotypes
+    will be unphased but observed minor allele count will not change.
 - `dosage`: If `true`, will assume target matrix are dosages for imputation. Note
-    this means the genotype matrix will be entirely 
-    single precision. 
-- `rescreen`: This option saves a number of top haplotype pairs when solving
+    this means the genotype matrix will be entirely single precision. 
+- `rescreen`: This option is more computationally intensive but gives more
+    accurate results. It saves a number of top haplotype pairs when solving
     the least squares objective, and re-minimize least squares on just
     observed data.
-- `max_haplotypes` Maximum number of haplotypes for using global search. Windows
+- `max_haplotypes`: Maximum number of haplotypes for using global search. Windows
     exceeding this number of unique haplotypes will be searched using a
     heuristic. A non-zero `stepscreen` or `thinning_factor` need to be specified 
 - `stepwise`: If an integer is specified, will solve the least squares objective
     by first finding `stepwise` top haplotypes using a stepwise heuristic then
-    finds the next haplotype using global search.
+    finds the next haplotype using global search. Uses `max_haplotypes`. 
 - `thinning_factor`: If an integer is specified, will solve the least squares
-    objective on only `thining_factor` unique haplotypes.
+    objective on only `thining_factor` unique haplotypes. Uses `max_haplotypes`.
 - `scale_allelefreq`: Boolean indicating whether to give rare SNPs more weight
     scaled by `wᵢ = 1 / √2p(1-p)` where max weight is 2. 
 - `dynamic_programming`: Boolean indicating whether to phase with a global 
-    search that finds the longest haplotype stretch over all windows.
+    search that finds the longest haplotype stretch over all windows. (Currently
+    broken, sorry!)
 """
 function phase(
     tgtfile::AbstractString,
@@ -66,9 +68,6 @@ function phase(
     # first handle errors
     if dynamic_programming
         error("Currently dynamic programming routine is broken! Sorry!")
-    end
-    if !impute
-        error("Due to a bug in impute!, currently cannot impute only typed SNPs! Sorry!")
     end
     endswith(outfile, ".jlso") || endswith(outfile, ".vcf") || 
         endswith(outfile, ".vcf.gz") || error("Output file name must end with" * 
@@ -133,8 +132,6 @@ function phase(
     ph = [HaplotypeMosaicPair(ref_snps) for i in 1:people]
     haplotype1 = [zeros(Int32, windows) for i in 1:people]
     haplotype2 = [zeros(Int32, windows) for i in 1:people]
-    haploscore = [zeros(Float32, windows) for i in 1:people]
-    snpscore = zeros(Float32, tgt_snps)
     # if dynamic_programming
     #     redundant_haplotypes = [[Tuple{Int32, Int32}[] for i in
     #         1:num_windows_per_chunks] for j in 1:people]
@@ -146,8 +143,8 @@ function phase(
     # find best happairs for each window
     #
     calculate_happairs_start = time()
-    haptimers = compute_optimal_haplotypes!(haplotype1, haplotype2, haploscore,
-        compressed_Hunique, X, X_pos, snpscore, stepwise, thinning_factor,
+    haptimers = compute_optimal_haplotypes!(haplotype1, haplotype2, 
+        compressed_Hunique, X, X_pos, stepwise, thinning_factor,
         scale_allelefreq, max_haplotypes, rescreen)
     # screen_flanking_windows!(haplotype1, haplotype2, compressed_Hunique, X)
     calculate_happairs_time = time() - calculate_happairs_start
@@ -161,10 +158,10 @@ function phase(
             1:windows)
     elseif ultra_compress # phase window-by-window for outputing ultra compressed format
         phasetimers = phase_fast_compressed!(ph, X, compressed_Hunique, 
-            haplotype1, haplotype2, haploscore)
+            haplotype1, haplotype2)
     else # phase window-by-window for outputing VCF files
         phasetimers = phase_fast!(ph, X, compressed_Hunique, haplotype1,
-            haplotype2, haploscore, impute)
+            haplotype2, impute)
     end
     phase_time = time() - phase_start
 
@@ -174,9 +171,11 @@ function phase(
     impute_start = time()
     write_time = 0.0
     XtoH_idx = indexin(X_pos, compressed_Hunique.pos)
+    # get each snp's imputation score
+    snpscore = typed_snpscore(X, ph, compressed_Hunique)
     if impute # imputes typed and untyped SNPs
-        # get each snp's imputation score
-        complete_snpscore = assign_snpscore(ref_snps, snpscore, XtoH_idx)
+        # get quality score for untyped SNPs
+        complete_snpscore = untyped_snpscore(ref_snps, snpscore, XtoH_idx)
 
         # convert phase's starting position from X's index to H's index
         update_marker_position!(ph, XtoH_idx)
@@ -229,15 +228,15 @@ function phase(
     else # .vcf.gz
         strip_chr = 6
     end
-    error_filename = outfile[1:end-strip_chr]
-    write_time += @elapsed begin
-        open(error_filename * "sample.error", "w") do io
-            print(io, "ID,error\n")
-            for i in eachindex(X_sampleID)
-                @inbounds print(io, X_sampleID[i], ",", sum(haploscore[i]), "\n")
-            end
-        end
-    end
+    # error_filename = outfile[1:end-strip_chr]
+    # write_time += @elapsed begin
+    #     open(error_filename * "sample.error", "w") do io
+    #         print(io, "ID,error\n")
+    #         for i in eachindex(X_sampleID)
+    #             @inbounds print(io, X_sampleID[i], ",", sum(haploscore[i]), "\n")
+    #         end
+    #     end
+    # end
     impute_time = time() - impute_start
     impute_nonwrite_time = impute_time - write_time
 
@@ -476,8 +475,6 @@ searches for optimal breakpoint.
     haplotypes for each window and some other information
 * `haplotype1`: `haplotype1[w]` stores a optimal haplotype for window `w`. 
 * `haplotype2`: `haplotype2[w]` stores a optimal haplotype for window `w`. 
-* `hapscore`: Error induced by optimal haplotype pair in current window, for 
-    each person
 * `impute_untyped`: Bool indicating whether untyped SNPs should be imputed. 
 
 # Timers:
@@ -491,7 +488,6 @@ function phase_fast!(
     compressed_Hunique::CompressedHaplotypes,
     haplotype1::AbstractVector,
     haplotype2::AbstractVector,
-    hapscore::AbstractVector,
     impute_untyped::Bool
     ) where T <: Real
 
@@ -519,14 +515,18 @@ function phase_fast!(
 
         # First pass to phase each sample window-by-window
         timers[id][8] += @elapsed phase_sample!(haplotype1[i], haplotype2[i],
-            hapscore[i], compressed_Hunique, survivors1[id], survivors2[id])
+            compressed_Hunique, survivors1[id], survivors2[id])
 
         # record info for first window
         timers[id][24] += @elapsed begin
             hap1 = haplotype1[i][1] # complete idx
             hap2 = haplotype2[i][1] # complete idx
-            h1 = complete_idx_to_unique_all_idx(hap1, 1, compressed_Hunique)
-            h2 = complete_idx_to_unique_all_idx(hap2, 1, compressed_Hunique)
+            h1 = impute_untyped ? complete_idx_to_unique_all_idx(hap1, 1, 
+                compressed_Hunique) : 
+                complete_idx_to_unique_typed_idx(hap1, 1, compressed_Hunique)
+            h2 = impute_untyped ? complete_idx_to_unique_all_idx(hap2, 1, 
+                compressed_Hunique) : 
+                complete_idx_to_unique_typed_idx(hap2, 1, compressed_Hunique)
             push!(ph[i].strand1.start, 1)
             push!(ph[i].strand1.haplotypelabel, h1)
             push!(ph[i].strand2.start, 1)
@@ -576,7 +576,6 @@ function phase_fast_compressed!(
     compressed_Hunique::CompressedHaplotypes,
     haplotype1::AbstractVector,
     haplotype2::AbstractVector,
-    hapscore::AbstractVector
     ) where T <: Real
 
     # declare some constants
@@ -603,7 +602,7 @@ function phase_fast_compressed!(
 
         # First pass to phase each sample window-by-window
         timers[id][8] += @elapsed phase_sample!(haplotype1[i], haplotype2[i],
-            hapscore[i], compressed_Hunique, survivors1[id], survivors2[id])
+            compressed_Hunique, survivors1[id], survivors2[id])
 
         # record info for first window
         timers[id][24] += @elapsed begin
@@ -629,7 +628,7 @@ function phase_fast_compressed!(
 
             # find optimal breakpoint if there is one
             timers[id][16] += @elapsed begin
-                _, bkpts = continue_haplotype(Xwi, compressed_Hunique, w, 
+                _, bkpts, err = continue_haplotype(Xwi, compressed_Hunique, w, 
                     (hap1_prev, hap2_prev), (hap1_curr, hap2_curr), 
                     phased=true, search_double_bkpts=true)
             end
@@ -640,19 +639,18 @@ function phase_fast_compressed!(
                     push_Mosaic!(ph[i].strand1, (start_prev + bkpts[1], 
                         hap1_curr))
                 end
-                # strand1 double stranded breakpoint
-                if bkpts[1] == -2
-                    push_Mosaic!(ph[i].strand1, (start_curr, hap1_curr))
-                end
                 # strand2 single stranded breakpoint
                 if -1 < bkpts[2] < length(Xwi)
                     push_Mosaic!(ph[i].strand2, (start_prev + bkpts[2], 
                         hap2_curr))
                 end
-                # strand2 double stranded breakpoint
-                if bkpts[2] == -2
-                    push_Mosaic!(ph[i].strand2, (start_curr, hap2_curr))
-                end
+                # if not searching double bkpts, need to uncomment below
+                # if bkpts[1] == -2
+                #     push_Mosaic!(ph[i].strand1, (start_curr, hap1_curr))
+                # end
+                # if bkpts[2] == -2
+                #     push_Mosaic!(ph[i].strand2, (start_curr, hap2_curr))
+                # end
             end
         end
         next!(pmeter) # update progress

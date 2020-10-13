@@ -10,15 +10,13 @@ MendelImpute accepts [VCF](https://samtools.github.io/hts-specs/VCFv4.3.pdf) and
 + Given a SNP, it's CHROM, POS, REF, and  ALT fields are the same in target data and reference panel. MendelImpute use SNP position internally to align markers. Note this is not explicitly checked. 
 + The position of every SNP is unique: so multiallelic markers should be excluded instead of split (this requirement will eventually be lifted). 
 
-The following are not necessary but recommended for pre-imputation quality control:
+!!! note
 
-+ Exclude markers with Hardy-Weinberg p-values $< 10^{-5}$. 
-+ Exclude markers with minor allele frequency $< 10^{-6}$
-+ Exclude samples with $>3\%$ missing genotypes
+    We recommend **not** doing pre-imputation quality control (i.e. do not remove SNPs out of Hardy-Weinburg equilibrium or SNPs with low minor allele frequencies...etc). Instead, reserve quality control to post-imputation. This is because every new set of typed SNPs requires a compressed reference haplotype panel that matches the set of typed SNPs. 
 
 # Preparing Reference Haplotype Panel
 
-Reference samples must all be phased and contain no missing genotypes. Reference VCF panels must be compressed into `.jlso` format first using the [compress_haplotypes](https://OpenMendel.github.io/MendelImpute.jl/dev/man/api/#MendelImpute.compress_haplotypes) function. One must specify `d`: the maximum number of unique haplotypes per window. Larger `d` slows down computation, but increases accuracy. For most purposes, we recommend $d \approx 1000$. A larger `d` may be needed for TOPMed data. 
+Reference samples must all be phased and contain no missing genotypes. Reference VCF panels must be compressed into `.jlso` format first using the [compress_haplotypes](https://OpenMendel.github.io/MendelImpute.jl/dev/man/api/#MendelImpute.compress_haplotypes) function. One must specify `d`: the maximum number of unique haplotypes per window. Larger `d` slows down computation, but increases accuracy. For most purposes, we recommend $d \approx 1000$. 
 
 # Detailed Example
 
@@ -188,34 +186,29 @@ outfile = "mendel.imputed.chr22.vcf.gz"           # output file name
 phase(tgtfile, reffile, outfile);
 ```
 
-    Number of threads = 1
+    Number of threads = 8
     Importing reference haplotype data...
-
-
-    [32mComputing optimal haplotypes...100%|████████████████████| Time: 0:00:20[39m
-
-
     Total windows = 1634, averaging ~ 508 unique haplotypes per window.
     
     Timings: 
-        Data import                     = 10.1839 seconds
-            import target data             = 1.78449 seconds
-            import compressed haplotypes   = 8.39945 seconds
-        Computing haplotype pair        = 20.8186 seconds
-            BLAS3 mul! to get M and N      = 1.09855 seconds per thread
-            haplopair search               = 19.2442 seconds per thread
-            initializing missing           = 0.100835 seconds per thread
-            allocating and viewing         = 0.284366 seconds per thread
-            index conversion               = 0.0800866 seconds per thread
-        Phasing by win-win intersection = 4.06343 seconds
-            Window-by-window intersection  = 0.536747 seconds per thread
-            Breakpoint search              = 3.24288 seconds per thread
-            Recording result               = 0.269504 seconds per thread
-        Imputation                     = 2.99534 seconds
-            Imputing missing               = 0.113144 seconds
-            Writing to file                = 2.8822 seconds
+        Data import                     = 10.834 seconds
+            import target data             = 2.01152 seconds
+            import compressed haplotypes   = 8.82244 seconds
+        Computing haplotype pair        = 4.2762 seconds
+            BLAS3 mul! to get M and N      = 0.195528 seconds per thread
+            haplopair search               = 3.59668 seconds per thread
+            initializing missing           = 0.0197455 seconds per thread
+            allocating and viewing         = 0.0582577 seconds per thread
+            index conversion               = 0.0013111 seconds per thread
+        Phasing by win-win intersection = 0.725905 seconds
+            Window-by-window intersection  = 0.0853058 seconds per thread
+            Breakpoint search              = 0.540266 seconds per thread
+            Recording result               = 0.0208671 seconds per thread
+        Imputation                     = 1.1085 seconds
+            Imputing missing               = 0.54597 seconds
+            Writing to file                = 0.562528 seconds
     
-        Total time                      = 38.0624 seconds
+        Total time                      = 16.9455 seconds
     
 
 
@@ -223,7 +216,7 @@ The `;` hides the output, or else the screen will be too jammed.
 
 !!! note
 
-    To run MendelImpute in parallel, type `export JULIA_NUM_THREADS=4` **before** starting Julia. See Performance Gotchas #1 on the left for details.
+    To run MendelImpute in parallel, type `export JULIA_NUM_THREADS=4` **before** starting Julia or Jupyter notebooks. See Performance Gotchas #1 on the left for details.
 
 ## Step 3.5: (only for simulated data) check imputation accuracy
 
@@ -237,32 +230,47 @@ n, p = size(X_mendel)
 println("error overall = ", sum(X_mendel .!= X_truth) / n / p)
 ```
 
-    error overall = 0.00527504782243333
+    error overall = 0.005273778941849357
 
 
 ## Post-imputation: per-SNP Imputation Quality Score
 
-By default, MendelImpute outputs a per-SNP imputation quality score. A score of 1 is best, 0 is worst. It is the percentage number of samples where the 2 chosen haplotypes match the observed genotype. For untyped (i.e. imputed) SNPs, the quality score is the average of the closest 2 typed SNP's score.
+By default, MendelImpute outputs a per-SNP imputation quality score. A score of 0 is best, and larger is worst. At the $k$th SNP, this score is the average least squares error between the observed genotype and the 2 selected haplotypes $\mathbf{h}_1, \mathbf{h}_2$ over all $n$ samples:
 
-To extract this score from a VCF file, we recommend the following. We will develop a better pipeline for importing this quality score if someone demands it from us. 
+$$e_k = \frac{1}{n}\sum_{i=1}^n ||x_k - h_{1k} - h_{2k}||_2^2$$
+
+For untyped (i.e. imputed) SNPs, the quality score is the average of the closest 2 typed SNP's score.
+
+To extract this score from a VCF file, one can do:
 
 
 ```julia
+using GeneticVariation, Plots
+reader = VCF.Reader(openvcf(outfile, "r"))
+snpscores = Vector{Float64}(undef, nrecords(outfile))
+
+# loop over SNPs
+for (i, record) in enumerate(reader)
+    snpscores[i] = parse(Float64, VCF.info(record)[1].second)
+end
+close(reader)
+
 # plot histogram of SNP scores
-using Plots
-histogram(snpscores, label=:none, xlabel="error", ylabel="SNP counts")
+histogram(snpscores, label=:none, xlabel="error", ylabel="SNP counts", bins=30)
 ```
 
 
 
 
-![svg](output_15_0.svg)
+![svg](output_16_0.svg)
 
 
 
-**Conclusion:** Most SNPs have imputation quality $> 0.5$, but some have quality score below $0.5$. We recommend those SNPs to be [filtered out](https://openmendel.github.io/VCFTools.jl/dev/man/filter/#Subsetting-VCF-files-using-array-masks). 
+**Conclusion:** Most SNPs are well imputed (least squares error close to $0.0$), but a few have quality score above $0.01$. We recommend such SNPs to be [filtered out](https://openmendel.github.io/VCFTools.jl/dev/man/filter/#Subsetting-VCF-files-using-array-masks). 
 
-Note the popular correlation metric $r^2$ such as [this one](https://genome.sph.umich.edu/wiki/Minimac3_Info_File#Rsq) is NOT a good metric for measuring imputation accuracy under MendelImpute's model, because all imputed SNPs will have $r^2 = 1$. For details, please see our paper. 
+!!! note
+
+    The popular correlation metric $r^2$ such as [this one](https://genome.sph.umich.edu/wiki/Minimac3_Info_File#Rsq) is NOT a good metric for measuring imputation accuracy under MendelImpute's model, because all imputed SNPs will have $r^2 = 1$. For details, please see our paper. 
 
 ## Post-imputation: per-sample Imputation Quality score
 
@@ -280,7 +288,7 @@ histogram(quality[:error], label=:none, xlabel="error", ylabel="Number of sample
 
 
 
-![svg](output_18_0.svg)
+![svg](output_20_0.svg)
 
 
 
