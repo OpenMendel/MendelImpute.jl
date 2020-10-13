@@ -50,7 +50,7 @@ function Base.write(
     print(pb[1], "##source=MendelImpute\n")
     print(pb[1], "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n")
     print(pb[1], "##INFO=<ID=IMPQ,Number=0,Type=Float,Description=" * 
-        "\"Quality of marker. 1 is best, 0 is worse. Present for all SNPs\">\n")
+        "\"Quality of marker. 0 is best, 1 is worse.\">\n")
     print(pb[1], "##INFO=<ID=IMP,Number=0,Type=Flag,Description=\"Imputed marker\">\n")
 
     # header line should match reffile (i.e. sample ID's should match)
@@ -73,7 +73,7 @@ function Base.write(
             print(pb[id], chr[i], "\t", string(pos[i]), "\t", ids[i][1], "\t", 
                 ref[i], "\t", alt[i][1], "\t.\tPASS\t")
             print(pb[id], "IMPQ=", round(snp_score[i], digits=3))
-            typed[i] ? print(pb[id], ";IMP\tGT") : print(pb[id], "\tGT")
+            typed[i] ? print(pb[id], "\tGT") : print(pb[id], ";IMP\tGT")
             # print ith record
             write_snp!(pb[id], X, i) 
             bytesavailable(pb[id]) > 1048576 && write(io[id], take!(pb[id]))
@@ -351,10 +351,10 @@ function untyped_snpscore(
     typed_snp_scores::AbstractVector,
     typed_index::AbstractVector
     )
+
     # copy typed SNPs' quality score into vector of complete SNPs
     complete_snpscore = Vector{eltype(typed_snp_scores)}(undef, total_snps)
     copyto!(@view(complete_snpscore[typed_index]), typed_snp_scores)
-    println(complete_snpscore[1:20], "\n")
 
     # all untyped SNPs before first typed SNPs gets same quality score
     cur_range = 1:(typed_index[1] - 1)
@@ -370,7 +370,6 @@ function untyped_snpscore(
     # last segment of untyped SNPs
     cur_range = (typed_index[end] + 1):total_snps
     complete_snpscore[cur_range] .= typed_snp_scores[end]
-    println(complete_snpscore[1:20], "\n")
 
     return complete_snpscore
 end
