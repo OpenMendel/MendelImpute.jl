@@ -191,24 +191,24 @@ phase(tgtfile, reffile, outfile);
     Total windows = 1634, averaging ~ 508 unique haplotypes per window.
     
     Timings: 
-        Data import                     = 10.834 seconds
-            import target data             = 2.01152 seconds
-            import compressed haplotypes   = 8.82244 seconds
-        Computing haplotype pair        = 4.2762 seconds
-            BLAS3 mul! to get M and N      = 0.195528 seconds per thread
-            haplopair search               = 3.59668 seconds per thread
-            initializing missing           = 0.0197455 seconds per thread
-            allocating and viewing         = 0.0582577 seconds per thread
-            index conversion               = 0.0013111 seconds per thread
-        Phasing by win-win intersection = 0.725905 seconds
-            Window-by-window intersection  = 0.0853058 seconds per thread
-            Breakpoint search              = 0.540266 seconds per thread
-            Recording result               = 0.0208671 seconds per thread
-        Imputation                     = 1.1085 seconds
-            Imputing missing               = 0.54597 seconds
-            Writing to file                = 0.562528 seconds
+        Data import                     = 9.9879 seconds
+            import target data             = 1.59052 seconds
+            import compressed haplotypes   = 8.39737 seconds
+        Computing haplotype pair        = 4.487 seconds
+            BLAS3 mul! to get M and N      = 0.203134 seconds per thread
+            haplopair search               = 3.47789 seconds per thread
+            initializing missing           = 0.0193766 seconds per thread
+            allocating and viewing         = 0.0948972 seconds per thread
+            index conversion               = 0.00162558 seconds per thread
+        Phasing by win-win intersection = 0.661786 seconds
+            Window-by-window intersection  = 0.0792241 seconds per thread
+            Breakpoint search              = 0.48882 seconds per thread
+            Recording result               = 0.0196465 seconds per thread
+        Imputation                     = 1.10519 seconds
+            Imputing missing               = 0.509987 seconds
+            Writing to file                = 0.595203 seconds
     
-        Total time                      = 16.9455 seconds
+        Total time                      = 16.243 seconds
     
 
 
@@ -239,7 +239,7 @@ By default, MendelImpute outputs a per-SNP imputation quality score. A score of 
 
 $$e_k = \frac{1}{n}\sum_{i=1}^n ||x_k - h_{1k} - h_{2k}||_2^2$$
 
-For untyped (i.e. imputed) SNPs, the quality score is the average of the closest 2 typed SNP's score.
+For untyped (i.e. imputed) SNPs, the quality score is the average of the closest 2 typed SNP's score. Note samples with missing genotypes are skipped, and $n$ adjusted accordingly, by default. 
 
 To extract this score from a VCF file, one can do:
 
@@ -274,7 +274,7 @@ histogram(snpscores, label=:none, xlabel="error", ylabel="SNP counts", bins=30)
 
 ## Post-imputation: per-sample Imputation Quality score
 
-MendelImpute also computes a rough quality score (file ending in `sample.error`) for measuring how well each sample is imputed. This value is the sum of the least squares error in each window. A value of 0 is best, and high values mean worse. For more detail, please refer to our paper. 
+MendelImpute also computes a rough quality score (file ending in `sample.error`) for measuring how well each sample is imputed. This value is the sum of the least squares error for all typed SNPs scaled by the total number of observed SNPs. A value of 0 is best, and high values mean worse. 
 
 
 ```julia
@@ -292,4 +292,4 @@ histogram(quality[:error], label=:none, xlabel="error", ylabel="Number of sample
 
 
 
-We want this histogram to look like this: most samples have small error (e.g. less than 200), indicating they are relatively well imputed. Only a few have large errors. A histogram with large right tail indicates poor imputation. 
+**Conclusion:** Most samples have small error, but some samples are indeed poorly imputed. From the histogram, we can safely [filtered out](https://openmendel.github.io/VCFTools.jl/dev/man/filter/#Subsetting-VCF-files-using-array-masks) samples with error $> 0.004$ as that would remove poorly imputed individuals without reducing sample size too much.

@@ -397,9 +397,9 @@ function typed_snpscore(
     scores = zeros(snps)
     Ximp = zeros(eltype(X), snps)
     Xerr = zeros(Float64, snps)
-    missing_counter = zeros(Int, snps)
     snp_error = zeros(Float64, snps)
     sample_error = zeros(Float64, samples)
+    missing_counter = zeros(Int, snps)
 
     @inbounds for i in 1:samples
         fill!(Ximp, 0)
@@ -420,15 +420,20 @@ function typed_snpscore(
         end
 
         # accumulate error
+        sample_missingness = 0
         for j in 1:snps
             if ismissing(X[j, i])
                 missing_counter[j] += 1
+                sample_missingness += 1
                 continue
             end
             err = abs2(X[j, i] - Ximp[j])
             snp_error[j] += err
             sample_error[i] += err
         end
+
+        # normalize per-sample error by number of observed SNPs 
+        sample_error[i] /= snps - sample_missingness 
     end
 
     for i in 1:snps
