@@ -166,11 +166,11 @@ s1 | s21
 s1 | s22
 """
 function search_breakpoint(
-    X::AbstractVector,
+    X::AbstractVector{Union{Missing, T}},
     s1::AbstractVector,
     s21::AbstractVector,
     s22::AbstractVector,
-    )
+    ) where T <: Real
 
     n = length(X)
     length(s1) == length(s21) == length(s22) == n ||error("search_breakpoint:" * 
@@ -194,15 +194,15 @@ function search_breakpoint(
         if !ismissing(X[bkpt]) && s21[bkpt] ≠ s22[bkpt]
             errors -= abs2(X[bkpt] - s1[bkpt] - s22[bkpt])
             errors += abs2(X[bkpt] - s1[bkpt] - s21[bkpt])
-            if errors :: Int < err_optim
+            if errors :: T < err_optim
                 bkpt_optim, err_optim = bkpt, errors
                 # quick return if perfect match
-                err_optim == 0 && return bkpt_optim, err_optim :: Int
+                err_optim == 0 && return bkpt_optim, err_optim :: T
             end
         end
     end
 
-    return bkpt_optim, err_optim :: Int
+    return bkpt_optim, err_optim :: T
 end
 
 """
@@ -214,12 +214,12 @@ s11 | s21
 s12 | s22
 """
 function search_breakpoint(
-    X::AbstractVector,
+    X::AbstractVector{Union{Missing, T}},
     s11::AbstractVector,
     s12::AbstractVector,
     s21::AbstractVector,
     s22::AbstractVector,
-    )
+    ) where T <: Real
     n = length(X)
     length(s11) == length(s12) == length(s21) == length(s22) == n || 
         error("search_breakpoint: all vectors should have same length but " *
@@ -244,12 +244,12 @@ function search_breakpoint(
                 errors += abs2(X[pos] - s12[pos] - s22[pos])
             end
         end
-        if errors :: Int < err_optim
+        if errors :: T < err_optim
             err_optim = errors
             bkpts_optim = (bkpt1, 0)
 
             # quick return if perfect match
-            err_optim == 0 && return bkpts_optim, err_optim :: Int
+            err_optim == 0 && return bkpts_optim, err_optim :: T
         end
 
         # extend haplotype s21 position by position
@@ -257,7 +257,7 @@ function search_breakpoint(
             if !ismissing(X[bkpt2]) && s21[bkpt2] ≠ s22[bkpt2]
                 errors -= abs2(X[bkpt2] - s11[bkpt2] - s22[bkpt2])
                 errors += abs2(X[bkpt2] - s11[bkpt2] - s21[bkpt2])
-                if errors :: Int < err_optim
+                if errors :: T < err_optim
                     err_optim = errors
                     bkpts_optim = (bkpt1, bkpt2)
                 end
@@ -267,15 +267,15 @@ function search_breakpoint(
             if !ismissing(X[bkpt2]) && s21[bkpt2] ≠ s22[bkpt2]
                 errors -= abs2(X[bkpt2] - s12[bkpt2] - s22[bkpt2])
                 errors += abs2(X[bkpt2] - s12[bkpt2] - s21[bkpt2])
-                if errors :: Int < err_optim
+                if errors :: T < err_optim
                     err_optim = errors
                     bkpts_optim = (bkpt1, bkpt2)
                     # quick return if perfect match
-                    err_optim == 0 && return bkpts_optim, err_optim :: Int
+                    err_optim == 0 && return bkpts_optim, err_optim :: T
                 end
             end
         end
     end
 
-    return bkpts_optim, err_optim :: Int
+    return bkpts_optim, err_optim :: T
 end
