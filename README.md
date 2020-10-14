@@ -39,6 +39,13 @@ tgtfile = "target.typedOnly.masked.vcf.gz" # target VCF file (GWAS file)
 reffile = "ref.excludeTarget.jlso"         # compressed reference file
 outfile = "imputed.vcf.gz"                 # output file name
 phase(tgtfile, reffile, outfile);
+
+# check error rate (since data was simulated)
+using VCFTools
+Ximputed = convert_gt(Float64, "imputed.vcf.gz")  # imputed genotypes
+Xtrue = convert_gt(Float64, "target.full.vcf.gz") # true genotypes
+m, n = size(Xtrue) # matrix dimensions
+error_rate = sum(Xtrue .!= Ximputed) / m / n
 ```
 
 For more realistic example, see [detailed example in documentation](https://openmendel.github.io/MendelImpute.jl/dev/man/Phasing_and_Imputation/#Detailed-Example)

@@ -105,8 +105,13 @@ function phase(
             save_snp_info=true, msg = "Importing genotype file as dosages...")
     elseif isplink(tgtfile)
         dosage && error("PLINK files detected but dosage = true!")
+        # convert SnpArray data to matrix.
         X_snpdata = SnpArrays.SnpData(tgtfile)
-        X = convert(Matrix{UInt8}, X_snpdata.snparray')
+        X = convert(Matrix{Union{UInt8, Missing}}, X_snpdata.snparray')
+        X[findall(isone, X)] .= missing    # 0x01 encodes missing
+        X[findall(x -> x === 0x02, X)] .= 1 # 0x02 is 1
+        X[findall(x -> x === 0x03, X)] .= 2 # 0x03 is 2
+        # get other relevant information
         X_sampleID = X_snpdata.person_info[!, :iid]
         X_chr = X_snpdata.snp_info[!, :chromosome]
         X_pos = X_snpdata.snp_info[!, :position]
