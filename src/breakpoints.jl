@@ -166,11 +166,11 @@ s1 | s21
 s1 | s22
 """
 function search_breakpoint(
-    X::AbstractVector{Union{Missing, T}},
+    X::AbstractVector,
     s1::AbstractVector,
     s21::AbstractVector,
     s22::AbstractVector,
-    ) where T <: Real
+    )
 
     n = length(X)
     length(s1) == length(s21) == length(s22) == n ||error("search_breakpoint:" * 
@@ -178,7 +178,7 @@ function search_breakpoint(
         " $(length(s1)), s21 = $(length(s21)), s22 = $(length(s22))")
 
     # count number of errors if second haplotype is all from s22
-    errors = 0
+    errors = 0.0
     @inbounds for pos in 1:n
         if !ismissing(X[pos])
             errors += abs2(X[pos] - s1[pos] - s22[pos])
@@ -187,22 +187,22 @@ function search_breakpoint(
     bkpt_optim, err_optim = 0, errors
 
     # quick return if perfect match
-    err_optim == 0 && return 0, 0
+    err_optim == 0.0 && return 0, 0.0
 
     # extend haplotype s21 position by position
     @inbounds for bkpt in 1:n
         if !ismissing(X[bkpt]) && s21[bkpt] ≠ s22[bkpt]
             errors -= abs2(X[bkpt] - s1[bkpt] - s22[bkpt])
             errors += abs2(X[bkpt] - s1[bkpt] - s21[bkpt])
-            if errors :: T < err_optim
+            if errors :: Float64 < err_optim
                 bkpt_optim, err_optim = bkpt, errors
                 # quick return if perfect match
-                err_optim == 0 && return bkpt_optim, err_optim :: T
+                err_optim == 0 && return bkpt_optim, err_optim :: Float64
             end
         end
     end
 
-    return bkpt_optim, err_optim :: T
+    return bkpt_optim, err_optim :: Float64
 end
 
 """
@@ -214,26 +214,27 @@ s11 | s21
 s12 | s22
 """
 function search_breakpoint(
-    X::AbstractVector{Union{Missing, T}},
+    X::AbstractVector,
     s11::AbstractVector,
     s12::AbstractVector,
     s21::AbstractVector,
     s22::AbstractVector,
-    ) where T <: Real
+    )
+
     n = length(X)
     length(s11) == length(s12) == length(s21) == length(s22) == n || 
         error("search_breakpoint: all vectors should have same length but " *
         "length X = $n, s11 = $(length(s11)), s12 = $(length(s12)), s21 = " *
         "$(length(s21)), s22 = $(length(s22))")
 
-    err_optim   = typemax(Int)
+    err_optim   = typemax(Float64)
     bkpts_optim = (0, 0)
 
     # search over all combintations of break points in two strands
     @inbounds for bkpt1 in 0:n
 
         # count number of errors if second haplotype is all from s22
-        errors = 0
+        errors = 0.0
         for pos in 1:bkpt1
             if !ismissing(X[pos])
                 errors += abs2(X[pos] - s11[pos] - s22[pos])
@@ -244,12 +245,12 @@ function search_breakpoint(
                 errors += abs2(X[pos] - s12[pos] - s22[pos])
             end
         end
-        if errors :: T < err_optim
+        if errors :: Float64 < err_optim
             err_optim = errors
             bkpts_optim = (bkpt1, 0)
 
             # quick return if perfect match
-            err_optim == 0 && return bkpts_optim, err_optim :: T
+            err_optim == 0 && return bkpts_optim, err_optim :: Float64
         end
 
         # extend haplotype s21 position by position
@@ -257,7 +258,7 @@ function search_breakpoint(
             if !ismissing(X[bkpt2]) && s21[bkpt2] ≠ s22[bkpt2]
                 errors -= abs2(X[bkpt2] - s11[bkpt2] - s22[bkpt2])
                 errors += abs2(X[bkpt2] - s11[bkpt2] - s21[bkpt2])
-                if errors :: T < err_optim
+                if errors :: Float64 < err_optim
                     err_optim = errors
                     bkpts_optim = (bkpt1, bkpt2)
                 end
@@ -267,15 +268,15 @@ function search_breakpoint(
             if !ismissing(X[bkpt2]) && s21[bkpt2] ≠ s22[bkpt2]
                 errors -= abs2(X[bkpt2] - s12[bkpt2] - s22[bkpt2])
                 errors += abs2(X[bkpt2] - s12[bkpt2] - s21[bkpt2])
-                if errors :: T < err_optim
+                if errors :: Float64 < err_optim
                     err_optim = errors
                     bkpts_optim = (bkpt1, bkpt2)
                     # quick return if perfect match
-                    err_optim == 0 && return bkpts_optim, err_optim :: T
+                    err_optim == 0.0 && return bkpts_optim, err_optim :: Float64
                 end
             end
         end
     end
 
-    return bkpts_optim, err_optim :: T
+    return bkpts_optim, err_optim :: Float64
 end
