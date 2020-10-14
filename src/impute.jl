@@ -379,7 +379,8 @@ end
     typed_snpscore(snps, typed_snp_scores, typed_index)
 
 For each typed SNP, compute its average least square error over all samples.
-0 is best, larger is worse. 
+Also for each sample, compute its total least squares error. In both cases
+0 is best and larger is worse. 
 
 # Inputs
 - `X`: Genotype matrix. Each row is a typed SNP and each column is a person. 
@@ -397,7 +398,8 @@ function typed_snpscore(
     Ximp = zeros(eltype(X), snps)
     Xerr = zeros(Float64, snps)
     missing_counter = zeros(Int, snps)
-    typed_snps_error = zeros(Float64, snps)
+    snp_error = zeros(Float64, snps)
+    sample_error = zeros(Float64, samples)
 
     @inbounds for i in 1:samples
         fill!(Ximp, 0)
@@ -423,13 +425,40 @@ function typed_snpscore(
                 missing_counter[j] += 1
                 continue
             end
-            typed_snps_error[j] += abs2(X[j, i] - Ximp[j])
+            err = abs2(X[j, i] - Ximp[j])
+            snp_error[j] += err
+            sample_error[i] += err
         end
     end
 
     for i in 1:snps
-        @inbounds typed_snps_error[i] /= samples - missing_counter[i]
+        @inbounds snp_error[i] /= samples - missing_counter[i]
     end
 
-    return typed_snps_error
+    return snp_error, sample_error
+end
+
+function write_sample_error(
+    outfile::AbstractString,
+    samplescore::AbstractVector,
+    sampleID::AbstractVector
+    )
+    # write per-sample error to output file
+    if endswith(outfile, ".jlso")
+        strip_chr = 4
+    elseif endswith(outfile, ".vcf")
+        strip_chr = 3
+    else # .vcf.gz
+        strip_chr = 6
+    end
+    error_filename = outfile[1:end-strip_chr]
+
+    open(error_filename * "sample.error", "w") do io
+        println(io, "sampleID,error")
+        for i in eachindex(sampleID)
+            @inbounds println(io, sampleID[i], ",", samplescore[i])
+        end
+    end
+
+    return nothing
 end

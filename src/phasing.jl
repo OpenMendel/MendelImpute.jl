@@ -172,7 +172,7 @@ function phase(
     write_time = 0.0
     XtoH_idx = indexin(X_pos, compressed_Hunique.pos)
     # get each snp's imputation score
-    snpscore = typed_snpscore(X, ph, compressed_Hunique)
+    snpscore, samplescore = typed_snpscore(X, ph, compressed_Hunique)
     if impute # imputes typed and untyped SNPs
         # get quality score for untyped SNPs
         complete_snpscore = untyped_snpscore(ref_snps, snpscore, XtoH_idx)
@@ -220,23 +220,7 @@ function phase(
                 X_sampleID, snpscore, XtoH_idx, false)
         end
     end
-    # write per-sample error to output file
-    if endswith(outfile, ".jlso")
-        strip_chr = 4
-    elseif endswith(outfile, ".vcf")
-        strip_chr = 3
-    else # .vcf.gz
-        strip_chr = 6
-    end
-    # error_filename = outfile[1:end-strip_chr]
-    # write_time += @elapsed begin
-    #     open(error_filename * "sample.error", "w") do io
-    #         print(io, "ID,error\n")
-    #         for i in eachindex(X_sampleID)
-    #             @inbounds print(io, X_sampleID[i], ",", sum(haploscore[i]), "\n")
-    #         end
-    #     end
-    # end
+    write_time += @elapsed write_sample_error(outfile, samplescore, X_sampleID)
     impute_time = time() - impute_start
     impute_nonwrite_time = impute_time - write_time
 
