@@ -121,7 +121,7 @@ function paint(
     )
     snps = sample_phase.strand1.length
     @assert snps == sample_phase.strand2.length "strands have different length!"
-    
+
     # length of strand 1 and 2
     l1 = length(sample_phase.strand1.haplotypelabel)
     l2 = length(sample_phase.strand2.haplotypelabel)

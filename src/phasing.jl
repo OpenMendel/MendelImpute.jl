@@ -177,6 +177,9 @@ function phase(
     write_time = 0.0
     XtoH_idx = indexin(X_pos, compressed_Hunique.pos)
     if ultra_compress # output ultra-compressed, phased genotypes in 
+        # convert phase's starting position from X's index to H's index
+        update_marker_position!(ph, XtoH_idx)
+
         write_time += @elapsed JLSO.save(outfile, :ph => ph, 
             :sampleID => X_sampleID, format=:julia_serialize, 
             compression=:gzip)
