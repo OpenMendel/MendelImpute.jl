@@ -176,56 +176,57 @@ function phase(
     impute_start = time()
     write_time = 0.0
     XtoH_idx = indexin(X_pos, compressed_Hunique.pos)
-    # get each snp's imputation score
-    snpscore, samplescore = typed_snpscore(X, ph, compressed_Hunique)
-    if impute # imputes typed and untyped SNPs
-        # get quality score for untyped SNPs
-        complete_snpscore = untyped_snpscore(ref_snps, snpscore, XtoH_idx)
+    if ultra_compress # output ultra-compressed, phased genotypes in 
+        write_time += @elapsed JLSO.save(outfile, :ph => ph, 
+            :sampleID => X_sampleID, format=:julia_serialize, 
+            compression=:gzip)
+    else
+        # get each snp's imputation score
+        snpscore, samplescore = typed_snpscore(X, ph, compressed_Hunique)
 
-        # convert phase's starting position from X's index to H's index
-        update_marker_position!(ph, XtoH_idx)
+        # output each sample's imputation score
+        write_time += @elapsed write_sample_error(outfile, samplescore,
+            X_sampleID)
 
-        if ultra_compress # output ultra-compressed, phased genotypes in 
-            write_time += @elapsed JLSO.save(outfile, :ph => ph, 
-                :sampleID => X_sampleID, format=:julia_serialize, 
-                compression=:gzip)
-        elseif phase # output genotypes all phased
-            X1 = BitArray(undef, ref_snps, people)
-            X2 = BitArray(undef, ref_snps, people)
+        if impute # imputes typed and untyped SNPs
+            # get quality score for untyped SNPs
+            complete_snpscore = untyped_snpscore(ref_snps, snpscore, XtoH_idx)
 
-            # impute and write to file
-            impute!(X1, X2, compressed_Hunique, ph, impute)
-            write_time += @elapsed write(outfile, (X1, X2), compressed_Hunique, 
-                X_sampleID, complete_snpscore, XtoH_idx)
-        else # output genotypes all unphased
-            X_full = Matrix{Union{Missing, UInt8}}(missing, ref_snps, people)
-            copyto!(@view(X_full[XtoH_idx, :]), X) # keep known entries
+            # convert phase's starting position from X's index to H's index
+            update_marker_position!(ph, XtoH_idx)
 
-            # impute and write to file
-            impute_discard_phase!(X_full, compressed_Hunique, ph, impute)
-            write_time += @elapsed write(outfile, X_full, compressed_Hunique, 
-                X_sampleID, complete_snpscore, XtoH_idx)
-        end
-    else # impute only missing entries in typed SNPs
-        if ultra_compress # output ultra-compressed, phased genotypes in 
-            write_time += @elapsed JLSO.save(outfile, :ph => ph, 
-                :sampleID => X_sampleID, format=:julia_serialize, 
-                compression=:gzip)
-        elseif phase
-            X1 = BitArray(undef, size(X, 1), size(X, 2))
-            X2 = BitArray(undef, size(X, 1), size(X, 2))
+            if phase # output genotypes all phased
+                X1 = BitArray(undef, ref_snps, people)
+                X2 = BitArray(undef, ref_snps, people)
 
-            # impute and write to file
-            impute!(X1, X2, compressed_Hunique, ph, impute)
-            write_time += @elapsed write(outfile, (X1, X2), compressed_Hunique, 
-                X_sampleID, snpscore, XtoH_idx, false)
-        else
-            impute_discard_phase!(X, compressed_Hunique, ph, impute)
-            write_time += @elapsed write(outfile, X, compressed_Hunique, 
-                X_sampleID, snpscore, XtoH_idx, false)
+                # impute and write to file
+                impute!(X1, X2, compressed_Hunique, ph, impute)
+                write_time += @elapsed write(outfile, (X1, X2), compressed_Hunique, 
+                    X_sampleID, complete_snpscore, XtoH_idx)
+            else # output genotypes all unphased
+                X_full = Matrix{Union{Missing, UInt8}}(missing, ref_snps, people)
+                copyto!(@view(X_full[XtoH_idx, :]), X) # keep known entries
+
+                # impute and write to file
+                impute_discard_phase!(X_full, compressed_Hunique, ph, impute)
+                write_time += @elapsed write(outfile, X_full, compressed_Hunique, 
+                    X_sampleID, complete_snpscore, XtoH_idx)
+            end
+        else # impute only missing entries in typed SNPs
+            if phase # output genotypes all phased
+                X1 = BitArray(undef, size(X, 1), size(X, 2))
+                X2 = BitArray(undef, size(X, 1), size(X, 2))
+                # impute and write to file
+                impute!(X1, X2, compressed_Hunique, ph, impute)
+                write_time += @elapsed write(outfile, (X1, X2), compressed_Hunique, 
+                    X_sampleID, snpscore, XtoH_idx, false)
+            else # output genotypes all unphased
+                impute_discard_phase!(X, compressed_Hunique, ph, impute)
+                write_time += @elapsed write(outfile, X, compressed_Hunique, 
+                    X_sampleID, snpscore, XtoH_idx, false)
+            end
         end
     end
-    write_time += @elapsed write_sample_error(outfile, samplescore, X_sampleID)
     impute_time = time() - impute_start
     impute_nonwrite_time = impute_time - write_time
 

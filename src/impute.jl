@@ -194,9 +194,9 @@ Helper function for impute! that computes the range of `X` and `H` in window `w`
     many segments)
 - `compressed_Hunique`: A `CompressedHaplotypes` object
 - `impute_untyped`: If `true`, all untyped SNPs will be considered in indexing. 
-- `haplabel_typedonly`: If `true`, `strand.haplotypelabel` stores haplotype index with
-    respect to `compressed_Hunique.CW`. Otherwise index is with respect
-    to `compressed_Hunique.CW_typed`
+- `haplabel_typedonly`: If `true`, `strand.haplotypelabel` stores haplotype
+    index with respect to `compressed_Hunique.CW`. Otherwise index is with
+    respect to `compressed_Hunique.CW_typed`
 """
 function _get_impute_ranges(
     segment::Int,
