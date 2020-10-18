@@ -1,0 +1,4 @@
+*.jlso
+*.gz
+*.vcf
+*.error
