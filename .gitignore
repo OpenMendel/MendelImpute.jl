@@ -45,3 +45,7 @@ docs/src/man/*.jlso
 *.bref3
 *.pvals
 
+
+data/1000_genome_phase3_v5/filtered/error.png
+
+data/1000_genome_phase3_v5/filtered/mendel.chr20.imputed.sample.error
