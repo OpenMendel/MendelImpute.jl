@@ -5,7 +5,6 @@ authors = ["Benjamin Chu <biona001@ucla.edu>", "Eric Sobel <esobel@ucla.edu>", "
 version = "0.0.0"
 
 [deps]
-CodecZlib = "944b1d66-785c-5afd-91f1-9de20f533193"
 Distances = "b4f34e82-e78d-54a5-968a-f98e89d6e8f7"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 FileIO = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
@@ -14,7 +13,6 @@ GroupSlices = "d853e229-7c7c-56e9-b6be-9a1acc5f13d9"
 JLD2 = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
 JLSO = "9da8a3cd-07a3-59c0-a743-3fdc52c30d11"
 LazyArrays = "5078a376-72f3-5289-bfd5-ec5146d43c02"
-Libdl = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
@@ -27,7 +25,10 @@ VCFTools = "a620830f-fdd7-5ebc-8d26-3621ab35fbfe"
 Documenter = ">=0.20"
 
 [extras]
+BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test"]
+test = ["Test", "CSV", "BenchmarkTools", "Statistics"]

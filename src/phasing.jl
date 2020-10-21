@@ -73,8 +73,6 @@ function phase(
         " .vcf or .vcf.gz or .jlso!")
     ultra_compress = endswith(outfile, ".jlso") ? true : false
     ultra_compress && !phase && error("Ultra compressed output must be phased!")
-    isfile(tgtfile) || error("Target file $tgtfile not found!")
-    isfile(reffile) || error("Reference file $reffile not found!")
 
     # import reference data
     println("Number of threads = ", Threads.nthreads())

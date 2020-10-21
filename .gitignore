@@ -49,3 +49,7 @@ docs/src/man/*.jlso
 data/1000_genome_phase3_v5/filtered/error.png
 
 data/1000_genome_phase3_v5/filtered/mendel.chr20.imputed.sample.error
+
+data/HRC/snpscores.txt
+
+data/HRC/mendel.chr10.imputed.target.sample.error
