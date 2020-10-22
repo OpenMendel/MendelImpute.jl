@@ -107,7 +107,7 @@ function phase(
         # convert SnpArray data to matrix.
         X_snpdata = SnpArrays.SnpData(tgtfile)
         X = convert(Matrix{Union{UInt8, Missing}}, X_snpdata.snparray')
-        X[findall(isone, X)] .= missing    # 0x01 encodes missing
+        X[findall(isone, X)] .= missing     # 0x01 encodes missing
         X[findall(x -> x === 0x02, X)] .= 1 # 0x02 is 1
         X[findall(x -> x === 0x03, X)] .= 2 # 0x03 is 2
         # get other relevant information
@@ -121,7 +121,7 @@ function phase(
         error("Unrecognized target file format: target file can only be VCF" *
             " files (ends in .vcf or .vcf.gz) or PLINK files (do not include" *
             " .bim/bed/fam and all three files must exist in 1 directory)")
-    end    
+    end
     genotype_import_time = time() - genotype_import_start
     import_data_time = time() - ref_import_start
 

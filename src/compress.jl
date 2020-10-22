@@ -291,7 +291,9 @@ run this function by themselves.
 
 # Inputs
 * `reffile`: reference haplotype file name (ends in `.vcf` or `.vcf.gz`)
-* `tgtfile`: target genotype file name (ends in `.vcf` or `.vcf.gz`)
+* `tgtfile`: VCF or PLINK files. VCF files should end in `.vcf` or `.vcf.gz`.
+    PLINK files should exclude `.bim/.bed/.fam` suffixes but the trio must all
+    be present in the same directory.
 * `outfile`: Output file name (ends in `.jlso`)
 
 # Optional Inputs
@@ -308,33 +310,54 @@ function compress_haplotypes(
     minwidth::Int=0,
     overlap::Float64=0.0
     )
+    # first handle error
     endswith(outfile, ".jld2") || endswith(outfile, ".jlso") || 
         error("Unrecognized compression format: `outfile` can only end in " * 
         "`.jlso` or `.jld2`")
     0.0 ≤ overlap ≤ 1.0 || error("overlap must be a percentage")
 
+    if endswith(tgtfile, ".vcf") || endswith(tgtfile, ".vcf.gz")
+        X, X_sampleID, X_chr, X_pos, X_ids, X_ref, X_alt = 
+            VCFTools.convert_gt(UInt8, tgtfile, trans=true, 
+            save_snp_info=true, msg = "Importing genotype file...")
+    elseif isplink(tgtfile)
+        # convert SnpArray data to matrix.
+        X_snpdata = SnpArrays.SnpData(tgtfile)
+        X = convert(Matrix{Union{UInt8, Missing}}, X_snpdata.snparray')
+        X[findall(isone, X)] .= missing     # 0x01 encodes missing
+        X[findall(x -> x === 0x02, X)] .= 1 # 0x02 is 1
+        X[findall(x -> x === 0x03, X)] .= 2 # 0x03 is 2
+        # get other relevant information
+        X_sampleID = X_snpdata.person_info[!, :iid]
+        X_chr = X_snpdata.snp_info[!, :chromosome]
+        X_pos = X_snpdata.snp_info[!, :position]
+        X_ids = X_snpdata.snp_info[!, :snpid]
+        X_ref = X_snpdata.snp_info[!, :allele1]
+        X_alt = X_snpdata.snp_info[!, :allele2]
+    else
+        error("Unrecognized target file format: target file can only be VCF" *
+            " files (ends in .vcf or .vcf.gz) or PLINK files (do not include" *
+            " .bim/bed/fam and all three files must exist in 1 directory)")
+    end    
+    
     # import reference haplotypes
     H, H_sampleID, H_chr, H_pos, H_ids, H_ref, H_alt = convert_ht(Bool, 
         reffile, trans=true, save_snp_info=true, 
         msg="importing reference data...")
-    X, X_sampleID, X_chr, X_pos, X_ids, X_ref, X_alt = 
-        VCFTools.convert_gt(UInt8, tgtfile, trans=true, save_snp_info=true, 
-        msg = "Importing genotype file...")
     any(isnothing, indexin(X_pos, H_pos)) && error("Found SNPs in target " * 
         "file that are not in reference file! Please filter them out first!")
 
     # compress routine
-    compress_haplotypes(H, X, outfile, X_pos, H_sampleID, H_chr, H_pos, H_ids, 
+    compress_haplotypes(H, outfile, X_pos, H_sampleID, H_chr, H_pos, H_ids, 
         H_ref, H_alt, d, minwidth, overlap)
 
     return nothing
 end
 
-function compress_haplotypes(H::AbstractMatrix, X::AbstractMatrix, 
-    outfile::AbstractString, X_pos::AbstractVector, H_sampleID::AbstractVector, 
-    H_chr::AbstractVector, H_pos::AbstractVector, H_ids::AbstractVector, 
-    H_ref::AbstractVector, H_alt::AbstractVector, d::Int, minwidth::Int,
-    overlap::Float64)
+function compress_haplotypes(H::AbstractMatrix, outfile::AbstractString, 
+    X_pos::AbstractVector, H_sampleID::AbstractVector, H_chr::AbstractVector,
+    H_pos::AbstractVector, H_ids::AbstractVector, H_ref::AbstractVector,
+    H_alt::AbstractVector, d::Int, minwidth::Int, overlap::Float64)
 
     endswith(outfile, ".jld2") || endswith(outfile, ".jlso") || 
         error("Unrecognized compression format: `outfile` can only end in " * 
@@ -343,7 +366,7 @@ function compress_haplotypes(H::AbstractMatrix, X::AbstractMatrix,
 
     # some constants
     ref_snps = size(H, 1)
-    tgt_snps = size(X, 1)
+    tgt_snps = length(X_pos)
 
     # compute window intervals based on typed SNPs
     XtoH_idx = indexin(X_pos, H_pos) # assumes all SNPs in X are in H
