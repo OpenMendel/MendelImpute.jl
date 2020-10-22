@@ -1,0 +1,160 @@
+
+
+ -------------------------------------------------------------------------------- 
+          Minimac3 - Fast Imputation Based on State Space Reduction HMM
+ --------------------------------------------------------------------------------
+           (c) 2014 - Sayantan Das, Christian Fuchsberger, David Hinds
+                             Mary Kate Wing, Goncalo Abecasis 
+
+ Version: 2.0.1;
+ Built: Fri Jul 24 13:45:41 PDT 2020 by biona001
+
+ Command Line Options: 
+    Reference Haplotypes : --refHaps [ref.excludeTarget.vcf.gz], --passOnly,
+                           --rsid
+       Target Haplotypes : --haps []
+       Output Parameters : --prefix [ref.excludeTarget],
+                           --processReference [ON], --updateModel, --nobgzip,
+                           --vcfOutput [ON], --doseOutput, --hapOutput,
+                           --format [GT,DS], --allTypedSites
+       Subset Parameters : --chr [], --start, --end, --window
+     Starting Parameters : --rec [], --err []
+   Estimation Parameters : --rounds [5], --states [200]
+        Other Parameters : --log, --lowMemory, --help, --cpus [1], --params
+               PhoneHome : --noPhoneHome, --phoneHomeThinning [50]
+
+
+ URL = http://genome.sph.umich.edu/wiki/Minimac3
+
+
+ NOTE: Since "--processReference" is ON, all options under "Target Haplotypes" 
+       and "Starting Parameters" will be ignored !!!
+       Program will only estimate parameters and create M3VCF file.
+       No imputation will be performed, hence other parameters are unnecessary !!!
+
+ NOTE: If "--processReference" is ON, Parameter Estimation will be done by default ! 
+       Use "--rounds 0" to AVOID Parameter Estimation !!!
+
+
+ ------------------------------------------------------------------------------
+                           REFERENCE HAPLOTYPE PANEL                           
+ ------------------------------------------------------------------------------
+
+ Format = VCF (Variant Call Format) 
+
+ Loading Reference Haplotype Set from VCF File       : ref.excludeTarget.vcf.gz
+
+ Reading VCF File to calculate number of records ... 
+
+
+ Number of Markers read from VCF File                : 80029
+ Number of Markers with more than Two Alleles        : 0
+ Number of Markers failing FILTER = PASS             : 0
+ Number of Markers with inconsistent Ref/Alt Allele  : 0
+ Number of Markers with duplicate ID:POS:REF:ALT     : 0
+ Number of Insertions                                : 0
+ Number of Deletions                                 : 0
+
+ Number of Markers to be Recorded                    : 80029
+ Number of Haplotypes to be Recorded                 : 100000
+
+ Starting to load data ...
+
+ Number of Threads to be Used = 1
+
+  Loading markers 1 - 10000  out of 80029 markers to be loaded... [0.0%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 10000 - 19999  out of 80029 markers to be loaded... [12.5%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 19999 - 29998  out of 80029 markers to be loaded... [25.0%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 29998 - 39997  out of 80029 markers to be loaded... [37.5%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 39997 - 49996  out of 80029 markers to be loaded... [50.0%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 49996 - 59995  out of 80029 markers to be loaded... [62.5%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 59995 - 69994  out of 80029 markers to be loaded... [75.0%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 69994 - 79993  out of 80029 markers to be loaded... [87.5%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 79993 - 80029  out of 80029 markers to be loaded... [100.0%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+
+ Number of Markers Recorded                          : 80029
+ Number of Haplotypes Recorded                       : 100000
+
+ Haplotype Set successfully loaded from VCF File     : ref.excludeTarget.vcf.gz
+
+ Writing draft [.m3vcf] file                         : ref.excludeTarget.draft.m3vcf.gz
+
+ Successfully written file ... 
+
+ ------------------------------------------------------------------------------
+                             PARAMETER ESTIMATION                              
+ ------------------------------------------------------------------------------
+
+ Setting up Markov Model for Parameter Estimation...
+
+ Initializing Model Parameters (using E-M and up to 200 haplotypes) ...
+
+ Round 1 of Parameter Refinement ...
+      0 mosaic crossovers expected per haplotype
+      0.000665 errors in mosaic expected per marker
+    Log-Likelihood of this Iteration : -31767
+
+ Round 2 of Parameter Refinement ...
+      0 mosaic crossovers expected per haplotype
+      0.000473 errors in mosaic expected per marker
+    Log-Likelihood of this Iteration : -10679
+
+ Round 3 of Parameter Refinement ...
+      0 mosaic crossovers expected per haplotype
+      0.000361 errors in mosaic expected per marker
+    Log-Likelihood of this Iteration : -7588.5
+
+ Round 4 of Parameter Refinement ...
+      0 mosaic crossovers expected per haplotype
+      0.000288 errors in mosaic expected per marker
+    Log-Likelihood of this Iteration : -5785.7
+
+ Round 5 of Parameter Refinement ...
+      0 mosaic crossovers expected per haplotype
+      0.000236 errors in mosaic expected per marker
+    Log-Likelihood of this Iteration : -4603.4
+
+ Saving estimated parameters for future use/reference to ...
+
+ Recombination Rates : ref.excludeTarget.rec
+ Error Rates         : ref.excludeTarget.erate
+
+ Time taken for parameter estimation = 692 seconds. 
+
+ Writing final reduced haplotype information to [.m3vcf] file  : ref.excludeTarget.m3vcf.gz
+
+ Successfully written file ... 
+
+ Temporary Draft [.m3vcf] file ref.excludeTarget.draft.m3vcf.gz deleted ... 
+
+
+ Time taken to load reference haplotype set = 6642 seconds.
+
+ ------------------------------------------------------------------------------
+                                END OF PROGRAM                                 
+ ------------------------------------------------------------------------------
+
+ Program Successfully Implemented... 
+ 
+ Total Run completed in 1 hours, 50 mins, 42 seconds.
+
+ Thank You for using Minimac3 !!! 
+

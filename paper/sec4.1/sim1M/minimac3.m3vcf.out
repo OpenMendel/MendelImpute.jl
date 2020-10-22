@@ -1,0 +1,74 @@
+
+
+ -------------------------------------------------------------------------------- 
+          Minimac3 - Fast Imputation Based on State Space Reduction HMM
+ --------------------------------------------------------------------------------
+           (c) 2014 - Sayantan Das, Christian Fuchsberger, David Hinds
+                             Mary Kate Wing, Goncalo Abecasis 
+
+ Version: 2.0.1;
+ Built: Fri Jul 24 13:45:41 PDT 2020 by biona001
+
+ Command Line Options: 
+    Reference Haplotypes : --refHaps [ref.excludeTarget.vcf.gz], --passOnly,
+                           --rsid
+       Target Haplotypes : --haps []
+       Output Parameters : --prefix [ref.excludeTarget],
+                           --processReference [ON], --updateModel, --nobgzip,
+                           --vcfOutput [ON], --doseOutput, --hapOutput,
+                           --format [GT,DS], --allTypedSites
+       Subset Parameters : --chr [], --start, --end, --window
+     Starting Parameters : --rec [], --err []
+   Estimation Parameters : --rounds [5], --states [200]
+        Other Parameters : --log, --lowMemory, --help, --cpus [1], --params
+               PhoneHome : --noPhoneHome, --phoneHomeThinning [50]
+
+
+ URL = http://genome.sph.umich.edu/wiki/Minimac3
+
+
+ NOTE: Since "--processReference" is ON, all options under "Target Haplotypes" 
+       and "Starting Parameters" will be ignored !!!
+       Program will only estimate parameters and create M3VCF file.
+       No imputation will be performed, hence other parameters are unnecessary !!!
+
+ NOTE: If "--processReference" is ON, Parameter Estimation will be done by default ! 
+       Use "--rounds 0" to AVOID Parameter Estimation !!!
+
+
+ ------------------------------------------------------------------------------
+                           REFERENCE HAPLOTYPE PANEL                           
+ ------------------------------------------------------------------------------
+
+ Format = VCF (Variant Call Format) 
+
+ Loading Reference Haplotype Set from VCF File       : ref.excludeTarget.vcf.gz
+
+ Reading VCF File to calculate number of records ... 
+
+
+ Number of Markers read from VCF File                : 114224
+ Number of Markers with more than Two Alleles        : 0
+ Number of Markers failing FILTER = PASS             : 0
+ Number of Markers with inconsistent Ref/Alt Allele  : 0
+ Number of Markers with duplicate ID:POS:REF:ALT     : 0
+ Number of Insertions                                : 0
+ Number of Deletions                                 : 0
+
+ Number of Markers to be Recorded                    : 114224
+ Number of Haplotypes to be Recorded                 : 1000000
+
+ Starting to load data ...
+
+ Number of Threads to be Used = 1
+
+  Loading markers 1 - 10000  out of 114224 markers to be loaded... [0.0%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 10000 - 19999  out of 114224 markers to be loaded... [8.8%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 19999 - 29998  out of 114224 markers to be loaded... [17.5%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 29998 - 39997  out of 114224 markers to be loaded... [26.3%] 

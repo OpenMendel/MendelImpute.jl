@@ -1,0 +1,31 @@
+# Filter and mask simulated data, then compress to JLSO/m3vcf/bref3
+nohup julia ./filter_and_mask.jl > filter_and_mask.out &
+nohup julia ./filter_and_mask.jl > filter_and_mask20.out &
+
+# compress reference file to m3vcf/bref3/imp5
+nohup /usr/bin/time Minimac3 --refHaps ref.chr20.excludeTarget.vcf.gz --processReference --prefix ref.chr20.excludeTarget > minimac3.chr20.m3vcf.out & 
+nohup /usr/bin/time Minimac3 --refHaps ref.chr10.excludeTarget.vcf.gz --processReference --prefix ref.chr10.excludeTarget > minimac3.chr10.m3vcf.out &
+java -jar bref3.18May20.d20.jar ref.chr10.excludeTarget.vcf.gz > ref.chr10.excludeTarget.bref3
+java -jar bref3.18May20.d20.jar ref.chr20.excludeTarget.vcf.gz > ref.chr20.excludeTarget.bref3
+
+# Prephase with Beagle 5.1 (minimac4 requires prephased data)
+nohup /usr/bin/time java -Xmx60g -jar beagle.18May20.d20.jar gt=target.chr20.typedOnly.maf0.4.masked.vcf.gz ref=ref.chr20.excludeTarget.bref3 out=target.chr20.prephased impute=false nthreads=10 > prephase.chr20.beagle.log &
+nohup /usr/bin/time java -Xmx60g -jar beagle.18May20.d20.jar gt=target.chr10.typedOnly.maf0.25.masked.vcf.gz ref=ref.chr10.excludeTarget.bref3 out=target.chr10.prephased impute=false nthreads=10 > prephase.chr10.beagle.log &
+
+# Run MendelImpute
+nohup /usr/bin/time julia ./impute.jl > mendel.impute.chr10.d1000.out &
+nohup /usr/bin/time julia ./impute.jl > mendel.impute.chr20.d1000.out &
+
+# Run Minimac4
+nohup /usr/bin/time minimac4 --refHaps ref.chr20.excludeTarget.m3vcf.gz --haps target.chr20.prephased.vcf.gz --prefix minimac4.chr20.result --cpus 10 > minimac4.chr20.imputed.log & 
+nohup /usr/bin/time minimac4 --refHaps ref.chr10.excludeTarget.m3vcf.gz --haps target.chr10.prephased.vcf.gz --prefix minimac4.chr10.result --cpus 10 > minimac4.chr10.imputed.log &
+
+# Run Beagle 5.1
+nohup /usr/bin/time java -Xmx60g -jar beagle.18May20.d20.jar gt=target.chr20.typedOnly.maf0.4.masked.vcf.gz ref=ref.chr20.excludeTarget.bref3 out=beagle.imputed.chr20 nthreads=10 > beagle.imputed.log &
+nohup /usr/bin/time java -Xmx60g -jar beagle.18May20.d20.jar gt=target.chr10.typedOnly.maf0.25.masked.vcf.gz ref=ref.chr10.excludeTarget.bref3 out=beagle.imputed.chr10 nthreads=10 > beagle.imputed.log &
+
+# Get error rate
+nohup julia ./error_rate.jl > all.error.out & 
+
+# Run ADMIXTURE
+nohup /usr/bin/time julia ./admixture.jl > chr18.admixture.out &

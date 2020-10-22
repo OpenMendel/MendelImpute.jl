@@ -1,0 +1,50 @@
+Number of threads = 10
+Importing reference haplotype data...
+Total windows = 16, averaging ~ 708 unique haplotypes per window.
+
+Timings: 
+    Data import                     = 7.69255 seconds
+        import target data             = 1.82674 seconds
+        import compressed haplotypes   = 5.8658 seconds
+    Computing haplotype pair        = 3.77711 seconds
+        BLAS3 mul! to get M and N      = 0.00547447 seconds per thread
+        haplopair search               = 0.0253735 seconds per thread
+        initializing missing           = 0.000390653 seconds per thread
+        allocating and viewing         = 0.00236016 seconds per thread
+        index conversion               = 0.000161204 seconds per thread
+    Phasing by win-win intersection = 1.25654 seconds
+        Window-by-window intersection  = 0.000130742 seconds per thread
+        Breakpoint search              = 0.19316 seconds per thread
+        Recording result               = 0.0366713 seconds per thread
+    Imputation                     = 1.06388 seconds
+        Imputing missing               = 0.12557 seconds
+        Writing to file                = 0.938312 seconds
+
+    Total time                      = 14.0518 seconds
+
+Number of threads = 10
+Importing reference haplotype data...
+Total windows = 867, averaging ~ 424 unique haplotypes per window.
+
+Timings: 
+    Data import                     = 9.00364 seconds
+        import target data             = 1.46583 seconds
+        import compressed haplotypes   = 7.53781 seconds
+    Computing haplotype pair        = 4.50789 seconds
+        BLAS3 mul! to get M and N      = 0.0859512 seconds per thread
+        haplopair search               = 1.6025 seconds per thread
+        initializing missing           = 0.00466138 seconds per thread
+        allocating and viewing         = 0.0151717 seconds per thread
+        index conversion               = 0.00301315 seconds per thread
+    Phasing by win-win intersection = 0.438517 seconds
+        Window-by-window intersection  = 0.0335798 seconds per thread
+        Breakpoint search              = 0.104001 seconds per thread
+        Recording result               = 0.000567001 seconds per thread
+    Imputation                     = 3.07353 seconds
+        Imputing missing               = 0.0454378 seconds
+        Writing to file                = 3.02809 seconds
+
+    Total time                      = 17.0244 seconds
+
+124.76user 2.66system 1:03.23elapsed 201%CPU (0avgtext+0avgdata 2390104maxresident)k
+169992inputs+3528outputs (3major+1159651minor)pagefaults 0swaps

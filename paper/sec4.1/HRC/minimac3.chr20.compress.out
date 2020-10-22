@@ -1,0 +1,384 @@
+
+
+ -------------------------------------------------------------------------------- 
+          Minimac3 - Fast Imputation Based on State Space Reduction HMM
+ --------------------------------------------------------------------------------
+           (c) 2014 - Sayantan Das, Christian Fuchsberger, David Hinds
+                             Mary Kate Wing, Goncalo Abecasis 
+
+ Version: 2.0.1;
+ Built: Fri Jul 24 13:45:41 PDT 2020 by biona001
+
+ Command Line Options: 
+    Reference Haplotypes : --refHaps [ref.chr20.excludeTarget.vcf.gz],
+                           --passOnly, --rsid
+       Target Haplotypes : --haps []
+       Output Parameters : --prefix [ref.chr20.excludeTarget],
+                           --processReference [ON], --updateModel, --nobgzip,
+                           --vcfOutput [ON], --doseOutput, --hapOutput,
+                           --format [GT,DS], --allTypedSites
+       Subset Parameters : --chr [], --start, --end, --window
+     Starting Parameters : --rec [], --err []
+   Estimation Parameters : --rounds [5], --states [200]
+        Other Parameters : --log, --lowMemory, --help, --cpus [1], --params
+               PhoneHome : --noPhoneHome, --phoneHomeThinning [50]
+
+
+ URL = http://genome.sph.umich.edu/wiki/Minimac3
+
+
+ NOTE: Since "--processReference" is ON, all options under "Target Haplotypes" 
+       and "Starting Parameters" will be ignored !!!
+       Program will only estimate parameters and create M3VCF file.
+       No imputation will be performed, hence other parameters are unnecessary !!!
+
+ NOTE: If "--processReference" is ON, Parameter Estimation will be done by default ! 
+       Use "--rounds 0" to AVOID Parameter Estimation !!!
+
+
+ ------------------------------------------------------------------------------
+                           REFERENCE HAPLOTYPE PANEL                           
+ ------------------------------------------------------------------------------
+
+ Format = VCF (Variant Call Format) 
+
+ Loading Reference Haplotype Set from VCF File       : ref.chr20.excludeTarget.vcf.gz
+
+ Reading VCF File to calculate number of records ... 
+
+
+ Number of Markers read from VCF File                : 829265
+ Number of Markers with more than Two Alleles        : 0
+ Number of Markers failing FILTER = PASS             : 829265
+ Number of Markers with inconsistent Ref/Alt Allele  : 0
+ Number of Markers with duplicate ID:POS:REF:ALT     : 0
+ Number of Insertions                                : 0
+ Number of Deletions                                 : 0
+
+ Number of Markers to be Recorded                    : 829265
+ Number of Haplotypes to be Recorded                 : 52330
+
+ Starting to load data ...
+
+ Number of Threads to be Used = 1
+
+  Loading markers 1 - 10000  out of 829265 markers to be loaded... [0.0%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 10000 - 19999  out of 829265 markers to be loaded... [1.2%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 19999 - 29998  out of 829265 markers to be loaded... [2.4%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 29998 - 39997  out of 829265 markers to be loaded... [3.6%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 39997 - 49996  out of 829265 markers to be loaded... [4.8%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 49996 - 59995  out of 829265 markers to be loaded... [6.0%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 59995 - 69994  out of 829265 markers to be loaded... [7.2%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 69994 - 79993  out of 829265 markers to be loaded... [8.4%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 79993 - 89992  out of 829265 markers to be loaded... [9.6%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 89992 - 99991  out of 829265 markers to be loaded... [10.9%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 99991 - 109990  out of 829265 markers to be loaded... [12.1%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 109990 - 119989  out of 829265 markers to be loaded... [13.3%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 119989 - 129988  out of 829265 markers to be loaded... [14.5%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 129988 - 139987  out of 829265 markers to be loaded... [15.7%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 139987 - 149986  out of 829265 markers to be loaded... [16.9%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 149986 - 159985  out of 829265 markers to be loaded... [18.1%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 159985 - 169984  out of 829265 markers to be loaded... [19.3%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 169984 - 179983  out of 829265 markers to be loaded... [20.5%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 179983 - 189982  out of 829265 markers to be loaded... [21.7%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 189982 - 199981  out of 829265 markers to be loaded... [22.9%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 199981 - 209980  out of 829265 markers to be loaded... [24.1%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 209980 - 219979  out of 829265 markers to be loaded... [25.3%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 219979 - 229978  out of 829265 markers to be loaded... [26.5%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 229978 - 239977  out of 829265 markers to be loaded... [27.7%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 239977 - 249976  out of 829265 markers to be loaded... [28.9%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 249976 - 259975  out of 829265 markers to be loaded... [30.1%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 259975 - 269974  out of 829265 markers to be loaded... [31.4%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 269974 - 279973  out of 829265 markers to be loaded... [32.6%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 279973 - 289972  out of 829265 markers to be loaded... [33.8%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 289972 - 299971  out of 829265 markers to be loaded... [35.0%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 299971 - 309970  out of 829265 markers to be loaded... [36.2%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 309970 - 319969  out of 829265 markers to be loaded... [37.4%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 319969 - 329968  out of 829265 markers to be loaded... [38.6%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 329968 - 339967  out of 829265 markers to be loaded... [39.8%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 339967 - 349966  out of 829265 markers to be loaded... [41.0%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 349966 - 359965  out of 829265 markers to be loaded... [42.2%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 359965 - 369964  out of 829265 markers to be loaded... [43.4%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 369964 - 379963  out of 829265 markers to be loaded... [44.6%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 379963 - 389962  out of 829265 markers to be loaded... [45.8%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 389962 - 399961  out of 829265 markers to be loaded... [47.0%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 399961 - 409960  out of 829265 markers to be loaded... [48.2%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 409960 - 419959  out of 829265 markers to be loaded... [49.4%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 419959 - 429958  out of 829265 markers to be loaded... [50.6%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 429958 - 439957  out of 829265 markers to be loaded... [51.8%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 439957 - 449956  out of 829265 markers to be loaded... [53.1%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 449956 - 459955  out of 829265 markers to be loaded... [54.3%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 459955 - 469954  out of 829265 markers to be loaded... [55.5%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 469954 - 479953  out of 829265 markers to be loaded... [56.7%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 479953 - 489952  out of 829265 markers to be loaded... [57.9%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 489952 - 499951  out of 829265 markers to be loaded... [59.1%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 499951 - 509950  out of 829265 markers to be loaded... [60.3%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 509950 - 519949  out of 829265 markers to be loaded... [61.5%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 519949 - 529948  out of 829265 markers to be loaded... [62.7%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 529948 - 539947  out of 829265 markers to be loaded... [63.9%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 539947 - 549946  out of 829265 markers to be loaded... [65.1%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 549946 - 559945  out of 829265 markers to be loaded... [66.3%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 559945 - 569944  out of 829265 markers to be loaded... [67.5%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 569944 - 579943  out of 829265 markers to be loaded... [68.7%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 579943 - 589942  out of 829265 markers to be loaded... [69.9%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 589942 - 599941  out of 829265 markers to be loaded... [71.1%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 599941 - 609940  out of 829265 markers to be loaded... [72.3%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 609940 - 619939  out of 829265 markers to be loaded... [73.6%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 619939 - 629938  out of 829265 markers to be loaded... [74.8%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 629938 - 639937  out of 829265 markers to be loaded... [76.0%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 639937 - 649936  out of 829265 markers to be loaded... [77.2%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 649936 - 659935  out of 829265 markers to be loaded... [78.4%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 659935 - 669934  out of 829265 markers to be loaded... [79.6%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 669934 - 679933  out of 829265 markers to be loaded... [80.8%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 679933 - 689932  out of 829265 markers to be loaded... [82.0%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 689932 - 699931  out of 829265 markers to be loaded... [83.2%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 699931 - 709930  out of 829265 markers to be loaded... [84.4%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 709930 - 719929  out of 829265 markers to be loaded... [85.6%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 719929 - 729928  out of 829265 markers to be loaded... [86.8%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 729928 - 739927  out of 829265 markers to be loaded... [88.0%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 739927 - 749926  out of 829265 markers to be loaded... [89.2%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 749926 - 759925  out of 829265 markers to be loaded... [90.4%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 759925 - 769924  out of 829265 markers to be loaded... [91.6%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 769924 - 779923  out of 829265 markers to be loaded... [92.8%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 779923 - 789922  out of 829265 markers to be loaded... [94.0%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 789922 - 799921  out of 829265 markers to be loaded... [95.3%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 799921 - 809920  out of 829265 markers to be loaded... [96.5%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 809920 - 819919  out of 829265 markers to be loaded... [97.7%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+  Loading markers 819919 - 829265  out of 829265 markers to be loaded... [98.9%] 
+     Processing Reference Chunk 1 for M3VCF ... 
+
+
+ Number of Markers Recorded                          : 829265
+ Number of Haplotypes Recorded                       : 52330
+
+ Haplotype Set successfully loaded from VCF File     : ref.chr20.excludeTarget.vcf.gz
+
+ Writing draft [.m3vcf] file                         : ref.chr20.excludeTarget.draft.m3vcf.gz
+
+ Successfully written file ... 
+
+ ------------------------------------------------------------------------------
+                             PARAMETER ESTIMATION                              
+ ------------------------------------------------------------------------------
+
+ Setting up Markov Model for Parameter Estimation...
+
+ Initializing Model Parameters (using E-M and up to 200 haplotypes) ...
+
+ Round 1 of Parameter Refinement ...
+      206 mosaic crossovers expected per haplotype
+      0.000354 errors in mosaic expected per marker
+    Log-Likelihood of this Iteration : -6.6597e+05
+
+ Round 2 of Parameter Refinement ...
+      161 mosaic crossovers expected per haplotype
+      0.000255 errors in mosaic expected per marker
+    Log-Likelihood of this Iteration : -5.618e+05
+
+ Round 3 of Parameter Refinement ...
+      157 mosaic crossovers expected per haplotype
+      0.000198 errors in mosaic expected per marker
+    Log-Likelihood of this Iteration : -5.4281e+05
+
+ Round 4 of Parameter Refinement ...
+      157 mosaic crossovers expected per haplotype
+      0.000162 errors in mosaic expected per marker
+    Log-Likelihood of this Iteration : -5.3212e+05
+
+ Round 5 of Parameter Refinement ...
+      158 mosaic crossovers expected per haplotype
+      0.000138 errors in mosaic expected per marker
+    Log-Likelihood of this Iteration : -5.251e+05
+
+ Saving estimated parameters for future use/reference to ...
+
+ Recombination Rates : ref.chr20.excludeTarget.rec
+ Error Rates         : ref.chr20.excludeTarget.erate
+
+ Time taken for parameter estimation = 10829 seconds. 
+
+ Writing final reduced haplotype information to [.m3vcf] file  : ref.chr20.excludeTarget.m3vcf.gz
+
+ Successfully written file ... 
+
+ Temporary Draft [.m3vcf] file ref.chr20.excludeTarget.draft.m3vcf.gz deleted ... 
+
+
+ Time taken to load reference haplotype set = 27446 seconds.
+
+ ------------------------------------------------------------------------------
+                                END OF PROGRAM                                 
+ ------------------------------------------------------------------------------
+
+ Program Successfully Implemented... 
+ 
+ Total Run completed in 7 hours, 37 mins, 26 seconds.
+
+ Thank You for using Minimac3 !!! 
+
+26992.14user 485.65system 7:37:27elapsed 100%CPU (0avgtext+0avgdata 5983984maxresident)k
+2926920inputs+1051728outputs (3major+354273444minor)pagefaults 0swaps

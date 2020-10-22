@@ -1,0 +1,21 @@
+# Filter and mask simulated data, then compress to JLSO/m3vcf/bref3
+nohup julia ./filter_and_mask.jl > filter_and_mask.out &
+
+# compress reference file to m3vcf/bref3/imp5
+nohup /usr/bin/time Minimac3 --refHaps ref.excludeTarget.vcf.gz --processReference --prefix ref.excludeTarget > minimac3.m3vcf.out & 
+java -jar bref3.18May20.d20.jar ref.excludeTarget.vcf.gz > ref.excludeTarget.bref3
+
+# Prephase with Beagle 5.1 (minimac4 requires prephased data)
+nohup /usr/bin/time java -Xmx60g -jar beagle.18May20.d20.jar gt=target.typedOnly.maf0.05.masked.vcf.gz ref=ref.excludeTarget.bref3 out=target.prephased impute=false nthreads=10 > prephase.beagle.log &
+
+# Run MendelImpute
+nohup /usr/bin/time julia ./impute.jl > mendel.impute.d1000.out &
+
+# Run Minimac4
+nohup /usr/bin/time minimac4 --refHaps ref.excludeTarget.m3vcf.gz --haps target.prephased.vcf.gz --prefix minimac4.result --cpus 10 > minimac4.imputed.log & 
+
+# Run Beagle 5.1
+nohup /usr/bin/time java -Xmx60g -jar beagle.18May20.d20.jar gt=target.typedOnly.maf0.05.masked.vcf.gz ref=ref.excludeTarget.bref3 out=beagle.imputed.maf0.05 nthreads=10 > beagle.imputed.log &
+
+# Get error rate
+nohup julia ./error_rate.jl > all.error.out & 
