@@ -4,18 +4,19 @@
 
 """
     phase(tgtfile::String, reffile::String, outfile::String; [impute::Bool],
-        [phase::Bool], [dosage::Bool], [recreen::Bool], [max_haplotypes::Int], 
+        [phase::Bool], [dosage::Bool], [rescreen::Bool], [max_haplotypes::Int], 
         [stepwise::Int], [thinning_factor::Int], [scale_allelefreq::Bool], 
         [dynamic_programming::Bool])
 
 Main function of MendelImpute program. Phasing (haplotying) of `tgtfile` from a
 pool of haplotypes `reffile` by sliding windows and saves result in `outfile`.
-All SNPs in `tgtfile` must be present in `reffile`. Per-sample imputation score
-(lower is better) will be saved in a file ending in `sample.error`.
+All SNPs in `tgtfile` must be present in `reffile`. Per-SNP quality score will
+be saved in `outfile, while per-sample imputation score will be saved in a file
+ending in `sample.error`.
 
 # Input
 - `tgtfile`: VCF or PLINK files. VCF files should end in `.vcf` or `.vcf.gz`.
-    PLINK files should exclude `.bim/.bed/.fam` suffixes but the trio must all
+    PLINK files should exclude `.bim/.bed/.fam` trailings but the trio must all
     be present in the same directory.
 - `reffile`: Reference haplotype file ending in `.vcf`, `.vcf.gz`, or `.jlso` 
     (compressed binary files).

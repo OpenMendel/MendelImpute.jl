@@ -79,7 +79,7 @@ For easier processing, copy the country of origin data into a folder called `dat
 
 The goal here is to create a `Dict{key, value}` where each key is a sample ID and the value is the population code. This will be used for both the [paint](https://openmendel.github.io/MendelImpute.jl/dev/man/api/#MendelImpute.paint) and [composition](https://openmendel.github.io/MendelImpute.jl/dev/man/api/#MendelImpute.composition) function.
 
-Here the population origin for different samples are encoded in weird subfolder directory way. We process them into the desired dictionary structure.
+Here the population origin for different samples are stored in sub-directories. We process them into the desired dictionary structure.
 
 
 ```julia

@@ -7,12 +7,8 @@ MendelImpute accepts [VCF](https://samtools.github.io/hts-specs/VCFv4.3.pdf) and
 + For PLINK files, all trios (`.bim`, `.bed`, `.fam`) are present in the same directory
 + Each file contains only 1 (non-sex) chromosome
 + Every record (SNP) is present in the reference panel. If this is untrue, you must [match markers in 2 VCF files](https://openmendel.github.io/VCFTools.jl/dev/man/conformgt/). 
-+ Given a SNP, it's CHROM, POS, REF, and  ALT fields are the same in target data and reference panel. MendelImpute use SNP position internally to align markers. Note this is not explicitly checked. 
++ Given a SNP, its CHROM, POS, REF, and  ALT fields are the same in target data and reference panel. MendelImpute use SNP position internally to align markers. Note this is not explicitly checked. 
 + The position of every SNP is unique: so multiallelic markers should be excluded instead of split (this requirement will eventually be lifted). 
-
-!!! note
-
-    We recommend **not** doing pre-imputation quality control (i.e. do not remove SNPs out of Hardy-Weinburg equilibrium or SNPs with low minor allele frequencies...etc). Instead, reserve quality control to post-imputation. This is because every new set of typed SNPs requires a compressed reference haplotype panel that matches the set of typed SNPs. 
 
 # Preparing Reference Haplotype Panel
 
@@ -36,10 +32,6 @@ data = "chr22.1kg.phase3.v5a.vcf.gz"
 @show nsamples(data);
 ```
 
-    ┌ Info: Precompiling MendelImpute [e47305d1-6a61-5370-bc5d-77554d143183]
-    └ @ Base loading.jl:1278
-
-
     nrecords(data) = 424147
     nsamples(data) = 2504
 
@@ -48,10 +40,10 @@ More summary statistics can be computed using the [gtstats](https://openmendel.g
 
 ## Step 1: generating realistic reference and target data 
 
-First we generate a reference panel and imputation target based on the 1000 genomes data. More specifically, we take the 1000 genomes chromosome 22 and divide it so that 
+First we generate a reference panel and imputation target based on the 1000 genomes data. Specifically, we divide the 1000 genomes chromosome 22 data so that 
 + 100 samples are randomly selected as imputation targets, where
     - 100k SNPs with minor allele frequency $\ge 0.05$ are randomly selected to be the typed positions. 
-    - 0.1% of typed SNPs are masked (mimicking GWAS errors)
+    - 0.1% of typed SNPs are masked (mimicking genotyping errors)
     - Genotypes are unphased
 + The remaining 2404 samples are used as reference haplotypes. 
 + SNPs with duplicate positions are filtered out.
@@ -175,7 +167,7 @@ outfile = "ref.chr22.maxd1000.excludeTarget.jlso"
 
 ## Step 3: Run imputation and phasing
 
-Below runs the main [phase](https://openmendel.github.io/MendelImpute.jl/dev/man/api/#MendelImpute.phase) function in a single thread. By default all output genotypes will be phased and non-missing. A list of optional inputs can be found in the [API](https://openmendel.github.io/MendelImpute.jl/dev/man/api/#MendelImpute.phase).
+The [phase](https://openmendel.github.io/MendelImpute.jl/dev/man/api/#MendelImpute.phase) function will perform imputation and phasing. By default, all output genotypes will be phased and non-missing. A list of optional inputs can be found in the [API](https://openmendel.github.io/MendelImpute.jl/dev/man/api/#MendelImpute.phase).
 
 
 ```julia
@@ -186,29 +178,34 @@ outfile = "mendel.imputed.chr22.vcf.gz"           # output file name
 phase(tgtfile, reffile, outfile);
 ```
 
-    Number of threads = 8
+    Number of threads = 1
     Importing reference haplotype data...
+
+
+    [32mComputing optimal haplotypes...100%|████████████████████| Time: 0:00:20[39m
+
+
     Total windows = 1634, averaging ~ 508 unique haplotypes per window.
     
     Timings: 
-        Data import                     = 9.9879 seconds
-            import target data             = 1.59052 seconds
-            import compressed haplotypes   = 8.39737 seconds
-        Computing haplotype pair        = 4.487 seconds
-            BLAS3 mul! to get M and N      = 0.203134 seconds per thread
-            haplopair search               = 3.47789 seconds per thread
-            initializing missing           = 0.0193766 seconds per thread
-            allocating and viewing         = 0.0948972 seconds per thread
-            index conversion               = 0.00162558 seconds per thread
-        Phasing by win-win intersection = 0.661786 seconds
-            Window-by-window intersection  = 0.0792241 seconds per thread
-            Breakpoint search              = 0.48882 seconds per thread
-            Recording result               = 0.0196465 seconds per thread
-        Imputation                     = 1.10519 seconds
-            Imputing missing               = 0.509987 seconds
-            Writing to file                = 0.595203 seconds
+        Data import                     = 9.88384 seconds
+            import target data             = 1.77236 seconds
+            import compressed haplotypes   = 8.11149 seconds
+        Computing haplotype pair        = 20.3066 seconds
+            BLAS3 mul! to get M and N      = 1.06045 seconds per thread
+            haplopair search               = 18.8367 seconds per thread
+            initializing missing           = 0.101118 seconds per thread
+            allocating and viewing         = 0.276894 seconds per thread
+            index conversion               = 0.0199662 seconds per thread
+        Phasing by win-win intersection = 4.32098 seconds
+            Window-by-window intersection  = 0.53913 seconds per thread
+            Breakpoint search              = 3.53301 seconds per thread
+            Recording result               = 0.23443 seconds per thread
+        Imputation                     = 3.40132 seconds
+            Imputing missing               = 0.440234 seconds
+            Writing to file                = 2.96109 seconds
     
-        Total time                      = 16.243 seconds
+        Total time                      = 37.914 seconds
     
 
 
@@ -233,13 +230,15 @@ println("error overall = ", sum(X_mendel .!= X_truth) / n / p)
     error overall = 0.005273778941849357
 
 
+Thus, we are looking at about 5 imputation error out of every 1000 SNPs. 
+
 ## Post-imputation: per-SNP Imputation Quality Score
 
-By default, MendelImpute outputs a per-SNP imputation quality score. A score of 0 is best, and larger is worst. At the $k$th SNP, this score is the average least squares error between the observed genotype and the 2 selected haplotypes $\mathbf{h}_1, \mathbf{h}_2$ over all $n$ samples:
-
-$$e_k = \frac{1}{n}\sum_{i=1}^n ||x_k - h_{1k} - h_{2k}||_2^2$$
-
-For untyped (i.e. imputed) SNPs, the quality score is the average of the closest 2 typed SNP's score. Note samples with missing genotypes are skipped, and $n$ adjusted accordingly, by default. 
+Consider the observed genotype $x_{ij} \in [0, 2] \cup \{missing\}$ at SNP $i$ of sample $j$ and the corresponding imputed genotype $g_{ij}$ derived from the two extended haplotypes of $j$. If $S_i$ denotes the set of individuals with observed genotypes at the SNP, then MendelImpute's quality score $q_i$ for the SNP is defined as
+\begin{eqnarray*}
+q_i & = & 1 - \frac{1}{|S_i|}\sum_{j \in S_i} \left(\frac{x_{ij} - g_{ij}}{2}\right)^2.
+\end{eqnarray*}
+Note that $0 \le q_i \le 1$ and that the larger the quality score, the more confidence in the imputed values. Because $q_i$ can only be computed for the typed SNPs, an untyped SNP is assigned the average of the quality scores for its two closest flanking typed SNPs.
 
 To extract this score from a VCF file, one can do:
 
@@ -256,7 +255,8 @@ end
 close(reader)
 
 # plot histogram of SNP scores
-histogram(snpscores, label=:none, xlabel="error", ylabel="SNP counts", bins=30)
+histogram(snpscores, label=:none, xlabel="per-SNP quality score", 
+    ylabel="SNP counts", bins=30)
 ```
 
 
@@ -266,7 +266,7 @@ histogram(snpscores, label=:none, xlabel="error", ylabel="SNP counts", bins=30)
 
 
 
-**Conclusion:** Most SNPs are well imputed (least squares error close to $0.0$), but a few have quality score above $0.01$. We recommend such SNPs to be [filtered out](https://openmendel.github.io/VCFTools.jl/dev/man/filter/#Subsetting-VCF-files-using-array-masks). 
+**Conclusion:** Most SNPs are well imputed (quality score close to $1.0$), but a few have subpar quality score (e.g. below $0.999$). We recommend such SNPs to be [filtered out](https://openmendel.github.io/VCFTools.jl/dev/man/filter/#Subsetting-VCF-files-using-array-masks). 
 
 !!! note
 
@@ -274,7 +274,7 @@ histogram(snpscores, label=:none, xlabel="error", ylabel="SNP counts", bins=30)
 
 ## Post-imputation: per-sample Imputation Quality score
 
-MendelImpute also computes a rough quality score (file ending in `sample.error`) for measuring how well each sample is imputed. This value is the sum of the least squares error for all typed SNPs scaled by the total number of observed SNPs. A value of 0 is best, and high values mean worse. 
+MendelImpute also computes a rough quality score (file ending in `sample.error`) for measuring how well each sample is imputed. This value is the sum of the least squares error for all typed SNPs scaled by the total number of observed SNPs, similar to the per-SNP quality score. A value of 1.0 is best, and 0 is worst. 
 
 
 ```julia
@@ -282,7 +282,8 @@ using CSV
 quality = CSV.read("mendel.imputed.chr22.sample.error") # import quality score 
 
 # visualize error distribution
-histogram(quality[:error], label=:none, xlabel="error", ylabel="Number of samples") 
+histogram(quality[:error], label=:none, xlabel="per-sample quality score",
+    ylabel="Number of samples") 
 ```
 
 
@@ -292,4 +293,4 @@ histogram(quality[:error], label=:none, xlabel="error", ylabel="Number of sample
 
 
 
-**Conclusion:** Most samples have small error, but some samples are indeed poorly imputed. From the histogram, we can safely [filtered out](https://openmendel.github.io/VCFTools.jl/dev/man/filter/#Subsetting-VCF-files-using-array-masks) samples with error $> 0.004$ as that would remove poorly imputed individuals without reducing sample size too much.
+**Conclusion:** Most samples are well imputed (e.g. score close to 1), but some samples are indeed poorly imputed. From the histogram, we can safely [filtered out](https://openmendel.github.io/VCFTools.jl/dev/man/filter/#Subsetting-VCF-files-using-array-masks) samples with score $< 0.999$ as that would remove poorly imputed individuals without reducing sample size too much.

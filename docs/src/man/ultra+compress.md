@@ -5,7 +5,7 @@ One can optionally save/load ultra-compressed phased genotypes after imputation.
 
 ## Saving
 
-Appending `.jlso` to the output file name will signal MendelImpute to save data in ultra-compressed format. For admixture estimation, we strongly recommend one to save in `.jlso` format.
+Appending `.jlso` to the output file name will signal MendelImpute to save data in ultra-compressed format. For admixture estimation, we require one to save in `.jlso` format.
 
 
 ```julia

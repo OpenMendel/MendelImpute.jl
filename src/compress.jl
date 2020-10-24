@@ -39,8 +39,9 @@ struct CompressedWindow
 end
 
 """
-Keeps a vector of `CompressedWindow`. Indexing off instances of 
-`CompressedHaplotypes` means indexing off `CompressedHaplotypes.CW`
+A compressed version of the original reference haplotype panel. Internally
+it is just 2 vectors of `CompressedWindow`, some pointers for coordination,
+and basic sample information.
 
 - `CW`: Vector of `CompressedWindow`. `CW[i]` stores unique haplotypes filtered
     with respect to all SNPs from `Hstart[i]` to `Hstart[i + 1]`
