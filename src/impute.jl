@@ -432,12 +432,13 @@ function typed_snpscore(
             sample_error[i] += err
         end
 
-        # normalize per-sample error by number of observed SNPs 
-        sample_error[i] /= snps - sample_missingness 
+        # normalize per-sample error
+        sample_error[i] = 1 - 0.25(sample_error[i] / (snps - sample_missingness))
     end
 
     for i in 1:snps
-        @inbounds snp_error[i] /= samples - missing_counter[i]
+        @inbounds snp_error[i] = 1 - 0.25(snp_error[i] / 
+            (samples - missing_counter[i]))
     end
 
     return snp_error, sample_error
