@@ -182,9 +182,9 @@ end
     # check per-sample error
     quality = CSV.read("imputed.sample.error")
     @test size(quality, 1) == 100
-    @test count(iszero, quality[:error]) == 65
-    @test mean(quality[:error]) ≈ 0.0012355705150502144
-    @test std(quality[:error]) ≈ 0.0025026186569014415
+    @test count(isone, quality[:error]) == 65
+    @test mean(quality[:error]) ≈ 0.9996911073712372
+    @test std(quality[:error]) ≈ 0.0006256546642253605
 
     # check per-SNP error
     reader = VCF.Reader(openvcf(outfile, "r"))
@@ -194,9 +194,9 @@ end
     end
     close(reader)
     @test length(snpscores) == 36063
-    @test count(iszero, snpscores) == 29934
-    @test mean(snpscores) ≈ 0.0012352826997199346
-    @test std(snpscores) ≈ 0.003064973239476418
+    @test count(isone, snpscores) == 29934
+    @test mean(snpscores) ≈ 0.9997004408951002
+    @test std(snpscores) ≈ 0.0007984939339310984
 end
 
 @testset "PLINK and dosage inputs" begin
