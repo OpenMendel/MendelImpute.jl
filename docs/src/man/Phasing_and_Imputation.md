@@ -235,9 +235,9 @@ Thus, we are looking at about 5 imputation error out of every 1000 SNPs.
 ## Post-imputation: per-SNP Imputation Quality Score
 
 Consider the observed genotype $x_{ij} \in [0, 2] \cup \{missing\}$ at SNP $i$ of sample $j$ and the corresponding imputed genotype $g_{ij}$ derived from the two extended haplotypes of $j$. If $S_i$ denotes the set of individuals with observed genotypes at the SNP, then MendelImpute's quality score $q_i$ for the SNP is defined as
-\begin{eqnarray*}
-q_i & = & 1 - \frac{1}{|S_i|}\sum_{j \in S_i} \left(\frac{x_{ij} - g_{ij}}{2}\right)^2.
-\end{eqnarray*}
+
+$$q_i = 1 - \frac{1}{|S_i|}\sum_{j \in S_i} \left(\frac{x_{ij} - g_{ij}}{2}\right)^2.$$
+
 Note that $0 \le q_i \le 1$ and that the larger the quality score, the more confidence in the imputed values. Because $q_i$ can only be computed for the typed SNPs, an untyped SNP is assigned the average of the quality scores for its two closest flanking typed SNPs.
 
 To extract this score from a VCF file, one can do:

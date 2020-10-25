@@ -18,7 +18,7 @@ This package supports Julia `v1.5`+.
 ## Documentation
 
 + [**Latest**](https://OpenMendel.github.io/MendelImpute.jl/dev/)
-+ [**Stable**](https://OpenMendel.github.io/MendelImpute.jl/dev/)
++ [**Stable**](https://OpenMendel.github.io/MendelImpute.jl/stable/)
 
 ## Example run:
 
