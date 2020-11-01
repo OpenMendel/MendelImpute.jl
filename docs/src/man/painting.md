@@ -6,8 +6,6 @@ If samples in the reference haplotype panel are labeled with a population origin
 + Estimate admixed proportions
 + Chromosome painting
 
-We use the [1000 genomes chromosome 22](http://bochet.gcc.biostat.washington.edu/beagle/1000_Genomes_phase3_v5a/b37.vcf/) as illustration. Example code to generate plots are presented. 
-
 
 ```julia
 # first load all necessary packages
@@ -25,12 +23,18 @@ using CSV
 
 ### Step 1. Filter chromosome data 
 
-The original chromosome data are filtered into target and reference panels. Follow [detailed example](https://openmendel.github.io/MendelImpute.jl/dev/man/Phasing+and+Imputation/#Detailed-Example) in Phasing and Imputation to obtain the same data.
+We use the [1000 genomes chromosome 22](http://bochet.gcc.biostat.washington.edu/beagle/1000_Genomes_phase3_v5a/b37.vcf/) as illustration.  The original data is filtered into target and reference panels. Follow [detailed example](https://openmendel.github.io/MendelImpute.jl/dev/man/Phasing+and+Imputation/#Detailed-Example) in Phasing and Imputation to obtain the same data.
+
+
+!!! note
+
+    In practice, it is better to infer ancestry of admixed populations using non-admixed reference populations. The example here is a simplified illustration and should not be taken too literally. 
+
+
 
 ### Step 2. Process each sample's population origin
 
 The goal is to create a `Dict{key, value}` where each key is a sample ID and the value is the population code. This will be used for both the [paint](https://openmendel.github.io/MendelImpute.jl/dev/man/api/#MendelImpute.paint) and [composition](https://openmendel.github.io/MendelImpute.jl/dev/man/api/#MendelImpute.composition) function.
-
 
 
 ```julia
@@ -190,45 +194,6 @@ sample_population
 
 
 
-
-```julia
-# here is our sample population (sample 1 is GBR, 4 is CHS, 84 is LWK...etc)
-sample_population
-```
-
-
-
-
-    100-element Array{String,1}:
-     "GBR"
-     "FIN"
-     "CHS"
-     "CHS"
-     "CDX"
-     "CDX"
-     "PUR"
-     "PUR"
-     "PUR"
-     "PUR"
-     "GBR"
-     "CLM"
-     "IBS"
-     ⋮
-     "MXL"
-     "ASW"
-     "ASW"
-     "TSI"
-     "TSI"
-     "TSI"
-     "TSI"
-     "TSI"
-     "TSI"
-     "TSI"
-     "GIH"
-     "GIH"
-
-
-
 ### Step 2: call `composition` function
 
 The [composition](https://openmendel.github.io/MendelImpute.jl/dev/man/api/#MendelImpute.composition) will compute a list of percentages where `composition[i]` equals the sample's ancestry (in %) from `populations[i]`. We are finally using the imputation result stored in `ph`.
@@ -297,9 +262,11 @@ bar!(barplot, sample84_comp, label="Sample 84 (LWK)", alpha=0.8)
 
 
 
-![svg](output_15_0.svg)
+![svg](output_14_0.svg)
 
 
+
+**Conclusion:** From the bar plot, sample 1 (GBR) is 30\% GBR, 15\% FIN, 10\% IBS...etc. Sample 4 (CHS) is 40\% CHS, 10\% CDX,...etc. Sample 84 is 25\% LWK, 20\% ACB,...etc. 
 
 ## Chromosome painting
 
