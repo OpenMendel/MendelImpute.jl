@@ -18,80 +18,30 @@ using Random
 using DataFrames
 using Plots
 using JLSO
+using CSV
 ```
-
-    ┌ Info: Precompiling MendelImpute [e47305d1-6a61-5370-bc5d-77554d143183]
-    └ @ Base loading.jl:1278
-
 
 ## Data preparation
 
-### Step 0. Filter chromosome data 
+### Step 1. Filter chromosome data 
 
 The original chromosome data are filtered into target and reference panels. Follow [detailed example](https://openmendel.github.io/MendelImpute.jl/dev/man/Phasing+and+Imputation/#Detailed-Example) in Phasing and Imputation to obtain the same data.
 
-### Step 1. Get population data
-
-Download [population code](ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/1000_genomes_project/data/) for each 1000 genomes sample via the command below (note `wget` will probably not work on non-Mac OS). Different population code is explained [here](https://www.internationalgenome.org/category/population/). 
-
-
-```julia
-# run this code in terminal
-# wget -r -l3 -N --no-parent ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/1000_genomes_project/data/
-```
-
-For easier processing, copy the country of origin data into a folder called `data`. It should look contain these subfolders (where each population code contains the sample IDs that belong to the population):
-
-
-```julia
-;ls data
-```
-
-    ACB
-    ASW
-    BEB
-    CDX
-    CEU
-    CHB
-    CHS
-    CLM
-    ESN
-    FIN
-    GBR
-    GIH
-    GWD
-    IBS
-    ITU
-    JPT
-    KHV
-    LWK
-    MSL
-    MXL
-    PEL
-    PJL
-    PUR
-    STU
-    TSI
-    YRI
-
-
 ### Step 2. Process each sample's population origin
 
-The goal here is to create a `Dict{key, value}` where each key is a sample ID and the value is the population code. This will be used for both the [paint](https://openmendel.github.io/MendelImpute.jl/dev/man/api/#MendelImpute.paint) and [composition](https://openmendel.github.io/MendelImpute.jl/dev/man/api/#MendelImpute.composition) function.
+The goal is to create a `Dict{key, value}` where each key is a sample ID and the value is the population code. This will be used for both the [paint](https://openmendel.github.io/MendelImpute.jl/dev/man/api/#MendelImpute.paint) and [composition](https://openmendel.github.io/MendelImpute.jl/dev/man/api/#MendelImpute.composition) function.
 
-Here the population origin for different samples are stored in sub-directories. We process them into the desired dictionary structure.
 
 
 ```julia
-df = DataFrame(sample = String[], population = String[])
+# read population origin into a dataframe
+file = joinpath(normpath(MendelImpute.datadir()), "1000genomes.population.txt")
+df = CSV.read(file)
+
+# create dictionary with key = ID, value = population 
 refID_to_population = Dict{String, String}()
-for population in readdir("data/")
-    population == ".DS_Store" && continue # skip auxiliary files
-    for sample in readdir("data/" * population)
-        sample == ".DS_Store" && continue # skip auxiliary files
-        push!(df, (sample, population))
-        refID_to_population[sample] = population
-    end
+for (id, population) in eachrow(df)
+     refID_to_population[id] = population
 end
 refID_to_population
 ```
@@ -99,7 +49,7 @@ refID_to_population
 
 
 
-    Dict{String,String} with 2709 entries:
+    Dict{String,String} with 2504 entries:
       "HG01791" => "GBR"
       "HG02736" => "PJL"
       "HG00182" => "FIN"
@@ -111,7 +61,6 @@ refID_to_population
       "NA19835" => "ASW"
       "NA19019" => "LWK"
       "HG01131" => "CLM"
-      "HG03725" => "ITU"
       "HG03578" => "MSL"
       "NA18550" => "CHB"
       "HG02401" => "CDX"
@@ -120,14 +69,17 @@ refID_to_population
       "NA07000" => "CEU"
       "HG01709" => "IBS"
       "HG01395" => "PUR"
-      "HG02388" => "CDX"
       "HG01980" => "PEL"
       "HG01979" => "PEL"
       "HG01122" => "CLM"
       "HG03869" => "ITU"
+      "HG03729" => "ITU"
+      "NA19920" => "ASW"
       ⋮         => ⋮
 
 
+
+Note the [population codes](ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/1000_genomes_project/data/) for 1000 genome's samples are explained [here](https://www.internationalgenome.org/category/population/). 
 
 ### Step 3. Compute phase information using MendelImpute
 
@@ -151,31 +103,32 @@ outfile = "mendel.imputed.jlso"
 
 
     [32mComputing optimal haplotypes...100%|████████████████████| Time: 0:00:22[39m
+    [32mPhasing...100%|█████████████████████████████████████████| Time: 0:00:05[39m
 
 
     Total windows = 1634, averaging ~ 508 unique haplotypes per window.
     
     Timings: 
-        Data import                     = 13.1989 seconds
-            import target data             = 3.39344 seconds
-            import compressed haplotypes   = 9.80547 seconds
-        Computing haplotype pair        = 22.7262 seconds
-            BLAS3 mul! to get M and N      = 0.990657 seconds per thread
-            haplopair search               = 17.9241 seconds per thread
-            initializing missing           = 0.0950638 seconds per thread
-            allocating and viewing         = 0.262792 seconds per thread
-            index conversion               = 0.0134224 seconds per thread
-        Phasing by win-win intersection = 4.74799 seconds
-            Window-by-window intersection  = 0.490777 seconds per thread
-            Breakpoint search              = 3.28471 seconds per thread
-            Recording result               = 0.00808895 seconds per thread
-        Imputation                     = 3.06857 seconds
-            Imputing missing               = 0.0608952 seconds
-            Writing to file                = 3.00767 seconds
+        Data import                     = 12.7096 seconds
+            import target data             = 3.12892 seconds
+            import compressed haplotypes   = 9.58064 seconds
+        Computing haplotype pair        = 23.0121 seconds
+            BLAS3 mul! to get M and N      = 1.01843 seconds per thread
+            haplopair search               = 18.2076 seconds per thread
+            initializing missing           = 0.0986759 seconds per thread
+            allocating and viewing         = 0.281521 seconds per thread
+            index conversion               = 0.0112288 seconds per thread
+        Phasing by win-win intersection = 5.48517 seconds
+            Window-by-window intersection  = 0.52932 seconds per thread
+            Breakpoint search              = 3.76968 seconds per thread
+            Recording result               = 0.138674 seconds per thread
+        Imputation                     = 3.11584 seconds
+            Imputing missing               = 0.0584283 seconds
+            Writing to file                = 3.05742 seconds
     
-        Total time                      = 43.917 seconds
+        Total time                      = 44.4688 seconds
     
-     51.409108 seconds (99.91 M allocations: 5.675 GiB, 4.56% gc time)
+     50.548123 seconds (94.73 M allocations: 5.402 GiB, 4.15% gc time)
 
 
 ## Estimate admixture proportions
@@ -237,6 +190,45 @@ sample_population
 
 
 
+
+```julia
+# here is our sample population (sample 1 is GBR, 4 is CHS, 84 is LWK...etc)
+sample_population
+```
+
+
+
+
+    100-element Array{String,1}:
+     "GBR"
+     "FIN"
+     "CHS"
+     "CHS"
+     "CDX"
+     "CDX"
+     "PUR"
+     "PUR"
+     "PUR"
+     "PUR"
+     "GBR"
+     "CLM"
+     "IBS"
+     ⋮
+     "MXL"
+     "ASW"
+     "ASW"
+     "TSI"
+     "TSI"
+     "TSI"
+     "TSI"
+     "TSI"
+     "TSI"
+     "TSI"
+     "GIH"
+     "GIH"
+
+
+
 ### Step 2: call `composition` function
 
 The [composition](https://openmendel.github.io/MendelImpute.jl/dev/man/api/#MendelImpute.composition) will compute a list of percentages where `composition[i]` equals the sample's ancestry (in %) from `populations[i]`. We are finally using the imputation result stored in `ph`.
@@ -249,38 +241,38 @@ populations = MendelImpute.unique_populations(refID_to_population)
 @time sample84_comp = composition(ph[84], panelID, refID_to_population) # origin LWK
 ```
 
-      0.003916 seconds (28 allocations: 2.719 KiB)
-      0.000336 seconds (8 allocations: 1.250 KiB)
-      0.000370 seconds (8 allocations: 1.250 KiB)
+      0.004058 seconds (28 allocations: 2.719 KiB)
+      0.000344 seconds (8 allocations: 1.250 KiB)
+      0.000341 seconds (8 allocations: 1.250 KiB)
 
 
 
 
 
     26-element Array{Float64,1}:
-     0.03159153536944775
+     0.031664555855883895
      0.004281873442329377
      0.0183269450383178
      0.0025138200248509064
      0.0014987155576730166
-     0.11780598576459632
+     0.1175713625622769
      0.0104802353893189
-     0.21297801484829695
+     0.21298280307691572
      0.0338623527918964
-     0.004151394212468068
-     0.07204967308369105
+     0.07203411134068007
      0.0002681408026507634
      0.004550014244980141
+     0.004151394212468068
      0.013386690160908423
      0.06359485840010917
      0.006903428611102466
      0.0006188785489751994
      0.1910251836884204
-     0.01634940661876842
+     0.016276386132332274
      0.06281796830671477
      0.0004357288043074905
      0.003690527207912069
-     0.11661611095283356
+     0.11686150766954519
      0.006875896296544575
      0.0028884989142691606
      0.0004381229186168723
@@ -305,7 +297,7 @@ bar!(barplot, sample84_comp, label="Sample 84 (LWK)", alpha=0.8)
 
 
 
-![svg](output_17_0.svg)
+![svg](output_15_0.svg)
 
 
 
@@ -340,7 +332,7 @@ goodcolors = [colorant"#c8c8ff", colorant"#ffeaea", colorant"#ffbfbf", colorant"
 
 
 
-![svg](output_19_0.svg)
+![svg](output_17_0.svg)
 
 
 
@@ -356,9 +348,9 @@ populations = unique_populations(refID_to_population)
 @time sample84_s1_comp, sample84_s2_comp = paint(ph[84], panelID, refID_to_population);
 ```
 
-      0.000260 seconds (12 allocations: 19.125 KiB)
-      0.000234 seconds (12 allocations: 20.375 KiB)
-      0.000252 seconds (12 allocations: 22.875 KiB)
+      0.000263 seconds (12 allocations: 19.125 KiB)
+      0.000252 seconds (12 allocations: 20.375 KiB)
+      0.000269 seconds (12 allocations: 22.875 KiB)
 
 
 ### Step 3: Generate plots for painted chromosomes
@@ -426,10 +418,14 @@ chrom_plt = groupedbar(mydata, bar_position = :stack, bar_width=0.7, label=:none
     ytickfont=font(12), xtickfont=font(12), xrotation=20)
 ```
 
+    ┌ Info: Precompiling StatsPlots [f3b207a7-027a-5e70-b257-86293d7955fd]
+    └ @ Base loading.jl:1278
 
 
 
-![svg](output_24_0.svg)
+
+
+![svg](output_22_1.svg)
 
 
 
