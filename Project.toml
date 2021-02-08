@@ -29,6 +29,7 @@ BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 
 [targets]
-test = ["Test", "CSV", "BenchmarkTools", "Statistics"]
+test = ["Test", "CSV", "BenchmarkTools", "Statistics", "DataFrames"]

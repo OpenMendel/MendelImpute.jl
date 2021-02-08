@@ -11,15 +11,14 @@
 Main function of MendelImpute program. Phasing (haplotying) of `tgtfile` from a
 pool of haplotypes `reffile` by sliding windows and saves result in `outfile`.
 All SNPs in `tgtfile` must be present in `reffile`. Per-SNP quality score will
-be saved in `outfile, while per-sample imputation score will be saved in a file
+be saved in `outfile`, while per-sample imputation score will be saved in a file
 ending in `sample.error`.
 
 # Input
 - `tgtfile`: VCF or PLINK files. VCF files should end in `.vcf` or `.vcf.gz`.
     PLINK files should exclude `.bim/.bed/.fam` trailings but the trio must all
     be present in the same directory.
-- `reffile`: Reference haplotype file ending in `.vcf`, `.vcf.gz`, or `.jlso` 
-    (compressed binary files).
+- `reffile`: Reference haplotype file ending in `.jlso` (compressed binary files).
 - `outfile`: output filename ending in `.vcf.gz`, `.vcf`, or `.jlso`. VCF output
     genotypes will have no missing data. If ending in `.jlso`, will output
     ultra-compressed data structure recording `HaplotypeMosaicPair`s for 
@@ -80,10 +79,9 @@ function phase(
     println("Importing reference haplotype data..."); flush(stdout)
     ref_import_start = time()
     if endswith(reffile, ".jlso")
-        loaded = JLSO.load(reffile)
-        compressed_Hunique = loaded[:compressed_Hunique]
+        compressed_Hunique = read_jlso(reffile)
     elseif endswith(reffile, ".vcf") || endswith(reffile, ".vcf.gz")
-        error("reference panel is in VCF for: please first compress reference" *
+        error("reference panel is VCF format: please first compress reference" *
             " file to .jlso format using the compress_haplotypes() function.")
     elseif endswith(reffile, ".jld2")
         @load reffile compressed_Hunique 

@@ -7,6 +7,7 @@ using CSV
 using Statistics
 using GeneticVariation
 using BenchmarkTools
+using DataFrames
 
 # change directory to where data is located
 cd(normpath(MendelImpute.datadir()))
@@ -180,11 +181,11 @@ end
     @test error_rate ≈ 0.0007129190583146162
 
     # check per-sample error
-    quality = CSV.read("imputed.sample.error")
+    quality = CSV.read("imputed.sample.error", DataFrame)
     @test size(quality, 1) == 100
-    @test count(isone, quality[:error]) == 65
-    @test mean(quality[:error]) ≈ 0.9996911073712372
-    @test std(quality[:error]) ≈ 0.0006256546642253605
+    @test count(isone, quality[!, :error]) == 65
+    @test mean(quality[!, :error]) ≈ 0.9996911073712372
+    @test std(quality[!, :error]) ≈ 0.0006256546642253605
 
     # check per-SNP error
     reader = VCF.Reader(openvcf(outfile, "r"))
