@@ -9,9 +9,9 @@
 Download and install [Julia](https://julialang.org/downloads/). Within Julia, copy and paste the following: 
 ```julia
 using Pkg
-Pkg.add(PackageSpec(url="https://github.com/OpenMendel/SnpArrays.jl.git"))
-Pkg.add(PackageSpec(url="https://github.com/OpenMendel/VCFTools.jl.git"))
-Pkg.add(PackageSpec(url="https://github.com/OpenMendel/MendelImpute.jl.git"))
+pkg"add https://github.com/OpenMendel/SnpArrays.jl"
+pkg"add https://github.com/OpenMendel/VCFTools.jl"
+pkg"add https://github.com/OpenMendel/MendelImpute.jl"
 ```
 This package supports Julia `v1.5`+.
 
