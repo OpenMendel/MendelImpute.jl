@@ -527,6 +527,5 @@ Imports a `.jlso`-compressed reference haplotype panel.
 """
 function read_jlso(reffile::AbstractString)
     loaded = JLSO.load(reffile)
-    compressed_Hunique = loaded[:compressed_Hunique]
-    return compressed_Hunique
+    return loaded[:compressed_Hunique]
 end
