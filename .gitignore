@@ -4,6 +4,7 @@
 .DS_Store
 .ipynb_checkpoints
 biona001@hoffman2.idre.ucla.edu
+*.sample.error
 
 # don't track real data
 AFRped_geno.txt
@@ -48,9 +49,7 @@ docs/src/man/*.jlso
 
 
 data/1000_genome_phase3_v5/filtered/error.png
-
 data/1000_genome_phase3_v5/filtered/mendel.chr20.imputed.sample.error
-
 data/HRC/snpscores.txt
-
 data/HRC/mendel.chr10.imputed.target.sample.error
+data/ukbb

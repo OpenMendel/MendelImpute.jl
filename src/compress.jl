@@ -374,7 +374,7 @@ function compress_haplotypes(H::AbstractMatrix, outfile::AbstractString,
     any(isnothing, XtoH_idx) && error("Found SNPs in target " * 
         "file that are not in reference file! Please filter them out first!")
     Hw_typed = H[XtoH_idx, :]        # H with only typed snps
-    window_ranges = get_window_intervals(Hw_typed, d, minwidth)
+    window_ranges, mapping_typed = get_window_intervals(Hw_typed, d, minwidth)
     wins = length(window_ranges)
 
     # initialize compressed haplotype object
@@ -428,18 +428,17 @@ function compress_haplotypes(H::AbstractMatrix, outfile::AbstractString,
             hapmap, complete_to_unique, uniqueH)
 
         # find unique haplotypes on typed SNPs
-        mapping_typed = groupslices(Hw_typed, dims = 2)
-        unique_idx_typed = unique(mapping_typed)
+        unique_idx_typed = unique(mapping_typed[w])
         hapmap_typed = Dict{Int32, Vector{Int32}}()
         for idx in unique_idx_typed
-            redundant_haplotypes = findall(x -> x == idx, mapping_typed)
+            redundant_haplotypes = findall(x -> x == idx, mapping_typed[w])
             if length(redundant_haplotypes) == 1
                 continue # skip singletons
             else
                 hapmap_typed[idx] = redundant_haplotypes
             end
         end
-        complete_to_unique_typed = indexin(mapping_typed, unique_idx_typed)
+        complete_to_unique_typed = indexin(mapping_typed[w], unique_idx_typed)
         uniqueH_typed = Hw_typed[:, unique_idx_typed]
         compressed_Hunique.CW_typed[w] = 
             MendelImpute.CompressedWindow(unique_idx_typed, hapmap_typed, 
@@ -487,20 +486,21 @@ function get_window_intervals(
     low::Int=1, 
     high::Int=size(H, 1),
     intervals = UnitRange[],
+    unique_columns_maps = Vector{Vector{Int}}(),
     seen=BitSet(),
     )
-
     mid = (low + high) >> 1
-    unique_columns_maps = groupslices(view(H, low:high, :), dims = 2)
-    k = count_unique(unique_columns_maps, seen)
+    unique_columns_map = groupslices(view(H, low:high, :), dims = 2)
+    k = count_unique(unique_columns_map, seen)
     if k ≤ d || length(low:mid) ≤ minwidth
         push!(intervals, low:high)
+        push!(unique_columns_maps, unique_columns_map)
     else
-        get_window_intervals(H, d, minwidth, low,     mid,  intervals, seen)
-        get_window_intervals(H, d, minwidth, mid + 1, high, intervals, seen)
+        get_window_intervals(H, d, minwidth, low,     mid,  intervals, unique_columns_maps, seen)
+        get_window_intervals(H, d, minwidth, mid + 1, high, intervals, unique_columns_maps, seen)
     end
 
-    return sort!(intervals)
+    return intervals, unique_columns_maps
 end
 
 """

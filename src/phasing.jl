@@ -121,6 +121,12 @@ function phase(
             " files (ends in .vcf or .vcf.gz) or PLINK files (do not include" *
             " .bim/bed/fam and all three files must exist in 1 directory)")
     end
+    XtoH_idx = indexin(X_pos, compressed_Hunique.pos)
+    if any(isnothing, XtoH_idx)
+        snp = X_ids[findfirst(isnothing, XtoH_idx)]
+        error("SNP $snp is in target genotype file but is not in reference file!" * 
+            "All SNPs in target genotype file must be in reference file!")
+    end
     genotype_import_time = time() - genotype_import_start
     import_data_time = time() - ref_import_start
 
@@ -173,7 +179,6 @@ function phase(
     #
     impute_start = time()
     write_time = 0.0
-    XtoH_idx = indexin(X_pos, compressed_Hunique.pos)
     if ultra_compress # output is jlso extension
         # convert phase's starting position from X's index to H's index
         update_marker_position!(ph, XtoH_idx)
