@@ -174,7 +174,7 @@ function phase(
     impute_start = time()
     write_time = 0.0
     XtoH_idx = indexin(X_pos, compressed_Hunique.pos)
-    if ultra_compress # output ultra-compressed, phased genotypes in 
+    if ultra_compress # output is jlso extension
         # convert phase's starting position from X's index to H's index
         update_marker_position!(ph, XtoH_idx)
 
@@ -561,6 +561,17 @@ function phase_fast!(
     return sum(timers) ./ Threads.nthreads()
 end
 
+"""
+    phase_fast_compressed!(ph, X, compressed_Hunique, haplotype1, haplotype2)
+
+Updates `ph` for the eventual goal of outputting a `.jlso` ultra-compressed 
+phased and imputed genotypes. Ancestry inference depends on this part of the code. 
+
+# Developer's notes:
+This function is very similar to `phase_fast!`. The main difference is:
++ Since reference samples potentally have different origins, `ph` records the
+    haplotype index corresponding to the (complete) reference panel.
+"""
 function phase_fast_compressed!(
     ph::Vector{HaplotypeMosaicPair},
     X::AbstractMatrix{Union{Missing, T}},
