@@ -32,6 +32,7 @@ data/1000_genome_phase3_v5/*/*.gz
 data/1000_genome_phase3_v5/*/*.jlso
 data/HRC/*.gz
 data/HRC/*.jlso
+data/omni_chips
 docs/src/man/*.gz
 docs/src/man/*.jlso
 *.m3vcf

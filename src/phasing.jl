@@ -105,7 +105,7 @@ function phase(
         dosage && error("PLINK files detected but dosage = true!")
         # convert SnpArray data to matrix.
         X_snpdata = SnpArrays.SnpData(tgtfile)
-        X = convert(Matrix{Union{UInt8, Missing}}, X_snpdata.snparray')
+        X = convert(Matrix{Union{UInt8, Missing}}, Transpose(X_snpdata.snparray))
         X[findall(isone, X)] .= missing     # 0x01 encodes missing
         X[findall(x -> x === 0x02, X)] .= 1 # 0x02 is 1
         X[findall(x -> x === 0x03, X)] .= 2 # 0x03 is 2
