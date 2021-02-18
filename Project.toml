@@ -2,9 +2,11 @@ name = "MendelImpute"
 uuid = "e47305d1-6a61-5370-bc5d-77554d143183"
 keywords = ["Imputation"]
 authors = ["Benjamin Chu <biona001@ucla.edu>", "Eric Sobel <esobel@ucla.edu>", "Hua Zhou <huazhou@ucla.edu>"]
-version = "0.0.0"
+version = "1.1.0"
 
 [deps]
+CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 Distances = "b4f34e82-e78d-54a5-968a-f98e89d6e8f7"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 FileIO = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
@@ -19,6 +21,7 @@ Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 SnpArrays = "4e780e97-f5bf-4111-9dc4-b70aaf691b06"
 SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
+StatsPlots = "f3b207a7-027a-5e70-b257-86293d7955fd"
 VCFTools = "a620830f-fdd7-5ebc-8d26-3621ab35fbfe"
 
 [compat]
@@ -27,9 +30,9 @@ Documenter = ">=0.20"
 [extras]
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
-DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 
 [targets]
 test = ["Test", "CSV", "BenchmarkTools", "Statistics", "DataFrames"]
