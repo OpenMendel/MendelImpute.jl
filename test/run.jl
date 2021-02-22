@@ -2748,3 +2748,32 @@ using VCFTools
 cd("/Users/biona001/.julia/dev/MendelImpute/simulation/compare2")
 vcf = "mendel.imputed.vcf.gz"
 reader = VCF.Reader(openvcf(vcf, "r"))
+
+
+
+
+# test BGEN
+using BGEN
+b = Bgen(BGEN.datadir("example.8bits.bgen"); 
+    sample_path=BGEN.datadir("example.sample"), 
+    idx_path=BGEN.datadir("example.8bits.bgen.bgi"))
+
+variants = parse_variants(b; from_bgen_start=true);
+minor_allele_dosage!(b, variants[1]; T=Float32)
+
+v = variants[1]
+
+function convert_gt(b::Bgen, T=Float64)
+    n = n_samples(b)
+    p = n_variants(b)
+    G = Matrix{T}(undef, p, n)
+    # loop over each variant
+    row = 1
+    for v in iterator(b; from_bgen_start=true)
+        copyto!(@view(G[row, :]), minor_allele_dosage!(b, v; T=T))
+        row += 1
+        clear!(v)
+    end
+    return G
+end
+G = convert_gt(b, Float32)
