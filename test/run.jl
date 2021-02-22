@@ -2757,23 +2757,62 @@ using BGEN
 b = Bgen(BGEN.datadir("example.8bits.bgen"); 
     sample_path=BGEN.datadir("example.sample"), 
     idx_path=BGEN.datadir("example.8bits.bgen.bgi"))
+b = Bgen(BGEN.datadir("haplotypes.bgen"); 
+    idx_path=BGEN.datadir("haplotypes.bgen.bgi"))
 
 variants = parse_variants(b; from_bgen_start=true);
 minor_allele_dosage!(b, variants[1]; T=Float32)
-
+probabilities!(b, variants[1]; T=Float32)
 v = variants[1]
 
-function convert_gt(b::Bgen, T=Float64)
+function convert_gt(b::Bgen, T=Float32)
     n = n_samples(b)
     p = n_variants(b)
+
+    # return arrays
     G = Matrix{T}(undef, p, n)
+    GsampleID = Vector{String}(undef, n)
+    Gchr = Vector{String}(undef, p)
+    Gpos = Vector{String}(undef, p)
+    GsnpID = Vector{String}(undef, p)
+    Gref = Vector{String}(undef, p)
+    Galt = Vector{String}(undef, p)
+
     # loop over each variant
-    row = 1
+    i = 1
     for v in iterator(b; from_bgen_start=true)
-        copyto!(@view(G[row, :]), minor_allele_dosage!(b, v; T=T))
-        row += 1
+        dose = minor_allele_dosage!(b, v; T=T)
+        copyto!(@view(G[i, :]), dose)
+        chr[i], pos[i], snpID[i], ref[i], alt[i] = chrom(v), pos(v), rsid(v),
+            major_allele(v), minor_allele(v)
+        i += 1
         clear!(v)
     end
-    return G
+    return G, sampleID, chr, pos, snpID, ref, alt
 end
-G = convert_gt(b, Float32)
+G, sampleID, chr, pos, snpID, ref, alt = convert_gt(b)
+
+
+
+b2 = Bgen(BGEN.datadir("complex.bgen"))
+vs = parse_variants(b2)
+p = probabilities!(b2, vs[1]) #ploidy 1
+
+n_samples(b2)
+n_variants(b2)
+
+
+b = Bgen(BGEN.datadir("example.8bits.bgen"); 
+    sample_path=BGEN.datadir("example.sample"), 
+    idx_path=BGEN.datadir("example.8bits.bgen.bgi"))
+
+
+
+
+using BGEN, VCFTools
+cd("/Users/biona001/Desktop/qctool_v2.0.8-osx")
+nsamples("ref.excludeTarget.vcf"), nrecords("ref.excludeTarget.vcf")
+b = Bgen("ref.excludeTarget.bgen")
+variants = parse_variants(b; from_bgen_start=true);
+v = variants[1]
+probabilities!(b, v; T=Float32)

@@ -1,28 +1,55 @@
-# TODO index files
-function convert_gt(b::Bgen, T=Float64)
+###### This file is part of the MendelImpute.jl package.
+###### These are wrapper functions for importing VCF/PLINK/BGEN target
+###### and reference files. 
+
+function convert_gt(b::Bgen, T=Float32)
     n = n_samples(b)
     p = n_variants(b)
-    
+
     # return arrays
     G = Matrix{T}(undef, p, n)
-    sampleID = Vector{String}(undef, n)
-    chr = Vector{String}(undef, p)
-    pos = Vector{String}(undef, p)
-    snpID = Vector{String}(undef, p)
-    ref = Vector{String}(undef, p)
-    alt = Vector{String}(undef, p)
+    Gchr = Vector{String}(undef, p)
+    Gpos = Vector{String}(undef, p)
+    GsnpID = Vector{String}(undef, p)
+    Gref = Vector{String}(undef, p)
+    Galt = Vector{String}(undef, p)
 
     # loop over each variant
     i = 1
     for v in iterator(b; from_bgen_start=true)
         dose = minor_allele_dosage!(b, v; T=T)
         copyto!(@view(G[i, :]), dose)
-        chr[i], pos[i], snpID[i], ref[i], alt[i] = chrom(v), pos(v), rsid(v),
-            major_allele(v), minor_allele(v)
+        Gchr[i], pos[i], GsnpID[i], Gref[i], Galt[i] =
+            chrom(v), pos(v), rsid(v), major_allele(v), minor_allele(v)
         i += 1
         clear!(v)
     end
-    return G, sampleID, chr, pos, snpID, ref, alt
+    return G, chr, pos, snpID, ref, alt
+end
+
+function convert_ht(b::Bgen)
+    n = 2n_samples(b)
+    p = n_variants(b)
+
+    # return arrays
+    H = BitMatrix(undef, p, n)
+    Hchr = Vector{String}(undef, p)
+    Hpos = Vector{String}(undef, p)
+    HsnpID = Vector{String}(undef, p)
+    Href = Vector{String}(undef, p)
+    Halt = Vector{String}(undef, p)
+
+    # loop over each variant
+    i = 1
+    for v in iterator(b; from_bgen_start=true)
+        dose = probabilities!(b, v; T=Bool)
+        # copyto!(@view(G[i, :]), dose)
+        # Hchr[i], Hpos[i], HsnpID[i], Href[i], Halt[i] =
+        #     chrom(v), pos(v), rsid(v), major_allele(v), minor_allele(v)
+        i += 1
+        clear!(v)
+    end
+    return H, chr, pos, snpID, ref, alt
 end
 
 isplink(tgtfile::AbstractString) = isfile(tgtfile * ".bed") && 
@@ -39,8 +66,12 @@ function import_target(tgtfile::AbstractString, dosage=false)
             VCFTools.convert_ds(Float32, tgtfile, trans=true, 
             save_snp_info=true, msg = "Importing genotype file as dosages...")
     elseif endswith(tgtfile, ".bgen")
-        X, X_sampleID, X_chr, X_pos, X_ids, X_ref, X_alt = 
-            convert_gt(tgtfile, Float32)
+        samplefile = tgtfile[1:end-5] * ".sample"
+        isfile(samplefile) || error("sample file $samplefile not found!")
+        indexfile = isfile(tgtfile * ".bgi") ? tgtfile * ".bgi" : nothing
+        bgen = Bgen(tgtfile; sample_path=samplefile, idx_path=indexfile)
+        X, X_chr, X_pos, X_ids, X_ref, X_alt = convert_gt(bgen, Float32)
+        X_sampleID = BGEN.get_samples(samplefile, n_samples(b))
     elseif isplink(tgtfile)
         dosage && error("PLINK files detected but dosage = true!")
         # convert SnpArray data to matrix.
@@ -87,11 +118,16 @@ end
 
 function import_reference(reffile::AbstractString)
     if endswith(reffile, ".vcf") || endswith(reffile, ".vcf.gz")
-        H, H_sampleID, H_chr, H_pos, H_ids, H_ref, H_alt = convert_ht(Bool, 
-            reffile, trans=true, save_snp_info=true, 
+        H, H_sampleID, H_chr, H_pos, H_ids, H_ref, H_alt = 
+            VCFTools.convert_ht(Bool, reffile, trans=true, save_snp_info=true, 
             msg="importing reference data...")
     elseif endswith(reffile, ".bgen")
-        # TODO
+        samplefile = reffile[1:end-5] * ".sample"
+        isfile(samplefile) || error("sample file $samplefile not found!")
+        indexfile = isfile(reffile * ".bgi") ? reffile * ".bgi" : nothing
+        bgen = Bgen(reffile; sample_path=samplefile, idx_path=indexfile)
+        H, H_chr, H_pos, H_ids, H_ref, H_alt = convert_ht(bgen)
+        H_sampleID = BGEN.get_samples(samplefile, n_samples(b))
     else
         error("Unrecognized reference file format: only VCF (ends in .vcf" * 
             " or .vcf.gz) or BGEN (ends in .bgen) files are accepted.")
