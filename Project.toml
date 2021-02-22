@@ -5,6 +5,7 @@ authors = ["Benjamin Chu <biona001@ucla.edu>", "Eric Sobel <esobel@ucla.edu>", "
 version = "1.1.0"
 
 [deps]
+BGEN = "6db4b851-9beb-4b83-9d64-eb1cfb37721d"
 CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 Distances = "b4f34e82-e78d-54a5-968a-f98e89d6e8f7"

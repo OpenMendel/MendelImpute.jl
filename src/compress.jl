@@ -317,34 +317,9 @@ function compress_haplotypes(
         "`.jlso` or `.jld2`")
     0.0 ≤ overlap ≤ 1.0 || error("overlap must be a percentage")
 
-    if endswith(tgtfile, ".vcf") || endswith(tgtfile, ".vcf.gz")
-        X, X_sampleID, X_chr, X_pos, X_ids, X_ref, X_alt = 
-            VCFTools.convert_gt(UInt8, tgtfile, trans=true, 
-            save_snp_info=true, msg = "Importing genotype file...")
-    elseif isplink(tgtfile)
-        # convert SnpArray data to matrix.
-        X_snpdata = SnpArrays.SnpData(tgtfile)
-        X = convert(Matrix{Union{UInt8, Missing}}, Transpose(X_snpdata.snparray))
-        X[findall(isone, X)] .= missing     # 0x01 encodes missing
-        X[findall(x -> x === 0x02, X)] .= 1 # 0x02 is 1
-        X[findall(x -> x === 0x03, X)] .= 2 # 0x03 is 2
-        # get other relevant information
-        X_sampleID = X_snpdata.person_info[!, :iid]
-        X_chr = X_snpdata.snp_info[!, :chromosome]
-        X_pos = X_snpdata.snp_info[!, :position]
-        X_ids = X_snpdata.snp_info[!, :snpid]
-        X_ref = X_snpdata.snp_info[!, :allele1]
-        X_alt = X_snpdata.snp_info[!, :allele2]
-    else
-        error("Unrecognized target file format: target file can only be VCF" *
-            " files (ends in .vcf or .vcf.gz) or PLINK files (do not include" *
-            " .bim/bed/fam and all three files must exist in 1 directory)")
-    end    
-    
-    # import reference haplotypes
-    H, H_sampleID, H_chr, H_pos, H_ids, H_ref, H_alt = convert_ht(Bool, 
-        reffile, trans=true, save_snp_info=true, 
-        msg="importing reference data...")
+    # import target genotypes and reference haplotypes
+    X, X_sampleID, X_chr, X_pos, X_ids, X_ref, X_alt = import_target(tgtfile)
+    H, H_sampleID, H_chr, H_pos, H_ids, H_ref, H_alt = import_reference(reffile)
     any(isnothing, indexin(X_pos, H_pos)) && error("Found SNPs in target " * 
         "file that are not in reference file! Please filter them out first!")
 

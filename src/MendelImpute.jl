@@ -6,6 +6,7 @@ module MendelImpute
     using GeneticVariation
     using VCFTools
     using SnpArrays
+    using BGEN
     using GroupSlices
     using Random
     using ProgressMeter
@@ -32,6 +33,7 @@ module MendelImpute
     include("intersect.jl")
     include("painting.jl")
     include("ultra_compress.jl")
+    include("read.jl")
 
     # test data directory
     datadir(parts...) = joinpath(@__DIR__, "..", "data", parts...)    
