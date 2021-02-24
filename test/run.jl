@@ -2808,11 +2808,17 @@ b = Bgen(BGEN.datadir("example.8bits.bgen");
 
 
 
-
-using BGEN, VCFTools
+using Revise, MendelImpute
+using BGEN, VCFTools, BGEN
 cd("/Users/biona001/Desktop/qctool_v2.0.8-osx")
+
 nsamples("ref.excludeTarget.vcf"), nrecords("ref.excludeTarget.vcf")
 b = Bgen("ref.excludeTarget.bgen")
 variants = parse_variants(b; from_bgen_start=true);
 v = variants[1]
 probabilities!(b, v; T=Float32)
+
+Gtest = MendelImpute.import_target("ref.excludeTarget.bgen")
+
+Htest = MendelImpute.import_reference("ref.excludeTarget.bgen")
+Htrue = convert_ht(Bool, "ref.excludeTarget.vcf", trans=true)

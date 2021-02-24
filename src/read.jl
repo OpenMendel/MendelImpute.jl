@@ -19,12 +19,12 @@ function convert_gt(b::Bgen, T=Float32)
     for v in iterator(b; from_bgen_start=true)
         dose = minor_allele_dosage!(b, v; T=T)
         copyto!(@view(G[i, :]), dose)
-        Gchr[i], pos[i], GsnpID[i], Gref[i], Galt[i] =
+        Gchr[i], Gpos[i], GsnpID[i], Gref[i], Galt[i] =
             chrom(v), pos(v), rsid(v), major_allele(v), minor_allele(v)
         i += 1
         clear!(v)
     end
-    return G, chr, pos, snpID, ref, alt
+    return G, Gchr, Gpos, GsnpID, Gref, Galt
 end
 
 function convert_ht(b::Bgen)
@@ -34,7 +34,7 @@ function convert_ht(b::Bgen)
     # return arrays
     H = BitMatrix(undef, p, n)
     Hchr = Vector{String}(undef, p)
-    Hpos = Vector{String}(undef, p)
+    Hpos = Vector{Int}(undef, p)
     HsnpID = Vector{String}(undef, p)
     Href = Vector{String}(undef, p)
     Halt = Vector{String}(undef, p)
@@ -42,15 +42,23 @@ function convert_ht(b::Bgen)
     # loop over each variant
     i = 1
     for v in iterator(b; from_bgen_start=true)
-        dose = probabilities!(b, v; T=Bool)
-        # copyto!(@view(G[i, :]), dose)
-        # Hchr[i], Hpos[i], HsnpID[i], Href[i], Halt[i] =
-        #     chrom(v), pos(v), rsid(v), major_allele(v), minor_allele(v)
+        # minor_allele_dosage!(b, v)
+        dose = probabilities!(b, v)
+        for j in 1:n_samples(b)
+            Hi = @view(dose[:, j])
+            H[i, 2j - 1] = read_haplotype1(Hi)
+            H[i, 2j] = read_haplotype2(Hi)
+        end
+        Hchr[i], Hpos[i], HsnpID[i], Href[i], Halt[i] =
+            chrom(v), pos(v), rsid(v), major_allele(v), minor_allele(v)
         i += 1
         clear!(v)
     end
-    return H, chr, pos, snpID, ref, alt
+    return H, Hchr, Hpos, HsnpID, Href, Halt
 end
+
+read_haplotype1(Hi::AbstractVector) = Hi[2] ≥ 1 ? true : false
+read_haplotype2(Hi::AbstractVector) = Hi[4] ≥ 1 ? true : false
 
 isplink(tgtfile::AbstractString) = isfile(tgtfile * ".bed") && 
                                    isfile(tgtfile * ".fam") && 
@@ -67,7 +75,7 @@ function import_target(tgtfile::AbstractString, dosage=false)
             save_snp_info=true, msg = "Importing genotype file as dosages...")
     elseif endswith(tgtfile, ".bgen")
         samplefile = tgtfile[1:end-5] * ".sample"
-        isfile(samplefile) || error("sample file $samplefile not found!")
+        # isfile(samplefile) || error("sample file $samplefile not found!")
         indexfile = isfile(tgtfile * ".bgi") ? tgtfile * ".bgi" : nothing
         bgen = Bgen(tgtfile; sample_path=samplefile, idx_path=indexfile)
         X, X_chr, X_pos, X_ids, X_ref, X_alt = convert_gt(bgen, Float32)
