@@ -167,6 +167,7 @@ end
 end
 
 @testset "impute & phasing" begin
+    Random.seed!(2020)
     tgtfile = "target.typedOnly.masked.vcf.gz"
     reffile = "ref.excludeTarget.jlso"
     outfile = "imputed.vcf.gz"

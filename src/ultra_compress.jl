@@ -26,7 +26,7 @@ function convert_compressed(
     reffile::AbstractString
     ) where T <: Real
     endswith(phaseinfo, ".jlso") || error("phaseinfo does not end with '.jlso'")
-    H = convert_ht(Bool, reffile, trans=true, msg="importing reference data...")
+    H = VCFTools.convert_ht(Bool, reffile, trans=true, msg="importing reference data...")
     
     phase_and_sampleID = JLSO.load(phaseinfo)
     phase = phase_and_sampleID[:ph]
