@@ -42,7 +42,6 @@ function convert_ht(b::Bgen)
     # loop over each variant
     i = 1
     for v in iterator(b; from_bgen_start=true)
-        # minor_allele_dosage!(b, v)
         dose = probabilities!(b, v)
         for j in 1:n_samples(b)
             Hi = @view(dose[:, j])
@@ -57,8 +56,8 @@ function convert_ht(b::Bgen)
     return H, Hchr, Hpos, HsnpID, Href, Halt
 end
 
-read_haplotype1(Hi::AbstractVector) = Hi[2] ≥ 1 ? true : false
-read_haplotype2(Hi::AbstractVector) = Hi[4] ≥ 1 ? true : false
+read_haplotype1(Hi::AbstractVector) = Hi[2] ≥ 0.5 ? true : false
+read_haplotype2(Hi::AbstractVector) = Hi[4] ≥ 0.5 ? true : false
 
 isplink(tgtfile::AbstractString) = isfile(tgtfile * ".bed") && 
                                    isfile(tgtfile * ".fam") && 
@@ -141,4 +140,14 @@ function import_reference(reffile::AbstractString)
             " or .vcf.gz) or BGEN (ends in .bgen) files are accepted.")
     end
     return H, H_sampleID, H_chr, H_pos, H_ids, H_ref, H_alt
+end
+
+"""
+    read_jlso(file::AbstractString)
+
+Imports a `.jlso`-compressed reference haplotype panel.
+"""
+function read_jlso(reffile::AbstractString)
+    loaded = JLSO.load(reffile)
+    return loaded[:compressed_Hunique]
 end

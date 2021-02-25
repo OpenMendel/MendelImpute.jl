@@ -494,13 +494,3 @@ function count_unique(v::AbstractVector{<:Integer}, seen::AbstractSet=BitSet())
     end
     return s
 end
-
-"""
-    read_jlso(file::AbstractString)
-
-Imports a `.jlso`-compressed reference haplotype panel.
-"""
-function read_jlso(reffile::AbstractString)
-    loaded = JLSO.load(reffile)
-    return loaded[:compressed_Hunique]
-end
