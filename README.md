@@ -2,9 +2,7 @@
 
 | **Documentation** | **Build Status** | **Code Coverage**  |
 |-------------------|------------------|--------------------|
-| [![](https://img.shields.io/badge/docs-latest-blue.svg)](https://OpenMendel.github.io/MendelImpute.jl/dev/) [![](https://img.shields.io/badge/docs-stable-blue.svg)](https://OpenMendel.github.io/MendelImpute.jl/stable/) | [![Build Status](https://travis-ci.com/OpenMendel/MendelImpute.jl.svg?branch=master)](https://travis-ci.com/github/OpenMendel/MendelImpute.jl) [![build Actions Status](https://github.com/OpenMendel/MendelImpute.jl/workflows/CI/badge.svg)](https://github.com/OpenMendel/MendelImpute.jl/actions)
-| [![Coverage Status](https://coveralls.io/repos/github/OpenMendel/MendelImpute.jl/badge.svg?branch=master)](https://coveralls.io/github/OpenMendel/MendelImpute.jl?branch=master) [![codecov](https://codecov.io/gh/OpenMendel/MendelImpute.jl/branch/master/graph/badge.svg?token=YyPqiFpIM1)](https://codecov.io/gh/OpenMendel/MendelImpute.jl)
- |
+| [![](https://img.shields.io/badge/docs-latest-blue.svg)](https://OpenMendel.github.io/MendelImpute.jl/dev/) [![](https://img.shields.io/badge/docs-stable-blue.svg)](https://OpenMendel.github.io/MendelImpute.jl/stable/) | [![build Actions Status](https://github.com/OpenMendel/MendelImpute.jl/workflows/CI/badge.svg)](https://github.com/OpenMendel/MendelImpute.jl/actions) | [![codecov](https://codecov.io/gh/OpenMendel/MendelImpute.jl/branch/master/graph/badge.svg?token=YyPqiFpIM1)](https://codecov.io/gh/OpenMendel/MendelImpute.jl) |
 
 ## Installation
 
