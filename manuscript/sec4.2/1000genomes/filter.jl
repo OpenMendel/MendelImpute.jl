@@ -20,13 +20,13 @@ function filter_and_mask(chr::Int)
 #             des = "chr$chr.uniqueSNPs.vcf.gz", allow_multiallelic=false)
 
     # import VCF data with only unique SNPs
-    _, vcf_sampleID, _, vcf_record_pos, _, _, _ = convert_ht(Bool, 
+    _, vcf_sampleID, _, vcf_record_pos, _, _, _ = convert_gt(UInt8, 
         "chr$chr.uniqueSNPs.vcf.gz", save_snp_info=true, msg="importing")
     total_snps = length(vcf_record_pos)
     samples = length(vcf_sampleID)
 
     # generate target panel with all snps
-    n = 1000
+    n = 100
     sample_idx = falses(samples)
     sample_idx[1:n] .= true
     shuffle!(sample_idx)
@@ -37,7 +37,7 @@ function filter_and_mask(chr::Int)
     VCFTools.filter("chr$chr.uniqueSNPs.vcf.gz", 1:total_snps, 
         .!sample_idx, des = "ref.chr$chr.excludeTarget.vcf.gz", allow_multiallelic=false)
 
-    # generate target file with 1000 samples whose snps are in the omni 5.4 chip
+    # generate target file with 100 samples whose snps are in the UK Biobank
     bed = CSV.read("/home/biona001/omni_chips/InfiniumOmni5-4v1-2_A1.bed", 
         skipto = 2, header=false, delim='\t', DataFrame)
     typed_snppos = bed[findall(x -> x == "chr$chr", bed[!, 1]), 3]

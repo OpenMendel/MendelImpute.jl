@@ -16,3 +16,415 @@ unphasing and masking entries in target file with typed snps only
  34.897161 seconds (357.27 M allocations: 26.609 GiB, 5.02% gc time)
 5869.593264 seconds (46.23 G allocations: 3.378 TiB, 29.26% gc time)
 33364.073547 seconds (503.50 G allocations: 39.572 TiB, 16.06% gc time)
+
+signal (15): Terminated
+in expression starting at /home/biona001/HRC/filter.jl:58
+crc32_z at /home/biona001/.julia/artifacts/27bce23cfb763bc3cc8ccba62ee0a8f67b6f9d9e/lib/libz.so (unknown line)
+inflate at /home/biona001/.julia/artifacts/27bce23cfb763bc3cc8ccba62ee0a8f67b6f9d9e/lib/libz.so (unknown line)
+inflate! at /home/biona001/.julia/packages/CodecZlib/ruMLE/src/libz.jl:93 [inlined]
+process at /home/biona001/.julia/packages/CodecZlib/ruMLE/src/decompression.jl:163 [inlined]
+callprocess at /home/biona001/.julia/packages/TranscodingStreams/MsN8d/src/stream.jl:637
+#fillbuffer#11 at /home/biona001/.julia/packages/TranscodingStreams/MsN8d/src/stream.jl:577
+fillbuffer at /home/biona001/.julia/packages/TranscodingStreams/MsN8d/src/stream.jl:564 [inlined]
+eof at /home/biona001/.julia/packages/TranscodingStreams/MsN8d/src/stream.jl:188
+#countlines#326 at ./io.jl:1126
+countlines at ./io.jl:1122
+unknown function (ip: 0x7ff12d164931)
+_jl_invoke at /buildworker/worker/package_linux64/build/src/gf.c:2231 [inlined]
+jl_apply_generic at /buildworker/worker/package_linux64/build/src/gf.c:2398
+countvcflines at /home/biona001/.julia/packages/VCFTools/johUz/src/gtstats.jl:247
+nrecords at /home/biona001/.julia/packages/VCFTools/johUz/src/gtstats.jl:276
+#convert_gt#10 at /home/biona001/.julia/packages/VCFTools/johUz/src/convert.jl:274
+convert_gt##kw at /home/biona001/.julia/packages/VCFTools/johUz/src/convert.jl:273 [inlined]
+filter_and_mask at /home/biona001/HRC/filter.jl:21
+top-level scope at ./timing.jl:174
+jl_toplevel_eval_flex at /buildworker/worker/package_linux64/build/src/toplevel.c:834
+jl_parse_eval_all at /buildworker/worker/package_linux64/build/src/ast.c:913
+jl_load_rewrite at /buildworker/worker/package_linux64/build/src/toplevel.c:914
+include at ./Base.jl:380
+include at ./Base.jl:368
+_jl_invoke at /buildworker/worker/package_linux64/build/src/gf.c:2214 [inlined]
+jl_apply_generic at /buildworker/worker/package_linux64/build/src/gf.c:2398
+exec_options at ./client.jl:296
+_start at ./client.jl:506
+jfptr__start_43701.clone_1 at /usr/local/julia-1.5.0/lib/julia/sys.so (unknown line)
+_jl_invoke at /buildworker/worker/package_linux64/build/src/gf.c:2214 [inlined]
+jl_apply_generic at /buildworker/worker/package_linux64/build/src/gf.c:2398
+unknown function (ip: 0x401931)
+unknown function (ip: 0x401533)
+__libc_start_main at /lib64/libc.so.6 (unknown line)
+unknown function (ip: 0x4015d4)
+unknown function (ip: (nil))
+Allocations: 81145893 (Pool: 81120401; Big: 25492); GC: 60
+			IMPUTE v5
+	Simone Rubinacci and Jonathan Marchini, 2020
+
+Version: 1.1.4
+Usage: impute5 [options]
+
+List of options accepted:
+
+Input:
+  --h arg                           Haplotype reference panel in VCF/BCF/IMP5 
+                                    format (must have .vcf[.gz]/.bcf/.imp5 
+                                    extension). The file must be indexed 
+                                    (tabix/imp5 index).
+  --g arg                           File containing target haplotypes for a 
+                                    study cohort that you want to impute in 
+                                    VCF/BCF format (must have .vcf[.gz]/.bcf 
+                                    extension). The file must be indexed (tabix
+                                    index).
+  --m arg                           Fine-scale recombination map for the region
+                                    to be analyzed. If not specified, a 
+                                    constant recombination rate of 1cM per Mb 
+                                    is used.
+  --r arg                           Region to be imputed. Example --r 
+                                    20:1000000-5000000 (region within 
+                                    chromosome 20). Buffer parameter (--b) or 
+                                    buffer-region expand this region, if 
+                                    specified.
+  --buffer-region arg               Region to be imputed with a buffer at both 
+                                    the borders. Buffer-region must include the
+                                    imputed region (--r). If both the buffer 
+                                    options are used (--b and --buffer-region) 
+                                    only --buffer-region is used.
+  --b arg (=250)                    Length of buffer region (in kb) to include 
+                                    on each side of the analysis window 
+                                    specified by the -r option. Variants in the
+                                    buffer regions inform the inference but do 
+                                    not appear in output files. If both the 
+                                    buffer options are used (--b and 
+                                    --buffer-region) only --buffer-region is 
+                                    used.
+  --haploid                         Specifies the target samples are haploid in
+                                    the region (e.g. for males in non-PAR 
+                                    region on Chromosome X).
+
+State selection:
+  --pbwt-depth arg (=4)             Depth of PBWT indexes to condition on
+  --pbwt-cm arg (=0.02)             Frequency of the selection algorithm in cM
+  --ohapcopy [=arg(=hapcopy.list)]  Output a file for each target haplotype. 
+                                    Each file contains the expected amount of 
+                                    sequence (in cM) copied from each reference
+                                    haplotype in the list of copying states. 
+                                    The output is in CSV file format.
+  --ban-repeated-sample-names       Ban reference haplotypes having the same 
+                                    name as the target from the state 
+                                    selection. To be used only when the target 
+                                    and the reference panel share (even 
+                                    partially) the same set of individuals.
+  --neigh-select                    Use prefix array to select states.
+
+Output:
+  --l arg                           Location of the log file to be written. If 
+                                    not specified, only console output is 
+                                    generated.
+  --bgen-compr arg                  Specifies the compression of the output 
+                                    BGEN file. If the output is in the 
+                                    .vcf[.gz]/.bcf format, this value is 
+                                    ignored. Accepted values: [no, zlib, zstd].
+  --bgen-bits arg                   Specifies the number of bits to be used for
+                                    the encoding probabilities of the output 
+                                    BGEN file. If the output is in the 
+                                    .vcf[.gz]/.bcf format, this value is 
+                                    ignored. Accepted values: 0 < x <= 32. 
+                                    Default: x=8.
+  --o arg (=impute5.out.bgen)       Specifies output file name. Accepted 
+                                    extensions: [.vcf[.gz],.bcf,.bgen]
+  --out-gp-field                    Output FORMAT/GP field (Genotype 
+                                    probabilities) if output is in VCF/BCF 
+                                    format.
+  --out-ap-field                    Output FORMAT/AP field (ALT haplotype 
+                                    probabilities) if output is in VCF/BCF 
+                                    format.
+
+Other parameters:
+  --help                            Produce help message, listing all the 
+                                    accepted arguments
+  --no-threshold                    Specifies if need to use all forward 
+                                    backward states and not apply a threshold
+  --ne arg (=20000)                 Effective population size.
+  --threads arg (=1)                Number of threads.
+
+Help option called or no option provided.
+0.00user 0.00system 0:00.00elapsed 33%CPU (0avgtext+0avgdata 952maxresident)k
+64inputs+16outputs (1major+265minor)pagefaults 0swaps
+			IMPUTE v5
+	Simone Rubinacci and Jonathan Marchini, 2020
+
+Version: 1.1.4
+Usage: impute5 [options]
+
+List of options accepted:
+
+Input:
+  --h arg                           Haplotype reference panel in VCF/BCF/IMP5 
+                                    format (must have .vcf[.gz]/.bcf/.imp5 
+                                    extension). The file must be indexed 
+                                    (tabix/imp5 index).
+  --g arg                           File containing target haplotypes for a 
+                                    study cohort that you want to impute in 
+                                    VCF/BCF format (must have .vcf[.gz]/.bcf 
+                                    extension). The file must be indexed (tabix
+                                    index).
+  --m arg                           Fine-scale recombination map for the region
+                                    to be analyzed. If not specified, a 
+                                    constant recombination rate of 1cM per Mb 
+                                    is used.
+  --r arg                           Region to be imputed. Example --r 
+                                    20:1000000-5000000 (region within 
+                                    chromosome 20). Buffer parameter (--b) or 
+                                    buffer-region expand this region, if 
+                                    specified.
+  --buffer-region arg               Region to be imputed with a buffer at both 
+                                    the borders. Buffer-region must include the
+                                    imputed region (--r). If both the buffer 
+                                    options are used (--b and --buffer-region) 
+                                    only --buffer-region is used.
+  --b arg (=250)                    Length of buffer region (in kb) to include 
+                                    on each side of the analysis window 
+                                    specified by the -r option. Variants in the
+                                    buffer regions inform the inference but do 
+                                    not appear in output files. If both the 
+                                    buffer options are used (--b and 
+                                    --buffer-region) only --buffer-region is 
+                                    used.
+  --haploid                         Specifies the target samples are haploid in
+                                    the region (e.g. for males in non-PAR 
+                                    region on Chromosome X).
+
+State selection:
+  --pbwt-depth arg (=4)             Depth of PBWT indexes to condition on
+  --pbwt-cm arg (=0.02)             Frequency of the selection algorithm in cM
+  --ohapcopy [=arg(=hapcopy.list)]  Output a file for each target haplotype. 
+                                    Each file contains the expected amount of 
+                                    sequence (in cM) copied from each reference
+                                    haplotype in the list of copying states. 
+                                    The output is in CSV file format.
+  --ban-repeated-sample-names       Ban reference haplotypes having the same 
+                                    name as the target from the state 
+                                    selection. To be used only when the target 
+                                    and the reference panel share (even 
+                                    partially) the same set of individuals.
+  --neigh-select                    Use prefix array to select states.
+
+Output:
+  --l arg                           Location of the log file to be written. If 
+                                    not specified, only console output is 
+                                    generated.
+  --bgen-compr arg                  Specifies the compression of the output 
+                                    BGEN file. If the output is in the 
+                                    .vcf[.gz]/.bcf format, this value is 
+                                    ignored. Accepted values: [no, zlib, zstd].
+  --bgen-bits arg                   Specifies the number of bits to be used for
+                                    the encoding probabilities of the output 
+                                    BGEN file. If the output is in the 
+                                    .vcf[.gz]/.bcf format, this value is 
+                                    ignored. Accepted values: 0 < x <= 32. 
+                                    Default: x=8.
+  --o arg (=impute5.out.bgen)       Specifies output file name. Accepted 
+                                    extensions: [.vcf[.gz],.bcf,.bgen]
+  --out-gp-field                    Output FORMAT/GP field (Genotype 
+                                    probabilities) if output is in VCF/BCF 
+                                    format.
+  --out-ap-field                    Output FORMAT/AP field (ALT haplotype 
+                                    probabilities) if output is in VCF/BCF 
+                                    format.
+
+Other parameters:
+  --help                            Produce help message, listing all the 
+                                    accepted arguments
+  --no-threshold                    Specifies if need to use all forward 
+                                    backward states and not apply a threshold
+  --ne arg (=20000)                 Effective population size.
+  --threads arg (=1)                Number of threads.
+
+Help option called or no option provided.
+0.00user 0.00system 0:00.00elapsed 100%CPU (0avgtext+0avgdata 956maxresident)k
+0inputs+16outputs (0major+268minor)pagefaults 0swaps
+			IMPUTE v5
+	Simone Rubinacci and Jonathan Marchini, 2020
+
+Version: 1.1.4
+Usage: impute5 [options]
+
+List of options accepted:
+
+Input:
+  --h arg                           Haplotype reference panel in VCF/BCF/IMP5 
+                                    format (must have .vcf[.gz]/.bcf/.imp5 
+                                    extension). The file must be indexed 
+                                    (tabix/imp5 index).
+  --g arg                           File containing target haplotypes for a 
+                                    study cohort that you want to impute in 
+                                    VCF/BCF format (must have .vcf[.gz]/.bcf 
+                                    extension). The file must be indexed (tabix
+                                    index).
+  --m arg                           Fine-scale recombination map for the region
+                                    to be analyzed. If not specified, a 
+                                    constant recombination rate of 1cM per Mb 
+                                    is used.
+  --r arg                           Region to be imputed. Example --r 
+                                    20:1000000-5000000 (region within 
+                                    chromosome 20). Buffer parameter (--b) or 
+                                    buffer-region expand this region, if 
+                                    specified.
+  --buffer-region arg               Region to be imputed with a buffer at both 
+                                    the borders. Buffer-region must include the
+                                    imputed region (--r). If both the buffer 
+                                    options are used (--b and --buffer-region) 
+                                    only --buffer-region is used.
+  --b arg (=250)                    Length of buffer region (in kb) to include 
+                                    on each side of the analysis window 
+                                    specified by the -r option. Variants in the
+                                    buffer regions inform the inference but do 
+                                    not appear in output files. If both the 
+                                    buffer options are used (--b and 
+                                    --buffer-region) only --buffer-region is 
+                                    used.
+  --haploid                         Specifies the target samples are haploid in
+                                    the region (e.g. for males in non-PAR 
+                                    region on Chromosome X).
+
+State selection:
+  --pbwt-depth arg (=4)             Depth of PBWT indexes to condition on
+  --pbwt-cm arg (=0.02)             Frequency of the selection algorithm in cM
+  --ohapcopy [=arg(=hapcopy.list)]  Output a file for each target haplotype. 
+                                    Each file contains the expected amount of 
+                                    sequence (in cM) copied from each reference
+                                    haplotype in the list of copying states. 
+                                    The output is in CSV file format.
+  --ban-repeated-sample-names       Ban reference haplotypes having the same 
+                                    name as the target from the state 
+                                    selection. To be used only when the target 
+                                    and the reference panel share (even 
+                                    partially) the same set of individuals.
+  --neigh-select                    Use prefix array to select states.
+
+Output:
+  --l arg                           Location of the log file to be written. If 
+                                    not specified, only console output is 
+                                    generated.
+  --bgen-compr arg                  Specifies the compression of the output 
+                                    BGEN file. If the output is in the 
+                                    .vcf[.gz]/.bcf format, this value is 
+                                    ignored. Accepted values: [no, zlib, zstd].
+  --bgen-bits arg                   Specifies the number of bits to be used for
+                                    the encoding probabilities of the output 
+                                    BGEN file. If the output is in the 
+                                    .vcf[.gz]/.bcf format, this value is 
+                                    ignored. Accepted values: 0 < x <= 32. 
+                                    Default: x=8.
+  --o arg (=impute5.out.bgen)       Specifies output file name. Accepted 
+                                    extensions: [.vcf[.gz],.bcf,.bgen]
+  --out-gp-field                    Output FORMAT/GP field (Genotype 
+                                    probabilities) if output is in VCF/BCF 
+                                    format.
+  --out-ap-field                    Output FORMAT/AP field (ALT haplotype 
+                                    probabilities) if output is in VCF/BCF 
+                                    format.
+
+Other parameters:
+  --help                            Produce help message, listing all the 
+                                    accepted arguments
+  --no-threshold                    Specifies if need to use all forward 
+                                    backward states and not apply a threshold
+  --ne arg (=20000)                 Effective population size.
+  --threads arg (=1)                Number of threads.
+
+Help option called or no option provided.
+0.00user 0.00system 0:00.00elapsed 100%CPU (0avgtext+0avgdata 956maxresident)k
+0inputs+8outputs (0major+267minor)pagefaults 0swaps
+			IMPUTE v5
+	Simone Rubinacci and Jonathan Marchini, 2020
+
+Version: 1.1.4
+Usage: impute5 [options]
+
+List of options accepted:
+
+Input:
+  --h arg                           Haplotype reference panel in VCF/BCF/IMP5 
+                                    format (must have .vcf[.gz]/.bcf/.imp5 
+                                    extension). The file must be indexed 
+                                    (tabix/imp5 index).
+  --g arg                           File containing target haplotypes for a 
+                                    study cohort that you want to impute in 
+                                    VCF/BCF format (must have .vcf[.gz]/.bcf 
+                                    extension). The file must be indexed (tabix
+                                    index).
+  --m arg                           Fine-scale recombination map for the region
+                                    to be analyzed. If not specified, a 
+                                    constant recombination rate of 1cM per Mb 
+                                    is used.
+  --r arg                           Region to be imputed. Example --r 
+                                    20:1000000-5000000 (region within 
+                                    chromosome 20). Buffer parameter (--b) or 
+                                    buffer-region expand this region, if 
+                                    specified.
+  --buffer-region arg               Region to be imputed with a buffer at both 
+                                    the borders. Buffer-region must include the
+                                    imputed region (--r). If both the buffer 
+                                    options are used (--b and --buffer-region) 
+                                    only --buffer-region is used.
+  --b arg (=250)                    Length of buffer region (in kb) to include 
+                                    on each side of the analysis window 
+                                    specified by the -r option. Variants in the
+                                    buffer regions inform the inference but do 
+                                    not appear in output files. If both the 
+                                    buffer options are used (--b and 
+                                    --buffer-region) only --buffer-region is 
+                                    used.
+  --haploid                         Specifies the target samples are haploid in
+                                    the region (e.g. for males in non-PAR 
+                                    region on Chromosome X).
+
+State selection:
+  --pbwt-depth arg (=4)             Depth of PBWT indexes to condition on
+  --pbwt-cm arg (=0.02)             Frequency of the selection algorithm in cM
+  --ohapcopy [=arg(=hapcopy.list)]  Output a file for each target haplotype. 
+                                    Each file contains the expected amount of 
+                                    sequence (in cM) copied from each reference
+                                    haplotype in the list of copying states. 
+                                    The output is in CSV file format.
+  --ban-repeated-sample-names       Ban reference haplotypes having the same 
+                                    name as the target from the state 
+                                    selection. To be used only when the target 
+                                    and the reference panel share (even 
+                                    partially) the same set of individuals.
+  --neigh-select                    Use prefix array to select states.
+
+Output:
+  --l arg                           Location of the log file to be written. If 
+                                    not specified, only console output is 
+                                    generated.
+  --bgen-compr arg                  Specifies the compression of the output 
+                                    BGEN file. If the output is in the 
+                                    .vcf[.gz]/.bcf format, this value is 
+                                    ignored. Accepted values: [no, zlib, zstd].
+  --bgen-bits arg                   Specifies the number of bits to be used for
+                                    the encoding probabilities of the output 
+                                    BGEN file. If the output is in the 
+                                    .vcf[.gz]/.bcf format, this value is 
+                                    ignored. Accepted values: 0 < x <= 32. 
+                                    Default: x=8.
+  --o arg (=impute5.out.bgen)       Specifies output file name. Accepted 
+                                    extensions: [.vcf[.gz],.bcf,.bgen]
+  --out-gp-field                    Output FORMAT/GP field (Genotype 
+                                    probabilities) if output is in VCF/BCF 
+                                    format.
+  --out-ap-field                    Output FORMAT/AP field (ALT haplotype 
+                                    probabilities) if output is in VCF/BCF 
+                                    format.
+
+Other parameters:
+  --help                            Produce help message, listing all the 
+                                    accepted arguments
+  --no-threshold                    Specifies if need to use all forward 
+                                    backward states and not apply a threshold
+  --ne arg (=20000)                 Effective population size.
+  --threads arg (=1)                Number of threads.
+
+Help option called or no option provided.
+0.00user 0.00system 0:00.00elapsed 100%CPU (0avgtext+0avgdata 956maxresident)k
+0inputs+16outputs (0major+268minor)pagefaults 0swaps

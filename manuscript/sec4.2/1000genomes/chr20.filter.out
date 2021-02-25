@@ -1,0 +1,74 @@
+
+signal (15): Terminated
+in expression starting at /home/biona001/1000genomes/filter.jl:4
+inst_type_w_ at /buildworker/worker/package_linux64/build/src/jltypes.c:1551
+inst_type_w_ at /buildworker/worker/package_linux64/build/src/jltypes.c:1515
+inst_type_w_ at /buildworker/worker/package_linux64/build/src/jltypes.c:1515
+inst_type_w_ at /buildworker/worker/package_linux64/build/src/jltypes.c:1515
+inst_type_w_ at /buildworker/worker/package_linux64/build/src/jltypes.c:1515
+inst_type_w_ at /buildworker/worker/package_linux64/build/src/jltypes.c:1529
+inst_type_w_ at /buildworker/worker/package_linux64/build/src/jltypes.c:1507
+inst_type_w_ at /buildworker/worker/package_linux64/build/src/jltypes.c:1515
+inst_type_w_ at /buildworker/worker/package_linux64/build/src/jltypes.c:1515
+inst_type_w_ at /buildworker/worker/package_linux64/build/src/jltypes.c:1529
+inst_type_w_ at /buildworker/worker/package_linux64/build/src/jltypes.c:1507
+inst_type_w_ at /buildworker/worker/package_linux64/build/src/jltypes.c:1529
+inst_type_w_ at /buildworker/worker/package_linux64/build/src/jltypes.c:1532
+inst_type_w_ at /buildworker/worker/package_linux64/build/src/jltypes.c:1532
+inst_type_w_ at /buildworker/worker/package_linux64/build/src/jltypes.c:1532
+inst_type_w_ at /buildworker/worker/package_linux64/build/src/jltypes.c:1532
+inst_type_w_ at /buildworker/worker/package_linux64/build/src/jltypes.c:1532
+inst_tuple_w_ at /buildworker/worker/package_linux64/build/src/jltypes.c:1472
+inst_type_w_ at /buildworker/worker/package_linux64/build/src/jltypes.c:1548
+jl_instantiate_unionall at /buildworker/worker/package_linux64/build/src/jltypes.c:918
+rename_unionall at /buildworker/worker/package_linux64/build/src/subtype.c:457 [inlined]
+unalias_unionall at /buildworker/worker/package_linux64/build/src/subtype.c:798
+subtype_unionall at /buildworker/worker/package_linux64/build/src/subtype.c:826 [inlined]
+subtype at /buildworker/worker/package_linux64/build/src/subtype.c:1275
+with_tvar at /buildworker/worker/package_linux64/build/src/subtype.c:735
+subtype_unionall at /buildworker/worker/package_linux64/build/src/subtype.c:829 [inlined]
+subtype at /buildworker/worker/package_linux64/build/src/subtype.c:1272
+exists_subtype at /buildworker/worker/package_linux64/build/src/subtype.c:1416 [inlined]
+forall_exists_subtype at /buildworker/worker/package_linux64/build/src/subtype.c:1444
+jl_subtype_env at /buildworker/worker/package_linux64/build/src/subtype.c:1873
+check_ambiguous_visitor at /buildworker/worker/package_linux64/build/src/gf.c:1296
+jl_typemap_intersection_node_visitor at /buildworker/worker/package_linux64/build/src/typemap.c:312
+jl_typemap_intersection_visitor at /buildworker/worker/package_linux64/build/src/typemap.c:408
+jl_typemap_intersection_visitor at /buildworker/worker/package_linux64/build/src/typemap.c:399
+check_ambiguous_matches at /buildworker/worker/package_linux64/build/src/gf.c:1394
+jl_method_table_insert at /buildworker/worker/package_linux64/build/src/gf.c:1709
+jl_insert_methods at /buildworker/worker/package_linux64/build/src/dump.c:2292 [inlined]
+_jl_restore_incremental at /buildworker/worker/package_linux64/build/src/dump.c:3254
+jl_restore_incremental at /buildworker/worker/package_linux64/build/src/dump.c:3305
+_include_from_serialized at ./loading.jl:681
+_require_search_from_serialized at ./loading.jl:782
+_tryrequire_from_serialized at ./loading.jl:712
+_require_search_from_serialized at ./loading.jl:771
+_tryrequire_from_serialized at ./loading.jl:712
+_require_search_from_serialized at ./loading.jl:771
+_require at ./loading.jl:1007
+require at ./loading.jl:928
+require at ./loading.jl:923
+_jl_invoke at /buildworker/worker/package_linux64/build/src/gf.c:2231 [inlined]
+jl_apply_generic at /buildworker/worker/package_linux64/build/src/gf.c:2398
+jl_apply at /buildworker/worker/package_linux64/build/src/julia.h:1690 [inlined]
+call_require at /buildworker/worker/package_linux64/build/src/toplevel.c:425 [inlined]
+eval_import_path at /buildworker/worker/package_linux64/build/src/toplevel.c:462
+jl_toplevel_eval_flex at /buildworker/worker/package_linux64/build/src/toplevel.c:682
+jl_parse_eval_all at /buildworker/worker/package_linux64/build/src/ast.c:913
+jl_load_rewrite at /buildworker/worker/package_linux64/build/src/toplevel.c:914
+include at ./Base.jl:380
+include at ./Base.jl:368
+_jl_invoke at /buildworker/worker/package_linux64/build/src/gf.c:2214 [inlined]
+jl_apply_generic at /buildworker/worker/package_linux64/build/src/gf.c:2398
+exec_options at ./client.jl:296
+_start at ./client.jl:506
+jfptr__start_43701.clone_1 at /usr/local/julia-1.5.0/lib/julia/sys.so (unknown line)
+_jl_invoke at /buildworker/worker/package_linux64/build/src/gf.c:2214 [inlined]
+jl_apply_generic at /buildworker/worker/package_linux64/build/src/gf.c:2398
+unknown function (ip: 0x401931)
+unknown function (ip: 0x401533)
+__libc_start_main at /lib64/libc.so.6 (unknown line)
+unknown function (ip: 0x4015d4)
+unknown function (ip: (nil))
+Allocations: 34172554 (Pool: 34158433; Big: 14121); GC: 35

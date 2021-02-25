@@ -314,7 +314,7 @@
  Recombination Rates : ref.chr20.excludeTarget.rec
  Error Rates         : ref.chr20.excludeTarget.erate
 
- Time taken for parameter estimation = 2109 seconds. 
+ Time taken for parameter estimation = 2113 seconds. 
 
  Writing final reduced haplotype information to [.m3vcf] file  : ref.chr20.excludeTarget.m3vcf.gz
 
@@ -323,7 +323,7 @@
  Temporary Draft [.m3vcf] file ref.chr20.excludeTarget.draft.m3vcf.gz deleted ... 
 
 
- Time taken to load reference haplotype set = 2841 seconds.
+ Time taken to load reference haplotype set = 2838 seconds.
 
  ------------------------------------------------------------------------------
                                 END OF PROGRAM                                 
@@ -331,9 +331,9 @@
 
  Program Successfully Implemented... 
  
- Total Run completed in 0 hours, 47 mins, 21 seconds.
+ Total Run completed in 0 hours, 47 mins, 18 seconds.
 
  Thank You for using Minimac3 !!! 
 
-2621.47user 223.46system 47:21.93elapsed 100%CPU (0avgtext+0avgdata 1390564maxresident)k
-373928inputs+274448outputs (0major+163547997minor)pagefaults 0swaps
+2597.28user 244.10system 49:25.64elapsed 95%CPU (0avgtext+0avgdata 1390572maxresident)k
+2304inputs+274184outputs (10major+163610205minor)pagefaults 0swaps

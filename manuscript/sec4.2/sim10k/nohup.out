@@ -79,3 +79,35 @@
  Reading chunk from target/GWAS panel ... 
 
  Compressing reference panel at GWAS sites ... 
+ERROR: LoadError: syntax: missing comma or ) in argument list
+Stacktrace:
+ [1] top-level scope at /home/biona001/sim10k/impute5_chunking.jl:3
+ [2] include(::Function, ::Module, ::String) at ./Base.jl:380
+ [3] include(::Module, ::String) at ./Base.jl:368
+ [4] exec_options(::Base.JLOptions) at ./client.jl:296
+ [5] _start() at ./client.jl:506
+in expression starting at /home/biona001/sim10k/impute5_chunking.jl:3
+1.41user 0.28system 0:01.11elapsed 152%CPU (0avgtext+0avgdata 221432maxresident)k
+8inputs+8outputs (0major+74235minor)pagefaults 0swaps
+ERROR: LoadError: syntax: missing comma or ) in argument list
+Stacktrace:
+ [1] top-level scope at /home/biona001/sim10k/impute5_chunking.jl:6
+ [2] include(::Function, ::Module, ::String) at ./Base.jl:380
+ [3] include(::Module, ::String) at ./Base.jl:368
+ [4] exec_options(::Base.JLOptions) at ./client.jl:296
+ [5] _start() at ./client.jl:506
+in expression starting at /home/biona001/sim10k/impute5_chunking.jl:6
+1.43user 0.24system 0:01.09elapsed 153%CPU (0avgtext+0avgdata 221396maxresident)k
+0inputs+16outputs (0major+74231minor)pagefaults 0swaps
+ERROR: LoadError: MethodError: no method matching chunk_impute5(::String, ::String, ::String, ::String, ::String)
+Closest candidates are:
+  chunk_impute5(!Matched::Int64, ::AbstractString, ::AbstractString, !Matched::Int64, !Matched::Int64) at /home/biona001/sim10k/impute5_chunking.jl:1
+Stacktrace:
+ [1] top-level scope at ./timing.jl:174
+ [2] include(::Function, ::Module, ::String) at ./Base.jl:380
+ [3] include(::Module, ::String) at ./Base.jl:368
+ [4] exec_options(::Base.JLOptions) at ./client.jl:296
+ [5] _start() at ./client.jl:506
+in expression starting at /home/biona001/sim10k/impute5_chunking.jl:26
+1.45user 0.25system 0:01.11elapsed 152%CPU (0avgtext+0avgdata 221832maxresident)k
+0inputs+8outputs (0major+74324minor)pagefaults 0swaps

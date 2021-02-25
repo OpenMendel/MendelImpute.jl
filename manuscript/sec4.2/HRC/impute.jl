@@ -9,21 +9,21 @@ d = 1000
 show_error = false
 warmup = true
 curdir = pwd()
-maf = chr == 10 ? 0.25 : 0.01
 
 BLAS.set_num_threads(1)
 Threads.nthreads() != 10 && error("not 10 threads!")
 
 if warmup
     cd(normpath(MendelImpute.datadir()))
+    #compress_haplotypes("ref.excludeTarget.vcf.gz", "target.typedOnly.masked.vcf.gz", "ref.excludeTarget.jlso")
     phase("target.typedOnly.masked.vcf.gz", "ref.excludeTarget.jlso", "imputed.vcf.gz")
 end
 
 Random.seed!(2020)
 cd(curdir)
-tgtfile = "target.chr$chr.typedOnly.maf$maf.masked.vcf.gz"
-reffile = "ref.chr$chr.excludeTarget.maxd$d.jlso"
-outfile = "mendel.imputed.chr$chr.vcf.gz"
+tgtfile = "target.chr$chr.typedOnly.masked.vcf.gz"
+reffile = "ref.chr$chr.excludeTarget.jlso"
+outfile = "mendel.imputed.chr$chr.jlso"
 ph = phase(tgtfile, reffile, outfile)
 
 if show_error

@@ -3,7 +3,7 @@ using Random
 using LinearAlgebra
 using VCFTools
 
-show_error = false
+show_error = true
 warmup = true
 curdir = pwd()
 
@@ -12,6 +12,7 @@ Threads.nthreads() != 10 && error("not 10 threads!")
 
 if warmup
     cd(normpath(MendelImpute.datadir()))
+    #compress_haplotypes("ref.excludeTarget.vcf.gz", "target.typedOnly.masked.vcf.gz", "ref.excludeTarget.jlso")
     phase("target.typedOnly.masked.vcf.gz", "ref.excludeTarget.jlso", "imputed.vcf.gz")
 end
 

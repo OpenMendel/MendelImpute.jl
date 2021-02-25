@@ -14,13 +14,12 @@ using ThreadPools
 
 function compress()
         max_d = 1000
-	chr = 10
 	minwidth = 0
 	overlap = 0.0
 
-        tgtfile = "target.chr$chr.typedOnly.masked.vcf.gz"
-        reffile = "ref.chr$chr.excludeTarget.vcf.gz"
-        outfile = "ref.chr$chr.excludeTarget.jlso"
+        tgtfile = "target.typedOnly.maf0.05.masked.vcf.gz"
+        reffile = "ref.excludeTarget.vcf.gz"
+        outfile = "ref.excludeTarget.maxd1000.jlso"
         @time compress_haplotypes(reffile, tgtfile, outfile, max_d, minwidth, overlap)
 end
 compress()
