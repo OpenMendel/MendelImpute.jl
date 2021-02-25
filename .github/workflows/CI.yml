@@ -81,22 +81,18 @@ jobs:
       - uses: julia-actions/setup-julia@v1
         with:
           version: '1.5'
-      - run: |
-          git config --global user.name name
-          git config --global user.email email
-          git config --global github.user username
-      - run: |
-          julia --project=docs -e '
-            using Pkg
-            Pkg.develop(PackageSpec(path=pwd()))
-            Pkg.instantiate()'
-      - run: | # add unregistered packages
+      - run: | # add unregistered packages first
           julia --project=docs -e '
             using Pkg
             pkg"add https://github.com/OpenMendel/SnpArrays.jl"
             pkg"add https://github.com/OpenMendel/VCFTools.jl"
             pkg"add https://github.com/OpenMendel/BGEN.jl"
             pkg"add https://github.com/OpenMendel/MendelImpute.jl"'
+      - run: |
+          julia --project=docs -e '
+            using Pkg
+            Pkg.develop(PackageSpec(path=pwd()))
+            Pkg.instantiate()'
       - run: |
           julia --project=docs -e '
             using Documenter: doctest
