@@ -11,9 +11,12 @@ Download and install [Julia](https://julialang.org/downloads/). Within Julia, co
 using Pkg
 pkg"add https://github.com/OpenMendel/SnpArrays.jl"
 pkg"add https://github.com/OpenMendel/VCFTools.jl"
+pkg"add https://github.com/OpenMendel/BGEN.jl"
 pkg"add https://github.com/OpenMendel/MendelImpute.jl"
 ```
-This package supports Julia `v1.5`+.
+This package supports Julia `v1.5`+. 
+
+**Note:** BGEN format is currrently experimental and is not guaranteed to work properly. 
 
 ## Documentation
 

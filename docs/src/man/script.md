@@ -1,7 +1,7 @@
 
 # Run MendelImpute as script
 
-If you don't want to run `MendelImpute.jl` in a Julia session (e.g. you want to run batch jobs on a cluster), you can do so by putting the code above in a Julia file. For example, in order to run with 8 threads, create a file called `impute.jl` which contains:
+If you don't want to run `MendelImpute.jl` in a Julia session (e.g. you want to run batch jobs on a cluster), you can do so by putting the code below in a Julia file. For example, in order to run with 8 threads, create a file called `impute.jl` which contains:
 
 ```julia
 # place these code in a file called impute.jl

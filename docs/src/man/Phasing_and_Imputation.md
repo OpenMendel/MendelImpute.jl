@@ -1,7 +1,7 @@
 
 # Preparing Target Data
 
-MendelImpute accepts [VCF](https://samtools.github.io/hts-specs/VCFv4.3.pdf) and [PLINK](https://www.cog-genomics.org/plink2/formats#bed) files. Please make sure the following are true:
+MendelImpute accepts [VCF](https://samtools.github.io/hts-specs/VCFv4.3.pdf) and [PLINK](https://www.cog-genomics.org/plink2/formats#bed) files (BGEN format is experimental). Please make sure the following are true:
 
 + VCF file ends in `.vcf` or `.vcf.gz` (phased or unphased and may contain missing data)
 + For PLINK files, all trios (`.bim`, `.bed`, `.fam`) are present in the same directory
@@ -12,7 +12,7 @@ MendelImpute accepts [VCF](https://samtools.github.io/hts-specs/VCFv4.3.pdf) and
 
 # Preparing Reference Haplotype Panel
 
-Reference samples must all be phased and contain no missing genotypes. Reference VCF panels must be compressed into `.jlso` format first using the [compress_haplotypes](https://OpenMendel.github.io/MendelImpute.jl/dev/man/api/#MendelImpute.compress_haplotypes) function. One must specify `d`: the maximum number of unique haplotypes per window. Larger `d` slows down computation, but increases accuracy. For most purposes, we recommend $d \approx 1000$. 
+Reference samples must be in VCF (`.vcf` or `.vcf.gz`) format, be phased, and contain no missing genotypes. Reference VCF panels must be compressed into `.jlso` format first using the [compress_haplotypes](https://OpenMendel.github.io/MendelImpute.jl/dev/man/api/#MendelImpute.compress_haplotypes) function. One must specify `d`: the maximum number of unique haplotypes per window. Larger `d` slows down computation, but increases accuracy. For most purposes, we recommend $d \approx 1000$. 
 
 # Detailed Example
 
@@ -182,30 +182,32 @@ phase(tgtfile, reffile, outfile);
     Importing reference haplotype data...
 
 
-    [32mComputing optimal haplotypes...100%|████████████████████| Time: 0:00:20[39m
+    [32mComputing optimal haplotypes...100%|████████████████████| Time: 0:01:09[39m
+    [32mPhasing...100%|█████████████████████████████████████████| Time: 0:00:12[39m
+    [32mWriting to file...100%|█████████████████████████████████| Time: 0:00:06[39m
 
 
     Total windows = 1634, averaging ~ 508 unique haplotypes per window.
     
     Timings: 
-        Data import                     = 9.88384 seconds
-            import target data             = 1.77236 seconds
-            import compressed haplotypes   = 8.11149 seconds
-        Computing haplotype pair        = 20.3066 seconds
-            BLAS3 mul! to get M and N      = 1.06045 seconds per thread
-            haplopair search               = 18.8367 seconds per thread
-            initializing missing           = 0.101118 seconds per thread
-            allocating and viewing         = 0.276894 seconds per thread
-            index conversion               = 0.0199662 seconds per thread
-        Phasing by win-win intersection = 4.32098 seconds
-            Window-by-window intersection  = 0.53913 seconds per thread
-            Breakpoint search              = 3.53301 seconds per thread
-            Recording result               = 0.23443 seconds per thread
-        Imputation                     = 3.40132 seconds
-            Imputing missing               = 0.440234 seconds
-            Writing to file                = 2.96109 seconds
+        Data import                     = 18.0675 seconds
+            import target data             = 3.5624 seconds
+            import compressed haplotypes   = 14.5051 seconds
+        Computing haplotype pair        = 69.2261 seconds
+            BLAS3 mul! to get M and N      = 3.62892 seconds per thread
+            haplopair search               = 64.2015 seconds per thread
+            initializing missing           = 0.33659 seconds per thread
+            allocating and viewing         = 0.958791 seconds per thread
+            index conversion               = 0.06272 seconds per thread
+        Phasing by win-win intersection = 12.2434 seconds
+            Window-by-window intersection  = 1.52831 seconds per thread
+            Breakpoint search              = 10.004 seconds per thread
+            Recording result               = 0.665559 seconds per thread
+        Imputation                     = 8.11533 seconds
+            Imputing missing               = 1.13759 seconds
+            Writing to file                = 6.97774 seconds
     
-        Total time                      = 37.914 seconds
+        Total time                      = 107.654 seconds
     
 
 
@@ -278,8 +280,8 @@ MendelImpute also computes a rough quality score (file ending in `sample.error`)
 
 
 ```julia
-using CSV
-quality = CSV.read("mendel.imputed.chr22.sample.error") # import quality score 
+using CSV, DataFrames
+quality = CSV.read("mendel.imputed.chr22.sample.error", DataFrame) # import quality score 
 
 # visualize error distribution
 histogram(quality[:error], label=:none, xlabel="per-sample quality score",

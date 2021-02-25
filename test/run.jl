@@ -2816,7 +2816,16 @@ nsamples("ref.excludeTarget.vcf"), nrecords("ref.excludeTarget.vcf")
 b = Bgen("ref.excludeTarget.bgen")
 variants = parse_variants(b; from_bgen_start=true);
 v = variants[1]
-probabilities!(b, v; T=Float32)
+p = probabilities!(b, v)
+n = 2n_samples(b)
+p = n_variants(b)
+H = BitMatrix(undef, p, n)
+Hchr = Vector{String}(undef, p)
+Hpos = Vector{Int}(undef, p)
+HsnpID = Vector{String}(undef, p)
+Href = Vector{String}(undef, p)
+Halt = Vector{String}(undef, p)
+
 
 Gtest = MendelImpute.import_target("ref.excludeTarget.bgen")
 
