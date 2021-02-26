@@ -26,6 +26,7 @@ data/uniqueSNPs.vcf.gz
 data/imputed.vcf.gz
 data/imputed.sample.error
 data/ref.excludeTarget.jlso
+data/imputed.jlso
 
 # don't track real data 
 data/1000_genome_phase3_v5/*/*.gz
