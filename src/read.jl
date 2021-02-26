@@ -2,6 +2,23 @@
 ###### These are wrapper functions for importing VCF/PLINK/BGEN target
 ###### and reference files. 
 
+"""
+    convert_gt(b::Bgen, T=Float32)
+
+Imports dosage information and chr/pos/snpID/ref/alt into numeric arrays.
+
+# Input
+- `b`: a `Bgen` object
+- `T`: Type for genotype array
+
+# Output
+- `G`: a `p × n` matrix of type `T`. Each column is a genotype
+- `Gchr`: Vector of `String`s holding chromosome number for each variant
+- `Gpos`: Vector of `Int` holding each variant's position
+- `GsnpID`: Vector of `String`s holding variant ID for each variant
+- `Gref`: Vector of `String`s holding reference allele for each variant
+- `Galt`: Vector of `String`s holding alterante allele for each variant
+"""
 function convert_gt(b::Bgen, T=Float32)
     n = n_samples(b)
     p = n_variants(b)
@@ -9,7 +26,7 @@ function convert_gt(b::Bgen, T=Float32)
     # return arrays
     G = Matrix{T}(undef, p, n)
     Gchr = Vector{String}(undef, p)
-    Gpos = Vector{String}(undef, p)
+    Gpos = Vector{Int}(undef, p)
     GsnpID = Vector{String}(undef, p)
     Gref = Vector{String}(undef, p)
     Galt = Vector{String}(undef, p)
@@ -27,6 +44,22 @@ function convert_gt(b::Bgen, T=Float32)
     return G, Gchr, Gpos, GsnpID, Gref, Galt
 end
 
+"""
+    convert_ht(b::Bgen)
+
+Import phased haplotypes as a `BitMatrix`, and store chr/pos/snpID/ref/alt.
+
+# Input
+- `b`: a `Bgen` object. Each variant must be phased and samples must be diploid
+
+# Output
+- `H`: a `p × 2n` matrix of type `T`. Each column is a haplotype. 
+- `Hchr`: Vector of `String`s holding chromosome number for each variant
+- `Hpos`: Vector of `Int` holding each variant's position
+- `HsnpID`: Vector of `String`s holding variant ID for each variant
+- `Href`: Vector of `String`s holding reference allele for each variant
+- `Halt`: Vector of `String`s holding alterante allele for each variant
+"""
 function convert_ht(b::Bgen)
     n = 2n_samples(b)
     p = n_variants(b)
@@ -43,6 +76,7 @@ function convert_ht(b::Bgen)
     i = 1
     for v in iterator(b; from_bgen_start=true)
         dose = probabilities!(b, v)
+        phased(v) || error("variant $(rsid(v)) at position $(pos(v)) not phased!")
         for j in 1:n_samples(b)
             Hi = @view(dose[:, j])
             H[i, 2j - 1] = read_haplotype1(Hi)

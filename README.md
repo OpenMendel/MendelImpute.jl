@@ -2,7 +2,7 @@
 
 | **Documentation** | **Build Status** | **Code Coverage**  |
 |-------------------|------------------|--------------------|
-| [![](https://img.shields.io/badge/docs-latest-blue.svg)](https://OpenMendel.github.io/MendelImpute.jl/dev/) [![](https://img.shields.io/badge/docs-stable-blue.svg)](https://OpenMendel.github.io/MendelImpute.jl/stable/) | [![build Actions Status](https://github.com/OpenMendel/MendelImpute.jl/workflows/CI/badge.svg)](https://github.com/OpenMendel/MendelImpute.jl/actions) | [![codecov](https://codecov.io/gh/OpenMendel/MendelImpute.jl/branch/master/graph/badge.svg?token=YyPqiFpIM1)](https://codecov.io/gh/OpenMendel/MendelImpute.jl) |
+| [![](https://img.shields.io/badge/docs-latest-blue.svg)](https://OpenMendel.github.io/MendelImpute.jl/dev/) [![](https://img.shields.io/badge/docs-stable-blue.svg)](https://OpenMendel.github.io/MendelImpute.jl/stable/) | [![build Actions Status](https://github.com/OpenMendel/MendelImpute.jl/workflows/CI/badge.svg)](https://github.com/OpenMendel/MendelImpute.jl/actions) [![CI (Julia nightly)](https://github.com/openmendel/mendelimpute.jl/workflows/JuliaNightly/badge.svg)](https://github.com/OpenMendel/MendelImpute.jl/actions/workflows/JuliaNightly.yml) | [![codecov](https://codecov.io/gh/OpenMendel/MendelImpute.jl/branch/master/graph/badge.svg?token=YyPqiFpIM1)](https://codecov.io/gh/OpenMendel/MendelImpute.jl) |
 
 ## Installation
 
