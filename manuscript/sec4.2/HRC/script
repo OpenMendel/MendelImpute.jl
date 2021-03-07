@@ -1,43 +1,62 @@
 # To filter
-nohup julia ./filter.jl 22 0.1 > chr22.filter.out &
-nohup julia ./filter.jl 21 0.05 > chr21.filter.out &
-nohup julia ./filter.jl 20 0.01 > chr20.filter.out &
-nohup julia ./filter.jl 19 0.005 > chr19.filter.out & 
-nohup julia ./filter.jl 10 0.25 > chr10.filter.out &
+nohup julia ./filter.jl > chr10.filter.out &
+nohup julia ./filter.jl > chr20.filter.out &
 
 # To compress to JLSO
 nohup julia ./compress.jl > mendel.compress.chr20.out &
 nohup julia ./compress.jl > mendel.compress.chr10.out &
 
-# compress reference file to m3vcf/bref3/imp5
+# compress reference file to m3vcf/bref3
 nohup /usr/bin/time Minimac3 --refHaps ref.chr20.excludeTarget.vcf.gz --processReference --prefix ref.chr20.excludeTarget > minimac3.chr20.compress.out &
 nohup /usr/bin/time Minimac3 --refHaps ref.chr10.excludeTarget.vcf.gz --processReference --prefix ref.chr10.excludeTarget > minimac3.chr10.compress.out &
 java -jar bref3.18May20.d20.jar ref.chr20.excludeTarget.vcf.gz > ref.chr20.excludeTarget.bref3
 java -jar bref3.18May20.d20.jar ref.chr10.excludeTarget.vcf.gz > ref.chr10.excludeTarget.bref3
 
-# Run MendelImpute
-nohup /usr/bin/time julia ./impute.jl > mendel.impute.chr20.d1000.out &
-nohup /usr/bin/time julia ./impute.jl > mendel.impute.chr10.d1000.out &
+# Prephase with Beagle 5.1 (minimac4/impute5 requires prephased data)
+nohup /usr/bin/time java -Xmx60g -jar beagle.18May20.d20.jar gt=target.chr20.typedOnly.masked.vcf.gz ref=ref.chr20.excludeTarget.bref3 out=target.chr20.prephased impute=false nthreads=10 > chr20.prephase.beagle.log &
+nohup /usr/bin/time java -Xmx60g -jar beagle.18May20.d20.jar gt=target.chr10.typedOnly.masked.vcf.gz ref=ref.chr10.excludeTarget.bref3 out=target.chr10.prephased impute=false nthreads=10 > chr10.prephase.beagle.log &
 
-# Prephase with Beagle 5.1 (minimac4 requires prephased data)
-nohup /usr/bin/time java -Xmx60g -jar beagle.18May20.d20.jar gt=target.chr20.typedOnly.maf0.01.masked.vcf.gz ref=ref.chr20.excludeTarget.bref3 out=target.chr20.prephased impute=false nthreads=10 > chr20.prephase.beagle.log &
-nohup /usr/bin/time java -Xmx60g -jar beagle.18May20.d20.jar gt=target.chr10.typedOnly.maf0.25.masked.vcf.gz ref=ref.chr10.excludeTarget.bref3 out=target.chr10.prephased impute=false nthreads=10 > chr10.prephase.beagle.log &
+# generate imp5 reffile and BGZF compress target to satisfy impute5 (first BGZF compress, index with tabix)
+gunzip ref.chr10.excludeTarget.vcf.gz
+gunzip ref.chr20.excludeTarget.vcf.gz
+nohup bgzip -c ref.chr10.excludeTarget.vcf > ref.chr10.excludeTarget.vcf.gz & 
+nohup bgzip -c ref.chr20.excludeTarget.vcf > ref.chr20.excludeTarget.vcf.gz & 
+rm ref.chr10.excludeTarget.vcf
+rm ref.chr20.excludeTarget.vcf
+tabix -fp vcf ref.chr20.excludeTarget.vcf.gz
+tabix -fp vcf ref.chr10.excludeTarget.vcf.gz
+tabix -fp vcf target.chr20.prephased.vcf.gz
+tabix -fp vcf target.chr10.prephased.vcf.gz
+imp5 --h ref.chr20.excludeTarget.vcf.gz --r 20 --o ref.chr20.excludeTarget.imp5 --threads 10
+imp5 --h ref.chr10.excludeTarget.vcf.gz --r 10 --o ref.chr10.excludeTarget.imp5 --threads 10
+
+# Run MendelImpute
+nohup /usr/bin/time julia ./impute.jl > mendel.impute.chr20.out &
+nohup /usr/bin/time julia ./impute.jl > mendel.impute.chr10.out &
 
 # Run Minimac4
 nohup /usr/bin/time minimac4 --refHaps ref.chr10.excludeTarget.m3vcf.gz --haps target.chr10.prephased.vcf.gz --prefix minimac4.chr10.result --cpus 10 > minimac4.chr10.imputed.log &
 nohup /usr/bin/time minimac4 --refHaps ref.chr20.excludeTarget.m3vcf.gz --haps target.chr20.prephased.vcf.gz --prefix minimac4.chr20.result --cpus 10 > minimac4.chr20.imputed.log &
 
-# To profile
-nohup julia ./profile.jl > profile.w64.out &
-nohup julia --track-allocation=user ./memory.jl > memory.w64.out &
-
 # Run Beagle 5.1:
 nohup /usr/bin/time java -Xmx60g -jar beagle.18May20.d20.jar gt=target.chr10.typedOnly.masked.vcf.gz ref=ref.chr10.excludeTarget.bref3 out=beagle.chr10.imputed nthreads=10 > beagle.imputed.chr10.log &
 nohup /usr/bin/time java -Xmx60g -jar beagle.18May20.d20.jar gt=target.chr20.typedOnly.masked.vcf.gz ref=ref.chr20.excludeTarget.bref3 out=beagle.chr20.imputed nthreads=10 > beagle.imputed.chr20.log &
 
+# Run impute 5 
+nohup /usr/bin/time /home/biona001/impute5_v1.1.4/impute5_1.1.4_static --h ref.chr20.excludeTarget.imp5 --g target.chr20.prephased.vcf.gz --r 20 --o impute5.chr20.result.vcf.gz --threads 10 > impute5.chr20.out &
+nohup /usr/bin/time /home/biona001/impute5_v1.1.4/impute5_1.1.4_static --h ref.chr10.excludeTarget.imp5 --g target.chr10.prephased.vcf.gz --r 10:10000000-20000000 --o impute5.chr10.result.vcf.gz > impute5.chr10.out &
+
+# Run Impute5 using chunking
+nohup /usr/bin/time julia chunk_impute5.jl 20 ref.chr20.excludeTarget.imp5 target.chr20.prephased.vcf.gz > impute5.chr20.out & 
+nohup /usr/bin/time julia chunk_impute5.jl 10 ref.chr10.excludeTarget.imp5 target.chr10.prephased.vcf.gz > impute5.chr10.out &
+
 # Get error rate
 nohup julia ./error_rate.jl > chr10.error.out &
 nohup julia ./error_rate.jl > chr20.error.out &
+
+# To profile
+nohup julia ./profile.jl > profile.w64.out &
+nohup julia --track-allocation=user ./memory.jl > memory.w64.out &
 
 # See why job got killed
 dmesg | tail -3
