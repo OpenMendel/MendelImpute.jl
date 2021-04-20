@@ -25,7 +25,7 @@ pkg"add https://github.com/OpenMendel/VCFTools.jl"
 pkg"add https://github.com/OpenMendel/BGEN.jl"
 pkg"add https://github.com/OpenMendel/MendelImpute.jl"
 ```
-This package supports Julia `v1.5`+.
+This package supports Julia `v1.6`+.
 
 ## Manual Outline
 
