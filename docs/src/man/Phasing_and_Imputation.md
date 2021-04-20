@@ -32,6 +32,10 @@ data = "chr22.1kg.phase3.v5a.vcf.gz"
 @show nsamples(data);
 ```
 
+    ┌ Info: Precompiling MendelImpute [e47305d1-6a61-5370-bc5d-77554d143183]
+    └ @ Base loading.jl:1317
+
+
     nrecords(data) = 424147
     nsamples(data) = 2504
 
@@ -182,32 +186,31 @@ phase(tgtfile, reffile, outfile);
     Importing reference haplotype data...
 
 
-    [32mComputing optimal haplotypes...100%|████████████████████| Time: 0:01:09[39m
-    [32mPhasing...100%|█████████████████████████████████████████| Time: 0:00:12[39m
-    [32mWriting to file...100%|█████████████████████████████████| Time: 0:00:06[39m
+    [32mComputing optimal haplotypes...100%|████████████████████| Time: 0:00:25[39m
+    [32mPhasing...100%|█████████████████████████████████████████| Time: 0:00:05[39m
 
 
     Total windows = 1634, averaging ~ 508 unique haplotypes per window.
     
     Timings: 
-        Data import                     = 18.0675 seconds
-            import target data             = 3.5624 seconds
-            import compressed haplotypes   = 14.5051 seconds
-        Computing haplotype pair        = 69.2261 seconds
-            BLAS3 mul! to get M and N      = 3.62892 seconds per thread
-            haplopair search               = 64.2015 seconds per thread
-            initializing missing           = 0.33659 seconds per thread
-            allocating and viewing         = 0.958791 seconds per thread
-            index conversion               = 0.06272 seconds per thread
-        Phasing by win-win intersection = 12.2434 seconds
-            Window-by-window intersection  = 1.52831 seconds per thread
-            Breakpoint search              = 10.004 seconds per thread
-            Recording result               = 0.665559 seconds per thread
-        Imputation                     = 8.11533 seconds
-            Imputing missing               = 1.13759 seconds
-            Writing to file                = 6.97774 seconds
+        Data import                     = 12.6331 seconds
+            import target data             = 3.54785 seconds
+            import compressed haplotypes   = 9.08523 seconds
+        Computing haplotype pair        = 25.8112 seconds
+            BLAS3 mul! to get M and N      = 1.14179 seconds per thread
+            haplopair search               = 19.8237 seconds per thread
+            initializing missing           = 0.11383 seconds per thread
+            allocating and viewing         = 0.183436 seconds per thread
+            index conversion               = 0.0146743 seconds per thread
+        Phasing by win-win intersection = 5.31061 seconds
+            Window-by-window intersection  = 0.56512 seconds per thread
+            Breakpoint search              = 3.4102 seconds per thread
+            Recording result               = 0.182498 seconds per thread
+        Imputation                     = 5.03281 seconds
+            Imputing missing               = 1.15402 seconds
+            Writing to file                = 3.87878 seconds
     
-        Total time                      = 107.654 seconds
+        Total time                      = 48.9418 seconds
     
 
 
@@ -229,7 +232,7 @@ n, p = size(X_mendel)
 println("error overall = ", sum(X_mendel .!= X_truth) / n / p)
 ```
 
-    error overall = 0.005273778941849357
+    error overall = 0.005273994412137202
 
 
 Thus, we are looking at about 5 imputation error out of every 1000 SNPs. 
@@ -246,7 +249,7 @@ To extract this score from a VCF file, one can do:
 
 
 ```julia
-using GeneticVariation, Plots
+using VariantCallFormat, Plots
 reader = VCF.Reader(openvcf(outfile, "r"))
 snpscores = Vector{Float64}(undef, nrecords(outfile))
 

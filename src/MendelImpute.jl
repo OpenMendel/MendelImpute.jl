@@ -1,7 +1,6 @@
 module MendelImpute
 
     using LinearAlgebra
-    using GeneticVariation
     using VCFTools
     using SnpArrays
     using BGEN
@@ -11,6 +10,7 @@ module MendelImpute
     using JLD2, FileIO, JLSO
     using Distances
     using LazyArrays
+    using VariantCallFormat
 
     # main functions that users are exposed to
     export phase               # main function for imputation and phasing
