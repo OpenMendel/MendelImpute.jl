@@ -8,7 +8,11 @@ using Random
 # compute simple summary statistics
 data = &quot;chr22.1kg.phase3.v5a.vcf.gz&quot;
 @show nrecords(data)
-@show nsamples(data);</code></pre><pre><code class="language-none">nrecords(data) = 424147
+@show nsamples(data);</code></pre><pre><code class="language-none">┌ Info: Precompiling MendelImpute [e47305d1-6a61-5370-bc5d-77554d143183]
+└ @ Base loading.jl:1317
+
+
+nrecords(data) = 424147
 nsamples(data) = 2504</code></pre><p>More summary statistics can be computed using the <a href="https://openmendel.github.io/VCFTools.jl/dev/man/api/#VCFTools.gtstats">gtstats</a> function in <code>VCFTools.jl</code>, with example usage <a href="https://openmendel.github.io/VCFTools.jl/dev/man/summaryinfo/#Summary-statistics">here</a>.</p><h2 id="Step-1:-generating-realistic-reference-and-target-data"><a class="docs-heading-anchor" href="#Step-1:-generating-realistic-reference-and-target-data">Step 1: generating realistic reference and target data</a><a id="Step-1:-generating-realistic-reference-and-target-data-1"></a><a class="docs-heading-anchor-permalink" href="#Step-1:-generating-realistic-reference-and-target-data" title="Permalink"></a></h2><p>First we generate a reference panel and imputation target based on the 1000 genomes data. Specifically, we divide the 1000 genomes chromosome 22 data so that </p><ul><li>100 samples are randomly selected as imputation targets, where<ul><li>100k SNPs with minor allele frequency <span>$\ge 0.05$</span> are randomly selected to be the typed positions. </li><li>0.1% of typed SNPs are masked (mimicking genotyping errors)</li><li>Genotypes are unphased</li></ul></li><li>The remaining 2404 samples are used as reference haplotypes. </li><li>SNPs with duplicate positions are filtered out.</li><li>All multiallelic markers are filtered out.</li></ul><p><strong>Instruction: execute the code below in a Julia session or a Jupyter notebook:</strong></p><pre><code class="language-julia"># set random seed for reproducibility
 Random.seed!(2020)
 
@@ -97,35 +101,34 @@ phase(tgtfile, reffile, outfile);</code></pre><pre><code class="language-none">N
 Importing reference haplotype data...
 
 
-[32mComputing optimal haplotypes...100%|████████████████████| Time: 0:01:09[39m
-[32mPhasing...100%|█████████████████████████████████████████| Time: 0:00:12[39m
-[32mWriting to file...100%|█████████████████████████████████| Time: 0:00:06[39m
+[32mComputing optimal haplotypes...100%|████████████████████| Time: 0:00:25[39m
+[32mPhasing...100%|█████████████████████████████████████████| Time: 0:00:05[39m
 
 
 Total windows = 1634, averaging ~ 508 unique haplotypes per window.
 
 Timings: 
-    Data import                     = 18.0675 seconds
-        import target data             = 3.5624 seconds
-        import compressed haplotypes   = 14.5051 seconds
-    Computing haplotype pair        = 69.2261 seconds
-        BLAS3 mul! to get M and N      = 3.62892 seconds per thread
-        haplopair search               = 64.2015 seconds per thread
-        initializing missing           = 0.33659 seconds per thread
-        allocating and viewing         = 0.958791 seconds per thread
-        index conversion               = 0.06272 seconds per thread
-    Phasing by win-win intersection = 12.2434 seconds
-        Window-by-window intersection  = 1.52831 seconds per thread
-        Breakpoint search              = 10.004 seconds per thread
-        Recording result               = 0.665559 seconds per thread
-    Imputation                     = 8.11533 seconds
-        Imputing missing               = 1.13759 seconds
-        Writing to file                = 6.97774 seconds
+    Data import                     = 12.6331 seconds
+        import target data             = 3.54785 seconds
+        import compressed haplotypes   = 9.08523 seconds
+    Computing haplotype pair        = 25.8112 seconds
+        BLAS3 mul! to get M and N      = 1.14179 seconds per thread
+        haplopair search               = 19.8237 seconds per thread
+        initializing missing           = 0.11383 seconds per thread
+        allocating and viewing         = 0.183436 seconds per thread
+        index conversion               = 0.0146743 seconds per thread
+    Phasing by win-win intersection = 5.31061 seconds
+        Window-by-window intersection  = 0.56512 seconds per thread
+        Breakpoint search              = 3.4102 seconds per thread
+        Recording result               = 0.182498 seconds per thread
+    Imputation                     = 5.03281 seconds
+        Imputing missing               = 1.15402 seconds
+        Writing to file                = 3.87878 seconds
 
-    Total time                      = 107.654 seconds</code></pre><p>The <code>;</code> hides the output, or else the screen will be too jammed. </p><div class="admonition is-info"><header class="admonition-header">Note</header><div class="admonition-body"><p>To run MendelImpute in parallel, type <code>export JULIA_NUM_THREADS=4</code> <strong>before</strong> starting Julia or Jupyter notebooks. See Performance Gotchas #1 on the left for details.</p></div></div><h2 id="Step-3.5:-(only-for-simulated-data)-check-imputation-accuracy"><a class="docs-heading-anchor" href="#Step-3.5:-(only-for-simulated-data)-check-imputation-accuracy">Step 3.5: (only for simulated data) check imputation accuracy</a><a id="Step-3.5:-(only-for-simulated-data)-check-imputation-accuracy-1"></a><a class="docs-heading-anchor-permalink" href="#Step-3.5:-(only-for-simulated-data)-check-imputation-accuracy" title="Permalink"></a></h2><p>Since we simulated data, we can check imputation accuracy.</p><pre><code class="language-julia">X_truth  = convert_gt(Float64, &quot;target.chr22.full.vcf.gz&quot;)    # import true genotypes
+    Total time                      = 48.9418 seconds</code></pre><p>The <code>;</code> hides the output, or else the screen will be too jammed. </p><div class="admonition is-info"><header class="admonition-header">Note</header><div class="admonition-body"><p>To run MendelImpute in parallel, type <code>export JULIA_NUM_THREADS=4</code> <strong>before</strong> starting Julia or Jupyter notebooks. See Performance Gotchas #1 on the left for details.</p></div></div><h2 id="Step-3.5:-(only-for-simulated-data)-check-imputation-accuracy"><a class="docs-heading-anchor" href="#Step-3.5:-(only-for-simulated-data)-check-imputation-accuracy">Step 3.5: (only for simulated data) check imputation accuracy</a><a id="Step-3.5:-(only-for-simulated-data)-check-imputation-accuracy-1"></a><a class="docs-heading-anchor-permalink" href="#Step-3.5:-(only-for-simulated-data)-check-imputation-accuracy" title="Permalink"></a></h2><p>Since we simulated data, we can check imputation accuracy.</p><pre><code class="language-julia">X_truth  = convert_gt(Float64, &quot;target.chr22.full.vcf.gz&quot;)    # import true genotypes
 X_mendel = convert_gt(Float64, &quot;mendel.imputed.chr22.vcf.gz&quot;) # import imputed genotypes
 n, p = size(X_mendel)
-println(&quot;error overall = &quot;, sum(X_mendel .!= X_truth) / n / p)</code></pre><pre><code class="language-none">error overall = 0.005273778941849357</code></pre><p>Thus, we are looking at about 5 imputation error out of every 1000 SNPs. </p><h2 id="Post-imputation:-per-SNP-Imputation-Quality-Score"><a class="docs-heading-anchor" href="#Post-imputation:-per-SNP-Imputation-Quality-Score">Post-imputation: per-SNP Imputation Quality Score</a><a id="Post-imputation:-per-SNP-Imputation-Quality-Score-1"></a><a class="docs-heading-anchor-permalink" href="#Post-imputation:-per-SNP-Imputation-Quality-Score" title="Permalink"></a></h2><p>Consider the observed genotype <span>$x_{ij} \in [0, 2] \cup \{missing\}$</span> at SNP <span>$i$</span> of sample <span>$j$</span> and the corresponding imputed genotype <span>$g_{ij}$</span> derived from the two extended haplotypes of <span>$j$</span>. If <span>$S_i$</span> denotes the set of individuals with observed genotypes at the SNP, then MendelImpute&#39;s quality score <span>$q_i$</span> for the SNP is defined as</p><p class="math-container">\[q_i = 1 - \frac{1}{|S_i|}\sum_{j \in S_i} \left(\frac{x_{ij} - g_{ij}}{2}\right)^2.\]</p><p>Note that <span>$0 \le q_i \le 1$</span> and that the larger the quality score, the more confidence in the imputed values. Because <span>$q_i$</span> can only be computed for the typed SNPs, an untyped SNP is assigned the average of the quality scores for its two closest flanking typed SNPs.</p><p>To extract this score from a VCF file, one can do:</p><pre><code class="language-julia">using GeneticVariation, Plots
+println(&quot;error overall = &quot;, sum(X_mendel .!= X_truth) / n / p)</code></pre><pre><code class="language-none">error overall = 0.005273994412137202</code></pre><p>Thus, we are looking at about 5 imputation error out of every 1000 SNPs. </p><h2 id="Post-imputation:-per-SNP-Imputation-Quality-Score"><a class="docs-heading-anchor" href="#Post-imputation:-per-SNP-Imputation-Quality-Score">Post-imputation: per-SNP Imputation Quality Score</a><a id="Post-imputation:-per-SNP-Imputation-Quality-Score-1"></a><a class="docs-heading-anchor-permalink" href="#Post-imputation:-per-SNP-Imputation-Quality-Score" title="Permalink"></a></h2><p>Consider the observed genotype <span>$x_{ij} \in [0, 2] \cup \{missing\}$</span> at SNP <span>$i$</span> of sample <span>$j$</span> and the corresponding imputed genotype <span>$g_{ij}$</span> derived from the two extended haplotypes of <span>$j$</span>. If <span>$S_i$</span> denotes the set of individuals with observed genotypes at the SNP, then MendelImpute&#39;s quality score <span>$q_i$</span> for the SNP is defined as</p><p class="math-container">\[q_i = 1 - \frac{1}{|S_i|}\sum_{j \in S_i} \left(\frac{x_{ij} - g_{ij}}{2}\right)^2.\]</p><p>Note that <span>$0 \le q_i \le 1$</span> and that the larger the quality score, the more confidence in the imputed values. Because <span>$q_i$</span> can only be computed for the typed SNPs, an untyped SNP is assigned the average of the quality scores for its two closest flanking typed SNPs.</p><p>To extract this score from a VCF file, one can do:</p><pre><code class="language-julia">using VariantCallFormat, Plots
 reader = VCF.Reader(openvcf(outfile, &quot;r&quot;))
 snpscores = Vector{Float64}(undef, nrecords(outfile))
 
@@ -142,4 +145,4 @@ quality = CSV.read(&quot;mendel.imputed.chr22.sample.error&quot;, DataFrame) # i
 
 # visualize error distribution
 histogram(quality[:error], label=:none, xlabel=&quot;per-sample quality score&quot;,
-    ylabel=&quot;Number of samples&quot;) </code></pre><p><img src="../output_20_0.svg" alt="svg"/></p><p><strong>Conclusion:</strong> Most samples are well imputed (e.g. score close to 1), but some samples are indeed poorly imputed. From the histogram, we can safely <a href="https://openmendel.github.io/VCFTools.jl/dev/man/filter/#Subsetting-VCF-files-using-array-masks">filtered out</a> samples with score <span>$&lt; 0.999$</span> as that would remove poorly imputed individuals without reducing sample size too much.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../">« Home</a><a class="docs-footer-nextpage" href="../performance/">Performance Gotchas »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Sunday 7 March 2021 21:18">Sunday 7 March 2021</span>. Using Julia version 1.5.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+    ylabel=&quot;Number of samples&quot;) </code></pre><p><img src="../output_20_0.svg" alt="svg"/></p><p><strong>Conclusion:</strong> Most samples are well imputed (e.g. score close to 1), but some samples are indeed poorly imputed. From the histogram, we can safely <a href="https://openmendel.github.io/VCFTools.jl/dev/man/filter/#Subsetting-VCF-files-using-array-masks">filtered out</a> samples with score <span>$&lt; 0.999$</span> as that would remove poorly imputed individuals without reducing sample size too much.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../">« Home</a><a class="docs-footer-nextpage" href="../performance/">Performance Gotchas »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Tuesday 20 April 2021 22:48">Tuesday 20 April 2021</span>. Using Julia version 1.5.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
