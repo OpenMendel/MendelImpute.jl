@@ -171,3 +171,81 @@ function paint(
 
     return s1_composition, s2_composition
 end
+
+"""
+    thousand_genome_samples_to_population()
+
+Creates 2 dictionaries mapping samples of 1000 genome project to their ancestry.
+
++ `refID_to_population`: The first dictionary maps sample IDs to 26 population codes
++ `refID_to_superpopulation`: The second dictionary maps sample IDs to 5
+    super-population codes.
+
+Population code and super population codes are described here:
+https://www.internationalgenome.org/category/population/
+"""
+function thousand_genome_samples_to_population()
+    # read population origin into a dataframe
+    file = joinpath(normpath(MendelImpute.datadir()), "1000genomes.population.txt")
+    df = CSV.read(file, DataFrame)
+
+    # create dictionary with key = ID, value = population 
+    refID_to_population = Dict{String, String}()
+    refID_to_superpopulation = Dict{String, String}()
+    for (id, population) in eachrow(df)
+        refID_to_population[id] = population
+        refID_to_superpopulation[id] = pop_to_superpop[population]
+    end
+    refID_to_population, refID_to_superpopulation
+end
+
+"""
+    thousand_genome_population_to_superpopulation()
+
+Creates a dictionary mapping population codes of 1000 genome project to their
+super-population codes.
+
+Population code and super population codes are described here:
+https://www.internationalgenome.org/category/population/
+"""
+function thousand_genome_population_to_superpopulation()
+    pop_to_superpop = Dict{String, String}()
+
+    # 5 east asian
+    pop_to_superpop["CHB"] = "EAS"
+    pop_to_superpop["JPT"] = "EAS"
+    pop_to_superpop["CHS"] = "EAS"
+    pop_to_superpop["CDX"] = "EAS"
+    pop_to_superpop["KHV"] = "EAS"
+
+    # 5 european
+    pop_to_superpop["CEU"] = "EUR"
+    pop_to_superpop["TSI"] = "EUR"
+    pop_to_superpop["FIN"] = "EUR"
+    pop_to_superpop["GBR"] = "EUR"
+    pop_to_superpop["IBS"] = "EUR"
+
+    # 7 african
+    pop_to_superpop["YRI"] = "AFR"
+    pop_to_superpop["LWK"] = "AFR"
+    pop_to_superpop["GWD"] = "AFR"
+    pop_to_superpop["MSL"] = "AFR"
+    pop_to_superpop["ESN"] = "AFR"
+    pop_to_superpop["ASW"] = "AFR"
+    pop_to_superpop["ACB"] = "AFR"
+
+    # 4 ad mixed americans
+    pop_to_superpop["MXL"] = "AMR"
+    pop_to_superpop["PUR"] = "AMR"
+    pop_to_superpop["CLM"] = "AMR"
+    pop_to_superpop["PEL"] = "AMR"
+
+    # 5 south asian
+    pop_to_superpop["GIH"] = "SAS"
+    pop_to_superpop["PJL"] = "SAS"
+    pop_to_superpop["BEB"] = "SAS"
+    pop_to_superpop["STU"] = "SAS"
+    pop_to_superpop["ITU"] = "SAS"
+
+    return pop_to_superpop
+end

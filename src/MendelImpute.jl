@@ -20,7 +20,7 @@ module MendelImpute
 
     include("compress.jl")
     include("data_structures.jl")
-    include("phasing.jl")
+    include("phase.jl")
     include("haplotype_pair.jl")
     include("haplotype_rescreen.jl")
     include("haplotype_thinning.jl")
@@ -29,7 +29,7 @@ module MendelImpute
     include("impute.jl")
     include("breakpoints.jl")
     include("intersect.jl")
-    include("painting.jl")
+    include("ancestry.jl")
     include("ultra_compress.jl")
     include("read.jl")
 
