@@ -9,6 +9,7 @@ If samples in the reference haplotype panel are labeled with a population origin
 
 ```julia
 # first load all necessary packages
+using Revise
 using MendelImpute
 using VCFTools
 using GeneticVariation
@@ -19,7 +20,13 @@ using JLSO
 using CSV
 ```
 
-## Data preparation
+    ┌ Info: Precompiling MendelImpute [e47305d1-6a61-5370-bc5d-77554d143183]
+    └ @ Base loading.jl:1317
+    ┌ Info: Precompiling Plots [91a5bcdd-55d7-5caf-9e0b-520d859cae80]
+    └ @ Base loading.jl:1317
+
+
+## Prepare Example data for illustration
 
 ### Step 1. Filter chromosome data 
 
@@ -34,57 +41,19 @@ We use the [1000 genomes chromosome 22](http://bochet.gcc.biostat.washington.edu
 
 ### Step 2. Process each sample's population origin
 
-MendelImpute needs to know each reference sample's origin (country/ethnicity/region...etc). This origin information should be provided by the reference haplotype panel, but users are free to further organize origin labels base on their own criteria. As in our paper, we use super-populations. 
+MendelImpute needs to know each reference sample's origin (country/ethnicity/region...etc). This origin information should be provided by the reference haplotype panel, but users are free to further organize origin labels base on their own criteria. `MendelImpute` need a `Dict{key, value}` where each key is a reference sample ID and the value is the population code. Example dictionaries for 1000 genome project can be created by `MendelImpute`'s internal helper functions. Users not using 1000 genomes would have to manually construct such a dictionary mapping reference sample IDs to a desired population label. 
 
-To do so, we need to create a `Dict{key, value}` where each key is a sample ID and the value is the population code. This will be used for both the [paint](https://openmendel.github.io/MendelImpute.jl/dev/man/api/#MendelImpute.paint) and [composition](https://openmendel.github.io/MendelImpute.jl/dev/man/api/#MendelImpute.composition) function.
-
-
-```julia
-# map population to super-population
-pop_to_superpop = Dict{String, String}()
-
-# 5 east asian
-pop_to_superpop["CHB"] = "EAS"; pop_to_superpop["JPT"] = "EAS"; pop_to_superpop["CHS"] = "EAS"; 
-pop_to_superpop["CDX"] = "EAS"; pop_to_superpop["KHV"] = "EAS"; 
-
-# 5 european
-pop_to_superpop["CEU"] = "EUR"; pop_to_superpop["TSI"] = "EUR"; pop_to_superpop["FIN"] = "EUR";
-pop_to_superpop["GBR"] = "EUR"; pop_to_superpop["IBS"] = "EUR";
-
-# 7 african
-pop_to_superpop["YRI"] = "AFR"; pop_to_superpop["LWK"] = "AFR"; pop_to_superpop["GWD"] = "AFR"; 
-pop_to_superpop["MSL"] = "AFR"; pop_to_superpop["ESN"] = "AFR"; pop_to_superpop["ASW"] = "AFR"; 
-pop_to_superpop["ACB"] = "AFR"; 
-
-# 4 ad mixed americans
-pop_to_superpop["MXL"] = "AMR"; pop_to_superpop["PUR"] = "AMR"; pop_to_superpop["CLM"] = "AMR"; 
-pop_to_superpop["PEL"] = "AMR";
-
-# 5 south asian
-pop_to_superpop["GIH"] = "SAS"; pop_to_superpop["PJL"] = "SAS"; pop_to_superpop["BEB"] = "SAS"; 
-pop_to_superpop["STU"] = "SAS"; pop_to_superpop["ITU"] = "SAS";
-```
+Here is a dictionary mapping reference sample IDs to super population codes. 
 
 
 ```julia
-# read population origin into a dataframe
-file = joinpath(normpath(MendelImpute.datadir()), "1000genomes.population.txt")
-df = CSV.read(file, DataFrame)
-
-# create dictionary with key = ID, value = population 
-refID_to_population = Dict{String, String}()
-refID_to_superpopulation = Dict{String, String}()
-for (id, population) in eachrow(df)
-     refID_to_population[id] = population
-     refID_to_superpopulation[id] = pop_to_superpop[population]
-end
-refID_to_superpopulation
+refID_to_superpopulation = thousand_genome_samples_to_super_population()
 ```
 
 
 
 
-    Dict{String,String} with 2504 entries:
+    Dict{String, String} with 2504 entries:
       "HG01791" => "EUR"
       "HG02736" => "SAS"
       "HG00182" => "EUR"
@@ -114,9 +83,54 @@ refID_to_superpopulation
 
 
 
+Here are dictionaries converting population code to super population codes.
+
+
+```julia
+pop_to_superpop = thousand_genome_population_to_superpopulation()
+```
+
+
+
+
+    Dict{String, String} with 26 entries:
+      "CHS" => "EAS"
+      "CDX" => "EAS"
+      "GIH" => "SAS"
+      "MSL" => "AFR"
+      "KHV" => "EAS"
+      "PUR" => "AMR"
+      "ACB" => "AFR"
+      "CLM" => "AMR"
+      "FIN" => "EUR"
+      "TSI" => "EUR"
+      "BEB" => "SAS"
+      "LWK" => "AFR"
+      "STU" => "SAS"
+      "JPT" => "EAS"
+      "PJL" => "SAS"
+      "ITU" => "SAS"
+      "MXL" => "AMR"
+      "GWD" => "AFR"
+      "CEU" => "EUR"
+      "YRI" => "AFR"
+      "ASW" => "AFR"
+      "ESN" => "AFR"
+      "CHB" => "EAS"
+      "IBS" => "EUR"
+      "PEL" => "AMR"
+      "GBR" => "EUR"
+
+
+
 Note the [population codes](ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/1000_genomes_project/data/) for 1000 genome's samples are explained [here](https://www.internationalgenome.org/category/population/). 
 
-### Step 3. Compute phase information using MendelImpute
+## Estimate admixture proportions
+
++ The [composition](https://openmendel.github.io/MendelImpute.jl/dev/man/api/#MendelImpute.composition) will compute a list of percentages where `composition[i]` equals the sample's ancestry (in %) from `populations[i]`.
++ This illustration depends on **data preparation** above. 
+
+### Step 1. Compute phase information using MendelImpute
 
 This is equivalent to running a typical imputation. Please ensure that:
 + The output file name ends with `.jlso` (save output to ultra-compressed format)
@@ -137,41 +151,36 @@ outfile = "mendel.imputed.jlso"
     Importing reference haplotype data...
 
 
-    [32mComputing optimal haplotypes...100%|████████████████████| Time: 0:00:28[39m
+    [32mComputing optimal haplotypes...100%|████████████████████| Time: 0:00:26[39m
     [32mPhasing...100%|█████████████████████████████████████████| Time: 0:00:05[39m
 
 
     Total windows = 1634, averaging ~ 508 unique haplotypes per window.
     
     Timings: 
-        Data import                     = 13.8493 seconds
-            import target data             = 3.61007 seconds
-            import compressed haplotypes   = 10.2393 seconds
-        Computing haplotype pair        = 28.5288 seconds
-            BLAS3 mul! to get M and N      = 1.20264 seconds per thread
-            haplopair search               = 22.9585 seconds per thread
-            initializing missing           = 0.121591 seconds per thread
-            allocating and viewing         = 0.337528 seconds per thread
-            index conversion               = 0.014748 seconds per thread
-        Phasing by win-win intersection = 5.92058 seconds
-            Window-by-window intersection  = 0.581821 seconds per thread
-            Breakpoint search              = 4.05849 seconds per thread
-            Recording result               = 0.146574 seconds per thread
-        Imputation                     = 3.65652 seconds
-            Imputing missing               = 0.0221378 seconds
-            Writing to file                = 3.63439 seconds
+        Data import                     = 13.2588 seconds
+            import target data             = 4.16205 seconds
+            import compressed haplotypes   = 9.09677 seconds
+        Computing haplotype pair        = 26.3008 seconds
+            BLAS3 mul! to get M and N      = 1.10473 seconds per thread
+            haplopair search               = 20.4958 seconds per thread
+            initializing missing           = 0.1148 seconds per thread
+            allocating and viewing         = 0.208966 seconds per thread
+            index conversion               = 0.00789653 seconds per thread
+        Phasing by win-win intersection = 5.64613 seconds
+            Window-by-window intersection  = 0.571368 seconds per thread
+            Breakpoint search              = 3.71102 seconds per thread
+            Recording result               = 0.201057 seconds per thread
+        Imputation                     = 3.85517 seconds
+            Imputing missing               = 0.0245544 seconds
+            Writing to file                = 3.83061 seconds
     
-        Total time                      = 52.1137 seconds
+        Total time                      = 49.2067 seconds
     
-     58.377736 seconds (96.50 M allocations: 5.471 GiB, 4.24% gc time)
+     59.741822 seconds (118.80 M allocations: 7.179 GiB, 5.28% gc time)
 
 
-## Estimate admixture proportions
-
-+ The [composition](https://openmendel.github.io/MendelImpute.jl/dev/man/api/#MendelImpute.composition) will compute a list of percentages where `composition[i]` equals the sample's ancestry (in %) from `populations[i]`.
-+ This illustration depends on **data preparation** above. 
-
-### Step 1: import necessary data
+### Step 2: import phased genotypes from JLSO file
 
 
 ```julia
@@ -184,7 +193,6 @@ panelID = compressed_Hunique.sampleID
 tgtfile = "target.chr22.typedOnly.masked.vcf.gz"
 reader = VCF.Reader(openvcf(tgtfile, "r"))
 tgtID  = VCF.header(reader).sampleID
-sample_population = [refID_to_population[id] for id in tgtID]
 sample_superpopulation = [refID_to_superpopulation[id] for id in tgtID];
 ```
 
@@ -197,7 +205,7 @@ sample_superpopulation
 
 
 
-    100-element Array{String,1}:
+    100-element Vector{String}:
      "EUR"
      "EUR"
      "EAS"
@@ -227,7 +235,7 @@ sample_superpopulation
 
 
 
-### Step 2: call `composition` function
+### Step 3: call `composition` function
 
 + The [composition](https://openmendel.github.io/MendelImpute.jl/dev/man/api/#MendelImpute.composition) will compute a list of percentages where `composition[i]` equals the sample's ancestry (in %) from `populations[i]`.
 + We are finally using the imputation result stored in `ph`.
@@ -258,14 +266,14 @@ println("sample 84 = ", round(sample84_comp[4], digits=3), " Admixed-American")
 println("sample 84 = ", round(sample84_comp[5], digits=3), " Africans");
 ```
 
-      0.003909 seconds (26 allocations: 2.000 KiB)
-      0.000167 seconds (6 allocations: 544 bytes)
-      0.000185 seconds (6 allocations: 544 bytes)
+      0.004967 seconds (24 allocations: 1.703 KiB, 96.70% compilation time)
+      0.000163 seconds (6 allocations: 544 bytes)
+      0.000177 seconds (6 allocations: 544 bytes)
     sample 1 = 0.652 S. asian
-    sample 1 = 0.088 E. asian
+    sample 1 = 0.089 E. asian
     sample 1 = 0.023 European
-    sample 1 = 0.17 Admixed-American
-    sample 1 = 0.067 Africans
+    sample 1 = 0.169 Admixed-American
+    sample 1 = 0.068 Africans
     
     sample 4 = 0.189 S. asian
     sample 4 = 0.061 E. asian
@@ -308,7 +316,7 @@ continent_colors = [colorant"#e6194B", colorant"#800000", colorant"#4363d8", col
 
 
 
-![svg](output_15_0.svg)
+![svg](output_17_0.svg)
 
 
 
@@ -324,14 +332,53 @@ populations = unique_populations(refID_to_superpopulation)
 @time sample84_s1_comp, sample84_s2_comp = paint(ph[84], panelID, refID_to_superpopulation, populations=populations);
 ```
 
-      0.072840 seconds (122.95 k allocations: 6.250 MiB)
-      0.000099 seconds (12 allocations: 19.906 KiB)
-      0.000104 seconds (12 allocations: 22.406 KiB)
+      0.080868 seconds (114.69 k allocations: 6.641 MiB, 98.85% compilation time)
+      0.000094 seconds (12 allocations: 19.906 KiB)
+      0.000101 seconds (12 allocations: 22.406 KiB)
+
+
+
+```julia
+# view phase information of haplotype 1 from sample 1
+[sample1_s1_comp[1] sample1_s1_comp[2]]
+```
+
+
+
+
+    545×2 Matrix{Any}:
+     0.000562617  "AFR"
+     0.000447699  "AMR"
+     0.000476429  "EUR"
+     0.0002849    "EUR"
+     0.0001221    "EUR"
+     7.66117e-5   "EUR"
+     0.000287294  "EUR"
+     0.000411788  "EAS"
+     0.000205894  "EAS"
+     0.00117072   "EUR"
+     0.00320811   "EUR"
+     0.00117312   "EUR"
+     0.00103426   "EUR"
+     ⋮            
+     0.00115636   "AMR"
+     0.00370609   "EUR"
+     0.000323205  "EAS"
+     0.00120424   "EUR"
+     0.000433335  "EUR"
+     0.00104623   "EUR"
+     0.00195839   "EUR"
+     0.00037827   "EUR"
+     0.000926522  "EUR"
+     0.000938493  "EAS"
+     0.000646411  "EUR"
+     0.00162321   "EUR"
+
 
 
 ### Step 3: Generate plots for painted chromosomes
 
-We found the [StatsPlots.jl](https://github.com/JuliaPlots/StatsPlots.jl) package to be more useful for this purpose, although the code below still did the plotting in a very roundabout way. 
+We found the [StatsPlots.jl](https://github.com/JuliaPlots/StatsPlots.jl) (version 0.14.17) package to be more useful for this purpose, although the code below still did the plotting in a very roundabout way. Newer StatsPlots version breaks this plotting code. To pin `StatsPlots` to the correct version, execute `]pin StatsPlots@v0.14.17` in Julia.
 
 
 ```julia
@@ -397,8 +444,18 @@ admixture_chrom_plt = scatter!(color_x, color_y, color=reverse(continent_colors)
 
 
 
-![svg](output_19_0.svg)
+![svg](output_22_0.svg)
 
+
+
+
+```julia
+]st StatsPlots # ensure StatsPlots version is v0.14.17
+```
+
+    [36m[1m     Project[22m[39m MendelImpute v1.1.0
+    [32m[1m      Status[22m[39m `~/.julia/dev/MendelImpute/Project.toml`
+     [90m [f3b207a7] [39m[37mStatsPlots v0.14.17 ⚲[39m
 
 
 **Conclusion:** 

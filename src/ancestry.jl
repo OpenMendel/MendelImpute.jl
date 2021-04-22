@@ -175,11 +175,8 @@ end
 """
     thousand_genome_samples_to_population()
 
-Creates 2 dictionaries mapping samples of 1000 genome project to their ancestry.
-
-+ `refID_to_population`: The first dictionary maps sample IDs to 26 population codes
-+ `refID_to_superpopulation`: The second dictionary maps sample IDs to 5
-    super-population codes.
+Creates a dictionaries mapping sample IDs of 1000 genome project to 26 population
+codes.
 
 Population code and super population codes are described here:
 https://www.internationalgenome.org/category/population/
@@ -191,12 +188,35 @@ function thousand_genome_samples_to_population()
 
     # create dictionary with key = ID, value = population 
     refID_to_population = Dict{String, String}()
-    refID_to_superpopulation = Dict{String, String}()
     for (id, population) in eachrow(df)
         refID_to_population[id] = population
+    end
+    refID_to_population
+end
+
+"""
+    thousand_genome_samples_to_population()
+
+Creates a dictionaries mapping sample IDs of 1000 genome project to 5
+super population codes.
+
+Population code and super population codes are described here:
+https://www.internationalgenome.org/category/population/
+"""
+function thousand_genome_samples_to_super_population()
+    # read population origin into a dataframe
+    file = joinpath(normpath(MendelImpute.datadir()), "1000genomes.population.txt")
+    df = CSV.read(file, DataFrame)
+
+    # dict mapping population code to super population code
+    pop_to_superpop = thousand_genome_population_to_superpopulation()
+
+    # create dictionary with key = ID, value = population 
+    refID_to_superpopulation = Dict{String, String}()
+    for (id, population) in eachrow(df)
         refID_to_superpopulation[id] = pop_to_superpop[population]
     end
-    refID_to_population, refID_to_superpopulation
+    refID_to_superpopulation
 end
 
 """
