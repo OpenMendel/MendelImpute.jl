@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Estimating ancestry · MendelImpute</title><link href="https://fonts.googleapis.com/css?family=Lato|Roboto+Mono" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.0/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.0/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.0/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.11.1/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit">MendelImpute</span></div><form class="docs-search" action="../../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><a class="tocitem" href="../Phasing_and_Imputation/">Phasing and Imputation</a></li><li><a class="tocitem" href="../performance/">Performance Gotchas</a></li><li class="is-active"><a class="tocitem" href>Estimating ancestry</a><ul class="internal"><li><a class="tocitem" href="#Data-preparation"><span>Data preparation</span></a></li><li><a class="tocitem" href="#Estimate-admixture-proportions"><span>Estimate admixture proportions</span></a></li><li><a class="tocitem" href="#Chromosome-painting"><span>Chromosome painting</span></a></li></ul></li><li><a class="tocitem" href="../ultra+compress/">Ultra compression</a></li><li><a class="tocitem" href="../script/">Run as script</a></li><li><a class="tocitem" href="../api/">API</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>Estimating ancestry</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Estimating ancestry</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/OpenMendel/MendelImpute.jl/blob/master/docs/src/man/painting.md" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="Estimating-ancestry"><a class="docs-heading-anchor" href="#Estimating-ancestry">Estimating ancestry</a><a id="Estimating-ancestry-1"></a><a class="docs-heading-anchor-permalink" href="#Estimating-ancestry" title="Permalink"></a></h1><p>If samples in the reference haplotype panel are labeled with a population origin, MendelImpute can also be used for:</p><ul><li>Estimate admixed proportions</li><li>Chromosome painting</li></ul><pre><code class="language-julia"># first load all necessary packages
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Estimating ancestry · MendelImpute</title><link href="https://fonts.googleapis.com/css?family=Lato|Roboto+Mono" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.0/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.0/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.0/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.11.1/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit">MendelImpute</span></div><form class="docs-search" action="../../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><a class="tocitem" href="../Phasing_and_Imputation/">Phasing and Imputation</a></li><li><a class="tocitem" href="../performance/">Performance Gotchas</a></li><li class="is-active"><a class="tocitem" href>Estimating ancestry</a><ul class="internal"><li><a class="tocitem" href="#Prepare-Example-data-for-illustration"><span>Prepare Example data for illustration</span></a></li><li><a class="tocitem" href="#Estimate-admixture-proportions"><span>Estimate admixture proportions</span></a></li><li><a class="tocitem" href="#Chromosome-painting"><span>Chromosome painting</span></a></li></ul></li><li><a class="tocitem" href="../ultra+compress/">Ultra compression</a></li><li><a class="tocitem" href="../script/">Run as script</a></li><li><a class="tocitem" href="../api/">API</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>Estimating ancestry</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Estimating ancestry</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/OpenMendel/MendelImpute.jl/blob/master/docs/src/man/painting.md" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="Estimating-ancestry"><a class="docs-heading-anchor" href="#Estimating-ancestry">Estimating ancestry</a><a id="Estimating-ancestry-1"></a><a class="docs-heading-anchor-permalink" href="#Estimating-ancestry" title="Permalink"></a></h1><p>If samples in the reference haplotype panel are labeled with a population origin, MendelImpute can also be used for:</p><ul><li>Estimate admixed proportions</li><li>Chromosome painting</li></ul><pre><code class="language-julia"># first load all necessary packages
+using Revise
 using MendelImpute
 using VCFTools
 using GeneticVariation
@@ -7,40 +8,10 @@ using Random
 using DataFrames
 using Plots
 using JLSO
-using CSV</code></pre><h2 id="Data-preparation"><a class="docs-heading-anchor" href="#Data-preparation">Data preparation</a><a id="Data-preparation-1"></a><a class="docs-heading-anchor-permalink" href="#Data-preparation" title="Permalink"></a></h2><h3 id="Step-1.-Filter-chromosome-data"><a class="docs-heading-anchor" href="#Step-1.-Filter-chromosome-data">Step 1. Filter chromosome data</a><a id="Step-1.-Filter-chromosome-data-1"></a><a class="docs-heading-anchor-permalink" href="#Step-1.-Filter-chromosome-data" title="Permalink"></a></h3><p>We use the <a href="http://bochet.gcc.biostat.washington.edu/beagle/1000_Genomes_phase3_v5a/b37.vcf/">1000 genomes chromosome 22</a> as illustration.  The original data is filtered into target and reference panels. Follow <a href="https://openmendel.github.io/MendelImpute.jl/dev/man/Phasing+and+Imputation/#Detailed-Example">detailed example</a> in Phasing and Imputation to obtain the same data.</p><div class="admonition is-info"><header class="admonition-header">Note</header><div class="admonition-body"><p>In practice, it is better to infer ancestry of admixed populations using non-admixed reference populations. The example here is a simplified illustration and should not be taken too literally. </p></div></div><h3 id="Step-2.-Process-each-sample&#39;s-population-origin"><a class="docs-heading-anchor" href="#Step-2.-Process-each-sample&#39;s-population-origin">Step 2. Process each sample&#39;s population origin</a><a id="Step-2.-Process-each-sample&#39;s-population-origin-1"></a><a class="docs-heading-anchor-permalink" href="#Step-2.-Process-each-sample&#39;s-population-origin" title="Permalink"></a></h3><p>MendelImpute needs to know each reference sample&#39;s origin (country/ethnicity/region...etc). This origin information should be provided by the reference haplotype panel, but users are free to further organize origin labels base on their own criteria. As in our paper, we use super-populations. </p><p>To do so, we need to create a <code>Dict{key, value}</code> where each key is a sample ID and the value is the population code. This will be used for both the <a href="https://openmendel.github.io/MendelImpute.jl/dev/man/api/#MendelImpute.paint">paint</a> and <a href="https://openmendel.github.io/MendelImpute.jl/dev/man/api/#MendelImpute.composition">composition</a> function.</p><pre><code class="language-julia"># map population to super-population
-pop_to_superpop = Dict{String, String}()
-
-# 5 east asian
-pop_to_superpop[&quot;CHB&quot;] = &quot;EAS&quot;; pop_to_superpop[&quot;JPT&quot;] = &quot;EAS&quot;; pop_to_superpop[&quot;CHS&quot;] = &quot;EAS&quot;; 
-pop_to_superpop[&quot;CDX&quot;] = &quot;EAS&quot;; pop_to_superpop[&quot;KHV&quot;] = &quot;EAS&quot;; 
-
-# 5 european
-pop_to_superpop[&quot;CEU&quot;] = &quot;EUR&quot;; pop_to_superpop[&quot;TSI&quot;] = &quot;EUR&quot;; pop_to_superpop[&quot;FIN&quot;] = &quot;EUR&quot;;
-pop_to_superpop[&quot;GBR&quot;] = &quot;EUR&quot;; pop_to_superpop[&quot;IBS&quot;] = &quot;EUR&quot;;
-
-# 7 african
-pop_to_superpop[&quot;YRI&quot;] = &quot;AFR&quot;; pop_to_superpop[&quot;LWK&quot;] = &quot;AFR&quot;; pop_to_superpop[&quot;GWD&quot;] = &quot;AFR&quot;; 
-pop_to_superpop[&quot;MSL&quot;] = &quot;AFR&quot;; pop_to_superpop[&quot;ESN&quot;] = &quot;AFR&quot;; pop_to_superpop[&quot;ASW&quot;] = &quot;AFR&quot;; 
-pop_to_superpop[&quot;ACB&quot;] = &quot;AFR&quot;; 
-
-# 4 ad mixed americans
-pop_to_superpop[&quot;MXL&quot;] = &quot;AMR&quot;; pop_to_superpop[&quot;PUR&quot;] = &quot;AMR&quot;; pop_to_superpop[&quot;CLM&quot;] = &quot;AMR&quot;; 
-pop_to_superpop[&quot;PEL&quot;] = &quot;AMR&quot;;
-
-# 5 south asian
-pop_to_superpop[&quot;GIH&quot;] = &quot;SAS&quot;; pop_to_superpop[&quot;PJL&quot;] = &quot;SAS&quot;; pop_to_superpop[&quot;BEB&quot;] = &quot;SAS&quot;; 
-pop_to_superpop[&quot;STU&quot;] = &quot;SAS&quot;; pop_to_superpop[&quot;ITU&quot;] = &quot;SAS&quot;;</code></pre><pre><code class="language-julia"># read population origin into a dataframe
-file = joinpath(normpath(MendelImpute.datadir()), &quot;1000genomes.population.txt&quot;)
-df = CSV.read(file, DataFrame)
-
-# create dictionary with key = ID, value = population 
-refID_to_population = Dict{String, String}()
-refID_to_superpopulation = Dict{String, String}()
-for (id, population) in eachrow(df)
-     refID_to_population[id] = population
-     refID_to_superpopulation[id] = pop_to_superpop[population]
-end
-refID_to_superpopulation</code></pre><pre><code class="language-none">Dict{String,String} with 2504 entries:
+using CSV</code></pre><pre><code class="language-none">┌ Info: Precompiling MendelImpute [e47305d1-6a61-5370-bc5d-77554d143183]
+└ @ Base loading.jl:1317
+┌ Info: Precompiling Plots [91a5bcdd-55d7-5caf-9e0b-520d859cae80]
+└ @ Base loading.jl:1317</code></pre><h2 id="Prepare-Example-data-for-illustration"><a class="docs-heading-anchor" href="#Prepare-Example-data-for-illustration">Prepare Example data for illustration</a><a id="Prepare-Example-data-for-illustration-1"></a><a class="docs-heading-anchor-permalink" href="#Prepare-Example-data-for-illustration" title="Permalink"></a></h2><h3 id="Step-1.-Filter-chromosome-data"><a class="docs-heading-anchor" href="#Step-1.-Filter-chromosome-data">Step 1. Filter chromosome data</a><a id="Step-1.-Filter-chromosome-data-1"></a><a class="docs-heading-anchor-permalink" href="#Step-1.-Filter-chromosome-data" title="Permalink"></a></h3><p>We use the <a href="http://bochet.gcc.biostat.washington.edu/beagle/1000_Genomes_phase3_v5a/b37.vcf/">1000 genomes chromosome 22</a> as illustration.  The original data is filtered into target and reference panels. Follow <a href="https://openmendel.github.io/MendelImpute.jl/dev/man/Phasing+and+Imputation/#Detailed-Example">detailed example</a> in Phasing and Imputation to obtain the same data.</p><div class="admonition is-info"><header class="admonition-header">Note</header><div class="admonition-body"><p>In practice, it is better to infer ancestry of admixed populations using non-admixed reference populations. The example here is a simplified illustration and should not be taken too literally. </p></div></div><h3 id="Step-2.-Process-each-sample&#39;s-population-origin"><a class="docs-heading-anchor" href="#Step-2.-Process-each-sample&#39;s-population-origin">Step 2. Process each sample&#39;s population origin</a><a id="Step-2.-Process-each-sample&#39;s-population-origin-1"></a><a class="docs-heading-anchor-permalink" href="#Step-2.-Process-each-sample&#39;s-population-origin" title="Permalink"></a></h3><p>MendelImpute needs to know each reference sample&#39;s origin (country/ethnicity/region...etc). This origin information should be provided by the reference haplotype panel, but users are free to further organize origin labels base on their own criteria. <code>MendelImpute</code> need a <code>Dict{key, value}</code> where each key is a reference sample ID and the value is the population code. Example dictionaries for 1000 genome project can be created by <code>MendelImpute</code>&#39;s internal helper functions. Users not using 1000 genomes would have to manually construct such a dictionary mapping reference sample IDs to a desired population label. </p><p>Here is a dictionary mapping reference sample IDs to super population codes. </p><pre><code class="language-julia">refID_to_superpopulation = thousand_genome_samples_to_super_population()</code></pre><pre><code class="language-none">Dict{String, String} with 2504 entries:
   &quot;HG01791&quot; =&gt; &quot;EUR&quot;
   &quot;HG02736&quot; =&gt; &quot;SAS&quot;
   &quot;HG00182&quot; =&gt; &quot;EUR&quot;
@@ -66,7 +37,33 @@ refID_to_superpopulation</code></pre><pre><code class="language-none">Dict{Strin
   &quot;HG03869&quot; =&gt; &quot;SAS&quot;
   &quot;HG03729&quot; =&gt; &quot;SAS&quot;
   &quot;NA19920&quot; =&gt; &quot;AFR&quot;
-  ⋮         =&gt; ⋮</code></pre><p>Note the <a href="ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/1000_genomes_project/data/">population codes</a> for 1000 genome&#39;s samples are explained <a href="https://www.internationalgenome.org/category/population/">here</a>. </p><h3 id="Step-3.-Compute-phase-information-using-MendelImpute"><a class="docs-heading-anchor" href="#Step-3.-Compute-phase-information-using-MendelImpute">Step 3. Compute phase information using MendelImpute</a><a id="Step-3.-Compute-phase-information-using-MendelImpute-1"></a><a class="docs-heading-anchor-permalink" href="#Step-3.-Compute-phase-information-using-MendelImpute" title="Permalink"></a></h3><p>This is equivalent to running a typical imputation. Please ensure that:</p><ul><li>The output file name ends with <code>.jlso</code> (save output to ultra-compressed format)</li><li><code>impute = true</code> (so the output contains the entire chromosome)</li></ul><p>Note data used here is prepared in <a href="https://openmendel.github.io/MendelImpute.jl/dev/man/Phasing+and+Imputation/#Detailed-Example">Detailed Example</a>.</p><pre><code class="language-julia"># compute each person&#39;s phase information
+  ⋮         =&gt; ⋮</code></pre><p>Here are dictionaries converting population code to super population codes.</p><pre><code class="language-julia">pop_to_superpop = thousand_genome_population_to_superpopulation()</code></pre><pre><code class="language-none">Dict{String, String} with 26 entries:
+  &quot;CHS&quot; =&gt; &quot;EAS&quot;
+  &quot;CDX&quot; =&gt; &quot;EAS&quot;
+  &quot;GIH&quot; =&gt; &quot;SAS&quot;
+  &quot;MSL&quot; =&gt; &quot;AFR&quot;
+  &quot;KHV&quot; =&gt; &quot;EAS&quot;
+  &quot;PUR&quot; =&gt; &quot;AMR&quot;
+  &quot;ACB&quot; =&gt; &quot;AFR&quot;
+  &quot;CLM&quot; =&gt; &quot;AMR&quot;
+  &quot;FIN&quot; =&gt; &quot;EUR&quot;
+  &quot;TSI&quot; =&gt; &quot;EUR&quot;
+  &quot;BEB&quot; =&gt; &quot;SAS&quot;
+  &quot;LWK&quot; =&gt; &quot;AFR&quot;
+  &quot;STU&quot; =&gt; &quot;SAS&quot;
+  &quot;JPT&quot; =&gt; &quot;EAS&quot;
+  &quot;PJL&quot; =&gt; &quot;SAS&quot;
+  &quot;ITU&quot; =&gt; &quot;SAS&quot;
+  &quot;MXL&quot; =&gt; &quot;AMR&quot;
+  &quot;GWD&quot; =&gt; &quot;AFR&quot;
+  &quot;CEU&quot; =&gt; &quot;EUR&quot;
+  &quot;YRI&quot; =&gt; &quot;AFR&quot;
+  &quot;ASW&quot; =&gt; &quot;AFR&quot;
+  &quot;ESN&quot; =&gt; &quot;AFR&quot;
+  &quot;CHB&quot; =&gt; &quot;EAS&quot;
+  &quot;IBS&quot; =&gt; &quot;EUR&quot;
+  &quot;PEL&quot; =&gt; &quot;AMR&quot;
+  &quot;GBR&quot; =&gt; &quot;EUR&quot;</code></pre><p>Note the <a href="ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/1000_genomes_project/data/">population codes</a> for 1000 genome&#39;s samples are explained <a href="https://www.internationalgenome.org/category/population/">here</a>. </p><h2 id="Estimate-admixture-proportions"><a class="docs-heading-anchor" href="#Estimate-admixture-proportions">Estimate admixture proportions</a><a id="Estimate-admixture-proportions-1"></a><a class="docs-heading-anchor-permalink" href="#Estimate-admixture-proportions" title="Permalink"></a></h2><ul><li>The <a href="https://openmendel.github.io/MendelImpute.jl/dev/man/api/#MendelImpute.composition">composition</a> will compute a list of percentages where <code>composition[i]</code> equals the sample&#39;s ancestry (in %) from <code>populations[i]</code>.</li><li>This illustration depends on <strong>data preparation</strong> above. </li></ul><h3 id="Step-1.-Compute-phase-information-using-MendelImpute"><a class="docs-heading-anchor" href="#Step-1.-Compute-phase-information-using-MendelImpute">Step 1. Compute phase information using MendelImpute</a><a id="Step-1.-Compute-phase-information-using-MendelImpute-1"></a><a class="docs-heading-anchor-permalink" href="#Step-1.-Compute-phase-information-using-MendelImpute" title="Permalink"></a></h3><p>This is equivalent to running a typical imputation. Please ensure that:</p><ul><li>The output file name ends with <code>.jlso</code> (save output to ultra-compressed format)</li><li><code>impute = true</code> (so the output contains the entire chromosome)</li></ul><p>Note data used here is prepared in <a href="https://openmendel.github.io/MendelImpute.jl/dev/man/Phasing+and+Imputation/#Detailed-Example">Detailed Example</a>.</p><pre><code class="language-julia"># compute each person&#39;s phase information
 tgtfile = &quot;target.chr22.typedOnly.masked.vcf.gz&quot;
 reffile = &quot;ref.chr22.maxd1000.excludeTarget.jlso&quot;
 outfile = &quot;mendel.imputed.jlso&quot;
@@ -74,33 +71,33 @@ outfile = &quot;mendel.imputed.jlso&quot;
 Importing reference haplotype data...
 
 
-[32mComputing optimal haplotypes...100%|████████████████████| Time: 0:00:28[39m
+[32mComputing optimal haplotypes...100%|████████████████████| Time: 0:00:26[39m
 [32mPhasing...100%|█████████████████████████████████████████| Time: 0:00:05[39m
 
 
 Total windows = 1634, averaging ~ 508 unique haplotypes per window.
 
 Timings: 
-    Data import                     = 13.8493 seconds
-        import target data             = 3.61007 seconds
-        import compressed haplotypes   = 10.2393 seconds
-    Computing haplotype pair        = 28.5288 seconds
-        BLAS3 mul! to get M and N      = 1.20264 seconds per thread
-        haplopair search               = 22.9585 seconds per thread
-        initializing missing           = 0.121591 seconds per thread
-        allocating and viewing         = 0.337528 seconds per thread
-        index conversion               = 0.014748 seconds per thread
-    Phasing by win-win intersection = 5.92058 seconds
-        Window-by-window intersection  = 0.581821 seconds per thread
-        Breakpoint search              = 4.05849 seconds per thread
-        Recording result               = 0.146574 seconds per thread
-    Imputation                     = 3.65652 seconds
-        Imputing missing               = 0.0221378 seconds
-        Writing to file                = 3.63439 seconds
+    Data import                     = 13.2588 seconds
+        import target data             = 4.16205 seconds
+        import compressed haplotypes   = 9.09677 seconds
+    Computing haplotype pair        = 26.3008 seconds
+        BLAS3 mul! to get M and N      = 1.10473 seconds per thread
+        haplopair search               = 20.4958 seconds per thread
+        initializing missing           = 0.1148 seconds per thread
+        allocating and viewing         = 0.208966 seconds per thread
+        index conversion               = 0.00789653 seconds per thread
+    Phasing by win-win intersection = 5.64613 seconds
+        Window-by-window intersection  = 0.571368 seconds per thread
+        Breakpoint search              = 3.71102 seconds per thread
+        Recording result               = 0.201057 seconds per thread
+    Imputation                     = 3.85517 seconds
+        Imputing missing               = 0.0245544 seconds
+        Writing to file                = 3.83061 seconds
 
-    Total time                      = 52.1137 seconds
+    Total time                      = 49.2067 seconds
 
- 58.377736 seconds (96.50 M allocations: 5.471 GiB, 4.24% gc time)</code></pre><h2 id="Estimate-admixture-proportions"><a class="docs-heading-anchor" href="#Estimate-admixture-proportions">Estimate admixture proportions</a><a id="Estimate-admixture-proportions-1"></a><a class="docs-heading-anchor-permalink" href="#Estimate-admixture-proportions" title="Permalink"></a></h2><ul><li>The <a href="https://openmendel.github.io/MendelImpute.jl/dev/man/api/#MendelImpute.composition">composition</a> will compute a list of percentages where <code>composition[i]</code> equals the sample&#39;s ancestry (in %) from <code>populations[i]</code>.</li><li>This illustration depends on <strong>data preparation</strong> above. </li></ul><h3 id="Step-1:-import-necessary-data"><a class="docs-heading-anchor" href="#Step-1:-import-necessary-data">Step 1: import necessary data</a><a id="Step-1:-import-necessary-data-1"></a><a class="docs-heading-anchor-permalink" href="#Step-1:-import-necessary-data" title="Permalink"></a></h3><pre><code class="language-julia"># First import compressed reference panel
+ 59.741822 seconds (118.80 M allocations: 7.179 GiB, 5.28% gc time)</code></pre><h3 id="Step-2:-import-phased-genotypes-from-JLSO-file"><a class="docs-heading-anchor" href="#Step-2:-import-phased-genotypes-from-JLSO-file">Step 2: import phased genotypes from JLSO file</a><a id="Step-2:-import-phased-genotypes-from-JLSO-file-1"></a><a class="docs-heading-anchor-permalink" href="#Step-2:-import-phased-genotypes-from-JLSO-file" title="Permalink"></a></h3><pre><code class="language-julia"># First import compressed reference panel
 reffile = &quot;ref.chr22.maxd1000.excludeTarget.jlso&quot;
 compressed_Hunique = MendelImpute.read_jlso(reffile)
 panelID = compressed_Hunique.sampleID
@@ -109,9 +106,8 @@ panelID = compressed_Hunique.sampleID
 tgtfile = &quot;target.chr22.typedOnly.masked.vcf.gz&quot;
 reader = VCF.Reader(openvcf(tgtfile, &quot;r&quot;))
 tgtID  = VCF.header(reader).sampleID
-sample_population = [refID_to_population[id] for id in tgtID]
 sample_superpopulation = [refID_to_superpopulation[id] for id in tgtID];</code></pre><pre><code class="language-julia"># here is each sample&#39;s super-population (sample 1 is EUR, sample 3 is EAS...etc)
-sample_superpopulation</code></pre><pre><code class="language-none">100-element Array{String,1}:
+sample_superpopulation</code></pre><pre><code class="language-none">100-element Vector{String}:
  &quot;EUR&quot;
  &quot;EUR&quot;
  &quot;EAS&quot;
@@ -137,7 +133,7 @@ sample_superpopulation</code></pre><pre><code class="language-none">100-element 
  &quot;EUR&quot;
  &quot;EUR&quot;
  &quot;SAS&quot;
- &quot;SAS&quot;</code></pre><h3 id="Step-2:-call-composition-function"><a class="docs-heading-anchor" href="#Step-2:-call-composition-function">Step 2: call <code>composition</code> function</a><a id="Step-2:-call-composition-function-1"></a><a class="docs-heading-anchor-permalink" href="#Step-2:-call-composition-function" title="Permalink"></a></h3><ul><li>The <a href="https://openmendel.github.io/MendelImpute.jl/dev/man/api/#MendelImpute.composition">composition</a> will compute a list of percentages where <code>composition[i]</code> equals the sample&#39;s ancestry (in %) from <code>populations[i]</code>.</li><li>We are finally using the imputation result stored in <code>ph</code>.</li></ul><pre><code class="language-julia">populations = MendelImpute.unique_populations(refID_to_superpopulation)
+ &quot;SAS&quot;</code></pre><h3 id="Step-3:-call-composition-function"><a class="docs-heading-anchor" href="#Step-3:-call-composition-function">Step 3: call <code>composition</code> function</a><a id="Step-3:-call-composition-function-1"></a><a class="docs-heading-anchor-permalink" href="#Step-3:-call-composition-function" title="Permalink"></a></h3><ul><li>The <a href="https://openmendel.github.io/MendelImpute.jl/dev/man/api/#MendelImpute.composition">composition</a> will compute a list of percentages where <code>composition[i]</code> equals the sample&#39;s ancestry (in %) from <code>populations[i]</code>.</li><li>We are finally using the imputation result stored in <code>ph</code>.</li></ul><pre><code class="language-julia">populations = MendelImpute.unique_populations(refID_to_superpopulation)
 @time sample1_comp = composition(ph[1], panelID, refID_to_superpopulation) # origin GBR (EUR)
 @time sample4_comp = composition(ph[4], panelID, refID_to_superpopulation) # origin CHS (EAS)
 @time sample84_comp = composition(ph[84], panelID, refID_to_superpopulation) # origin LWK (AFR)
@@ -158,14 +154,14 @@ println(&quot;sample 84 = &quot;, round(sample84_comp[1], digits=3), &quot; S. a
 println(&quot;sample 84 = &quot;, round(sample84_comp[2], digits=3), &quot; E. asian&quot;)
 println(&quot;sample 84 = &quot;, round(sample84_comp[3], digits=3), &quot; European&quot;)
 println(&quot;sample 84 = &quot;, round(sample84_comp[4], digits=3), &quot; Admixed-American&quot;)
-println(&quot;sample 84 = &quot;, round(sample84_comp[5], digits=3), &quot; Africans&quot;);</code></pre><pre><code class="language-none">  0.003909 seconds (26 allocations: 2.000 KiB)
-  0.000167 seconds (6 allocations: 544 bytes)
-  0.000185 seconds (6 allocations: 544 bytes)
+println(&quot;sample 84 = &quot;, round(sample84_comp[5], digits=3), &quot; Africans&quot;);</code></pre><pre><code class="language-none">  0.004967 seconds (24 allocations: 1.703 KiB, 96.70% compilation time)
+  0.000163 seconds (6 allocations: 544 bytes)
+  0.000177 seconds (6 allocations: 544 bytes)
 sample 1 = 0.652 S. asian
-sample 1 = 0.088 E. asian
+sample 1 = 0.089 E. asian
 sample 1 = 0.023 European
-sample 1 = 0.17 Admixed-American
-sample 1 = 0.067 Africans
+sample 1 = 0.169 Admixed-American
+sample 1 = 0.068 Africans
 
 sample 4 = 0.189 S. asian
 sample 4 = 0.061 E. asian
@@ -178,12 +174,39 @@ sample 84 = 0.014 E. asian
 sample 84 = 0.784 European
 sample 84 = 0.111 Admixed-American
 sample 84 = 0.025 Africans</code></pre><p>Here <code>sample1_comp[i]</code> equals the sample&#39;s estimated ancestry (in %) from <code>populations[i]</code>. </p><p><strong>Conclusion:</strong> We computed the population percentages for sample 1, 4, and 84 with respect to the 5 reference super populations. Thus sample 1 is 65% European, 10% South Asian, 20% American...etc. Sample 4 is 20% European, 70% East Asian,...etc. Sample 84 is 80% African and 5% European...etc. </p><h2 id="Chromosome-painting"><a class="docs-heading-anchor" href="#Chromosome-painting">Chromosome painting</a><a id="Chromosome-painting-1"></a><a class="docs-heading-anchor-permalink" href="#Chromosome-painting" title="Permalink"></a></h2><p>The main function is the <a href="https://openmendel.github.io/MendelImpute.jl/dev/man/api/#MendelImpute.paint">paint</a> function. For an imputed sample, it will convert <strong>each haplotype segment</strong> into a percentage indicating the segment&#39;s length in the chromosome. Then the list can be used for easy plotting. </p><p><strong>Note:</strong> this illustration depends on <strong>data preparation</strong> above. </p><h3 id="Step-1:-Choose-your-colors"><a class="docs-heading-anchor" href="#Step-1:-Choose-your-colors">Step 1: Choose your colors</a><a id="Step-1:-Choose-your-colors-1"></a><a class="docs-heading-anchor-permalink" href="#Step-1:-Choose-your-colors" title="Permalink"></a></h3><p>In this example, colors are arranged such that:</p><ul><li>Blue ≈ European/American</li><li>Red ≈ South/East Asian</li><li>Green ≈ African</li></ul><p>Of course, Julia lets you plot your favoriate colors. We pick our colors here: https://mdigi.tools/color-shades/#008000.</p><pre><code class="language-julia">continent = [&quot;SAS&quot;, &quot;EAS&quot;, &quot;EUR&quot;, &quot;AMR&quot;, &quot;AFR&quot;]
-continent_colors = [colorant&quot;#e6194B&quot;, colorant&quot;#800000&quot;, colorant&quot;#4363d8&quot;, colorant&quot;#0000b3&quot;, colorant&quot;#bfef45&quot;]</code></pre><p><img src="../output_15_0.svg" alt="svg"/></p><h3 id="Step-2:-Run-paint-funcion"><a class="docs-heading-anchor" href="#Step-2:-Run-paint-funcion">Step 2: Run <code>paint</code> funcion</a><a id="Step-2:-Run-paint-funcion-1"></a><a class="docs-heading-anchor-permalink" href="#Step-2:-Run-paint-funcion" title="Permalink"></a></h3><p>This function convert the imputed haplotype segments into a list of percentages (one list for each strand). This is simply a post-processing routine so that data can be used for easy plotting later.</p><pre><code class="language-julia">populations = unique_populations(refID_to_superpopulation)
+continent_colors = [colorant&quot;#e6194B&quot;, colorant&quot;#800000&quot;, colorant&quot;#4363d8&quot;, colorant&quot;#0000b3&quot;, colorant&quot;#bfef45&quot;]</code></pre><p><img src="../output_17_0.svg" alt="svg"/></p><h3 id="Step-2:-Run-paint-funcion"><a class="docs-heading-anchor" href="#Step-2:-Run-paint-funcion">Step 2: Run <code>paint</code> funcion</a><a id="Step-2:-Run-paint-funcion-1"></a><a class="docs-heading-anchor-permalink" href="#Step-2:-Run-paint-funcion" title="Permalink"></a></h3><p>This function convert the imputed haplotype segments into a list of percentages (one list for each strand). This is simply a post-processing routine so that data can be used for easy plotting later.</p><pre><code class="language-julia">populations = unique_populations(refID_to_superpopulation)
 @time sample1_s1_comp, sample1_s2_comp = paint(ph[1], panelID, refID_to_superpopulation, populations=populations)
 @time sample4_s1_comp, sample4_s2_comp = paint(ph[4], panelID, refID_to_superpopulation, populations=populations)
-@time sample84_s1_comp, sample84_s2_comp = paint(ph[84], panelID, refID_to_superpopulation, populations=populations);</code></pre><pre><code class="language-none">  0.072840 seconds (122.95 k allocations: 6.250 MiB)
-  0.000099 seconds (12 allocations: 19.906 KiB)
-  0.000104 seconds (12 allocations: 22.406 KiB)</code></pre><h3 id="Step-3:-Generate-plots-for-painted-chromosomes"><a class="docs-heading-anchor" href="#Step-3:-Generate-plots-for-painted-chromosomes">Step 3: Generate plots for painted chromosomes</a><a id="Step-3:-Generate-plots-for-painted-chromosomes-1"></a><a class="docs-heading-anchor-permalink" href="#Step-3:-Generate-plots-for-painted-chromosomes" title="Permalink"></a></h3><p>We found the <a href="https://github.com/JuliaPlots/StatsPlots.jl">StatsPlots.jl</a> package to be more useful for this purpose, although the code below still did the plotting in a very roundabout way. </p><pre><code class="language-julia">using StatsPlots, FixedPointNumbers
+@time sample84_s1_comp, sample84_s2_comp = paint(ph[84], panelID, refID_to_superpopulation, populations=populations);</code></pre><pre><code class="language-none">  0.080868 seconds (114.69 k allocations: 6.641 MiB, 98.85% compilation time)
+  0.000094 seconds (12 allocations: 19.906 KiB)
+  0.000101 seconds (12 allocations: 22.406 KiB)</code></pre><pre><code class="language-julia"># view phase information of haplotype 1 from sample 1
+[sample1_s1_comp[1] sample1_s1_comp[2]]</code></pre><pre><code class="language-none">545×2 Matrix{Any}:
+ 0.000562617  &quot;AFR&quot;
+ 0.000447699  &quot;AMR&quot;
+ 0.000476429  &quot;EUR&quot;
+ 0.0002849    &quot;EUR&quot;
+ 0.0001221    &quot;EUR&quot;
+ 7.66117e-5   &quot;EUR&quot;
+ 0.000287294  &quot;EUR&quot;
+ 0.000411788  &quot;EAS&quot;
+ 0.000205894  &quot;EAS&quot;
+ 0.00117072   &quot;EUR&quot;
+ 0.00320811   &quot;EUR&quot;
+ 0.00117312   &quot;EUR&quot;
+ 0.00103426   &quot;EUR&quot;
+ ⋮            
+ 0.00115636   &quot;AMR&quot;
+ 0.00370609   &quot;EUR&quot;
+ 0.000323205  &quot;EAS&quot;
+ 0.00120424   &quot;EUR&quot;
+ 0.000433335  &quot;EUR&quot;
+ 0.00104623   &quot;EUR&quot;
+ 0.00195839   &quot;EUR&quot;
+ 0.00037827   &quot;EUR&quot;
+ 0.000926522  &quot;EUR&quot;
+ 0.000938493  &quot;EAS&quot;
+ 0.000646411  &quot;EUR&quot;
+ 0.00162321   &quot;EUR&quot;</code></pre><h3 id="Step-3:-Generate-plots-for-painted-chromosomes"><a class="docs-heading-anchor" href="#Step-3:-Generate-plots-for-painted-chromosomes">Step 3: Generate plots for painted chromosomes</a><a id="Step-3:-Generate-plots-for-painted-chromosomes-1"></a><a class="docs-heading-anchor-permalink" href="#Step-3:-Generate-plots-for-painted-chromosomes" title="Permalink"></a></h3><p>We found the <a href="https://github.com/JuliaPlots/StatsPlots.jl">StatsPlots.jl</a> (version 0.14.17) package to be more useful for this purpose, although the code below still did the plotting in a very roundabout way. Newer StatsPlots version breaks this plotting code. To pin <code>StatsPlots</code> to the correct version, execute <code>]pin StatsPlots@v0.14.17</code> in Julia.</p><pre><code class="language-julia">using StatsPlots, FixedPointNumbers
 
 # assign a color to each haplotype segment
 sample1_s1_colors = [continent_colors[findfirst(x -&gt; x == pop, continent)] for pop in sample1_s1_comp[2]]
@@ -239,4 +262,6 @@ color_y = collect(1:1:5)
 admixture_chrom_plt = scatter!(color_x, color_y, color=reverse(continent_colors), ytick=(1:1:5, reverse(continent)), 
     xrange=(0.9, 1.1), xtick=false, label=:none, markersize=8, ytickfont=font(16),
     grid=false, framestyle=:grid, mirror=true, tick_direction=:out, markershape=:rect,
-    inset = (1, bbox(-0.05, 0.0, 0.05, 1.0, :bottom, :right)), subplot = 2)</code></pre><p><img src="../output_19_0.svg" alt="svg"/></p><p><strong>Conclusion:</strong> </p><ul><li>We can visualize the linkage patterns for the 3 samples across their 6 haplotypes</li><li>Sample 1 is mostly European and admixed American, sample 2 is mainly South/East Asian, and sample 3 is mainly African.</li></ul><p><strong>Note:</strong> this example should not be taken too literally, since we <em>did not</em> exclude admixed samples from the reference panel. For more details, please refer to our paper, or file an issue on GitHub. </p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../performance/">« Performance Gotchas</a><a class="docs-footer-nextpage" href="../ultra+compress/">Ultra compression »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Tuesday 20 April 2021 23:03">Tuesday 20 April 2021</span>. Using Julia version 1.5.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+    inset = (1, bbox(-0.05, 0.0, 0.05, 1.0, :bottom, :right)), subplot = 2)</code></pre><p><img src="../output_22_0.svg" alt="svg"/></p><pre><code class="language-julia">]st StatsPlots # ensure StatsPlots version is v0.14.17</code></pre><pre><code class="language-none">[36m[1m     Project[22m[39m MendelImpute v1.1.0
+[32m[1m      Status[22m[39m `~/.julia/dev/MendelImpute/Project.toml`
+ [90m [f3b207a7] [39m[37mStatsPlots v0.14.17 ⚲[39m</code></pre><p><strong>Conclusion:</strong> </p><ul><li>We can visualize the linkage patterns for the 3 samples across their 6 haplotypes</li><li>Sample 1 is mostly European and admixed American, sample 2 is mainly South/East Asian, and sample 3 is mainly African.</li></ul><p><strong>Note:</strong> this example should not be taken too literally, since we <em>did not</em> exclude admixed samples from the reference panel. For more details, please refer to our paper, or file an issue on GitHub. </p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../performance/">« Performance Gotchas</a><a class="docs-footer-nextpage" href="../ultra+compress/">Ultra compression »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Thursday 22 April 2021 22:36">Thursday 22 April 2021</span>. Using Julia version 1.5.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
