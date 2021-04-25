@@ -3,6 +3,57 @@
 ###### computation of poplation admixtures.
 
 """
+    admixture_global(tgtfile::String, reffile::String, outfile::String,
+        refID_to_population::Dict{String, String})
+
+Computes global ancestry estimates for each sample in `tgtfile` using a labeled
+reference panel `reffile`. 
+
+# Inputs
+- `tgtfile`: VCF or PLINK files. VCF files should end in `.vcf` or `.vcf.gz`.
+    PLINK files should exclude `.bim/.bed/.fam` trailings but the trio must all
+    be present in the same directory.
+- `reffile`: Reference haplotype file ending in `.jlso` (compressed binary files).
+    See [`compress_haplotypes`](@ref).
+- `refID_to_population`: A dictionary mapping each sample IDs in the haplotype 
+    reference panel to their population origin. For examples, see
+    [`thousand_genome_population_to_superpopulation`](@ref) and
+    [`thousand_genome_samples_to_super_population`](@ref)
+
+# Output
+- `Q`: A `DataFrame` containing estimated ancestry fractions. Each row is a sample.
+    Matrix will be saved in `mendelimpute.ancestry.Q`
+"""
+function admixture_global(
+    tgtfile::AbstractString,
+    reffile::AbstractString,
+    refID_to_population::Dict{String, String}
+    )
+    if !endswith(reffile, ".jlso")
+        throw(ArgumentError("Reference file must be JLSO compressed!"))
+    end
+    outfile = "mendelimpute.ancestry.Q"
+
+    # compute each person's phase information
+    ph = phase(tgtfile, reffile, outfile * ".jlso")
+
+    # get ref sample IDs
+    refID = MendelImpute.read_jlso(reffile).sampleID
+
+    # compute sample composition using MendelImpute
+    populations = unique(values(refID_to_population))
+    Q = DataFrame(zeros(length(ph), length(populations)), populations)
+    for i in 1:length(ph)
+        Q[i, :] .= composition(ph[i], refID, refID_to_population, populations=populations)
+    end
+
+    # save result in dataframe
+    CSV.write(outfile, Q)
+
+    return Q
+end
+
+"""
     composition(sample_phase::HaplotypeMosaicPair, panelID::Vector{String}, 
         refID_to_population::Dict{String, String}, [populations::Vector{String}])
 
@@ -27,11 +78,11 @@ function composition(
     sample_phase::HaplotypeMosaicPair,
     panelID::Vector{String},
     refID_to_population::Dict{String, String};
-    populations::Vector{String} = unique_populations(refID_to_population)
+    populations::Vector{String} = unique(values(refID_to_population))
     )
     snps = sample_phase.strand1.length
     @assert snps == sample_phase.strand2.length "strands have different length!"
-    
+
     # return elements
     composition = zeros(length(populations))
 
@@ -79,20 +130,6 @@ function composition(
 end
 
 """
-    unique_populations(x::Dict{String, String})
-
-Computes the unique list of populations, preserving order. `x` is a `Dict`
-where each sample is a key and populations are values. 
-"""
-function unique_populations(x::Dict{String, String})
-    populations = String[]
-    for (key, val) in x
-        val ∉ populations && push!(populations, val)
-    end
-    return populations
-end
-
-"""
     paint(sample_phase::HaplotypeMosaicPair, panelID::Vector{String},
         refID_to_population::Dict{String, String}, populations::Vector{String})
 
@@ -117,7 +154,7 @@ function paint(
     sample_phase::HaplotypeMosaicPair,
     panelID::Vector{String},
     refID_to_population::Dict{String, String};
-    populations::Vector{String} = unique_populations(refID_to_population)
+    populations::Vector{String} = unique(values(refID_to_population))
     )
     snps = sample_phase.strand1.length
     @assert snps == sample_phase.strand2.length "strands have different length!"

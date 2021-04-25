@@ -19,6 +19,7 @@ ending in `sample.error`.
     PLINK files should exclude `.bim/.bed/.fam` trailings but the trio must all
     be present in the same directory.
 - `reffile`: Reference haplotype file ending in `.jlso` (compressed binary files).
+    See [`compress_haplotypes`](@ref)
 - `outfile`: output filename ending in `.vcf.gz`, `.vcf`, or `.jlso`. VCF output
     genotypes will have no missing data. If ending in `.jlso`, will output
     ultra-compressed data structure recording `HaplotypeMosaicPair`s for 
