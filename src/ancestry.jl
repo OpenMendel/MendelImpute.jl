@@ -54,6 +54,76 @@ function admixture_global(
 end
 
 """
+Data structure that stores one haplotype's local admixture information. The haplotype
+is decomposed into segments whose individual length sums to 1. The lengths are stored 
+in `composition`. Each segment `composition[i]` has an ancestry stored in 
+`population_origins[i]`.
+"""
+struct HapolotypeAdmixture
+    composition :: Vector{Float64}
+    population_origins :: Vector{String}
+end
+Base.length(x::HapolotypeAdmixture) = length(x.composition)
+
+"""
+Data structure that stores a sample's (local) admixture information for both haplotypes
+"""
+struct SampleAdmixture
+    H1 :: HapolotypeAdmixture
+    H2 :: HapolotypeAdmixture
+end
+
+"""
+Returns length of `x.H1` or `x.H2`, which ever is greater. 
+"""
+Base.length(x::SampleAdmixture) = max(length(x.H1), length(x.H2))
+
+function admixture_local(
+    tgtfile::AbstractString,
+    reffile::AbstractString,
+    refID_to_population::Dict{String, String};
+    populations::Vector{String} = unique(values(refID_to_population)),
+    goodcolors::Vector
+    )
+    if !endswith(reffile, ".jlso")
+        throw(ArgumentError("Reference file must be JLSO compressed!"))
+    end
+    length(goodcolors) == length(populations) || error("goodcolors should have " * 
+        "same length as populations!")
+
+    # compute each person's phase information
+    outfile = "mendelimpute.ancestry.Q"
+    ph = phase(tgtfile, reffile, outfile * "mendelimpute.ancestry.Q.jlso")
+
+    # get ref sample IDs
+    refID = MendelImpute.read_jlso(reffile).sampleID
+
+    # compute each sample's composition
+    sample_admixture = Vector{SampleAdmixture}(undef, length(ph))
+    for i in 1:length(ph)
+        sample_admixture[i] = paint(ph[i], refID, refID_to_population, populations=populations)
+    end
+
+    # calculate admixture matrix and matrix of colors for easy plotting
+    Q = zeros(2length(ph), length(sample_admixture))
+    pop_colors = Matrix{eltype(goodcolors)}(undef, 2length(ph), length(sample_admixture))
+    for i in 1:length(ph)
+        l1 = length(sample_admixture[i].H1)
+        l2 = length(sample_admixture[i].H2)
+        Q[2i - 1, 1:l1] .= sample_admixture[i].H1.composition
+        Q[2i,     1:l2] .= sample_admixture[i].H2.composition
+        for (j, pop) in enumerate(sample_admixture[i].H1.population_origins)
+            pop_colors[2i - 1, j] = goodcolors[findfirst(x -> x == pop, populations)]
+        end
+        for (j, pop) in enumerate(sample_admixture[i].H2.population_origins)
+            pop_colors[2i, j] = goodcolors[findfirst(x -> x == pop, populations)]
+        end
+    end
+
+    return Q, pop_colors
+end
+
+"""
     composition(sample_phase::HaplotypeMosaicPair, panelID::Vector{String}, 
         refID_to_population::Dict{String, String}, [populations::Vector{String}])
 
@@ -147,8 +217,12 @@ function is used for easier plotting a "painted chromosome".
 - `populations`: A unique list of populations present in `refID_to_population`
 
 # Output
-- `composition`: A list of percentages where `composition[i]` equals the
-    sample's ancestry (in %) from `populations[i]` 
+- `s1_composition`: Haplotype 1's composition is stored in `s1_composition[1]`,
+    which is a list of percentages such that `sum(s1_composition[1]) == 1`. Each
+    segment `s1_composition[1][i]` has ancestry stored in `s1_composition[2][i]`.
+- `s1_composition`: Haplotype 2's composition is stored in `s2_composition[1]`,
+    which is a list of percentages such that `sum(s2_composition[1]) == 1`. Each
+    segment `s2_composition[1][i]` has ancestry stored in `s2_composition[2][i]`.
 """
 function paint(
     sample_phase::HaplotypeMosaicPair,
@@ -206,7 +280,10 @@ function paint(
     sum(s1_composition[1]) ≈ 1.0 || error("strand 1 compositions should sum to 1")
     sum(s2_composition[1]) ≈ 1.0 || error("strand 1 compositions should sum to 1")
 
-    return s1_composition, s2_composition
+    s1 = HapolotypeAdmixture(s1_composition[1], s1_composition[2])
+    s2 = HapolotypeAdmixture(s2_composition[1], s2_composition[2])
+    return SampleAdmixture(s1, s2)
+    # return s1_composition, s2_composition
 end
 
 """

@@ -19,7 +19,7 @@ module MendelImpute
     export convert_compressed  # for ultra-compression outputs
 
     # functions for ancestry inference
-    export admixture_global
+    export admixture_global, admixture_local
     export paint, composition, unique_populations 
     export thousand_genome_population_to_superpopulation
     export thousand_genome_samples_to_population
