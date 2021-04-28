@@ -60,31 +60,31 @@ Q = admixture_global(tgtfile, reffile, refID_to_superpopulation, superpopulation
 Importing reference haplotype data...
 
 
-[32mComputing optimal haplotypes...100%|████████████████████| Time: 0:00:26[39m
+[32mComputing optimal haplotypes...100%|████████████████████| Time: 0:00:28[39m
 [32mPhasing...100%|█████████████████████████████████████████| Time: 0:00:05[39m
 
 
 Total windows = 1634, averaging ~ 508 unique haplotypes per window.
 
 Timings: 
-    Data import                     = 13.8528 seconds
-        import target data             = 4.12091 seconds
-        import compressed haplotypes   = 9.73192 seconds
-    Computing haplotype pair        = 26.8533 seconds
-        BLAS3 mul! to get M and N      = 1.09533 seconds per thread
-        haplopair search               = 20.4894 seconds per thread
-        initializing missing           = 0.116104 seconds per thread
-        allocating and viewing         = 0.20979 seconds per thread
-        index conversion               = 0.00986025 seconds per thread
-    Phasing by win-win intersection = 5.33033 seconds
-        Window-by-window intersection  = 0.594361 seconds per thread
-        Breakpoint search              = 3.30596 seconds per thread
-        Recording result               = 0.198279 seconds per thread
-    Imputation                     = 4.08516 seconds
-        Imputing missing               = 0.0261255 seconds
-        Writing to file                = 4.05904 seconds
+    Data import                     = 13.4081 seconds
+        import target data             = 4.22697 seconds
+        import compressed haplotypes   = 9.18115 seconds
+    Computing haplotype pair        = 28.9244 seconds
+        BLAS3 mul! to get M and N      = 1.17107 seconds per thread
+        haplopair search               = 22.3658 seconds per thread
+        initializing missing           = 0.123895 seconds per thread
+        allocating and viewing         = 0.225084 seconds per thread
+        index conversion               = 0.00800339 seconds per thread
+    Phasing by win-win intersection = 5.15749 seconds
+        Window-by-window intersection  = 0.577337 seconds per thread
+        Breakpoint search              = 3.25451 seconds per thread
+        Recording result               = 0.188439 seconds per thread
+    Imputation                     = 3.9812 seconds
+        Imputing missing               = 0.0254229 seconds
+        Writing to file                = 3.95578 seconds
 
-    Total time                      = 50.2979 seconds</code></pre><p>Each row of <code>Q</code> equals the sample&#39;s estimated ancestry (in %) from <code>superpopulations[i]</code>. For instance, sample 1 is 65% European, 8% South Asian, 2% African, 16% American, and 6% East Asian...etc</p><pre><code class="language-julia">@show Q[1:10, :]; # sample 1~10 composition</code></pre><pre><code class="language-none">Q[1:10, :] = 10×5 DataFrame
+    Total time                      = 51.6225 seconds</code></pre><p>Each row of <code>Q</code> equals the sample&#39;s estimated ancestry (in %) from <code>superpopulations[i]</code>. For instance, sample 1 is 6% East Asian, 8% South Asian, 2% African, 16% American, and 65% European...etc.</p><pre><code class="language-julia">@show Q[1:10, :]; # sample 1~10 composition</code></pre><pre><code class="language-none">Q[1:10, :] = 10×5 DataFrame
 │ Row │ EAS       │ SAS       │ AFR        │ AMR       │ EUR      │
 │     │ Float64   │ Float64   │ Float64    │ Float64   │ Float64  │
 ├─────┼───────────┼───────────┼────────────┼───────────┼──────────┤
@@ -97,13 +97,15 @@ Timings:
 │ 7   │ 0.103472  │ 0.0649164 │ 0.0136704  │ 0.425958  │ 0.391982 │
 │ 8   │ 0.0764429 │ 0.0729965 │ 0.0628898  │ 0.323463  │ 0.464208 │
 │ 9   │ 0.06995   │ 0.0772293 │ 0.0428307  │ 0.342301  │ 0.467689 │
-│ 10  │ 0.0644077 │ 0.0909931 │ 0.0358219  │ 0.293383  │ 0.515394 │</code></pre><p>We can visualize them in a plot you might have seen elsewhere</p><pre><code class="language-julia">global_plt = groupedbar(Matrix(Q), linecolor=nothing, bar_position = :stack,
+│ 10  │ 0.0644077 │ 0.0909931 │ 0.0358219  │ 0.293383  │ 0.515394 │</code></pre><p>We can visualize all samples&#39;s global admixture with a plot you might have seen elsewhere:</p><pre><code class="language-julia">global_plt = groupedbar(Matrix(Q), linecolor=nothing, bar_position = :stack,
     label=[&quot;EUR&quot; &quot;SAS&quot; &quot;AFR&quot; &quot;AMR&quot; &quot;EAS&quot;], legend=:outerright, size=(1000, 150), dpi=300)
 
 savefig(global_plt, &quot;global_admixture.png&quot;)
-display(&quot;image/png&quot;, read(&quot;global_admixture.png&quot;))</code></pre><p><img src="../output_11_0.png" alt="png"/></p><h2 id="Local-ancestry-inference"><a class="docs-heading-anchor" href="#Local-ancestry-inference">Local ancestry inference</a><a id="Local-ancestry-inference-1"></a><a class="docs-heading-anchor-permalink" href="#Local-ancestry-inference" title="Permalink"></a></h2><p>Now we turn to local ancestry inference, or chromosome painting. We still need to process each sample&#39;s population origin as detailed in the top of this page. </p><div class="admonition is-info"><header class="admonition-header">Note</header><div class="admonition-body"><p>The plotting code here depends on StatsPlots.jl at version v0.14.17. If plotting doesn&#39;t work, try <code>using Pkg;Pkg.pin(name=&quot;StatsPlots&quot;, version=&quot;0.14.17&quot;)</code>.</p></div></div><pre><code class="language-julia"># We pick our colors here: https://mdigi.tools/color-shades/#008000.
+display(&quot;image/png&quot;, read(&quot;global_admixture.png&quot;))</code></pre><p><img src="../output_11_0.png" alt="png"/></p><h2 id="Local-ancestry-inference"><a class="docs-heading-anchor" href="#Local-ancestry-inference">Local ancestry inference</a><a id="Local-ancestry-inference-1"></a><a class="docs-heading-anchor-permalink" href="#Local-ancestry-inference" title="Permalink"></a></h2><p>Now we turn to local ancestry inference, or chromosome painting. We still need to process each sample&#39;s population origin as detailed in the top of this page. The only difference is now you must additionally supply a color gradient for different populations manually. </p><div class="admonition is-info"><header class="admonition-header">Note</header><div class="admonition-body"><p>The plotting code here depends on StatsPlots.jl at version v0.14.17. If plotting doesn&#39;t work, try <code>using Pkg;Pkg.pin(name=&quot;StatsPlots&quot;, version=&quot;0.14.17&quot;)</code>.</p></div></div><pre><code class="language-julia"># We pick our colors here: https://mdigi.tools/color-shades/#008000.
 continent = [&quot;SAS&quot;, &quot;EAS&quot;, &quot;EUR&quot;, &quot;AMR&quot;, &quot;AFR&quot;]
-continent_colors = [colorant&quot;#e6194B&quot;, colorant&quot;#800000&quot;, colorant&quot;#4363d8&quot;, colorant&quot;#0000b3&quot;, colorant&quot;#bfef45&quot;]</code></pre><p><img src="../output_14_0.svg" alt="svg"/></p><pre><code class="language-julia"># run MendelImpute to get local ancestries
+continent_colors = [colorant&quot;#e6194B&quot;, colorant&quot;#800000&quot;, colorant&quot;#4363d8&quot;, colorant&quot;#0000b3&quot;, colorant&quot;#bfef45&quot;]
+
+# run MendelImpute to get local ancestries
 tgtfile = &quot;target.chr22.typedOnly.masked.vcf.gz&quot;
 reffile = &quot;ref.chr22.maxd1000.excludeTarget.jlso&quot;
 Q, pop_colors = admixture_local(tgtfile, reffile, refID_to_superpopulation, 
@@ -111,30 +113,31 @@ Q, pop_colors = admixture_local(tgtfile, reffile, refID_to_superpopulation,
 Importing reference haplotype data...
 
 
-[32mComputing optimal haplotypes...100%|████████████████████| Time: 0:00:21[39m
+[32mComputing optimal haplotypes...100%|████████████████████| Time: 0:00:24[39m
+[32mPhasing...100%|█████████████████████████████████████████| Time: 0:00:05[39m
 
 
 Total windows = 1634, averaging ~ 508 unique haplotypes per window.
 
 Timings: 
-    Data import                     = 8.94164 seconds
-        import target data             = 1.92282 seconds
-        import compressed haplotypes   = 7.01882 seconds
-    Computing haplotype pair        = 21.813 seconds
-        BLAS3 mul! to get M and N      = 1.07046 seconds per thread
-        haplopair search               = 20.4037 seconds per thread
-        initializing missing           = 0.114701 seconds per thread
-        allocating and viewing         = 0.207487 seconds per thread
-        index conversion               = 0.00793575 seconds per thread
-    Phasing by win-win intersection = 3.85876 seconds
-        Window-by-window intersection  = 0.593566 seconds per thread
-        Breakpoint search              = 3.05031 seconds per thread
-        Recording result               = 0.197227 seconds per thread
-    Imputation                     = 0.108493 seconds
-        Imputing missing               = 0.000611936 seconds
-        Writing to file                = 0.107881 seconds
+    Data import                     = 8.32839 seconds
+        import target data             = 1.71787 seconds
+        import compressed haplotypes   = 6.61052 seconds
+    Computing haplotype pair        = 24.912 seconds
+        BLAS3 mul! to get M and N      = 1.27734 seconds per thread
+        haplopair search               = 23.2227 seconds per thread
+        initializing missing           = 0.136352 seconds per thread
+        allocating and viewing         = 0.238768 seconds per thread
+        index conversion               = 0.0202952 seconds per thread
+    Phasing by win-win intersection = 5.7508 seconds
+        Window-by-window intersection  = 0.88523 seconds per thread
+        Breakpoint search              = 4.53825 seconds per thread
+        Recording result               = 0.299743 seconds per thread
+    Imputation                     = 0.172601 seconds
+        Imputing missing               = 0.00086028 seconds
+        Writing to file                = 0.171741 seconds
 
-    Total time                      = 34.7226 seconds</code></pre><p>Lets plot the local ancestries of</p><ul><li>Samples 1 (British)</li><li>Sample 4 (Chinese)</li><li>Sample 84 (Kenyan)</li></ul><p>Their haplotypes occupy rows 1-2, 7-8, and 167-168 of <code>Q</code>, and their haplotype colors are stored in corresponding rows of <code>pop_colors</code>. </p><pre><code class="language-julia"># sample index and axis labels
+    Total time                      = 39.1647 seconds</code></pre><p>Lets plot the local ancestries of</p><ul><li>Samples 1 (British)</li><li>Sample 4 (Chinese)</li><li>Sample 84 (Kenyan)</li></ul><p>Their haplotypes occupy rows 1-2, 7-8, and 167-168 of <code>Q</code>, and their haplotype colors are stored in corresponding rows of <code>pop_colors</code>. </p><pre><code class="language-julia"># sample index and axis labels
 sample_idx = [1, 2, 7, 8, 167, 168]
 sample_Q = Q[sample_idx, :]
 sample_color = pop_colors[sample_idx, :]
@@ -155,4 +158,4 @@ scatter!(local_plt, ones(xlength), collect(1:xlength), color=continent_colors, y
     inset = (1, bbox(-0.05, -0.1, 0.05, 1.1, :bottom, :right)), subplot = 2)
 
 # save figure
-# savefig(local_plt, &quot;local_admixture.png&quot;)</code></pre><p><img src="../output_17_0.svg" alt="svg"/></p><p><strong>Conclusion:</strong> </p><ul><li>We can visualize the linkage patterns for the 3 samples across their 6 haplotypes</li><li>Sample 1 (British) is mostly European and admixed American, sample 2 (Chinese) is mainly South/East Asian, and sample 3 (Kenyan) is mainly African.</li></ul><p><strong>Note:</strong> this example should not be taken too literally, since we <em>did not</em> exclude admixed samples from the reference panel. For more details, please refer to our paper, or file an issue on GitHub. </p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../performance/">« Performance Gotchas</a><a class="docs-footer-nextpage" href="../ultra+compress/">Ultra compression »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Wednesday 28 April 2021 04:52">Wednesday 28 April 2021</span>. Using Julia version 1.5.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+# savefig(local_plt, &quot;local_admixture.png&quot;)</code></pre><p><img src="../output_15_0.svg" alt="svg"/></p><p><strong>Conclusion:</strong> </p><ul><li>We can visualize the linkage patterns for the 3 samples across their 6 haplotypes</li><li>Sample 1 (British) is mostly European and admixed American, sample 2 (Chinese) is mainly South/East Asian, and sample 3 (Kenyan) is mainly African.</li></ul><p>For more details, please refer to our paper, or file an issue on GitHub. </p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../performance/">« Performance Gotchas</a><a class="docs-footer-nextpage" href="../ultra+compress/">Ultra compression »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Wednesday 28 April 2021 21:35">Wednesday 28 April 2021</span>. Using Julia version 1.5.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
