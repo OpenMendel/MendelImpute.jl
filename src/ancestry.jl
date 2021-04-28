@@ -3,8 +3,8 @@
 ###### computation of poplation admixtures.
 
 """
-    admixture_global(tgtfile::String, reffile::String, outfile::String,
-        refID_to_population::Dict{String, String})
+    admixture_global(tgtfile::String, reffile::String, 
+        refID_to_population::Dict{String, String}, populations::Vector{String})
 
 Computes global ancestry estimates for each sample in `tgtfile` using a labeled
 reference panel `reffile`. 
@@ -16,10 +16,10 @@ reference panel `reffile`.
 - `reffile`: Reference haplotype file ending in `.jlso` (compressed binary files).
     See [`compress_haplotypes`](@ref).
 - `refID_to_population`: A dictionary mapping each sample IDs in the haplotype 
-    reference panel to their population origin. For examples, see
+    reference panel to their population origin. For examples, see output of
     [`thousand_genome_population_to_superpopulation`](@ref) and
     [`thousand_genome_samples_to_super_population`](@ref)
-- `population`: A list `String` containing unique populations present in
+- `populations`: A vector of `String` containing unique populations present in
     `values(refID_to_population)`. 
 
 # Optional Inputs
@@ -77,7 +77,7 @@ reference panel `reffile`.
 - `reffile`: Reference haplotype file ending in `.jlso` (compressed binary files).
     See [`compress_haplotypes`](@ref).
 - `refID_to_population`: A dictionary mapping each sample IDs in the haplotype 
-    reference panel to their population origin. For examples, see
+    reference panel to their population origin. For examples, see output of
     [`thousand_genome_population_to_superpopulation`](@ref) and
     [`thousand_genome_samples_to_super_population`](@ref)
 - `population`: A list `String` containing unique populations present in
@@ -172,8 +172,10 @@ function is used for easier plotting a person's admixed proportions.
 - `sample_phase`: A `HaplotypeMosaicPair` storing phase information for a
     sample, includes haplotype start position and haplotype label.
 - `panelID`: Sample ID's in the reference haplotype panel
-- `refID_to_population`: A dictionary mapping each ID in the haplotype 
-    reference panel to its population origin. 
+- `refID_to_population`: A dictionary mapping each sample IDs in the haplotype 
+    reference panel to their population origin. For examples, see output of
+    [`thousand_genome_population_to_superpopulation`](@ref) and
+    [`thousand_genome_samples_to_super_population`](@ref)
 
 # Optional inputs
 - `populations`: A unique list of populations present in `refID_to_population`
@@ -248,8 +250,10 @@ function is used for easier plotting a "painted chromosome".
 - `sample_phase`: A `HaplotypeMosaicPair` storing phase information for a
     sample, includes haplotype start position and haplotype label.
 - `panelID`: Sample ID's in the reference haplotype panel
-- `refID_to_population`: A dictionary mapping each ID in the haplotype 
-    reference panel to its population origin. 
+- `refID_to_population`: A dictionary mapping each sample IDs in the haplotype 
+    reference panel to their population origin. For examples, see output of
+    [`thousand_genome_population_to_superpopulation`](@ref) and
+    [`thousand_genome_samples_to_super_population`](@ref)
 
 # Optional inputs
 - `populations`: A unique list of populations present in `refID_to_population`

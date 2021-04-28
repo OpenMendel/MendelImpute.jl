@@ -124,35 +124,35 @@ Q = admixture_global(tgtfile, reffile, refID_to_superpopulation, superpopulation
     Importing reference haplotype data...
 
 
-    [32mComputing optimal haplotypes...100%|████████████████████| Time: 0:00:26[39m
+    [32mComputing optimal haplotypes...100%|████████████████████| Time: 0:00:28[39m
     [32mPhasing...100%|█████████████████████████████████████████| Time: 0:00:05[39m
 
 
     Total windows = 1634, averaging ~ 508 unique haplotypes per window.
     
     Timings: 
-        Data import                     = 13.8528 seconds
-            import target data             = 4.12091 seconds
-            import compressed haplotypes   = 9.73192 seconds
-        Computing haplotype pair        = 26.8533 seconds
-            BLAS3 mul! to get M and N      = 1.09533 seconds per thread
-            haplopair search               = 20.4894 seconds per thread
-            initializing missing           = 0.116104 seconds per thread
-            allocating and viewing         = 0.20979 seconds per thread
-            index conversion               = 0.00986025 seconds per thread
-        Phasing by win-win intersection = 5.33033 seconds
-            Window-by-window intersection  = 0.594361 seconds per thread
-            Breakpoint search              = 3.30596 seconds per thread
-            Recording result               = 0.198279 seconds per thread
-        Imputation                     = 4.08516 seconds
-            Imputing missing               = 0.0261255 seconds
-            Writing to file                = 4.05904 seconds
+        Data import                     = 13.4081 seconds
+            import target data             = 4.22697 seconds
+            import compressed haplotypes   = 9.18115 seconds
+        Computing haplotype pair        = 28.9244 seconds
+            BLAS3 mul! to get M and N      = 1.17107 seconds per thread
+            haplopair search               = 22.3658 seconds per thread
+            initializing missing           = 0.123895 seconds per thread
+            allocating and viewing         = 0.225084 seconds per thread
+            index conversion               = 0.00800339 seconds per thread
+        Phasing by win-win intersection = 5.15749 seconds
+            Window-by-window intersection  = 0.577337 seconds per thread
+            Breakpoint search              = 3.25451 seconds per thread
+            Recording result               = 0.188439 seconds per thread
+        Imputation                     = 3.9812 seconds
+            Imputing missing               = 0.0254229 seconds
+            Writing to file                = 3.95578 seconds
     
-        Total time                      = 50.2979 seconds
+        Total time                      = 51.6225 seconds
     
 
 
-Each row of `Q` equals the sample's estimated ancestry (in %) from `superpopulations[i]`. For instance, sample 1 is 65% European, 8% South Asian, 2% African, 16% American, and 6% East Asian...etc
+Each row of `Q` equals the sample's estimated ancestry (in %) from `superpopulations[i]`. For instance, sample 1 is 6% East Asian, 8% South Asian, 2% African, 16% American, and 65% European...etc.
 
 
 ```julia
@@ -175,7 +175,7 @@ Each row of `Q` equals the sample's estimated ancestry (in %) from `superpopulat
     │ 10  │ 0.0644077 │ 0.0909931 │ 0.0358219  │ 0.293383  │ 0.515394 │
 
 
-We can visualize them in a plot you might have seen elsewhere
+We can visualize all samples's global admixture with a plot you might have seen elsewhere:
 
 
 ```julia
@@ -192,7 +192,7 @@ display("image/png", read("global_admixture.png"))
 
 ## Local ancestry inference
 
-Now we turn to local ancestry inference, or chromosome painting. We still need to process each sample's population origin as detailed in the top of this page. 
+Now we turn to local ancestry inference, or chromosome painting. We still need to process each sample's population origin as detailed in the top of this page. The only difference is now you must additionally supply a color gradient for different populations manually. 
 
 !!! note
 
@@ -203,17 +203,7 @@ Now we turn to local ancestry inference, or chromosome painting. We still need t
 # We pick our colors here: https://mdigi.tools/color-shades/#008000.
 continent = ["SAS", "EAS", "EUR", "AMR", "AFR"]
 continent_colors = [colorant"#e6194B", colorant"#800000", colorant"#4363d8", colorant"#0000b3", colorant"#bfef45"]
-```
 
-
-
-
-![svg](output_14_0.svg)
-
-
-
-
-```julia
 # run MendelImpute to get local ancestries
 tgtfile = "target.chr22.typedOnly.masked.vcf.gz"
 reffile = "ref.chr22.maxd1000.excludeTarget.jlso"
@@ -225,30 +215,31 @@ Q, pop_colors = admixture_local(tgtfile, reffile, refID_to_superpopulation,
     Importing reference haplotype data...
 
 
-    [32mComputing optimal haplotypes...100%|████████████████████| Time: 0:00:21[39m
+    [32mComputing optimal haplotypes...100%|████████████████████| Time: 0:00:24[39m
+    [32mPhasing...100%|█████████████████████████████████████████| Time: 0:00:05[39m
 
 
     Total windows = 1634, averaging ~ 508 unique haplotypes per window.
     
     Timings: 
-        Data import                     = 8.94164 seconds
-            import target data             = 1.92282 seconds
-            import compressed haplotypes   = 7.01882 seconds
-        Computing haplotype pair        = 21.813 seconds
-            BLAS3 mul! to get M and N      = 1.07046 seconds per thread
-            haplopair search               = 20.4037 seconds per thread
-            initializing missing           = 0.114701 seconds per thread
-            allocating and viewing         = 0.207487 seconds per thread
-            index conversion               = 0.00793575 seconds per thread
-        Phasing by win-win intersection = 3.85876 seconds
-            Window-by-window intersection  = 0.593566 seconds per thread
-            Breakpoint search              = 3.05031 seconds per thread
-            Recording result               = 0.197227 seconds per thread
-        Imputation                     = 0.108493 seconds
-            Imputing missing               = 0.000611936 seconds
-            Writing to file                = 0.107881 seconds
+        Data import                     = 8.32839 seconds
+            import target data             = 1.71787 seconds
+            import compressed haplotypes   = 6.61052 seconds
+        Computing haplotype pair        = 24.912 seconds
+            BLAS3 mul! to get M and N      = 1.27734 seconds per thread
+            haplopair search               = 23.2227 seconds per thread
+            initializing missing           = 0.136352 seconds per thread
+            allocating and viewing         = 0.238768 seconds per thread
+            index conversion               = 0.0202952 seconds per thread
+        Phasing by win-win intersection = 5.7508 seconds
+            Window-by-window intersection  = 0.88523 seconds per thread
+            Breakpoint search              = 4.53825 seconds per thread
+            Recording result               = 0.299743 seconds per thread
+        Imputation                     = 0.172601 seconds
+            Imputing missing               = 0.00086028 seconds
+            Writing to file                = 0.171741 seconds
     
-        Total time                      = 34.7226 seconds
+        Total time                      = 39.1647 seconds
     
 
 
@@ -288,7 +279,7 @@ scatter!(local_plt, ones(xlength), collect(1:xlength), color=continent_colors, y
 
 
 
-![svg](output_17_0.svg)
+![svg](output_15_0.svg)
 
 
 
@@ -296,4 +287,4 @@ scatter!(local_plt, ones(xlength), collect(1:xlength), color=continent_colors, y
 + We can visualize the linkage patterns for the 3 samples across their 6 haplotypes
 + Sample 1 (British) is mostly European and admixed American, sample 2 (Chinese) is mainly South/East Asian, and sample 3 (Kenyan) is mainly African.
 
-**Note:** this example should not be taken too literally, since we *did not* exclude admixed samples from the reference panel. For more details, please refer to our paper, or file an issue on GitHub. 
+For more details, please refer to our paper, or file an issue on GitHub. 
