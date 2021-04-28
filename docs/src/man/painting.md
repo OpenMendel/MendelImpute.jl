@@ -9,24 +9,13 @@ If samples in the reference haplotype panel are labeled with a population origin
 
 ```julia
 # first load all necessary packages
-using Revise
 using MendelImpute
-using VCFTools
-using VariantCallFormat
-using Random
-using DataFrames
 using StatsPlots
-using JLSO
-using CSV
 ```
-
-    ┌ Info: Precompiling MendelImpute [e47305d1-6a61-5370-bc5d-77554d143183]
-    └ @ Base loading.jl:1317
-
 
 ## Prepare Example data for illustration
 
-We use the [1000 genomes chromosome 22](http://bochet.gcc.biostat.washington.edu/beagle/1000_Genomes_phase3_v5a/b37.vcf/) as illustration.  The original data is filtered into target and reference panels. Follow [detailed example](https://openmendel.github.io/MendelImpute.jl/dev/man/Phasing+and+Imputation/#Detailed-Example) in Phasing and Imputation to obtain the same data.
+We use the [1000 genomes chromosome 22](http://bochet.gcc.biostat.washington.edu/beagle/1000_Genomes_phase3_v5a/b37.vcf/) as illustration.  The original data is filtered into target and reference panels. Follow [detailed example](https://openmendel.github.io/MendelImpute.jl/dev/man/Phasing_and_Imputation/#Detailed-Example) in Phasing and Imputation to obtain the same data.
 
 
 !!! note
@@ -37,9 +26,9 @@ We use the [1000 genomes chromosome 22](http://bochet.gcc.biostat.washington.edu
 
 ### Process each sample's population origin
 
-MendelImpute needs to know each reference sample's origin (country/ethnicity/region...etc). This origin information should be provided by the reference haplotype panel, but users are free to further organize origin labels base on their own criteria. `MendelImpute` need a `Dict{key, value}` where each key is a reference sample ID and the value is the population code. Example dictionaries for 1000 genome project can be created by `MendelImpute`'s internal helper functions. Users not using 1000 genomes would have to manually construct such a dictionary mapping reference sample IDs to a desired population label. 
+MendelImpute needs to know each reference sample's origin (country/ethnicity/region...etc). This origin information should be provided by the reference haplotype panel, but users are free to further organize origin labels base on their own criteria. For this purpose, `MendelImpute` needs a `Dict{key, value}` where each key is a reference sample ID and the value is the population code. Example dictionaries for 1000 genome project can be created by `MendelImpute`'s internal helper functions. Users not using 1000 genomes would have to manually construct such a dictionary mapping reference sample IDs to a desired population label. 
 
-Here is a dictionary mapping reference sample IDs to super population codes. 
+Here is a dictionary mapping sample IDs (from 1000 genomes project) to their super [population codes](https://www.internationalgenome.org/category/population/).
 
 
 ```julia
@@ -79,7 +68,7 @@ refID_to_superpopulation = thousand_genome_samples_to_super_population()
 
 
 
-Here are dictionaries converting population code to super population codes.
+Here is another dictionary mapping population code to super population codes. Thus we can map samples to super populations.
 
 
 ```julia
@@ -119,13 +108,9 @@ pop_to_superpop = thousand_genome_population_to_superpopulation()
 
 
 
-Note the [population codes](ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/1000_genomes_project/data/) for 1000 genome's samples are explained [here](https://www.internationalgenome.org/category/population/). 
-
 ## Global ancestry inference
 
 Running global ancestry inference will produce a matrix `Q` where row `i` is the ancestry proportion of sample `i`. 
-
-**Note:** Data used here is prepared in [Detailed Example](https://openmendel.github.io/MendelImpute.jl/dev/man/Phasing+and+Imputation/#Detailed-Example). 
 
 
 ```julia
@@ -139,31 +124,31 @@ Q = admixture_global(tgtfile, reffile, refID_to_superpopulation, superpopulation
     Importing reference haplotype data...
 
 
-    [32mComputing optimal haplotypes...100%|████████████████████| Time: 0:00:27[39m
+    [32mComputing optimal haplotypes...100%|████████████████████| Time: 0:00:26[39m
     [32mPhasing...100%|█████████████████████████████████████████| Time: 0:00:05[39m
 
 
     Total windows = 1634, averaging ~ 508 unique haplotypes per window.
     
     Timings: 
-        Data import                     = 14.271 seconds
-            import target data             = 4.6565 seconds
-            import compressed haplotypes   = 9.61448 seconds
-        Computing haplotype pair        = 28.399 seconds
-            BLAS3 mul! to get M and N      = 1.18484 seconds per thread
-            haplopair search               = 21.2065 seconds per thread
-            initializing missing           = 0.122075 seconds per thread
-            allocating and viewing         = 0.214212 seconds per thread
-            index conversion               = 0.0234457 seconds per thread
-        Phasing by win-win intersection = 5.8918 seconds
-            Window-by-window intersection  = 0.626495 seconds per thread
-            Breakpoint search              = 3.70797 seconds per thread
-            Recording result               = 0.215429 seconds per thread
-        Imputation                     = 4.47378 seconds
-            Imputing missing               = 0.027766 seconds
-            Writing to file                = 4.44602 seconds
+        Data import                     = 13.8528 seconds
+            import target data             = 4.12091 seconds
+            import compressed haplotypes   = 9.73192 seconds
+        Computing haplotype pair        = 26.8533 seconds
+            BLAS3 mul! to get M and N      = 1.09533 seconds per thread
+            haplopair search               = 20.4894 seconds per thread
+            initializing missing           = 0.116104 seconds per thread
+            allocating and viewing         = 0.20979 seconds per thread
+            index conversion               = 0.00986025 seconds per thread
+        Phasing by win-win intersection = 5.33033 seconds
+            Window-by-window intersection  = 0.594361 seconds per thread
+            Breakpoint search              = 3.30596 seconds per thread
+            Recording result               = 0.198279 seconds per thread
+        Imputation                     = 4.08516 seconds
+            Imputing missing               = 0.0261255 seconds
+            Writing to file                = 4.05904 seconds
     
-        Total time                      = 53.2124 seconds
+        Total time                      = 50.2979 seconds
     
 
 
@@ -202,7 +187,7 @@ display("image/png", read("global_admixture.png"))
 ```
 
 
-![png](output_12_0.png)
+![png](output_11_0.png)
 
 
 ## Local ancestry inference
@@ -223,7 +208,7 @@ continent_colors = [colorant"#e6194B", colorant"#800000", colorant"#4363d8", col
 
 
 
-![svg](output_15_0.svg)
+![svg](output_14_0.svg)
 
 
 
@@ -240,35 +225,39 @@ Q, pop_colors = admixture_local(tgtfile, reffile, refID_to_superpopulation,
     Importing reference haplotype data...
 
 
-    [32mComputing optimal haplotypes...100%|████████████████████| Time: 0:00:27[39m
-    [32mPhasing...100%|█████████████████████████████████████████| Time: 0:00:06[39m
+    [32mComputing optimal haplotypes...100%|████████████████████| Time: 0:00:21[39m
 
 
     Total windows = 1634, averaging ~ 508 unique haplotypes per window.
     
     Timings: 
-        Data import                     = 8.87272 seconds
-            import target data             = 2.25506 seconds
-            import compressed haplotypes   = 6.61767 seconds
-        Computing haplotype pair        = 27.7263 seconds
-            BLAS3 mul! to get M and N      = 1.37723 seconds per thread
-            haplopair search               = 25.9162 seconds per thread
-            initializing missing           = 0.146825 seconds per thread
-            allocating and viewing         = 0.264689 seconds per thread
-            index conversion               = 0.0104723 seconds per thread
-        Phasing by win-win intersection = 6.46958 seconds
-            Window-by-window intersection  = 0.912526 seconds per thread
-            Breakpoint search              = 5.21216 seconds per thread
-            Recording result               = 0.316624 seconds per thread
-        Imputation                     = 0.155461 seconds
-            Imputing missing               = 0.000771987 seconds
-            Writing to file                = 0.154689 seconds
+        Data import                     = 8.94164 seconds
+            import target data             = 1.92282 seconds
+            import compressed haplotypes   = 7.01882 seconds
+        Computing haplotype pair        = 21.813 seconds
+            BLAS3 mul! to get M and N      = 1.07046 seconds per thread
+            haplopair search               = 20.4037 seconds per thread
+            initializing missing           = 0.114701 seconds per thread
+            allocating and viewing         = 0.207487 seconds per thread
+            index conversion               = 0.00793575 seconds per thread
+        Phasing by win-win intersection = 3.85876 seconds
+            Window-by-window intersection  = 0.593566 seconds per thread
+            Breakpoint search              = 3.05031 seconds per thread
+            Recording result               = 0.197227 seconds per thread
+        Imputation                     = 0.108493 seconds
+            Imputing missing               = 0.000611936 seconds
+            Writing to file                = 0.107881 seconds
     
-        Total time                      = 43.225 seconds
+        Total time                      = 34.7226 seconds
     
 
 
-Lets plot the local ancestries of samples 1 (British), 4 (Chinese), and 84 (Kenyan). They occupy haplotypes 1-2, 7-8, and 167-168.
+Lets plot the local ancestries of
++ Samples 1 (British)
++ Sample 4 (Chinese)
++ Sample 84 (Kenyan)
+
+Their haplotypes occupy rows 1-2, 7-8, and 167-168 of `Q`, and their haplotype colors are stored in corresponding rows of `pop_colors`. 
 
 
 ```julia
@@ -276,10 +265,10 @@ Lets plot the local ancestries of samples 1 (British), 4 (Chinese), and 84 (Keny
 sample_idx = [1, 2, 7, 8, 167, 168]
 sample_Q = Q[sample_idx, :]
 sample_color = pop_colors[sample_idx, :]
-xnames = ["Sample 1 hap1", "Sample 1 hap2", "Sample 4 hap1", "Sample 4 hap2", "Sample 84 hap1", "Sample 84 hap2"]
-ynames = ["SNP 1", "SNP 208k", "SNP 417k"]
 
 # make plot
+xnames = ["Sample 1 hap1", "Sample 1 hap2", "Sample 4 hap1", "Sample 4 hap2", "Sample 84 hap1", "Sample 84 hap2"]
+ynames = ["SNP 1", "SNP 208k", "SNP 417k"]
 local_plt = groupedbar(sample_Q, bar_position = :stack, bar_width=0.7, label=:none, 
     color=sample_color, xticks=(1:1:6, xnames), yticks=(0:0.5:1, ynames),
     ytickfont=font(12), xtickfont=font(12), xrotation=20, grid=false, 
@@ -299,7 +288,7 @@ scatter!(local_plt, ones(xlength), collect(1:xlength), color=continent_colors, y
 
 
 
-![svg](output_18_0.svg)
+![svg](output_17_0.svg)
 
 
 
