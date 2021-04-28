@@ -19,6 +19,14 @@ reference panel `reffile`.
     reference panel to their population origin. For examples, see
     [`thousand_genome_population_to_superpopulation`](@ref) and
     [`thousand_genome_samples_to_super_population`](@ref)
+- `population`: A list `String` containing unique populations present in
+    `values(refID_to_population)`. 
+
+# Optional Inputs
+- `Q_outfile`: Output file name for the estimated `Q` matrix. Default
+    `Q_outfile="mendelimpute.ancestry.Q"`.
+- `imputed_outfile`: Output file name for the imputed genotypes ending in `.jlso`.
+    Default `impute_outfile = "mendelimpute.ancestry.Q.jlso"`
 
 # Output
 - `Q`: A `DataFrame` containing estimated ancestry fractions. Each row is a sample.
@@ -27,30 +35,105 @@ reference panel `reffile`.
 function admixture_global(
     tgtfile::AbstractString,
     reffile::AbstractString,
-    refID_to_population::Dict{String, String}
+    refID_to_population::Dict{String, String},
+    populations::Vector{String};
+    Q_outfile = "mendelimpute.ancestry.Q",
+    impute_outfile = "mendelimpute.ancestry.Q.jlso"
     )
     if !endswith(reffile, ".jlso")
         throw(ArgumentError("Reference file must be JLSO compressed!"))
     end
-    outfile = "mendelimpute.ancestry.Q"
 
     # compute each person's phase information
-    ph = phase(tgtfile, reffile, outfile * ".jlso")
+    ph = phase(tgtfile, reffile, impute_outfile)
 
     # get ref sample IDs
     refID = MendelImpute.read_jlso(reffile).sampleID
 
     # compute sample composition using MendelImpute
-    populations = unique(values(refID_to_population))
     Q = DataFrame(zeros(length(ph), length(populations)), populations)
     for i in 1:length(ph)
         Q[i, :] .= composition(ph[i], refID, refID_to_population, populations=populations)
     end
 
     # save result in dataframe
-    CSV.write(outfile, Q)
+    CSV.write(Q_outfile, Q)
 
     return Q
+end
+
+"""
+    admixture_local(tgtfile::String, reffile::String, 
+        refID_to_population::Dict{String, String}, populations::Vector{String},
+        population_colors::Vector{RGB{FixedPointNumbers.N0f8}})
+
+Computes global ancestry estimates for each sample in `tgtfile` using a labeled
+reference panel `reffile`. 
+
+# Inputs
+- `tgtfile`: VCF or PLINK files. VCF files should end in `.vcf` or `.vcf.gz`.
+    PLINK files should exclude `.bim/.bed/.fam` trailings but the trio must all
+    be present in the same directory.
+- `reffile`: Reference haplotype file ending in `.jlso` (compressed binary files).
+    See [`compress_haplotypes`](@ref).
+- `refID_to_population`: A dictionary mapping each sample IDs in the haplotype 
+    reference panel to their population origin. For examples, see
+    [`thousand_genome_population_to_superpopulation`](@ref) and
+    [`thousand_genome_samples_to_super_population`](@ref)
+- `population`: A list `String` containing unique populations present in
+    `values(refID_to_population)`. 
+- `population_colors`: A vector of colors for each population.
+    `typeof(population_colors}` should be `Vector{RGB{FixedPointNumbers.N0f8}}`
+
+# Output
+- `Q`: Matrix containing estimated ancestry fractions. Each row is a haplotype.
+    Sample 1's haplotypes are in rows 1 and 2, sample 2's are in rows 3, 4...etc.
+- `pop_colors`: Matrix with sample dimension of `Q` storing colors. 
+"""
+function admixture_local(
+    tgtfile::AbstractString,
+    reffile::AbstractString,
+    refID_to_population::Dict{String, String},
+    populations::Vector{String},
+    population_colors::Vector;
+    outfile::AbstractString = "mendelimpute.ancestry.jlso"
+    )
+    if !endswith(reffile, ".jlso")
+        throw(ArgumentError("Reference file must be JLSO compressed!"))
+    end
+    length(population_colors) == length(populations) || error("population_colors" * 
+        "  should have same length as populations!")
+
+    # compute each person's phase information
+    ph = phase(tgtfile, reffile, outfile)
+
+    # get ref sample IDs
+    refID = MendelImpute.read_jlso(reffile).sampleID
+
+    # compute each sample's composition
+    sample_admixture = Vector{SampleAdmixture}(undef, length(ph))
+    for i in 1:length(ph)
+        sample_admixture[i] = paint(ph[i], refID, refID_to_population, populations=populations)
+    end
+    max_segments = maximum(length.(sample_admixture))
+
+    # calculate admixture matrix and matrix of colors for easy plotting
+    Q = zeros(2length(ph), max_segments)
+    pop_colors = Matrix{eltype(population_colors)}(undef, 2length(ph), max_segments)
+    for i in 1:length(ph)
+        l1 = length(sample_admixture[i].H1)
+        l2 = length(sample_admixture[i].H2)
+        Q[2i - 1, 1:l1] .= sample_admixture[i].H1.composition
+        Q[2i,     1:l2] .= sample_admixture[i].H2.composition
+        for (j, pop) in enumerate(sample_admixture[i].H1.population_origins)
+            pop_colors[2i - 1, j] = population_colors[findfirst(x -> x == pop, populations)]
+        end
+        for (j, pop) in enumerate(sample_admixture[i].H2.population_origins)
+            pop_colors[2i, j] = population_colors[findfirst(x -> x == pop, populations)]
+        end
+    end
+
+    return Q, pop_colors
 end
 
 """
@@ -77,51 +160,6 @@ end
 Returns length of `x.H1` or `x.H2`, which ever is greater. 
 """
 Base.length(x::SampleAdmixture) = max(length(x.H1), length(x.H2))
-
-function admixture_local(
-    tgtfile::AbstractString,
-    reffile::AbstractString,
-    refID_to_population::Dict{String, String};
-    populations::Vector{String} = unique(values(refID_to_population)),
-    goodcolors::Vector
-    )
-    if !endswith(reffile, ".jlso")
-        throw(ArgumentError("Reference file must be JLSO compressed!"))
-    end
-    length(goodcolors) == length(populations) || error("goodcolors should have " * 
-        "same length as populations!")
-
-    # compute each person's phase information
-    outfile = "mendelimpute.ancestry.Q"
-    ph = phase(tgtfile, reffile, outfile * "mendelimpute.ancestry.Q.jlso")
-
-    # get ref sample IDs
-    refID = MendelImpute.read_jlso(reffile).sampleID
-
-    # compute each sample's composition
-    sample_admixture = Vector{SampleAdmixture}(undef, length(ph))
-    for i in 1:length(ph)
-        sample_admixture[i] = paint(ph[i], refID, refID_to_population, populations=populations)
-    end
-
-    # calculate admixture matrix and matrix of colors for easy plotting
-    Q = zeros(2length(ph), length(sample_admixture))
-    pop_colors = Matrix{eltype(goodcolors)}(undef, 2length(ph), length(sample_admixture))
-    for i in 1:length(ph)
-        l1 = length(sample_admixture[i].H1)
-        l2 = length(sample_admixture[i].H2)
-        Q[2i - 1, 1:l1] .= sample_admixture[i].H1.composition
-        Q[2i,     1:l2] .= sample_admixture[i].H2.composition
-        for (j, pop) in enumerate(sample_admixture[i].H1.population_origins)
-            pop_colors[2i - 1, j] = goodcolors[findfirst(x -> x == pop, populations)]
-        end
-        for (j, pop) in enumerate(sample_admixture[i].H2.population_origins)
-            pop_colors[2i, j] = goodcolors[findfirst(x -> x == pop, populations)]
-        end
-    end
-
-    return Q, pop_colors
-end
 
 """
     composition(sample_phase::HaplotypeMosaicPair, panelID::Vector{String}, 
