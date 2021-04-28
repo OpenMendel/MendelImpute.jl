@@ -20,7 +20,7 @@ module MendelImpute
 
     # functions for ancestry inference
     export admixture_global, admixture_local
-    export paint, composition, unique_populations 
+    export paint, composition 
     export thousand_genome_population_to_superpopulation
     export thousand_genome_samples_to_population
     export thousand_genome_samples_to_super_population
