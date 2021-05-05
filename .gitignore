@@ -6,10 +6,6 @@
 biona001@hoffman2.idre.ucla.edu
 *.sample.error
 
-# don't track real data
-AFRped_geno.txt
-GBR_data.csv
-
 # don't track simulations 
 test/*.gz
 simulation/*/*.gz
@@ -18,6 +14,15 @@ simulation/*/*.jlso
 simulation/*.gz
 test/*.vcf
 test/*.vcf.gz
+
+# aux files from manuscript
+manuscript/sec4.3/*.summary
+manuscript/sec4.3/*.png
+manuscript/sec4.3/*.Q
+manuscript/sec4.3/*.P
+manuscript/sec4.3/*.bim
+manuscript/sec4.3/*.bed
+manuscript/sec4.3/*.fam
 
 # example data only track target genotype, reference haplotype, and true genotypes
 data/full.vcf
@@ -28,9 +33,14 @@ data/imputed.sample.error
 data/ref.excludeTarget.jlso
 data/imputed.jlso
 
-# don't track real data 
+# don't track real data
+AFRped_geno.txt
+GBR_data.csv
 data/1000_genome_phase3_v5/*/*.gz
 data/1000_genome_phase3_v5/*/*.jlso
+data/1000_genome_phase3_v5/*/*.png
+data/1000_genome_phase3_v5/*/*.maf
+data/1000_genome_phase3_v5/*/*.bed
 data/HRC/*.gz
 data/HRC/*.jlso
 data/omni_chips
