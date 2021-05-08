@@ -17,7 +17,6 @@ test/*.vcf.gz
 
 # aux files from manuscript
 manuscript/sec4.3/*.summary
-manuscript/sec4.3/*.png
 manuscript/sec4.3/*.Q
 manuscript/sec4.3/*.P
 manuscript/sec4.3/*.bim
