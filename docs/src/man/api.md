@@ -13,7 +13,6 @@ Pages = ["api.md"]
 ```@docs
 phase
 compress_haplotypes
-unique_populations
 convert_compressed
 admixture_global
 admixture_local

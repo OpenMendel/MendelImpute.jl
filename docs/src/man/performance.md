@@ -14,7 +14,7 @@ To run `MendelImpute.jl` in parallel,
 
 ## Gotcha 2: Compressing haplotype panels is slow
 
-Currently every new set of typed SNPs requires a new compressed reference haplotype panel. The compression routine is slow because reading raw VCF files is slow. Thus, it is highly advised that one try to use the same set of typed SNPs as much as possible. 
+Currently it is recommended to build a new compressed reference haplotype panel for every new set of typed SNPs (although this is not strictly required). The compression routine is slow because reading raw VCF files is slow. Thus, it is highly advised that one try to use the same set of typed SNPs as much as possible. 
 
 We are actively developing a new set of functions in [SnpArrays.jl](https://github.com/OpenMendel/SnpArrays.jl) to alleviate this problem. Since SnpArrays use memory mapping, read times can be improved dramatically. 
 
