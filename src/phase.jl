@@ -90,12 +90,16 @@ function phase(
         error("SNP $snp is in target genotype file but is not in reference file!" * 
             "All SNPs in target genotype file must be in reference file!")
     end
+    length(unique(X_chr)) > 1 && error("Detected >1 chromosome in target file.")
+    all(compressed_Hunique.refallele[XtoH_idx] .== X_ref) || error("SNP ", 
+        findfirst(compressed_Hunique.refallele[XtoH_idx] .!= X_ref), "at position ",
+        X_pos[findfirst(compressed_Hunique.refallele[XtoH_idx] .!= X_ref)],
+        " has different ALT/REF label in reference panel")
     genotype_import_time = time() - genotype_import_start
     import_data_time = time() - ref_import_start
 
     # some constants and timers
     people = size(X, 2)
-    tgt_snps = size(X, 1)
     ref_snps = length(compressed_Hunique.pos)
     windows = nwindows(compressed_Hunique)
     num_unique_haps = round(Int, avg_haplotypes_per_window(compressed_Hunique))
