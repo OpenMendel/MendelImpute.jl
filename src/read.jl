@@ -19,12 +19,12 @@ Imports dosage information and chr/pos/snpID/ref/alt into numeric arrays.
 - `Gref`: Vector of `String`s holding reference allele for each variant
 - `Galt`: Vector of `String`s holding alterante allele for each variant
 """
-function convert_gt(b::Bgen, T=Float32)
+function convert_gt(t::Type{T}, b::Bgen) where T <: Real
     n = n_samples(b)
     p = n_variants(b)
 
     # return arrays
-    G = Matrix{T}(undef, p, n)
+    G = Matrix{t}(undef, p, n)
     Gchr = Vector{String}(undef, p)
     Gpos = Vector{Int}(undef, p)
     GsnpID = Vector{String}(undef, p)
@@ -34,14 +34,15 @@ function convert_gt(b::Bgen, T=Float32)
     # loop over each variant
     i = 1
     for v in iterator(b; from_bgen_start=true)
-        dose = minor_allele_dosage!(b, v; T=T)
+        dose = ref_allele_dosage!(b, v; T=t) # this reads REF allele as 1
+        BGEN.alt_dosage!(dose, v.genotypes.preamble) # switch 2 and 0 (ie treat ALT as 1)
         copyto!(@view(G[i, :]), dose)
         Gchr[i], Gpos[i], GsnpID[i], Gref[i], Galt[i] =
             chrom(v), pos(v), rsid(v), major_allele(v), minor_allele(v)
         i += 1
         clear!(v)
     end
-    return G, Gchr, Gpos, GsnpID, Gref, Galt
+    return G, b.samples, Gchr, Gpos, GsnpID, Gref, Galt
 end
 
 """
@@ -76,14 +77,13 @@ function convert_ht(b::Bgen)
     i = 1
     for v in iterator(b; from_bgen_start=true)
         dose = probabilities!(b, v)
-        phased(v) || error("variant $(rsid(v)) at position $(pos(v)) not phased!")
+        phased(v) == true || error("variant $(rsid(v)) at position $(pos(v)) not phased!")
         for j in 1:n_samples(b)
             Hi = @view(dose[:, j])
             H[i, 2j - 1] = read_haplotype1(Hi)
             H[i, 2j] = read_haplotype2(Hi)
         end
-        Hchr[i], Hpos[i], HsnpID[i], Href[i], Halt[i] =
-            chrom(v), pos(v), rsid(v), major_allele(v), minor_allele(v)
+        Hchr[i], Hpos[i], HsnpID[i] = chrom(v), pos(v), rsid(v)
         i += 1
         clear!(v)
     end
