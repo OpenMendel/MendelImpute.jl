@@ -37,8 +37,10 @@ function convert_gt(t::Type{T}, b::Bgen) where T <: Real
         dose = ref_allele_dosage!(b, v; T=t) # this reads REF allele as 1
         BGEN.alt_dosage!(dose, v.genotypes.preamble) # switch 2 and 0 (ie treat ALT as 1)
         copyto!(@view(G[i, :]), dose)
-        Gchr[i], Gpos[i], GsnpID[i], Gref[i], Galt[i] =
-            chrom(v), pos(v), rsid(v), major_allele(v), minor_allele(v)
+        Gchr[i], Gpos[i], GsnpID[i] = chrom(v), pos(v), rsid(v)
+        ref_alt_alleles = alleles(v)
+        length(ref_alt_alleles) > 2 && error("Marker $i of BGEN is not biallelic!")
+        Gref[i], Galt[i] = ref_alt_alleles[1], ref_alt_alleles[2]
         i += 1
         clear!(v)
     end
