@@ -25,7 +25,7 @@ function convert_gt(t::Type{T}, b::Bgen) where T <: Real
     p = n_variants(b)
 
     # return arrays
-    G = Matrix{t}(undef, p, n)
+    G = Matrix{Union{Missing, t}}(undef, p, n)
     Gchr = Vector{String}(undef, p)
     Gpos = Vector{Int}(undef, p)
     GsnpID = [String[] for _ in 1:p] # each variant can have >1 rsid, although we don't presently allow this
@@ -48,6 +48,10 @@ function convert_gt(t::Type{T}, b::Bgen) where T <: Real
         i += 1
         clear!(v)
     end
+
+    # convert NaN to missing
+    replace!(G, NaN => missing)
+
     return G, b.samples, Gchr, Gpos, GsnpID, Gref, Galt
 end
 
@@ -120,12 +124,11 @@ function import_target(tgtfile::AbstractString, dosage=false)
             VCFTools.convert_ds(Float32, tgtfile, trans=true, 
             save_snp_info=true, msg = "Importing genotype file as dosages...")
     elseif endswith(tgtfile, ".bgen")
-        samplefile = tgtfile[1:end-5] * ".sample"
-        # isfile(samplefile) || error("sample file $samplefile not found!")
+        samplefile = isfile(tgtfile[1:end-5] * ".sample") ? 
+            tgtfile[1:end-5] * ".sample" : nothing
         indexfile = isfile(tgtfile * ".bgi") ? tgtfile * ".bgi" : nothing
         bgen = Bgen(tgtfile; sample_path=samplefile, idx_path=indexfile)
-        X, X_chr, X_pos, X_ids, X_ref, X_alt = convert_gt(bgen, Float32)
-        X_sampleID = BGEN.get_samples(samplefile, n_samples(b))
+        X, X_sampleID, X_chr, X_pos, X_ids, X_ref, X_alt = convert_gt(Float32, bgen)
     elseif isplink(tgtfile)
         dosage && error("PLINK files detected but dosage = true!")
         # convert SnpArray data to matrix.
