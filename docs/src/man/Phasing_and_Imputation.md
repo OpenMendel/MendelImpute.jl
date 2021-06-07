@@ -1,18 +1,23 @@
 
 # Preparing Target Data
 
-MendelImpute accepts [VCF](https://samtools.github.io/hts-specs/VCFv4.3.pdf) and [PLINK](https://www.cog-genomics.org/plink2/formats#bed) files (BGEN format is experimental). Please make sure the following are true:
+MendelImpute accepts [VCF](https://samtools.github.io/hts-specs/VCFv4.3.pdf) and [PLINK (.bed/.bim/.fam)](https://www.cog-genomics.org/plink2/formats#bed), and [BGEN](https://www.well.ox.ac.uk/~gav/bgen_format/) files. Please make sure the following are true:
 
 + VCF file ends in `.vcf` or `.vcf.gz` (phased or unphased and may contain missing data)
++ BGEN file ends in `.bgen` (if used to store haplotypes, all variants must be phased and non-missing). 
 + For PLINK files, all trios (`.bim`, `.bed`, `.fam`) are present in the same directory
 + Each file contains only 1 (non-sex) chromosome
-+ Every record (SNP) is present in the reference panel. If this is untrue, you must [match markers in 2 VCF files](https://openmendel.github.io/VCFTools.jl/dev/man/conformgt/). 
-+ Given a SNP, its CHROM, POS, REF, and  ALT fields are the same in target data and reference panel. MendelImpute use SNP position internally to align markers. Note this is not explicitly checked. 
++ Every record (SNP) in the imputation target is present in the reference panel. If this is untrue, you must [match markers in 2 VCF files](https://openmendel.github.io/VCFTools.jl/dev/man/conformgt/). 
++ Given a SNP, its CHROM, POS, REF, and  ALT fields are the same in target data and reference panel. MendelImpute use SNP position internally to align markers. 
 + The position of every SNP is unique: so multiallelic markers should be excluded instead of split (this requirement will eventually be lifted). 
+
+    !!! note
+
+Currently only BGEN inputs support index files. Indexing support for VCF files coming soon...
 
 # Preparing Reference Haplotype Panel
 
-Reference samples must be in VCF (`.vcf` or `.vcf.gz`) format, be phased, and contain no missing genotypes. Reference VCF panels must be compressed into `.jlso` format first using the [compress_haplotypes](https://OpenMendel.github.io/MendelImpute.jl/dev/man/api/#MendelImpute.compress_haplotypes) function. One must specify `d`: the maximum number of unique haplotypes per window. Larger `d` slows down computation, but increases accuracy. For most purposes, we recommend $d \approx 1000$. 
+Reference samples must be in VCF (`.vcf` or `.vcf.gz`) or BGEN (`.bgen`) format, every record must be phased, and contain no missing genotypes. Reference panels must be compressed into `.jlso` format first using the [compress_haplotypes](https://OpenMendel.github.io/MendelImpute.jl/dev/man/api/#MendelImpute.compress_haplotypes) function. One must specify `d`: the maximum number of unique haplotypes per window. Larger `d` slows down computation, but increases accuracy. For most purposes, we recommend $d \approx 1000$. 
 
 # Detailed Example
 
@@ -267,7 +272,7 @@ histogram(snpscores, label=:none, xlabel="per-SNP quality score",
 
 
 
-![svg](output_16_0.svg)
+![svg](output_17_0.svg)
 
 
 
@@ -294,7 +299,7 @@ histogram(quality[:error], label=:none, xlabel="per-sample quality score",
 
 
 
-![svg](output_20_0.svg)
+![svg](output_21_0.svg)
 
 
 

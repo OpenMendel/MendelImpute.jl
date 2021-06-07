@@ -15,9 +15,9 @@ be saved in `outfile`, while per-sample imputation score will be saved in a file
 ending in `sample.error`.
 
 # Input
-- `tgtfile`: VCF or PLINK files. VCF files should end in `.vcf` or `.vcf.gz`.
+- `tgtfile`: VCF, PLINK, or BGEN file. VCF files should end in `.vcf` or `.vcf.gz`.
     PLINK files should exclude `.bim/.bed/.fam` trailings but the trio must all
-    be present in the same directory.
+    be present in the same directory. BGEN files should end in `.bgen`
 - `reffile`: Reference haplotype file ending in `.jlso` (compressed binary files).
     See [`compress_haplotypes`](@ref)
 - `outfile`: output filename ending in `.vcf.gz`, `.vcf`, or `.jlso`. VCF output

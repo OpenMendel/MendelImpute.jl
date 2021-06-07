@@ -16,8 +16,6 @@ pkg"add https://github.com/OpenMendel/MendelImpute.jl"
 ```
 This package supports Julia `v1.6`+. 
 
-**Note:** BGEN format is currrently experimental and is not guaranteed to work properly. 
-
 ## Documentation
 
 + [**Latest**](https://OpenMendel.github.io/MendelImpute.jl/dev/)
@@ -51,6 +49,8 @@ Xtrue = convert_gt(Float64, "target.full.vcf.gz") # true genotypes
 m, n = size(Xtrue) # matrix dimensions
 error_rate = sum(Xtrue .!= Ximputed) / m / n
 ```
+
+We also support PLINK binary files (`.bed/.bim/.fam`) via [SnpArrays.jl](https://github.com/OpenMendel/SnpArrays.jl) and BGEN files `.bgen` via [BGEN.jl](https://github.com/OpenMendel/BGEN.jl). 
 
 For more realistic example, see [detailed example in documentation](https://openmendel.github.io/MendelImpute.jl/dev/man/Phasing_and_Imputation/#Detailed-Example)
 
