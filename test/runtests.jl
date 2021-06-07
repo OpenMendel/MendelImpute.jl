@@ -8,6 +8,7 @@ using Statistics
 using BenchmarkTools
 using DataFrames
 using VariantCallFormat
+using BGEN
 
 # change directory to where data is located
 cd(normpath(MendelImpute.datadir()))
@@ -310,4 +311,34 @@ end
 
     @test b.allocs == 0
     @test b.memory == 0
+end
+
+@testset "import BGEN" begin
+    # compare BGEN genotypes to VCF genotypes
+    @time G, Gsamples, Gchr, Gpos, GsnpID, Gref, Galt = MendelImpute.convert_gt(Float64,
+        Bgen("target.typedOnly.masked.bgen"))
+    @time Gtrue, sampleID, record_chr, record_pos, record_ids, record_ref, 
+        record_alt = convert_gt(Float64, "target.typedOnly.masked.vcf.gz",
+        trans=true, save_snp_info=true)
+    @test all(skipmissing(Gtrue .== G))
+    @test all(Gsamples .== sampleID)
+    @test all(Gchr .== record_chr)
+    @test all(Gpos .== record_pos)
+    @test all(GsnpID .== record_ids)
+    @test all(Gref .== record_ref)
+    @test all(Galt .== record_alt)
+
+    # reference panel (BGEN vs VCF)
+    @time H, Hsamples, Hchr, Hpos, HsnpID, Href, Halt = 
+        MendelImpute.convert_ht(Bgen("ref.excludeTarget.bgen"))
+    @time Htrue, sampleID, record_chr, record_pos, record_ids, record_ref, 
+        record_alt = VCFTools.convert_ht(Bool, "ref.excludeTarget.vcf.gz", trans=true,
+        save_snp_info=true)
+    @test all(Htrue .== H)
+    @test all(Hsamples .== sampleID)
+    @test all(Hchr .== record_chr)
+    @test all(Hpos .== record_pos)
+    @test all(HsnpID .== record_ids)
+    @test all(Href .== record_ref)
+    @test all(Halt .== record_alt)
 end

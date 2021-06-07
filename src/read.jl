@@ -5,7 +5,8 @@
 """
     convert_gt(b::Bgen, T=Float32)
 
-Imports dosage information and chr/pos/snpID/ref/alt into numeric arrays.
+Imports dosage information and chr/sampleID/pos/snpID/ref/alt into numeric arrays.
+Assumes every variant is biallelic (ie only 1 alt allele). 
 
 # Input
 - `b`: a `Bgen` object
@@ -27,9 +28,9 @@ function convert_gt(t::Type{T}, b::Bgen) where T <: Real
     G = Matrix{t}(undef, p, n)
     Gchr = Vector{String}(undef, p)
     Gpos = Vector{Int}(undef, p)
-    GsnpID = Vector{String}(undef, p)
+    GsnpID = [String[] for _ in 1:p] # each variant can have >1 rsid, although we don't presently allow this
     Gref = Vector{String}(undef, p)
-    Galt = Vector{String}(undef, p)
+    Galt = [String[] for _ in 1:p] # each variant can have >1 alt allele, although we don't presently allow this
 
     # loop over each variant
     i = 1
@@ -37,10 +38,13 @@ function convert_gt(t::Type{T}, b::Bgen) where T <: Real
         dose = ref_allele_dosage!(b, v; T=t) # this reads REF allele as 1
         BGEN.alt_dosage!(dose, v.genotypes.preamble) # switch 2 and 0 (ie treat ALT as 1)
         copyto!(@view(G[i, :]), dose)
-        Gchr[i], Gpos[i], GsnpID[i] = chrom(v), pos(v), rsid(v)
+        # store chr/pos/snpID/ref/alt info
+        Gchr[i], Gpos[i] = chrom(v), pos(v)
+        push!(GsnpID[i], rsid(v))
         ref_alt_alleles = alleles(v)
         length(ref_alt_alleles) > 2 && error("Marker $i of BGEN is not biallelic!")
-        Gref[i], Galt[i] = ref_alt_alleles[1], ref_alt_alleles[2]
+        Gref[i] = ref_alt_alleles[1]
+        push!(Galt[i], ref_alt_alleles[2])
         i += 1
         clear!(v)
     end
@@ -50,7 +54,8 @@ end
 """
     convert_ht(b::Bgen)
 
-Import phased haplotypes as a `BitMatrix`, and store chr/pos/snpID/ref/alt.
+Import phased haplotypes as a `BitMatrix`, and store chr/sampleID/pos/snpID/ref/alt. 
+Assumes every variant is phased and biallelic (ie only 1 alt allele). 
 
 # Input
 - `b`: a `Bgen` object. Each variant must be phased and samples must be diploid
@@ -71,9 +76,9 @@ function convert_ht(b::Bgen)
     H = BitMatrix(undef, p, n)
     Hchr = Vector{String}(undef, p)
     Hpos = Vector{Int}(undef, p)
-    HsnpID = Vector{String}(undef, p)
+    HsnpID = [String[] for _ in 1:p] # each variant can have >1 rsid, although we don't presently allow this
     Href = Vector{String}(undef, p)
-    Halt = Vector{String}(undef, p)
+    Halt = [String[] for _ in 1:p] # each variant can have >1 alt allele, although we don't presently allow this
 
     # loop over each variant
     i = 1
@@ -85,11 +90,17 @@ function convert_ht(b::Bgen)
             H[i, 2j - 1] = read_haplotype1(Hi)
             H[i, 2j] = read_haplotype2(Hi)
         end
-        Hchr[i], Hpos[i], HsnpID[i] = chrom(v), pos(v), rsid(v)
+        # store chr/pos/snpID/ref/alt info
+        Hchr[i], Hpos[i] = chrom(v), pos(v)
+        push!(HsnpID[i], rsid(v))
+        ref_alt_alleles = alleles(v)
+        length(ref_alt_alleles) > 2 && error("Marker $i of BGEN is not biallelic!")
+        Href[i] = ref_alt_alleles[1]
+        push!(Halt[i], ref_alt_alleles[2])
         i += 1
         clear!(v)
     end
-    return H, Hchr, Hpos, HsnpID, Href, Halt
+    return H, b.samples, Hchr, Hpos, HsnpID, Href, Halt
 end
 
 read_haplotype1(Hi::AbstractVector) = Hi[2] ≥ 0.5 ? true : false
@@ -165,12 +176,10 @@ function import_reference(reffile::AbstractString)
             VCFTools.convert_ht(Bool, reffile, trans=true, save_snp_info=true, 
             msg="importing reference data...")
     elseif endswith(reffile, ".bgen")
-        samplefile = reffile[1:end-5] * ".sample"
-        isfile(samplefile) || error("sample file $samplefile not found!")
+        samplefile = isfile(reffile[1:end-5] * ".sample") ? reffile[1:end-5] * ".sample" : nothing
         indexfile = isfile(reffile * ".bgi") ? reffile * ".bgi" : nothing
         bgen = Bgen(reffile; sample_path=samplefile, idx_path=indexfile)
-        H, H_chr, H_pos, H_ids, H_ref, H_alt = convert_ht(bgen)
-        H_sampleID = BGEN.get_samples(samplefile, n_samples(b))
+        H, H_sampleID, H_chr, H_pos, H_ids, H_ref, H_alt = convert_ht(bgen)
     else
         error("Unrecognized reference file format: only VCF (ends in .vcf" * 
             " or .vcf.gz) or BGEN (ends in .bgen) files are accepted.")
