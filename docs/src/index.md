@@ -10,7 +10,7 @@ Given a target genotype file (phased or unphased and may contain missing data) a
 
 - Phasing and imputation with respect to a reference haplotype panel
 - Imputation on dosage data, phasing without imputation, imputation without phasing
-- Built-in support for [VCF](https://samtools.github.io/hts-specs/VCFv4.3.pdf) (`.vcf`, `.vcf.gz`), [PLINK](https://www.cog-genomics.org/plink2/formats#bed), and [BGEN](https://www.well.ox.ac.uk/~gav/bgen_format/)  (`.bgen`, currently experimental) files
+- Built-in support for [VCF](https://samtools.github.io/hts-specs/VCFv4.3.pdf) (`.vcf`, `.vcf.gz`), [binary PLINK](https://www.cog-genomics.org/plink2/formats#bed) (`.bed/.bim/.fam`), and [BGEN](https://www.well.ox.ac.uk/~gav/bgen_format/) (`.bgen`) files
 - Out-of-the-box multithreaded (shared memory) parallelism. 
 - Admixture estimation, with code examples to make pretty plots!
 - Ultra-compressed file for phased genotypes.

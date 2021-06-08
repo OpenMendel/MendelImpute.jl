@@ -1,10 +1,11 @@
 
 # Preparing Target Data
 
-MendelImpute accepts [VCF](https://samtools.github.io/hts-specs/VCFv4.3.pdf) and [PLINK (.bed/.bim/.fam)](https://www.cog-genomics.org/plink2/formats#bed), and [BGEN](https://www.well.ox.ac.uk/~gav/bgen_format/) files. Please make sure the following are true:
+MendelImpute accepts [VCF](https://samtools.github.io/hts-specs/VCFv4.3.pdf), [PLINK (.bed/.bim/.fam)](https://www.cog-genomics.org/plink2/formats#bed), and [BGEN](https://www.well.ox.ac.uk/~gav/bgen_format/) files.  Please make sure the following are true:
 
-+ VCF file ends in `.vcf` or `.vcf.gz` (phased or unphased and may contain missing data)
-+ BGEN file ends in `.bgen` (if used to store haplotypes, all variants must be phased and non-missing). 
++ Missing data is allowed. Genotypes does not have to be phased. 
++ VCF file ends in `.vcf` or `.vcf.gz`
++ BGEN file ends in `.bgen`. If available, index files should have the same prefix. (e.g. `genotypes.bgen` should have index file called `genotypes.bgen.bgi`. Sample identifiers may be either contained in the `.bgen` file or listed in an external `genotypes.sample` file.
 + For PLINK files, all trios (`.bim`, `.bed`, `.fam`) are present in the same directory
 + Each file contains only 1 (non-sex) chromosome
 + Every record (SNP) in the imputation target is present in the reference panel. If this is untrue, you must [match markers in 2 VCF files](https://openmendel.github.io/VCFTools.jl/dev/man/conformgt/). 
@@ -12,7 +13,6 @@ MendelImpute accepts [VCF](https://samtools.github.io/hts-specs/VCFv4.3.pdf) and
 + The position of every SNP is unique: so multiallelic markers should be excluded instead of split (this requirement will eventually be lifted). 
 
     !!! note
-
 Currently only BGEN inputs support index files. Indexing support for VCF files coming soon...
 
 # Preparing Reference Haplotype Panel
