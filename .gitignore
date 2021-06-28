@@ -16,12 +16,12 @@ test/*.vcf
 test/*.vcf.gz
 
 # aux files from manuscript
-manuscript/sec4.3/*.summary
-manuscript/sec4.3/*.Q
-manuscript/sec4.3/*.P
-manuscript/sec4.3/*.bim
-manuscript/sec4.3/*.bed
-manuscript/sec4.3/*.fam
+manuscript/sec3.3/*.summary
+manuscript/sec3.3/*.Q
+manuscript/sec3.3/*.P
+manuscript/sec3.3/*.bim
+manuscript/sec3.3/*.bed
+manuscript/sec3.3/*.fam
 
 # example data only track target genotype, reference haplotype, and true genotypes
 data/full.vcf

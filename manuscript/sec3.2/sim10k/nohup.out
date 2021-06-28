@@ -1,0 +1,113 @@
+
+
+ -------------------------------------------------------------------------------- 
+          Minimac4 - Fast Imputation Based on State Space Reduction HMM
+ --------------------------------------------------------------------------------
+           (c) 2014 - Sayantan Das, Christian Fuchsberger, David Hinds
+                             Mary Kate Wing, Goncalo Abecasis 
+
+ Version: 1.0.2;
+ Built: Fri Jul 24 13:42:14 PDT 2020 by biona001
+
+ Command Line Options: 
+       Reference Haplotypes : --refHaps [ref.excludeTarget.m3vcf.gz],
+                              --passOnly, --rsid, --referenceEstimates [ON],
+                              --mapFile [docs/geneticMapFile.b38.map.txt.gz]
+          Target Haplotypes : --haps [target.typedOnly.maf0.05.masked.vcf.gz]
+          Output Parameters : --prefix [minimac4.result], --estimate,
+                              --nobgzip, --vcfBuffer [200], --format [GT,DS],
+                              --allTypedSites, --meta, --memUsage
+        Chunking Parameters : --ChunkLengthMb [20.00], --ChunkOverlapMb [3.00]
+          Subset Parameters : --chr [], --start, --end, --window
+   Approximation Parameters : --minimac3, --probThreshold [0.01],
+                              --diffThreshold [0.01], --topThreshold [0.01]
+           Other Parameters : --log, --help, --cpus [10], --params
+                  PhoneHome : --noPhoneHome, --phoneHomeThinning [50]
+
+
+ URL = http://genome.sph.umich.edu/wiki/Minimac4
+ Starting Main Imputation/Estimation Analysis ... 
+
+ Performing preliminary check on input parameters... 
+
+ ------------------------------------------------------------------------------
+                             PRELIMINARY FILE CHECK                            
+ ------------------------------------------------------------------------------
+
+ Checking GWAS haplotype file : target.typedOnly.maf0.05.masked.vcf.gz
+
+ Gathering variant information ...
+
+ Successful !!! 
+
+ Checking Reference haplotype file : ref.excludeTarget.m3vcf.gz
+
+ Gathering variant information ...
+
+ Successful !!! 
+
+ Reference Panel   : Found 5000 samples (10000 haplotypes) and 79383 variants ...
+
+ Target/GWAS Panel : Found 1000 samples (2000 haplotypes) and 22879 variants ...
+                     22879 variants overlap with Reference panel 
+                     0 variants imported that exist only in Target/GWAS panel
+
+ ------------------------------------------------------------------------------
+                           CHUNKING INFORMATION                           
+ ------------------------------------------------------------------------------
+
+ Chunking region into 1 chunk(s) with atleast 79383 variants in each chunk ... 
+
+ Details of chunks is given below ...
+
+ No   LeftBuffer      LeftEnd   RightPoint  RightBuffer       #Sites(GWAS/Ref/%)
+ -------------------------------------------------------------------------------
+  1           21           21      9999718      9999718    22879/   79383/ 28.82%
+
+
+ ------------------------------------------------------------------------------
+                           MAIN IMPUTATION ANALYSIS                            
+ ------------------------------------------------------------------------------
+
+ Starting imputation analysis of 1 chunk(s) ... 
+
+ -------------------------------------------
+ Analyzing Chunk 1/1 [1:21-9999718]
+ -------------------------------------------
+
+ Reading chunk from reference panel ... 
+ Reading chunk from target/GWAS panel ... 
+
+ Compressing reference panel at GWAS sites ... 
+ERROR: LoadError: syntax: missing comma or ) in argument list
+Stacktrace:
+ [1] top-level scope at /home/biona001/sim10k/impute5_chunking.jl:3
+ [2] include(::Function, ::Module, ::String) at ./Base.jl:380
+ [3] include(::Module, ::String) at ./Base.jl:368
+ [4] exec_options(::Base.JLOptions) at ./client.jl:296
+ [5] _start() at ./client.jl:506
+in expression starting at /home/biona001/sim10k/impute5_chunking.jl:3
+1.41user 0.28system 0:01.11elapsed 152%CPU (0avgtext+0avgdata 221432maxresident)k
+8inputs+8outputs (0major+74235minor)pagefaults 0swaps
+ERROR: LoadError: syntax: missing comma or ) in argument list
+Stacktrace:
+ [1] top-level scope at /home/biona001/sim10k/impute5_chunking.jl:6
+ [2] include(::Function, ::Module, ::String) at ./Base.jl:380
+ [3] include(::Module, ::String) at ./Base.jl:368
+ [4] exec_options(::Base.JLOptions) at ./client.jl:296
+ [5] _start() at ./client.jl:506
+in expression starting at /home/biona001/sim10k/impute5_chunking.jl:6
+1.43user 0.24system 0:01.09elapsed 153%CPU (0avgtext+0avgdata 221396maxresident)k
+0inputs+16outputs (0major+74231minor)pagefaults 0swaps
+ERROR: LoadError: MethodError: no method matching chunk_impute5(::String, ::String, ::String, ::String, ::String)
+Closest candidates are:
+  chunk_impute5(!Matched::Int64, ::AbstractString, ::AbstractString, !Matched::Int64, !Matched::Int64) at /home/biona001/sim10k/impute5_chunking.jl:1
+Stacktrace:
+ [1] top-level scope at ./timing.jl:174
+ [2] include(::Function, ::Module, ::String) at ./Base.jl:380
+ [3] include(::Module, ::String) at ./Base.jl:368
+ [4] exec_options(::Base.JLOptions) at ./client.jl:296
+ [5] _start() at ./client.jl:506
+in expression starting at /home/biona001/sim10k/impute5_chunking.jl:26
+1.45user 0.25system 0:01.11elapsed 152%CPU (0avgtext+0avgdata 221832maxresident)k
+0inputs+8outputs (0major+74324minor)pagefaults 0swaps

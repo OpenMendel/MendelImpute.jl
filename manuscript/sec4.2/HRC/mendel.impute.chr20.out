@@ -1,53 +1,0 @@
-Number of threads = 10
-Importing reference haplotype data...
-Total windows = 16, averaging ~ 708 unique haplotypes per window.
-
-Timings: 
-    Data import                     = 3.91946 seconds
-        import target data             = 1.74525 seconds
-        import compressed haplotypes   = 2.1742 seconds
-    Computing haplotype pair        = 4.04239 seconds
-        BLAS3 mul! to get M and N      = 0.00639804 seconds per thread
-        haplopair search               = 0.0323496 seconds per thread
-        initializing missing           = 0.000478638 seconds per thread
-        allocating and viewing         = 0.00253376 seconds per thread
-        index conversion               = 7.7834e-6 seconds per thread
-    Phasing by win-win intersection = 1.27727 seconds
-        Window-by-window intersection  = 0.000149327 seconds per thread
-        Breakpoint search              = 0.174847 seconds per thread
-        Recording result               = 0.1012 seconds per thread
-    Imputation                     = 1.52465 seconds
-        Imputing missing               = 0.620833 seconds
-        Writing to file                = 0.903818 seconds
-
-    Total time                      = 10.8652 seconds
-
-Number of threads = 10
-Importing reference haplotype data...
-Importing genotype file... 37%|█████████▍               |  ETA: 0:00:08[KImporting genotype file... 81%|████████████████████▍    |  ETA: 0:00:02[KImporting genotype file...100%|█████████████████████████| Time: 0:00:12[K
-Computing optimal haplotypes... 19%|███▊                |  ETA: 0:00:21[KComputing optimal haplotypes... 43%|████████▌           |  ETA: 0:00:14[KComputing optimal haplotypes... 68%|█████████████▊      |  ETA: 0:00:07[KComputing optimal haplotypes... 94%|██████████████████▊ |  ETA: 0:00:01[KComputing optimal haplotypes...100%|████████████████████| Time: 0:00:22[K
-Phasing... 35%|██████████████▍                          |  ETA: 0:00:09[KPhasing... 69%|████████████████████████████▎            |  ETA: 0:00:04[KPhasing... 99%|████████████████████████████████████████▋|  ETA: 0:00:00[KPhasing...100%|█████████████████████████████████████████| Time: 0:00:15[K
-Total windows = 2266, averaging ~ 472 unique haplotypes per window.
-
-Timings: 
-    Data import                     = 36.5898 seconds
-        import target data             = 13.4989 seconds
-        import compressed haplotypes   = 23.0909 seconds
-    Computing haplotype pair        = 22.6468 seconds
-        BLAS3 mul! to get M and N      = 0.293735 seconds per thread
-        haplopair search               = 20.1011 seconds per thread
-        initializing missing           = 0.247207 seconds per thread
-        allocating and viewing         = 0.0233145 seconds per thread
-        index conversion               = 0.0364763 seconds per thread
-    Phasing by win-win intersection = 16.0594 seconds
-        Window-by-window intersection  = 13.0286 seconds per thread
-        Breakpoint search              = 0.42666 seconds per thread
-        Recording result               = 0.681764 seconds per thread
-    Imputation                     = 3.81548 seconds
-        Imputing missing               = 0.00604447 seconds
-        Writing to file                = 3.80944 seconds
-
-    Total time                      = 79.1152 seconds
-
-477.07user 2.96system 2:00.49elapsed 398%CPU (0avgtext+0avgdata 4263108maxresident)k
-0inputs+9472outputs (0major+1848566minor)pagefaults 0swaps

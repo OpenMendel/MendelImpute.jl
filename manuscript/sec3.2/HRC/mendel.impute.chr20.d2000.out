@@ -1,0 +1,32 @@
+Importing reference haplotype data...
+Importing genotype file... 16%|████▏                    |  ETA: 0:00:26[KImporting genotype file... 39%|█████████▊               |  ETA: 0:00:16[KImporting genotype file... 60%|███████████████▏         |  ETA: 0:00:10[KImporting genotype file... 81%|████████████████████▎    |  ETA: 0:00:05[KImporting genotype file... 99%|████████████████████████▊|  ETA: 0:00:00[KImporting genotype file...100%|█████████████████████████| Time: 0:00:25[K
+Computing optimal haplotypes...  2%|▍                   |  ETA: 0:04:22[KComputing optimal haplotypes...  5%|█▏                  |  ETA: 0:02:58[KComputing optimal haplotypes...  8%|█▋                  |  ETA: 0:02:59[KComputing optimal haplotypes... 11%|██▎                 |  ETA: 0:02:54[KComputing optimal haplotypes... 14%|██▉                 |  ETA: 0:02:42[KComputing optimal haplotypes... 16%|███▎                |  ETA: 0:02:44[KComputing optimal haplotypes... 20%|████                |  ETA: 0:02:28[KComputing optimal haplotypes... 23%|████▋               |  ETA: 0:02:21[KComputing optimal haplotypes... 26%|█████▎              |  ETA: 0:02:15[KComputing optimal haplotypes... 29%|█████▊              |  ETA: 0:02:10[KComputing optimal haplotypes... 33%|██████▋             |  ETA: 0:01:58[KComputing optimal haplotypes... 37%|███████▍            |  ETA: 0:01:49[KComputing optimal haplotypes... 40%|████████            |  ETA: 0:01:42[KComputing optimal haplotypes... 43%|████████▋           |  ETA: 0:01:36[KComputing optimal haplotypes... 46%|█████████▏          |  ETA: 0:01:32[KComputing optimal haplotypes... 49%|█████████▉          |  ETA: 0:01:26[KComputing optimal haplotypes... 52%|██████████▍         |  ETA: 0:01:22[KComputing optimal haplotypes... 54%|██████████▉         |  ETA: 0:01:19[KComputing optimal haplotypes... 57%|███████████▌        |  ETA: 0:01:13[KComputing optimal haplotypes... 61%|████████████▏       |  ETA: 0:01:07[KComputing optimal haplotypes... 64%|████████████▉       |  ETA: 0:01:01[KComputing optimal haplotypes... 67%|█████████████▌      |  ETA: 0:00:55[KComputing optimal haplotypes... 70%|██████████████▏     |  ETA: 0:00:50[KComputing optimal haplotypes... 74%|██████████████▊     |  ETA: 0:00:44[KComputing optimal haplotypes... 77%|███████████████▌    |  ETA: 0:00:38[KComputing optimal haplotypes... 81%|████████████████▎   |  ETA: 0:00:31[KComputing optimal haplotypes... 85%|████████████████▉   |  ETA: 0:00:25[KComputing optimal haplotypes... 87%|█████████████████▍  |  ETA: 0:00:22[KComputing optimal haplotypes... 90%|█████████████████▉  |  ETA: 0:00:17[KComputing optimal haplotypes... 93%|██████████████████▌ |  ETA: 0:00:12[KComputing optimal haplotypes... 95%|███████████████████ |  ETA: 0:00:09[KComputing optimal haplotypes... 97%|███████████████████▍|  ETA: 0:00:05[KComputing optimal haplotypes... 99%|███████████████████▊|  ETA: 0:00:02[KComputing optimal haplotypes...100%|███████████████████▉|  ETA: 0:00:01[KComputing optimal haplotypes...100%|████████████████████|  ETA: 0:00:00[KComputing optimal haplotypes...100%|████████████████████| Time: 0:03:01[K
+Phasing... 42%|█████████████████▏                       |  ETA: 0:00:07[KPhasing... 87%|███████████████████████████████████▉     |  ETA: 0:00:01[KPhasing...100%|█████████████████████████████████████████| Time: 0:00:12[K
+Writing to file... 94%|██████████████████████████████▉  |  ETA: 0:00:00[KWriting to file...100%|█████████████████████████████████| Time: 0:00:05[K
+Total windows = 2141, averaging ~ 1006 unique haplotypes per window.
+
+Timings: 
+    Data import                     = 54.8001 seconds
+        import target data             = 27.4698 seconds
+        import compressed haplotypes   = 27.3303 seconds
+    Computing haplotype pair        = 182.125 seconds
+        BLAS3 mul! to get M and N      = 1.33164 seconds per thread
+        haplopair search               = 120.604 seconds per thread
+        min least sq on observed data  = 33.0463 seconds per thread
+        initializing missing           = 0.35092 seconds per thread
+        allocating and viewing         = 5.35034 seconds per thread
+        index conversion               = 0.043492 seconds per thread
+    Phasing by win-win intersection = 12.3397 seconds
+        Window-by-window intersection  = 8.95912 seconds per thread
+        Breakpoint search              = 0.412241 seconds per thread
+        Recording result               = 1.43556 seconds per thread
+    Imputation                     = 8.34697 seconds
+        Imputing missing               = 2.13896 seconds
+        Writing to file                = 6.20801 seconds
+
+    Total time                      = 257.862 seconds
+
+error overall = 0.0012167881442142776 
+
+2105.20user 41.65system 8:45.63elapsed 408%CPU (0avgtext+0avgdata 9394024maxresident)k
+238032inputs+276472outputs (0major+36507399minor)pagefaults 0swaps

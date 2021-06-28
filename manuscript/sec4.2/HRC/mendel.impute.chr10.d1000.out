@@ -1,56 +1,0 @@
-Number of threads = 10
-Importing reference haplotype data...
-Total windows = 16, averaging ~ 708 unique haplotypes per window.
-
-Timings: 
-    Data import                     = 6.56438 seconds
-        import target data             = 1.72355 seconds
-        import compressed haplotypes   = 4.84083 seconds
-    Computing haplotype pair        = 3.86886 seconds
-        BLAS3 mul! to get M and N      = 0.00618535 seconds per thread
-        haplopair search               = 0.0325845 seconds per thread
-        initializing missing           = 0.000459961 seconds per thread
-        allocating and viewing         = 0.00266562 seconds per thread
-        index conversion               = 0.000190049 seconds per thread
-    Phasing by win-win intersection = 1.78767 seconds
-        Window-by-window intersection  = 0.000142167 seconds per thread
-        Breakpoint search              = 0.178941 seconds per thread
-        Recording result               = 0.0490132 seconds per thread
-    Imputation                     = 1.25244 seconds
-        Imputing missing               = 0.160441 seconds
-        Writing to file                = 1.092 seconds
-
-    Total time                      = 13.7391 seconds
-
-Number of threads = 10
-Importing reference haplotype data...
-Importing genotype file... 25%|██████▏                  |  ETA: 0:00:15[KImporting genotype file... 58%|██████████████▌          |  ETA: 0:00:07[KImporting genotype file... 89%|██████████████████████▍  |  ETA: 0:00:02[KImporting genotype file...100%|█████████████████████████| Time: 0:00:16[K
-Computing optimal haplotypes... 12%|██▌                 |  ETA: 0:00:36[KComputing optimal haplotypes... 31%|██████▎             |  ETA: 0:00:22[KComputing optimal haplotypes... 49%|█████████▉          |  ETA: 0:00:15[KComputing optimal haplotypes... 69%|█████████████▊      |  ETA: 0:00:09[KComputing optimal haplotypes... 87%|█████████████████▌  |  ETA: 0:00:04[KComputing optimal haplotypes... 99%|███████████████████▉|  ETA: 0:00:00[KComputing optimal haplotypes...100%|████████████████████| Time: 0:00:31[K
-Phasing... 19%|███████▋                                 |  ETA: 0:00:24[KPhasing... 39%|████████████████▏                        |  ETA: 0:00:16[KPhasing... 59%|████████████████████████▏                |  ETA: 0:00:11[KPhasing... 78%|████████████████████████████████▏        |  ETA: 0:00:06[KPhasing... 96%|███████████████████████████████████████▌ |  ETA: 0:00:01[KPhasing...100%|█████████████████████████████████████████| Time: 0:00:27[K
-Writing to file... 44%|██████████████▌                  |  ETA: 0:00:06[KWriting to file... 89%|█████████████████████████████▍   |  ETA: 0:00:01[KWriting to file...100%|█████████████████████████████████| Time: 0:00:11[K
-Total windows = 3150, averaging ~ 478 unique haplotypes per window.
-
-Timings: 
-    Data import                     = 85.8888 seconds
-        import target data             = 22.0442 seconds
-        import compressed haplotypes   = 63.8446 seconds
-    Computing haplotype pair        = 31.2513 seconds
-        BLAS3 mul! to get M and N      = 0.391657 seconds per thread
-        haplopair search               = 27.3241 seconds per thread
-        initializing missing           = 0.272806 seconds per thread
-        allocating and viewing         = 0.0300792 seconds per thread
-        index conversion               = 0.170465 seconds per thread
-    Phasing by win-win intersection = 27.3275 seconds
-        Window-by-window intersection  = 21.2419 seconds per thread
-        Breakpoint search              = 1.17174 seconds per thread
-        Recording result               = 3.52044 seconds per thread
-    Imputation                     = 15.1894 seconds
-        Imputing missing               = 3.16442 seconds
-        Writing to file                = 12.025 seconds
-
-    Total time                      = 159.689 seconds
-
-error overall = 0.0068719158152153485 
-
-1268.02user 13.27system 10:37.06elapsed 201%CPU (0avgtext+0avgdata 12809628maxresident)k
-3053144inputs+613296outputs (945major+5895126minor)pagefaults 0swaps

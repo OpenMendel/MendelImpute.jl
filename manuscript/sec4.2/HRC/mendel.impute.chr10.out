@@ -1,53 +1,0 @@
-Number of threads = 10
-Importing reference haplotype data...
-Total windows = 16, averaging ~ 708 unique haplotypes per window.
-
-Timings: 
-    Data import                     = 4.0654 seconds
-        import target data             = 1.80789 seconds
-        import compressed haplotypes   = 2.25751 seconds
-    Computing haplotype pair        = 3.56145 seconds
-        BLAS3 mul! to get M and N      = 0.00646923 seconds per thread
-        haplopair search               = 0.03192 seconds per thread
-        initializing missing           = 0.000460648 seconds per thread
-        allocating and viewing         = 0.002561 seconds per thread
-        index conversion               = 6.7594e-6 seconds per thread
-    Phasing by win-win intersection = 1.32057 seconds
-        Window-by-window intersection  = 0.000147806 seconds per thread
-        Breakpoint search              = 0.176994 seconds per thread
-        Recording result               = 0.103321 seconds per thread
-    Imputation                     = 1.5542 seconds
-        Imputing missing               = 0.629647 seconds
-        Writing to file                = 0.924558 seconds
-
-    Total time                      = 10.6028 seconds
-
-Number of threads = 10
-Importing reference haplotype data...
-Importing genotype file... 16%|███▉                     |  ETA: 0:00:27[KImporting genotype file... 37%|█████████▎               |  ETA: 0:00:17[KImporting genotype file... 57%|██████████████▎          |  ETA: 0:00:12[KImporting genotype file... 76%|███████████████████      |  ETA: 0:00:06[KImporting genotype file... 92%|███████████████████████  |  ETA: 0:00:02[KImporting genotype file...100%|█████████████████████████| Time: 0:00:27[K
-Computing optimal haplotypes...  9%|█▊                  |  ETA: 0:00:53[KComputing optimal haplotypes... 20%|███▉                |  ETA: 0:00:41[KComputing optimal haplotypes... 30%|██████              |  ETA: 0:00:35[KComputing optimal haplotypes... 42%|████████▍           |  ETA: 0:00:28[KComputing optimal haplotypes... 56%|███████████▎        |  ETA: 0:00:19[KComputing optimal haplotypes... 69%|█████████████▊      |  ETA: 0:00:13[KComputing optimal haplotypes... 82%|████████████████▍   |  ETA: 0:00:08[KComputing optimal haplotypes... 91%|██████████████████▏ |  ETA: 0:00:04[KComputing optimal haplotypes... 95%|███████████████████ |  ETA: 0:00:02[KComputing optimal haplotypes... 98%|███████████████████▋|  ETA: 0:00:01[KComputing optimal haplotypes...100%|████████████████████| Time: 0:00:52[K
-Phasing... 21%|████████▋                                |  ETA: 0:00:19[KPhasing... 40%|████████████████▌                        |  ETA: 0:00:15[KPhasing... 61%|████████████████████████▉                |  ETA: 0:00:10[KPhasing... 80%|████████████████████████████████▉        |  ETA: 0:00:05[KPhasing... 97%|███████████████████████████████████████▊ |  ETA: 0:00:01[KPhasing...100%|█████████████████████████████████████████| Time: 0:00:29[K
-Total windows = 4137, averaging ~ 499 unique haplotypes per window.
-
-Timings: 
-    Data import                     = 94.5977 seconds
-        import target data             = 28.9275 seconds
-        import compressed haplotypes   = 65.6702 seconds
-    Computing haplotype pair        = 53.0875 seconds
-        BLAS3 mul! to get M and N      = 0.637761 seconds per thread
-        haplopair search               = 40.1964 seconds per thread
-        initializing missing           = 0.505127 seconds per thread
-        allocating and viewing         = 0.0608037 seconds per thread
-        index conversion               = 0.0228701 seconds per thread
-    Phasing by win-win intersection = 29.3882 seconds
-        Window-by-window intersection  = 23.0565 seconds per thread
-        Breakpoint search              = 0.959195 seconds per thread
-        Recording result               = 0.987076 seconds per thread
-    Imputation                     = 4.465 seconds
-        Imputing missing               = 0.0118923 seconds
-        Writing to file                = 4.45311 seconds
-
-    Total time                      = 181.543 seconds
-
-847.37user 4.40system 3:43.71elapsed 380%CPU (0avgtext+0avgdata 8188392maxresident)k
-2792inputs+14568outputs (8major+2947129minor)pagefaults 0swaps
