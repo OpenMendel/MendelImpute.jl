@@ -134,9 +134,7 @@ function import_target(tgtfile::AbstractString, dosage=false)
         # convert SnpArray data to matrix.
         X_snpdata = SnpArrays.SnpData(tgtfile)
         X = convert(Matrix{Union{UInt8, Missing}}, Transpose(X_snpdata.snparray))
-        X[findall(isone, X)] .= missing     # 0x01 encodes missing
-        X[findall(x -> x === 0x02, X)] .= 1 # 0x02 is 1
-        X[findall(x -> x === 0x03, X)] .= 2 # 0x03 is 2
+        _convert_plink_genotypes!(X)
         # get other relevant information
         X_sampleID = X_snpdata.person_info[!, :iid]
         X_chr = X_snpdata.snp_info[!, :chromosome]
@@ -150,6 +148,31 @@ function import_target(tgtfile::AbstractString, dosage=false)
             " (do not include.bim/bed/fam) and all trio must exist in 1 directory)")
     end
     return X, X_sampleID, X_chr, X_pos, X_ids, X_ref, X_alt
+end
+
+"""
+    _convert_plink_genotypes!(X::Matrix{Union{UInt8, Missing})
+
+When PLINK binary files are imported into `Matrix{AbstractInt}`, conversion
+conventions are not obeyed. So we need to manually set
+0x00 => 0
+0x01 => missing
+0x02 => 2
+0x03 => 3
+"""
+function _convert_plink_genotypes!(X::Matrix{Union{UInt8, Missing}})
+    p, n = size(X)
+    @inbounds for j in 1:n, i in 1:p
+        if X[i, j] == 0x00
+            continue
+        elseif X[i, j] == 0x01
+            X[i, j] = missing
+        elseif X[i, j] == 0x02
+            X[i, j] = 0x01
+        else
+            X[i, j] = 0x02
+        end
+    end
 end
 
 function import_compressed_reference(reffile::AbstractString)
