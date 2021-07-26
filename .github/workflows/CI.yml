@@ -40,6 +40,10 @@ jobs:
             ${{ runner.os }}-${{ matrix.arch }}-test-
             ${{ runner.os }}-${{ matrix.arch }}-
             ${{ runner.os }}-
+      - run: |
+          julia --project=. -e '
+              using Pkg
+              Pkg.update()'
       - uses: julia-actions/julia-buildpkg@latest
       - run: |
           git config --global user.name Tester
