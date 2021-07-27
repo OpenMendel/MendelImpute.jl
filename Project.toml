@@ -28,6 +28,7 @@ VariantCallFormat = "28eba6e3-a997-4ad9-87c6-d933b8bca6c1"
 
 [compat]
 CSV = "0.8"
+DataFrames = "1"
 Documenter = "0.20 - 0.27"
 GroupSlices = "0.0.3"
 JLD2 = "0.4"
