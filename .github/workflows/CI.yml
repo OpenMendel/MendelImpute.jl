@@ -4,7 +4,7 @@ name: CI
 on:
   pull_request:
     branches:
-      - [master]
+      - master
   schedule:
     - cron: '0 2 * * *'  # Daily at 2 AM UTC (8 PM CST)
   push:
