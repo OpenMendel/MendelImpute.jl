@@ -1,24 +1,47 @@
 
 # Performance gotchas
 
-## Gotcha 1: Run MendelImpute in parallel
+## First time performance
 
-To run `MendelImpute.jl` in parallel,
-1. To use 4 threads, execute `export JULIA_NUM_THREADS=4` **before** starting Julia. 
-2. Verify the Julia session is running in parallel by executing `Threads.nthreads()` in Julia
+In a fresh Julia session, the first time any function gets called will take a long time because the code has to be compiled on the spot. For instance, compare
+
+
+```julia
+@time using MendelImpute
+```
+
+      6.958706 seconds (16.72 M allocations: 1.148 GiB, 5.00% gc time)
+
+
+
+```julia
+@time using MendelImpute
+```
+
+      0.022658 seconds (32.81 k allocations: 1.886 MiB, 99.49% compilation time)
+
+
+The first call was 350 times slower than the second time! Fortunately, for large problems, compilation time becomes negligible.
+
+## Run MendelImpute in parallel
+
+If Julia is started with multiple threads (e.g. julia --threads 4), MendelImpute.jl will automatically run your code in parallel.
+
+1. [How to start Julia with multiple threads](https://docs.julialang.org/en/v1/manual/multi-threading/#Starting-Julia-with-multiple-threads).
+2. Execute `Threads.nthreads()` within Julia to check if multiple thread is enabled
 3. Set the number of BLAS threads to be 1 by `using LinearAlgebra; BLAS.set_num_threads(1)`. This avoids [oversubscription](https://ieeexplore.ieee.org/document/5470434). 
 
 !!! note
 
     We recommend number of threads equal to the number of physical CPU cores on your machine. **Number of Julia threads should never exceed number of physical CPU cores!!** Hyperthreading is valuable for I/O operations (in our experience), but not for linear algebra routines used throughout MendelImpute. 
 
-## Gotcha 2: Compressing haplotype panels is slow
+## Compressing haplotype panels is slow
 
 Currently it is recommended to build a new compressed reference haplotype panel for every new set of typed SNPs (although this is not strictly required). The compression routine is slow because reading raw VCF files is slow. Thus, it is highly advised that one try to use the same set of typed SNPs as much as possible. 
 
 We are actively developing a new set of functions in [SnpArrays.jl](https://github.com/OpenMendel/SnpArrays.jl) to alleviate this problem. Since SnpArrays use memory mapping, read times can be improved dramatically. 
 
-## Gotcha 3: `max_d` too high (or too low)
+## `max_d` too high (or too low)
 
 When you compress the haplotype panels into a `.jlso` format, you specified `max_d` which is the maximum number of unique haplotypes per window. We generally recommend using `max_d = 1000`, BUT 1000 may be too small if you use a reference panel larger than HRC. In that case, you can try larger `max_d`, which will improve error rate. 
 
@@ -34,7 +57,7 @@ Too few typed SNPs per window indicates `max_d` is set too low. You can calculat
 
 A high `max_d` generally improve error, so it is understandable you want to do so. If a high `max_d` value runs too slow, try setting `stepwise = 100` and `max_haplotypes` to a number that is close to 1000. This avoids searching the global minimizer of the least-squares problem for windows that have more than `max_haplotypes` number of unique haplotypes. Setting `thinning_factor` instead of `stepwise` have a similar effect. Details for these 2 heuristic searches are explained in the appendix of our paper. 
 
-## Gotcha 4: Do you have enough memory (RAM)?
+## Do you have enough memory (RAM)?
 
 While MendelImpute uses the least RAM compared to competing softwares (as of 2020), it is still possible for large imputation problems to consume all available RAM. If this happens, Julia will first try to use `swap` before crashing (until all of `swap` is consumed). Monitor your RAM usage constantly to make sure this doesn't happen. On Mac/Linux machines, the `top` or `htop` command will monitor this information. Alternatively, the `/usr/bin/time` command will automatically records max RAM usage for job and whether any `swap` had been performed. 
 

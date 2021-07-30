@@ -12,8 +12,9 @@ MendelImpute accepts [VCF](https://samtools.github.io/hts-specs/VCFv4.3.pdf), [P
 + Given a SNP, its CHROM, POS, REF, and  ALT fields are the same in target data and reference panel. MendelImpute use SNP position internally to align markers. 
 + The position of every SNP is unique: so multiallelic markers should be excluded instead of split (this requirement will eventually be lifted). 
 
-    !!! note
-Currently only BGEN inputs support index files. Indexing support for VCF files coming soon...
+!!! note
+
+    Currently only BGEN inputs support index files. Indexing support for VCF files coming soon...
 
 # Preparing Reference Haplotype Panel
 
@@ -221,10 +222,6 @@ phase(tgtfile, reffile, outfile);
 
 The `;` hides the output, or else the screen will be too jammed. 
 
-!!! note
-
-    To run MendelImpute in parallel, type `export JULIA_NUM_THREADS=4` **before** starting Julia or Jupyter notebooks. See Performance Gotchas #1 on the left for details.
-
 ## Step 3.5: (only for simulated data) check imputation accuracy
 
 Since we simulated data, we can check imputation accuracy.
@@ -272,7 +269,7 @@ histogram(snpscores, label=:none, xlabel="per-SNP quality score",
 
 
 
-![svg](output_17_0.svg)
+![svg](output_16_0.svg)
 
 
 
@@ -299,7 +296,7 @@ histogram(quality[:error], label=:none, xlabel="per-sample quality score",
 
 
 
-![svg](output_21_0.svg)
+![svg](output_20_0.svg)
 
 
 

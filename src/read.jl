@@ -157,8 +157,8 @@ When PLINK binary files are imported into `Matrix{AbstractInt}`, conversion
 conventions are not obeyed. So we need to manually set
 0x00 => 0
 0x01 => missing
-0x02 => 2
-0x03 => 3
+0x02 => 1
+0x03 => 2
 """
 function _convert_plink_genotypes!(X::Matrix{Union{UInt8, Missing}})
     p, n = size(X)

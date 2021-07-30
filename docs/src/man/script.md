@@ -19,6 +19,5 @@ phase(tgtfile, reffile, outfile)
 
 Then in the terminal/command-prompt, you can do
 ```
-export JULIA_NUM_THREADS=8
-julia impute.jl ref.jlso target.vcf.gz output.vcf.gz
+julia --threads 8 impute.jl ref.jlso target.vcf.gz output.vcf.gz
 ```
