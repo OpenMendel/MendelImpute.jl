@@ -34,13 +34,13 @@ cd(normpath(MendelImpute.datadir()))
 reffile = "ref.excludeTarget.vcf.gz"       # reference VCF file
 tgtfile = "target.typedOnly.masked.vcf.gz" # target VCF file (GWAS file)
 outfile = "ref.excludeTarget.jlso"         # output file name (end in .jlso)
-compress_haplotypes(reffile, tgtfile, outfile)
+@time compress_haplotypes(reffile, tgtfile, outfile)
 
-# phase & impute
+# phase & impute (note: 2nd run will be much faster because code is compiled)
 tgtfile = "target.typedOnly.masked.vcf.gz" # target VCF file (GWAS file)
 reffile = "ref.excludeTarget.jlso"         # compressed reference file
 outfile = "imputed.vcf.gz"                 # output file name
-phase(tgtfile, reffile, outfile);
+@time phase(tgtfile, reffile, outfile);
 
 # check error rate (since data was simulated)
 using VCFTools
