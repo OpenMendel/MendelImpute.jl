@@ -25,7 +25,7 @@ The first call was 350 times slower than the second time! Fortunately, for large
 
 ## Run MendelImpute in parallel
 
-If Julia is started with multiple threads (e.g. julia --threads 4), MendelImpute.jl will automatically run your code in parallel.
+If Julia is started with multiple threads (e.g. `julia --threads 4`), MendelImpute.jl will automatically run your code in parallel.
 
 1. [How to start Julia with multiple threads](https://docs.julialang.org/en/v1/manual/multi-threading/#Starting-Julia-with-multiple-threads).
 2. Execute `Threads.nthreads()` within Julia to check if multiple thread is enabled
