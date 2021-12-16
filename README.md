@@ -9,7 +9,7 @@
 Download and install [Julia](https://julialang.org/downloads/). Within Julia, copy and paste the following: 
 ```julia
 using Pkg
-pkg"add https://github.com/OpenMendel/MendelImpute.jl"
+pkg"add MendelImpute"
 ```
 This package supports Julia `v1.6`+. 
 
