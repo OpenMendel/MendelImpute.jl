@@ -62,14 +62,18 @@ PRs and feature requests are welcomed!
 
 ## Citation
 
-Our paper is on [bioRxiv](https://www.biorxiv.org/content/10.1101/2020.10.24.353755v2). If you want to cite `MendelImpute.jl`, please cite
+Our paper is published [here](https://doi.org/10.1093/bioinformatics/btab489). If you use `MendelImpute.jl`, please cite
 
 ```
 @article{mendelimpute,
-    title = {{A Fast Data-Driven Method for Genotype Imputation, Phasing, and Local Ancestry Inference: MendelImpute.jl}},
-    author = {Chu, Benjamin B and Sobel, Eric M and Wasiolek, Rory and Sinsheimer, Janet S and Zhou, Hua and Lange, Kenneth},
-    year = {2020},
-    journal={arXiv preprint DOI:10.1101/2020.10.24.353755}
+  title={{A Fast Data-Driven Method for Genotype Imputation, Phasing, and Local Ancestry Inference: MendelImpute.jl}},
+  author={Chu, Benjamin B and Sobel, Eric and Wasiolek, Rory and Sinsheimer, Janet S and Zhou, Hua and Lange, Kenneth},
+  journal={Bioinformatics},
+  volume={37},
+  number={24},
+  pages={4756–4763},
+  year={2021},
+  publisher={Oxford University Press}
 }
 ```
 
