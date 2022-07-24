@@ -59,20 +59,11 @@ PRs and feature requests are welcomed!
 
 ## Citation
 
-Our paper is published [here](https://doi.org/10.1093/bioinformatics/btab489). If you use `MendelImpute.jl`, please cite
+If you use this analysis package in your research, please cite the following references in resulting publications:
 
-```
-@article{mendelimpute,
-  title={{A Fast Data-Driven Method for Genotype Imputation, Phasing, and Local Ancestry Inference: MendelImpute.jl}},
-  author={Chu, Benjamin B and Sobel, Eric and Wasiolek, Rory and Sinsheimer, Janet S and Zhou, Hua and Lange, Kenneth},
-  journal={Bioinformatics},
-  volume={37},
-  number={24},
-  pages={4756–4763},
-  year={2021},
-  publisher={Oxford University Press}
-}
-```
+*Chu BB, Sobel EM, Wasiolek R, Ko S, Sinsheimer JS, Zhou H, Lange K. A fast Data-Driven method for genotype imputation, phasing, and local ancestry inference: MendelImpute.jl. Bioinformatics. 2021 Jul 21;37(24):4756–63. doi: 10.1093/bioinformatics/btab489. Epub ahead of print. PMID: 34289008; PMCID: [PMC8665755](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8665755/).*
+
+*Zhou H, Sinsheimer JS, Bates DM, Chu BB, German CA, Ji SS, Keys KL, Kim J, Ko S, Mosher GD, Papp JC, Sobel EM, Zhai J, Zhou JJ, Lange K. OPENMENDEL: a cooperative programming project for statistical genetics. Hum Genet. 2020 Jan;139(1):61-71. doi: 10.1007/s00439-019-02001-z. Epub 2019 Mar 26. PMID: 30915546; PMCID: [PMC6763373](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6763373/).*
 
 ## Acknowledgement
 
