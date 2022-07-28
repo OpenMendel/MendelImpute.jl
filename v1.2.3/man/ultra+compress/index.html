@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Ultra compression · MendelImpute</title><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.045/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.24/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../../">MendelImpute</a></span></div><form class="docs-search" action="../../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><a class="tocitem" href="../Phasing_and_Imputation/">Phasing and Imputation</a></li><li><a class="tocitem" href="../performance/">Performance Gotchas</a></li><li><a class="tocitem" href="../painting/">Estimating ancestry</a></li><li class="is-active"><a class="tocitem" href>Ultra compression</a><ul class="internal"><li><a class="tocitem" href="#Saving"><span>Saving</span></a></li><li><a class="tocitem" href="#Loading"><span>Loading</span></a></li></ul></li><li><a class="tocitem" href="../script/">Run as script</a></li><li><a class="tocitem" href="../api/">API</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>Ultra compression</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Ultra compression</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/OpenMendel/MendelImpute.jl/blob/master/docs/src/man/ultra+compress.md" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="Ultra-compressed-format"><a class="docs-heading-anchor" href="#Ultra-compressed-format">Ultra-compressed format</a><a id="Ultra-compressed-format-1"></a><a class="docs-heading-anchor-permalink" href="#Ultra-compressed-format" title="Permalink"></a></h1><p>One can optionally save/load ultra-compressed phased genotypes after imputation. Ultra-compression is nothing fancy. Instead of converting haplotype segments into genotypes, this protocol simply saves the starting position and the correct haplotype label. We put this result into our own data structure, and saving/loading is achieved by the <a href="https://github.com/invenia/JLSO.jl">JLSO package</a>. </p><h2 id="Saving"><a class="docs-heading-anchor" href="#Saving">Saving</a><a id="Saving-1"></a><a class="docs-heading-anchor-permalink" href="#Saving" title="Permalink"></a></h2><p>Appending <code>.jlso</code> to the output file name will signal MendelImpute to save data in ultra-compressed format. For admixture estimation, we require one to save in <code>.jlso</code> format.</p><pre><code class="language-julia hljs"># first load all necessary packages
+using MendelImpute
+using VCFTools
+
+# compute each person&#39;s phase information
+tgtfile = &quot;target.chr22.typedOnly.masked.vcf.gz&quot;
+reffile = &quot;ref.chr22.maxd1000.excludeTarget.jlso&quot;
+outfile = &quot;mendel.imputed.jlso&quot; # output file name ends in jlso!
+@time phaseinfo = phase(tgtfile, reffile, outfile);</code></pre><pre><code class="nohighlight hljs">Number of threads = 1
+Importing reference haplotype data...
+
+
+[32mComputing optimal haplotypes...100%|████████████████████| Time: 0:00:23[39m
+[32mPhasing...100%|█████████████████████████████████████████| Time: 0:00:05[39m
+
+
+Total windows = 1634, averaging ~ 508 unique haplotypes per window.
+
+Timings: 
+    Data import                     = 13.5855 seconds
+        import target data             = 2.99557 seconds
+        import compressed haplotypes   = 10.5899 seconds
+    Computing haplotype pair        = 23.5138 seconds
+        BLAS3 mul! to get M and N      = 1.02228 seconds per thread
+        haplopair search               = 18.3673 seconds per thread
+        initializing missing           = 0.101495 seconds per thread
+        allocating and viewing         = 0.270367 seconds per thread
+        index conversion               = 0.0212053 seconds per thread
+    Phasing by win-win intersection = 5.17088 seconds
+        Window-by-window intersection  = 0.499549 seconds per thread
+        Breakpoint search              = 3.71212 seconds per thread
+        Recording result               = 0.00855205 seconds per thread
+    Imputation                     = 3.04347 seconds
+        Imputing missing               = 0.0513904 seconds
+        Writing to file                = 2.99208 seconds
+
+    Total time                      = 45.5041 seconds
+
+ 60.231372 seconds (124.56 M allocations: 6.857 GiB, 5.31% gc time)</code></pre><p>The object saved to <code>mendel.imputed.jlso</code> is literally the <code>phaseinfo</code> variable. We can inspect its element:</p><pre><code class="language-julia hljs"># look at sample 1&#39;s haplotype segments
+haplotype_labels = phaseinfo[1].strand1.haplotypelabel # strand1
+haplotype_start = phaseinfo[1].strand1.start # strand1
+[haplotype_start haplotype_labels]</code></pre><pre><code class="nohighlight hljs">545×2 Array{Int64,2}:
+      1  4119
+    236   887
+    423   272
+    622    12
+    741   124
+    792     4
+    824    24
+    944  1282
+   1116  1741
+   1202  4543
+   1691  1198
+   3031    22
+   3521    18
+      ⋮  
+ 411702   877
+ 412185    74
+ 413733  3849
+ 413868   248
+ 414371    31
+ 414552  3187
+ 414989  4481
+ 415807     5
+ 415965   143
+ 416352  1276
+ 416744    71
+ 417014   311</code></pre><h2 id="Loading"><a class="docs-heading-anchor" href="#Loading">Loading</a><a id="Loading-1"></a><a class="docs-heading-anchor-permalink" href="#Loading" title="Permalink"></a></h2><p>The function <a href="https://OpenMendel.github.io/MendelImpute.jl/dev/man/api/#MendelImpute.convert_compressed">convert_compressed</a> will load the ultra-compressed data into genotype matrices and the original <code>phaseinfo</code> data structure. </p><p><strong>Note: Decompressing requires loading the original haplotype reference panel.</strong> </p><pre><code class="language-julia hljs">tgtfile = &quot;mendel.imputed.jlso&quot; # ultra-compressed genotypes after phasing &amp; imputation
+reffile = &quot;ref.chr22.excludeTarget.vcf.gz&quot; # original haplotype reference file
+X1, X2, phaseinfo, sampleID, H = convert_compressed(Float64, tgtfile, reffile);</code></pre><pre><code class="nohighlight hljs">[32mimporting reference data...100%|████████████████████████| Time: 0:01:51[39m</code></pre><p>Check this compression protocol exhibit same error rate with <a href="https://OpenMendel.github.io/MendelImpute.jl/dev/man/Phasing+and+Imputation/#Step-4:-%28only-for-simulated-data%29-check-imputation-accuracy">standard VCF compression</a>. Note that <code>X1</code>, <code>X2</code>, and <code>H</code> are transposed. </p><pre><code class="language-julia hljs">X_truth  = convert_gt(Float64, &quot;target.chr22.full.vcf.gz&quot;) # import true genotypes
+X_mendel = (X1 + X2)&#39; # transpose X1 and X2
+n, p = size(X_mendel)
+println(&quot;error overall = $(sum(X_mendel .!= X_truth) / n / p)&quot;)</code></pre><pre><code class="nohighlight hljs">error overall = 0.00527504782243333</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../painting/">« Estimating ancestry</a><a class="docs-footer-nextpage" href="../script/">Run as script »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.22 on <span class="colophon-date" title="Thursday 28 July 2022 21:35">Thursday 28 July 2022</span>. Using Julia version 1.7.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
