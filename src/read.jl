@@ -35,8 +35,8 @@ function convert_gt(t::Type{T}, b::Bgen) where T <: Real
     # loop over each variant
     i = 1
     for v in iterator(b; from_bgen_start=true)
-        dose = ref_allele_dosage!(b, v; T=t) # this reads REF allele as 1
-        BGEN.alt_dosage!(dose, v.genotypes.preamble) # switch 2 and 0 (ie treat ALT as 1)
+        dose = first_allele_dosage!(b, v; T=t) # this reads REF allele as 1
+        BGEN.second_dosage!(dose, v.genotypes.preamble) # switch 2 and 0 (ie treat ALT as 1)
         copyto!(@view(G[i, :]), dose)
         # store chr/pos/snpID/ref/alt info
         Gchr[i], Gpos[i] = chrom(v), pos(v)
