@@ -35,8 +35,8 @@ function convert_gt(t::Type{T}, b::Bgen) where T <: Real
     # loop over each variant
     i = 1
     for v in iterator(b; from_bgen_start=true)
-        dose = ref_allele_dosage!(b, v; T=t) # this reads REF allele as 1
-        BGEN.alt_dosage!(dose, v.genotypes.preamble) # switch 2 and 0 (ie treat ALT as 1)
+        dose = first_allele_dosage!(b, v; T=t) # this reads REF allele as 1
+        BGEN.second_dosage!(dose, v.genotypes.preamble) # switch 2 and 0 (ie treat ALT as 1)
         copyto!(@view(G[i, :]), dose)
         # store chr/pos/snpID/ref/alt info
         Gchr[i], Gpos[i] = chrom(v), pos(v)
@@ -157,8 +157,8 @@ When PLINK binary files are imported into `Matrix{AbstractInt}`, conversion
 conventions are not obeyed. So we need to manually set
 0x00 => 0
 0x01 => missing
-0x02 => 2
-0x03 => 3
+0x02 => 1
+0x03 => 2
 """
 function _convert_plink_genotypes!(X::Matrix{Union{UInt8, Missing}})
     p, n = size(X)

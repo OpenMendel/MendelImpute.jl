@@ -9,10 +9,7 @@
 Download and install [Julia](https://julialang.org/downloads/). Within Julia, copy and paste the following: 
 ```julia
 using Pkg
-pkg"add https://github.com/OpenMendel/SnpArrays.jl"
-pkg"add https://github.com/OpenMendel/VCFTools.jl"
-pkg"add https://github.com/OpenMendel/BGEN.jl"
-pkg"add https://github.com/OpenMendel/MendelImpute.jl"
+pkg"add MendelImpute"
 ```
 This package supports Julia `v1.6`+. 
 
@@ -34,13 +31,13 @@ cd(normpath(MendelImpute.datadir()))
 reffile = "ref.excludeTarget.vcf.gz"       # reference VCF file
 tgtfile = "target.typedOnly.masked.vcf.gz" # target VCF file (GWAS file)
 outfile = "ref.excludeTarget.jlso"         # output file name (end in .jlso)
-compress_haplotypes(reffile, tgtfile, outfile)
+@time compress_haplotypes(reffile, tgtfile, outfile)
 
-# phase & impute
+# phase & impute (note: 2nd run will be much faster because code is compiled)
 tgtfile = "target.typedOnly.masked.vcf.gz" # target VCF file (GWAS file)
 reffile = "ref.excludeTarget.jlso"         # compressed reference file
 outfile = "imputed.vcf.gz"                 # output file name
-phase(tgtfile, reffile, outfile);
+@time phase(tgtfile, reffile, outfile);
 
 # check error rate (since data was simulated)
 using VCFTools
@@ -62,17 +59,12 @@ PRs and feature requests are welcomed!
 
 ## Citation
 
-Our paper is on [bioRxiv](https://www.biorxiv.org/content/10.1101/2020.10.24.353755v2). If you want to cite `MendelImpute.jl`, please cite
+If you use this analysis package in your research, please cite the following references in resulting publications:
 
-```
-@article{mendelimpute,
-    title = {{A Fast Data-Driven Method for Genotype Imputation, Phasing, and Local Ancestry Inference: MendelImpute.jl}},
-    author = {Chu, Benjamin B and Sobel, Eric M and Wasiolek, Rory and Sinsheimer, Janet S and Zhou, Hua and Lange, Kenneth},
-    year = {2020},
-    journal={arXiv preprint DOI:10.1101/2020.10.24.353755}
-}
-```
+*Chu BB, Sobel EM, Wasiolek R, Ko S, Sinsheimer JS, Zhou H, Lange K. A fast Data-Driven method for genotype imputation, phasing, and local ancestry inference: MendelImpute.jl. Bioinformatics. 2021 Jul 21;37(24):4756–63. doi: 10.1093/bioinformatics/btab489. Epub ahead of print. PMID: 34289008; PMCID: [PMC8665755](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8665755/).*
+
+*Zhou H, Sinsheimer JS, Bates DM, Chu BB, German CA, Ji SS, Keys KL, Kim J, Ko S, Mosher GD, Papp JC, Sobel EM, Zhai J, Zhou JJ, Lange K. OPENMENDEL: a cooperative programming project for statistical genetics. Hum Genet. 2020 Jan;139(1):61-71. doi: 10.1007/s00439-019-02001-z. Epub 2019 Mar 26. PMID: 30915546; PMCID: [PMC6763373](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6763373/).*
 
 ## Acknowledgement
 
-This project is supported by the National Institutes of Health under NIGMS awards R01GM053275 and R25GM103774 and NHGRI award R01HG006139.
+This project has been supported by the National Institutes of Health under awards R01GM053275, R01HG006139, R25GM103774, and 1R25HG011845.

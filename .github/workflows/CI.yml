@@ -18,7 +18,9 @@ jobs:
       fail-fast: false
       matrix:
         version:
+          - "1"
           - "1.6"
+          - "nightly"
         os:
           - ubuntu-latest
           - macOS-latest
@@ -79,14 +81,7 @@ jobs:
       - uses: actions/checkout@v2
       - uses: julia-actions/setup-julia@v1
         with:
-          version: '1.5'
-      - run: | # add unregistered packages first
-          julia --project=docs -e '
-            using Pkg
-            pkg"add https://github.com/OpenMendel/SnpArrays.jl"
-            pkg"add https://github.com/OpenMendel/VCFTools.jl"
-            pkg"add https://github.com/OpenMendel/BGEN.jl"
-            pkg"add https://github.com/OpenMendel/MendelImpute.jl"'
+          version: '1'
       - run: |
           julia --project=docs -e '
             using Pkg
