@@ -2,7 +2,7 @@ name = "MendelImpute"
 uuid = "e47305d1-6a61-5370-bc5d-77554d143183"
 keywords = ["Imputation"]
 authors = ["Benjamin Chu <biona001@ucla.edu>", "Eric Sobel <esobel@ucla.edu>", "Hua Zhou <huazhou@ucla.edu>"]
-version = "1.2.4"
+version = "1.2.5"
 
 [deps]
 BGEN = "6db4b851-9beb-4b83-9d64-eb1cfb37721d"
