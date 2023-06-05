@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Phasing and Imputation · MendelImpute</title><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.045/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.24/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../../">MendelImpute</a></span></div><form class="docs-search" action="../../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li class="is-active"><a class="tocitem" href>Phasing and Imputation</a><ul class="internal"><li class="toplevel"><a class="tocitem" href="#Preparing-Reference-Haplotype-Panel"><span>Preparing Reference Haplotype Panel</span></a></li><li class="toplevel"><a class="tocitem" href="#Detailed-Example"><span>Detailed Example</span></a></li><li><a class="tocitem" href="#Step-1:-generating-realistic-reference-and-target-data"><span>Step 1: generating realistic reference and target data</span></a></li><li><a class="tocitem" href="#Step-2:-generating-.jlso-compressed-reference-panel"><span>Step 2: generating <code>.jlso</code> compressed reference panel</span></a></li><li><a class="tocitem" href="#Step-3:-Run-imputation-and-phasing"><span>Step 3: Run imputation and phasing</span></a></li><li><a class="tocitem" href="#Step-3.5:-(only-for-simulated-data)-check-imputation-accuracy"><span>Step 3.5: (only for simulated data) check imputation accuracy</span></a></li><li><a class="tocitem" href="#Post-imputation:-per-SNP-Imputation-Quality-Score"><span>Post-imputation: per-SNP Imputation Quality Score</span></a></li><li><a class="tocitem" href="#Post-imputation:-per-sample-Imputation-Quality-score"><span>Post-imputation: per-sample Imputation Quality score</span></a></li></ul></li><li><a class="tocitem" href="../performance/">Performance Gotchas</a></li><li><a class="tocitem" href="../painting/">Estimating ancestry</a></li><li><a class="tocitem" href="../ultra+compress/">Ultra compression</a></li><li><a class="tocitem" href="../script/">Run as script</a></li><li><a class="tocitem" href="../api/">API</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>Phasing and Imputation</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Phasing and Imputation</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/OpenMendel/MendelImpute.jl/blob/master/docs/src/man/Phasing_and_Imputation.md" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="Preparing-Target-Data"><a class="docs-heading-anchor" href="#Preparing-Target-Data">Preparing Target Data</a><a id="Preparing-Target-Data-1"></a><a class="docs-heading-anchor-permalink" href="#Preparing-Target-Data" title="Permalink"></a></h1><p>MendelImpute accepts <a href="https://samtools.github.io/hts-specs/VCFv4.3.pdf">VCF</a>, <a href="https://www.cog-genomics.org/plink2/formats#bed">PLINK (.bed/.bim/.fam)</a>, and <a href="https://www.well.ox.ac.uk/~gav/bgen_format/">BGEN</a> files.  Please make sure the following are true:</p><ul><li>Missing data is allowed. Genotypes does not have to be phased. </li><li>VCF file ends in <code>.vcf</code> or <code>.vcf.gz</code></li><li>BGEN file ends in <code>.bgen</code>. If available, index files should have the same prefix. (e.g. <code>genotypes.bgen</code> should have index file called <code>genotypes.bgen.bgi</code>. Sample identifiers may be either contained in the <code>.bgen</code> file or listed in an external <code>genotypes.sample</code> file.</li><li>For PLINK files, all trios (<code>.bim</code>, <code>.bed</code>, <code>.fam</code>) are present in the same directory</li><li>Each file contains only 1 (non-sex) chromosome</li><li>Every record (SNP) in the imputation target is present in the reference panel. If this is untrue, you must <a href="https://openmendel.github.io/VCFTools.jl/dev/man/conformgt/">match markers in 2 VCF files</a>. </li><li>Given a SNP, its CHROM, POS, REF, and  ALT fields are the same in target data and reference panel. MendelImpute use SNP position internally to align markers. </li><li>The position of every SNP is unique: so multiallelic markers should be excluded instead of split (this requirement will eventually be lifted). </li></ul><div class="admonition is-info"><header class="admonition-header">Note</header><div class="admonition-body"><p>Currently only BGEN inputs support index files. Indexing support for VCF files coming soon...</p></div></div><h1 id="Preparing-Reference-Haplotype-Panel"><a class="docs-heading-anchor" href="#Preparing-Reference-Haplotype-Panel">Preparing Reference Haplotype Panel</a><a id="Preparing-Reference-Haplotype-Panel-1"></a><a class="docs-heading-anchor-permalink" href="#Preparing-Reference-Haplotype-Panel" title="Permalink"></a></h1><p>Reference samples must be in VCF (<code>.vcf</code> or <code>.vcf.gz</code>) or BGEN (<code>.bgen</code>) format, every record must be phased, and contain no missing genotypes. Reference panels must be compressed into <code>.jlso</code> format first using the <a href="https://OpenMendel.github.io/MendelImpute.jl/dev/man/api/#MendelImpute.compress_haplotypes">compress_haplotypes</a> function. One must specify <code>d</code>: the maximum number of unique haplotypes per window. Larger <code>d</code> slows down computation, but increases accuracy. For most purposes, we recommend <span>$d \approx 1000$</span>. </p><h1 id="Detailed-Example"><a class="docs-heading-anchor" href="#Detailed-Example">Detailed Example</a><a id="Detailed-Example-1"></a><a class="docs-heading-anchor-permalink" href="#Detailed-Example" title="Permalink"></a></h1><p>We use the <a href="http://bochet.gcc.biostat.washington.edu/beagle/1000_Genomes_phase3_v5a/b37.vcf/">1000 genomes chromosome 22</a> as an example. As show below, this data contains 424147 SNPs and 2504 samples.</p><pre><code class="language-julia hljs"># load necessary packages in Julia
+using VCFTools
+using MendelImpute
+using VCFTools
+using Random
+
+# compute simple summary statistics
+data = &quot;chr22.1kg.phase3.v5a.vcf.gz&quot;
+@show nrecords(data)
+@show nsamples(data);</code></pre><pre><code class="nohighlight hljs">┌ Info: Precompiling MendelImpute [e47305d1-6a61-5370-bc5d-77554d143183]
+└ @ Base loading.jl:1317
+
+
+nrecords(data) = 424147
+nsamples(data) = 2504</code></pre><p>More summary statistics can be computed using the <a href="https://openmendel.github.io/VCFTools.jl/dev/man/api/#VCFTools.gtstats">gtstats</a> function in <code>VCFTools.jl</code>, with example usage <a href="https://openmendel.github.io/VCFTools.jl/dev/man/summaryinfo/#Summary-statistics">here</a>.</p><h2 id="Step-1:-generating-realistic-reference-and-target-data"><a class="docs-heading-anchor" href="#Step-1:-generating-realistic-reference-and-target-data">Step 1: generating realistic reference and target data</a><a id="Step-1:-generating-realistic-reference-and-target-data-1"></a><a class="docs-heading-anchor-permalink" href="#Step-1:-generating-realistic-reference-and-target-data" title="Permalink"></a></h2><p>First we generate a reference panel and imputation target based on the 1000 genomes data. Specifically, we divide the 1000 genomes chromosome 22 data so that </p><ul><li>100 samples are randomly selected as imputation targets, where<ul><li>100k SNPs with minor allele frequency <span>$\ge 0.05$</span> are randomly selected to be the typed positions. </li><li>0.1% of typed SNPs are masked (mimicking genotyping errors)</li><li>Genotypes are unphased</li></ul></li><li>The remaining 2404 samples are used as reference haplotypes. </li><li>SNPs with duplicate positions are filtered out.</li><li>All multiallelic markers are filtered out.</li></ul><p><strong>Instruction: execute the code below in a Julia session or a Jupyter notebook:</strong></p><pre><code class="language-julia hljs"># set random seed for reproducibility
+Random.seed!(2020)
+
+# download example data 
+data = &quot;chr22.1kg.phase3.v5a.vcf.gz&quot;
+if !isfile(data) 
+    download(&quot;http://bochet.gcc.biostat.washington.edu/beagle/1000_Genomes_phase3_v5a/b37.vcf/chr22.1kg.phase3.v5a.vcf.gz&quot;)
+end
+
+# remove SNPs with the same positions, keep all samples, save result into new file
+SNPs_to_keep = .!find_duplicate_marker(data) 
+@time VCFTools.filter(data, SNPs_to_keep, 1:nsamples(data), des = &quot;chr22.uniqueSNPs.vcf.gz&quot;)
+
+# summarize data
+total_snps, samples, _, _, _, maf_by_record, _ = gtstats(&quot;chr22.uniqueSNPs.vcf.gz&quot;)
+
+# generate target file with 100 samples and 100k snps with maf&gt;0.05
+n = 100
+p = 100000
+record_idx = falses(total_snps)
+large_maf = findall(x -&gt; x &gt; 0.05, maf_by_record)  
+Random.shuffle!(large_maf)
+record_idx[large_maf[1:p]] .= true
+sample_idx = falses(samples)
+sample_idx[1:n] .= true
+Random.shuffle!(sample_idx)
+@time VCFTools.filter(&quot;chr22.uniqueSNPs.vcf.gz&quot;, record_idx, sample_idx, 
+    des = &quot;target.chr22.typedOnly.vcf.gz&quot;, allow_multiallelic=false)
+
+# unphase and mask 0.1% entries in target file
+masks = falses(p, n)
+missingprop = 0.001
+for j in 1:n, i in 1:p
+    rand() &lt; missingprop &amp;&amp; (masks[i, j] = true)
+end
+@time mask_gt(&quot;target.chr22.typedOnly.vcf.gz&quot;, masks, 
+    des=&quot;target.chr22.typedOnly.masked.vcf.gz&quot;, unphase=true)
+
+# generate target panel with all snps (this file contains true phase and genotypes)
+@time VCFTools.filter(&quot;chr22.uniqueSNPs.vcf.gz&quot;, 1:total_snps, 
+    sample_idx, des = &quot;target.chr22.full.vcf.gz&quot;, allow_multiallelic=false)
+
+# generate reference panel with 2404 samples
+@time VCFTools.filter(&quot;chr22.uniqueSNPs.vcf.gz&quot;, 1:total_snps, .!sample_idx, 
+    des = &quot;ref.chr22.excludeTarget.vcf.gz&quot;, allow_multiallelic=false)</code></pre><pre><code class="nohighlight hljs">┌ Info: Precompiling MendelImpute [e47305d1-6a61-5370-bc5d-77554d143183]
+└ @ Base loading.jl:1278
+[32mfinding duplicate markers...100%|███████████████████████| Time: 0:03:56[39m
+[32mfiltering vcf file...100%|██████████████████████████████| Time: 0:04:46[39m
+
+
+292.131527 seconds (3.20 G allocations: 301.789 GiB, 7.89% gc time)
+
+
+[32mProgress: 100%|█████████████████████████████████████████| Time: 0:04:02[39m
+[32mfiltering vcf file...100%|██████████████████████████████| Time: 0:03:59[39m
+
+
+244.425505 seconds (3.18 G allocations: 301.694 GiB, 9.69% gc time)
+  1.935526 seconds (20.00 M allocations: 1.491 GiB, 6.33% gc time)
+
+
+[32mfiltering vcf file...100%|██████████████████████████████| Time: 0:04:10[39m
+
+
+255.505399 seconds (3.27 G allocations: 317.749 GiB, 9.95% gc time)
+
+
+[32mfiltering vcf file...100%|██████████████████████████████| Time: 0:07:27[39m
+
+
+453.383147 seconds (6.16 G allocations: 566.535 GiB, 10.16% gc time)</code></pre><h3 id="Output-explanation:"><a class="docs-heading-anchor" href="#Output-explanation:">Output explanation:</a><a id="Output-explanation:-1"></a><a class="docs-heading-anchor-permalink" href="#Output-explanation:" title="Permalink"></a></h3><p>You just generated reference and target VCF files:</p><ul><li><code>ref.chr22.excludeTarget.vcf.gz</code>: Reference haplotype panel with 2404 samples</li><li><code>target.chr22.typedOnly.masked.vcf.gz</code>: Imputation target file containing 100 samples at 100k SNPs. All genotypes are unphased and contains 0.1% missing data. </li></ul><p>You also generated/downloaded:</p><ul><li><code>chr22.1kg.phase3.v5a.vcf.gz</code>: The original chromosome 22 data downloaded from Beagle&#39;s website.</li><li><code>chr22.uniqueSNPs.vcf.gz</code>: This is the original chromosome 22 data excluding duplicate records (SNPs) by checking marker positions. The first SNP is included but all subsequent SNPs are removed. </li><li><code>target.chr22.full.vcf.gz</code>: The complete data for imputation target, used for checking imputation accuracy. All genotypes are phased and non-missing. </li><li><code>target.chr22.typedOnly.vcf.gz</code>: Complete target data on just the typed SNPs. All genotypes are phased and non-missing. Just by-producted for generating other files; not used for anything downstream.</li></ul><h2 id="Step-2:-generating-.jlso-compressed-reference-panel"><a class="docs-heading-anchor" href="#Step-2:-generating-.jlso-compressed-reference-panel">Step 2: generating <code>.jlso</code> compressed reference panel</a><a id="Step-2:-generating-.jlso-compressed-reference-panel-1"></a><a class="docs-heading-anchor-permalink" href="#Step-2:-generating-.jlso-compressed-reference-panel" title="Permalink"></a></h2><p>MendelImpute requires one to pre-process the reference panel for faster reading. This is achieved via the <a href="https://openmendel.github.io/MendelImpute.jl/dev/man/api/#MendelImpute.compress_haplotypes">compress_haplotypes</a> function.</p><pre><code class="language-julia hljs"># load necessary packages in Julia
+using MendelImpute
+
+max_d = 1000 # maximum number of unique haplotypes per window
+reffile = &quot;ref.chr22.excludeTarget.vcf.gz&quot;
+tgtfile = &quot;target.chr22.typedOnly.masked.vcf.gz&quot;
+outfile = &quot;ref.chr22.maxd1000.excludeTarget.jlso&quot;
+@time compress_haplotypes(reffile, tgtfile, outfile, max_d)</code></pre><pre><code class="nohighlight hljs">[32mimporting reference data...100%|████████████████████████| Time: 0:02:00[39m
+
+
+295.546081 seconds (2.09 G allocations: 209.215 GiB, 10.53% gc time)</code></pre><h2 id="Step-3:-Run-imputation-and-phasing"><a class="docs-heading-anchor" href="#Step-3:-Run-imputation-and-phasing">Step 3: Run imputation and phasing</a><a id="Step-3:-Run-imputation-and-phasing-1"></a><a class="docs-heading-anchor-permalink" href="#Step-3:-Run-imputation-and-phasing" title="Permalink"></a></h2><p>The <a href="https://openmendel.github.io/MendelImpute.jl/dev/man/api/#MendelImpute.phase">phase</a> function will perform imputation and phasing. By default, all output genotypes will be phased and non-missing. A list of optional inputs can be found in the <a href="https://openmendel.github.io/MendelImpute.jl/dev/man/api/#MendelImpute.phase">API</a>.</p><pre><code class="language-julia hljs"># note: run twice for more accurate timing
+reffile = &quot;ref.chr22.maxd1000.excludeTarget.jlso&quot; # jlso reference file
+tgtfile = &quot;target.chr22.typedOnly.masked.vcf.gz&quot;  # target genotype file
+outfile = &quot;mendel.imputed.chr22.vcf.gz&quot;           # output file name
+phase(tgtfile, reffile, outfile);</code></pre><pre><code class="nohighlight hljs">Number of threads = 1
+Importing reference haplotype data...
+
+
+[32mComputing optimal haplotypes...100%|████████████████████| Time: 0:00:25[39m
+[32mPhasing...100%|█████████████████████████████████████████| Time: 0:00:05[39m
+
+
+Total windows = 1634, averaging ~ 508 unique haplotypes per window.
+
+Timings: 
+    Data import                     = 12.6331 seconds
+        import target data             = 3.54785 seconds
+        import compressed haplotypes   = 9.08523 seconds
+    Computing haplotype pair        = 25.8112 seconds
+        BLAS3 mul! to get M and N      = 1.14179 seconds per thread
+        haplopair search               = 19.8237 seconds per thread
+        initializing missing           = 0.11383 seconds per thread
+        allocating and viewing         = 0.183436 seconds per thread
+        index conversion               = 0.0146743 seconds per thread
+    Phasing by win-win intersection = 5.31061 seconds
+        Window-by-window intersection  = 0.56512 seconds per thread
+        Breakpoint search              = 3.4102 seconds per thread
+        Recording result               = 0.182498 seconds per thread
+    Imputation                     = 5.03281 seconds
+        Imputing missing               = 1.15402 seconds
+        Writing to file                = 3.87878 seconds
+
+    Total time                      = 48.9418 seconds</code></pre><p>The <code>;</code> hides the output, or else the screen will be too jammed. </p><h2 id="Step-3.5:-(only-for-simulated-data)-check-imputation-accuracy"><a class="docs-heading-anchor" href="#Step-3.5:-(only-for-simulated-data)-check-imputation-accuracy">Step 3.5: (only for simulated data) check imputation accuracy</a><a id="Step-3.5:-(only-for-simulated-data)-check-imputation-accuracy-1"></a><a class="docs-heading-anchor-permalink" href="#Step-3.5:-(only-for-simulated-data)-check-imputation-accuracy" title="Permalink"></a></h2><p>Since we simulated data, we can check imputation accuracy.</p><pre><code class="language-julia hljs">X_truth  = convert_gt(Float64, &quot;target.chr22.full.vcf.gz&quot;)    # import true genotypes
+X_mendel = convert_gt(Float64, &quot;mendel.imputed.chr22.vcf.gz&quot;) # import imputed genotypes
+n, p = size(X_mendel)
+println(&quot;error overall = &quot;, sum(X_mendel .!= X_truth) / n / p)</code></pre><pre><code class="nohighlight hljs">error overall = 0.005273994412137202</code></pre><p>Thus, we are looking at about 5 imputation error out of every 1000 SNPs. </p><h2 id="Post-imputation:-per-SNP-Imputation-Quality-Score"><a class="docs-heading-anchor" href="#Post-imputation:-per-SNP-Imputation-Quality-Score">Post-imputation: per-SNP Imputation Quality Score</a><a id="Post-imputation:-per-SNP-Imputation-Quality-Score-1"></a><a class="docs-heading-anchor-permalink" href="#Post-imputation:-per-SNP-Imputation-Quality-Score" title="Permalink"></a></h2><p>Consider the observed genotype <span>$x_{ij} \in [0, 2] \cup \{missing\}$</span> at SNP <span>$i$</span> of sample <span>$j$</span> and the corresponding imputed genotype <span>$g_{ij}$</span> derived from the two extended haplotypes of <span>$j$</span>. If <span>$S_i$</span> denotes the set of individuals with observed genotypes at the SNP, then MendelImpute&#39;s quality score <span>$q_i$</span> for the SNP is defined as</p><p class="math-container">\[q_i = 1 - \frac{1}{|S_i|}\sum_{j \in S_i} \left(\frac{x_{ij} - g_{ij}}{2}\right)^2.\]</p><p>Note that <span>$0 \le q_i \le 1$</span> and that the larger the quality score, the more confidence in the imputed values. Because <span>$q_i$</span> can only be computed for the typed SNPs, an untyped SNP is assigned the average of the quality scores for its two closest flanking typed SNPs.</p><p>To extract this score from a VCF file, one can do:</p><pre><code class="language-julia hljs">using VariantCallFormat, Plots
+reader = VCF.Reader(openvcf(outfile, &quot;r&quot;))
+snpscores = Vector{Float64}(undef, nrecords(outfile))
+
+# loop over SNPs
+for (i, record) in enumerate(reader)
+    snpscores[i] = parse(Float64, VCF.info(record)[1].second)
+end
+close(reader)
+
+# plot histogram of SNP scores
+histogram(snpscores, label=:none, xlabel=&quot;per-SNP quality score&quot;, 
+    ylabel=&quot;SNP counts&quot;, bins=30)</code></pre><p><img src="../output_16_0.svg" alt="svg"/></p><p><strong>Conclusion:</strong> Most SNPs are well imputed (quality score close to <span>$1.0$</span>), but a few have subpar quality score (e.g. below <span>$0.999$</span>). We recommend such SNPs to be <a href="https://openmendel.github.io/VCFTools.jl/dev/man/filter/#Subsetting-VCF-files-using-array-masks">filtered out</a>. </p><div class="admonition is-info"><header class="admonition-header">Note</header><div class="admonition-body"><p>The popular correlation metric <span>$r^2$</span> such as <a href="https://genome.sph.umich.edu/wiki/Minimac3_Info_File#Rsq">this one</a> is NOT a good metric for measuring imputation accuracy under MendelImpute&#39;s model, because all imputed SNPs will have <span>$r^2 = 1$</span>. For details, please see our paper. </p></div></div><h2 id="Post-imputation:-per-sample-Imputation-Quality-score"><a class="docs-heading-anchor" href="#Post-imputation:-per-sample-Imputation-Quality-score">Post-imputation: per-sample Imputation Quality score</a><a id="Post-imputation:-per-sample-Imputation-Quality-score-1"></a><a class="docs-heading-anchor-permalink" href="#Post-imputation:-per-sample-Imputation-Quality-score" title="Permalink"></a></h2><p>MendelImpute also computes a rough quality score (file ending in <code>sample.error</code>) for measuring how well each sample is imputed. This value is the sum of the least squares error for all typed SNPs scaled by the total number of observed SNPs, similar to the per-SNP quality score. A value of 1.0 is best, and 0 is worst. </p><pre><code class="language-julia hljs">using CSV, DataFrames
+quality = CSV.read(&quot;mendel.imputed.chr22.sample.error&quot;, DataFrame) # import quality score 
+
+# visualize error distribution
+histogram(quality[:error], label=:none, xlabel=&quot;per-sample quality score&quot;,
+    ylabel=&quot;Number of samples&quot;) </code></pre><p><img src="../output_20_0.svg" alt="svg"/></p><p><strong>Conclusion:</strong> Most samples are well imputed (e.g. score close to 1), but some samples are indeed poorly imputed. From the histogram, we can safely <a href="https://openmendel.github.io/VCFTools.jl/dev/man/filter/#Subsetting-VCF-files-using-array-masks">filtered out</a> samples with score <span>$&lt; 0.999$</span> as that would remove poorly imputed individuals without reducing sample size too much.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../">« Home</a><a class="docs-footer-nextpage" href="../performance/">Performance Gotchas »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.24 on <span class="colophon-date" title="Monday 5 June 2023 00:25">Monday 5 June 2023</span>. Using Julia version 1.9.0.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
