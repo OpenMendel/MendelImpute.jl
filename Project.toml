@@ -2,14 +2,13 @@ name = "MendelImpute"
 uuid = "e47305d1-6a61-5370-bc5d-77554d143183"
 keywords = ["Imputation"]
 authors = ["Benjamin Chu <biona001@ucla.edu>", "Eric Sobel <esobel@ucla.edu>", "Hua Zhou <huazhou@ucla.edu>"]
-version = "1.2.5"
+version = "1.2.6"
 
 [deps]
 BGEN = "6db4b851-9beb-4b83-9d64-eb1cfb37721d"
 CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 Distances = "b4f34e82-e78d-54a5-968a-f98e89d6e8f7"
-Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 FileIO = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
 FixedPointNumbers = "53c48c17-4a7d-5ca2-90c5-79b7896eea93"
 GroupSlices = "d853e229-7c7c-56e9-b6be-9a1acc5f13d9"
@@ -31,7 +30,6 @@ BGEN = "0.1.3"
 CSV = "0.8, 0.9, 0.10"
 DataFrames = "0.21, 0.22, 1"
 Distances = "0.10"
-Documenter = "0.20 - 0.27"
 FileIO = "1"
 FixedPointNumbers = "0.8"
 GroupSlices = "0.0.3"
