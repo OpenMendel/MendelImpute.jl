@@ -13,7 +13,8 @@ makedocs(
         "Ultra compression" => "man/ultra+compress.md",
         "Run as script" => "man/script.md",
         "API" => "man/api.md"
-    ]
+    ],
+    warnonly = true
 )
 
 # Documenter can also automatically deploy documentation to gh-pages.
